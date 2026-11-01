@@ -81,6 +81,27 @@ release.properties
 ### Windows ###
 Thumbs.db
 Thumbs.db:encryptable
+
+### Frontend (React / Vite) ###
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+### Python (FastAPI) ###
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+### Model files (대용량은 공유 드라이브로) ###
+fastapi_server/artifacts/*.pkl
+fastapi_server/artifacts/*.joblib
+
+### Claude Code 개인 설정 (.claude/settings.json은 커밋함) ###
+.claude/settings.local.json
 ehthumbs.db
 $RECYCLE.BIN/
 *.stackdump
