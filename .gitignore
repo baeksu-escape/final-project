@@ -96,9 +96,23 @@ __pycache__/
 venv/
 .ipynb_checkpoints/
 
+### 데이터·모델 파일 (Git에 올리지 않고 드라이브로 공유, 형상 관리자 규칙) ###
+*.csv
+*.xlsx
+*.pkl
+*.joblib
+# 예외: 생성 코드의 정의서·통계 원자료 (7개, 약 480KB)
+!fastapi_server/data_generation/docs/DATA_DICTIONARY.csv
+!fastapi_server/data_generation/field_dictionary.csv
+!fastapi_server/data_generation/reference/**/*.csv
+!fastapi_server/data_generation/reference/statistics/*.xlsx
+
 ### Model files (대용량은 공유 드라이브로) ###
 fastapi_server/artifacts/*.pkl
 fastapi_server/artifacts/*.joblib
+fastapi_server/data/*
+!fastapi_server/data/README.md
+fastapi_server/data_generation/data/
 
 ### Claude Code 개인 설정 (.claude/settings.json은 커밋함) ###
 .claude/settings.local.json

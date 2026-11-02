@@ -1,0 +1,140 @@
+{
+ "package_version": "3.5.7-light",
+ "package_contents": "generation code, configuration, statistical sources and documentation; generated datasets are not included",
+ "packaged_input": {
+  "file": "data/base_207.csv",
+  "rows": 12000,
+  "description": "original academy-generator 207 columns and labels, unchanged since v2.4",
+  "sha256": "85fc74118f5385e5646b9719f0067e02e4e557f41be7cd6e130d4886dfd0ffaa"
+ },
+ "data_version": "not assigned to bundled files (datasets are not bundled). Full-size generation from this code was validated on 2026-11-01; assign a data_version when datasets are published",
+ "original_generator_sha256": "1cecf0cae289af64762abdc60225709b81fbb6f7d64c742599bb85416b47544d",
+ "source_statistics": "reference/statistical_priors.json",
+ "label_origin": {
+  "legacy": "academy_original",
+  "thinfile": "thinfile_scenario_v25",
+  "nonfinancial_effect_label": "build_nonfinancial_labels.py (docs/NONFINANCIAL_LABEL.md); v3.5.0 adds social insurance arrears and payment regularity terms",
+  "nonfinancial_sources": "build_nonfinancial_sources.py (docs/NONFINANCIAL_SOURCES.md); original labels are not read"
+ },
+ "seeds": {
+  "legacy_extension": 20261029,
+  "thinfile": 20261030,
+  "members": 20261101,
+  "loan_products": 20261102,
+  "external_api": 20261103,
+  "nonfinancial_label": 20261104,
+  "nonfinancial_sources": 20261105
+ },
+ "official_thinfile_thresholds_used": false,
+ "training_data_policy": "models are trained on synthetic data only; service_dummy/ (members) is never used for training",
+ "execution_status": {
+  "release": "v3.5.7",
+  "source_code_changed": "v3.5.7: new generate/build_input_features_6m.py, verify/verify_input_features_6m.py, tests/test_input_features_6m.py; changed generate/service_dummy_logic.py (6-month inputs, credit bureau and utility responses and checks), generate/build_members.py (credit bureau and utility ledgers), generate/build_external_api.py (two new responses), tools/build_handoff.py (6-month features, columns members cannot provide left out), reference/service_dummy_anchors.json (input_months, utility, credit_bureau), tests/test_service_dummy_logic.py (+4 tests). v3.5.6: tools/build_handoff.py (prepare_output refuses a symbolic-link --out before resolve(); the old check ran after resolve() and never fired), tests/test_build_handoff.py (+2 tests), tools/handoff_README.md (version, test count, symlink note). v3.5.5: generate/build_nonfinancial_sources.py (summary 'folder' is package-relative, no absolute path), tests/test_nonfinancial_sources.py (+1 test), tools/handoff_README.md (thin-file training restricted to eval_future_credit_exposure == 1). v3.5.0 changes: new: generate/nonfinancial_sources.py, generate/build_nonfinancial_sources.py, experiments/measure_nonfinancial_label_lift.py, verify/verify_nonfinancial_sources.py, tests/test_nonfinancial_sources.py, reference/nonfinancial_sources.json; changed: generate/nonfinancial_label.py, generate/build_nonfinancial_labels.py, generate/build_members.py, generate/build_external_api.py, generate/service_dummy_logic.py, reference/nonfinancial_label.json",
+  "full_generation_and_validation": {
+   "date": "2026-11-01",
+   "settings": "defaults (legacy 12,000; thin 600/cohort; members 100/cohort), clean copy, README order",
+   "environment": {
+    "python": "3.13",
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "scipy": "1.18.1",
+    "scikit-learn": "1.9.1",
+    "note": "newer than requirements.txt pins; last float digits can differ under the pinned versions"
+   },
+   "generators": "all completed",
+   "verifiers": {
+    "verify": "PASS",
+    "verify_statistics": "PASS",
+    "verify_thinfile_general": "PASS",
+    "verify_card_accounts": "PASS",
+    "verify_thinfile": "PASS",
+    "verify_loan_extension": "PASS",
+    "verify_assumption_sensitivity": "PASS",
+    "verify_nonfinancial_experiment": "PASS",
+    "verify_nonfinancial_sources": "PASS"
+   },
+   "fixed_fixture_tests": "74 passed (v3.5.7; 66 at v3.5.6, 64 at v3.5.5, 63 at v3.5.4, 52 at the v3.5.0 generation)",
+   "input_base_207_unchanged": true,
+   "outputs_changed_vs_v3_4_2": [
+    "data/labels_nonfinancial.csv",
+    "data/labels_nonfinancial_metadata.csv",
+    "thinfile/labels_nonfinancial.csv",
+    "thinfile/labels_nonfinancial_metadata.csv"
+   ],
+   "outputs_unchanged_vs_v3_4_2": "all other generated files are byte-identical",
+   "nonfinancial_label_auc_lift": {
+    "legacy": 0.0502,
+    "thinfile": 0.0674,
+    "legacy_expected_20_redraws": 0.0351,
+    "thinfile_expected_20_redraws": 0.0526,
+    "legacy_original_label": 0.0,
+    "thinfile_original_label": -0.0199,
+    "check_range": {
+     "legacy": [
+      0.02,
+      0.05
+     ],
+     "thinfile": [
+      0.02,
+      0.06
+     ]
+    },
+    "note": "realized single-draw lifts slightly exceed the upper bounds; expected lifts are inside. Effect sizes and seeds were not changed"
+   },
+   "nonfinancial_sources_anchors": {
+    "legacy": {
+     "dp_ever_used_rate": 0.8496666666666667,
+     "dp_customer_month_active_rate": 0.5780486111111112,
+     "dp_ticket_median_krw": 31353.333333333332,
+     "pension_on_time_amount_ratio": {
+      "workplace": 0.9533012795473133,
+      "regional": 0.7202652955898923
+     },
+     "pension_regional_exempt_share": 0.27840327533265097,
+     "si_arrears_any_rate": 0.18808333333333332
+    },
+    "thinfile": {
+     "dp_ever_used_rate": 0.85875,
+     "dp_customer_month_active_rate": 0.5930902777777778,
+     "dp_ticket_median_krw": 30735.0,
+     "pension_on_time_amount_ratio": {
+      "workplace": 0.9523221147305849,
+      "regional": 0.7174793200574187
+     },
+     "pension_regional_exempt_share": 0.3513302034428795,
+     "si_arrears_any_rate": 0.29791666666666666
+    }
+   },
+   "v3_5_5_regeneration": {
+    "date": "2026-11-01",
+    "settings": "defaults, clean copy, README order; same environment versions as above",
+    "verifiers": "all 9 PASS",
+    "outputs_changed_vs_v3_5_4": [
+     "data/nonfinancial_sources_summary.json ('folder' values only)"
+    ],
+    "outputs_unchanged_vs_v3_5_4": "all other generated files are byte-identical"
+   },
+   "v3_5_6_regeneration": {
+    "date": "2026-11-01",
+    "settings": "defaults, clean copy, README order; same environment versions as above",
+    "verifiers": "all 9 PASS",
+    "fixed_fixture_tests": "66 passed",
+    "handoff_bundle_vs_v3_5_5": "51 files; README.md and .handoff_bundle differ (version, test count, symlink note); the other 49 files are byte-identical",
+    "db_sql_vs_db_v2_1": "16 SQL files rebuilt from service_dummy/ with the DB bundle's tools/build_db.py are byte-identical"
+   },
+   "v3_5_7_regeneration": {
+    "date": "2026-11-02",
+    "settings": "defaults, clean copy, README order; same environment versions as above",
+    "verifiers": "all 10 PASS (verify_input_features_6m added)",
+    "fixed_fixture_tests": "74 passed",
+    "outputs_changed_vs_v3_5_6": ["service_dummy/members/member_monthly_inputs.csv (6 months, 2,400 rows; kept months identical)"],
+    "outputs_added": ["data/input_features_6m.csv", "thinfile/input_features_6m.csv", "service_dummy/external_api/credit_bureau_responses.jsonl", "service_dummy/external_api/utility_responses.jsonl", "service_dummy/members/ledgers/credit_bureau.csv", "service_dummy/members/ledgers/utility_monthly.csv"],
+    "outputs_unchanged_vs_v3_5_6": "all other generated files are byte-identical",
+    "handoff_model_tables": "legacy 12,000 x 242, thinfile 2,400 x 251; every feature has a member-side source",
+    "db": "DB bundle v2.2"
+   }
+  },
+  "outputs_bundled": false,
+  "since_v3_5_0": "v3.5.1 documentation only; v3.5.2-v3.5.4 add tools/build_handoff.py and its safeguards (no generator or data change); v3.5.5 removes the absolute path from nonfinancial_sources_summary.json and documents the thin-file training filter; v3.5.6 fixes the symbolic-link check in tools/build_handoff.py (no generator or data change); v3.5.7 aligns model features with what service members provide (6-month inputs, credit bureau and utility APIs)"
+ }
+}

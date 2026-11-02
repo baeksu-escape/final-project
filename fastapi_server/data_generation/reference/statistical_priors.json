@@ -1,0 +1,115 @@
+{
+  "wage_year": 2024,
+  "wage": [
+    {
+      "age_min": 20,
+      "age_max": 29,
+      "mean_monthly_krw": 2710000.0,
+      "median_monthly_krw": 2600000.0
+    },
+    {
+      "age_min": 30,
+      "age_max": 39,
+      "mean_monthly_krw": 3970000.0,
+      "median_monthly_krw": 3480000.0
+    },
+    {
+      "age_min": 40,
+      "age_max": 49,
+      "mean_monthly_krw": 4690000.0,
+      "median_monthly_krw": 3800000.0
+    },
+    {
+      "age_min": 50,
+      "age_max": 59,
+      "mean_monthly_krw": 4450000.0,
+      "median_monthly_krw": 3040000.0
+    },
+    {
+      "age_min": 60,
+      "age_max": 69,
+      "mean_monthly_krw": 2930000.0,
+      "median_monthly_krw": 2160000.0
+    }
+  ],
+  "expense_period": "2026Q2",
+  "expense": [
+    {
+      "group": "100만원 미만",
+      "household_income": 587938.0,
+      "household_consumption": 1314048.0,
+      "household_size": 1.26,
+      "per_person_monthly_income": 466617.4603174603,
+      "consumption_to_gross_income": 2.235011174647667
+    },
+    {
+      "group": "100~200만원",
+      "household_income": 1492837.0,
+      "household_consumption": 1352462.0,
+      "household_size": 1.28,
+      "per_person_monthly_income": 1166278.90625,
+      "consumption_to_gross_income": 0.9059676307594198
+    },
+    {
+      "group": "200~300만원",
+      "household_income": 2511544.0,
+      "household_consumption": 1746457.0,
+      "household_size": 1.51,
+      "per_person_monthly_income": 1663274.1721854305,
+      "consumption_to_gross_income": 0.6953718509410944
+    },
+    {
+      "group": "300~400만원",
+      "household_income": 3488430.0,
+      "household_consumption": 2214117.0,
+      "household_size": 1.75,
+      "per_person_monthly_income": 1993388.5714285714,
+      "consumption_to_gross_income": 0.6347030039301348
+    },
+    {
+      "group": "400~500만원",
+      "household_income": 4490723.0,
+      "household_consumption": 2625174.0,
+      "household_size": 2.0,
+      "per_person_monthly_income": 2245361.5,
+      "consumption_to_gross_income": 0.5845771382470039
+    },
+    {
+      "group": "500~600만원",
+      "household_income": 5474497.0,
+      "household_consumption": 3133956.0,
+      "household_size": 2.4,
+      "per_person_monthly_income": 2281040.416666667,
+      "consumption_to_gross_income": 0.5724646483503416
+    },
+    {
+      "group": "600~700만원",
+      "household_income": 6478002.0,
+      "household_consumption": 3492415.0,
+      "household_size": 2.69,
+      "per_person_monthly_income": 2408179.182156134,
+      "consumption_to_gross_income": 0.5391191605065883
+    },
+    {
+      "group": "700만원 이상",
+      "household_income": 10394101.0,
+      "household_consumption": 4970081.0,
+      "household_size": 3.05,
+      "per_person_monthly_income": 3407901.9672131147,
+      "consumption_to_gross_income": 0.4781636237708292
+    }
+  ],
+  "assets": {
+    "household_type": "one_person",
+    "asset_year": 2025,
+    "income_year": 2024,
+    "mean_assets_10k_krw": 22302.450673,
+    "mean_savings_10k_krw": 4363.1735735,
+    "mean_income_10k_krw": 3423.2925938
+  },
+  "source_files": {
+    "연령대별_소득_20261023171123.csv": "be49029a75cad5418ec1a4ab7049230e7d68ee4cbdce6935622117082f29bb5c",
+    "소득구간별_가구당_월평균_가계수지__도시_1인이상__20261021153242.csv": "d275aeebe4b39a46b192a71ea3ec040cf80cb795d49bd538efc90b526e8c7288",
+    "2025년+가계금융복지조사+부록+통계표.xlsx": "fe3cf0fe60d3e0b94530e3a5b75e8a51241b36e7837d7fe6c6a1a2fcc858f7e6"
+  }
+}

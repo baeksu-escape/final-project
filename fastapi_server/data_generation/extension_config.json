@@ -1,0 +1,41 @@
+{
+  "seed": 20261029,
+  "rows": 12000,
+  "occupation_map": {
+    "1": "wage",
+    "2": "selfemp",
+    "7": "freelance"
+  },
+  "history_start": "2025-09",
+  "history_months": 12,
+  "monthly_sigma": {
+    "wage": 0.06,
+    "selfemp": 0.3,
+    "freelance": 0.45
+  },
+  "season_amplitude": {
+    "wage": 0.0,
+    "selfemp": 0.25,
+    "freelance": 0.15
+  },
+  "zero_income_month_probability": {
+    "wage": 0.0,
+    "selfemp": 0.02,
+    "freelance": 0.08
+  },
+  "fixed_expense_share": 0.65,
+  "variable_expense_sigma": 0.12,
+  "asset_to_income_log_median": 1.5,
+  "asset_to_income_log_sigma": 0.6,
+  "liquid_asset_fraction": [
+    0.1,
+    0.4
+  ],
+  "stress_income_drop": 0.2,
+  "origin": "v2.4: reference/statistical_priors.json의 통계값과 SOURCES_AND_ASSUMPTIONS.md의 변환 가정 구분. 기타 값은 기존 프로젝트 가정.",
+  "income_debt_copula_rho": 0.5,
+  "expense_drawdown_fraction": 0.5,
+  "minimum_annual_living_expense_krw": 12000000,
+  "statistical_priors_enabled": true,
+  "accessible_savings_fraction": 0.5
+}
