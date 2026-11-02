@@ -1,0 +1,931 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>3조 바이브 코딩 가이드</title>
+<style>
+  @page { size: A4; margin: 20mm 18mm 20mm 18mm; }
+  :root {
+    --ink: #1d2433; --muted: #5b6475; --line: #d9dee7; --soft: #f4f6fa;
+    --accent: #2f5bd3; --accent-soft: #e8eefc; --warn: #b4531a; --warn-soft: #fdf1e7;
+    --ok: #1f7a4d; --ok-soft: #e6f4ec; --no: #b42335; --no-soft: #fbe9ec;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "Noto Sans CJK KR", "Noto Sans KR", "Malgun Gothic", sans-serif;
+         color: var(--ink); font-size: 10pt; line-height: 1.7; margin: 0; background: #fff; word-break: keep-all; }
+  h1 { font-size: 19pt; margin: 0 0 4mm; padding-bottom: 2.5mm; border-bottom: 2px solid var(--ink); page-break-before: always; letter-spacing: -0.3px; }
+  h1 .no { color: var(--accent); margin-right: 8px; }
+  h2 { font-size: 13pt; margin: 7mm 0 2mm; letter-spacing: -0.2px; }
+  h3 { font-size: 11pt; margin: 5mm 0 1.5mm; color: var(--ink); }
+  p { margin: 0 0 2.5mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 5.5mm; }
+  li { margin: 0.6mm 0; }
+  code { font-family: "Noto Sans Mono CJK KR", "D2Coding", Consolas, monospace; font-size: 8.8pt;
+         background: var(--soft); padding: 0.3mm 1.2mm; border-radius: 3px; }
+  pre { font-family: "Noto Sans Mono CJK KR", "D2Coding", Consolas, monospace; font-size: 8.6pt; line-height: 1.55;
+        background: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 3mm 4mm; margin: 0 0 3.5mm;
+        white-space: pre-wrap; page-break-inside: avoid; }
+  pre code { background: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 0 0 4mm; font-size: 9pt; page-break-inside: auto; }
+  th, td { border: 1px solid var(--line); padding: 1.6mm 2.4mm; text-align: left; vertical-align: top; }
+  th { background: var(--soft); font-weight: 700; }
+  tr { page-break-inside: avoid; }
+  .box { border-radius: 6px; padding: 3mm 4mm; margin: 0 0 4mm; page-break-inside: avoid; border-left: 4px solid var(--accent); background: var(--accent-soft); }
+  .box.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .box.ok { border-color: var(--ok); background: var(--ok-soft); }
+  .box b.t { display: block; margin-bottom: 1mm; }
+  .box p:last-child, .box ul:last-child { margin-bottom: 0; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin: 0 0 4mm; page-break-inside: avoid; }
+  .pair > div { border-radius: 6px; padding: 2.5mm 3.5mm; font-size: 9pt; }
+  .pair .bad { background: var(--no-soft); border: 1px solid #f0c4cb; }
+  .pair .good { background: var(--ok-soft); border: 1px solid #bfe2cf; }
+  .pair .lbl { font-weight: 700; font-size: 8.5pt; display: block; margin-bottom: 1mm; }
+  .bad .lbl { color: var(--no); } .good .lbl { color: var(--ok); }
+  .pair pre { margin: 0; background: #ffffffa0; font-size: 8.3pt; }
+  .muted { color: var(--muted); }
+  .small { font-size: 8.8pt; }
+  .check li { list-style: none; margin-left: -5mm; }
+  .check li::before { content: "☐  "; color: var(--accent); }
+  /* cover */
+  .cover { height: 250mm; display: flex; flex-direction: column; justify-content: space-between; }
+  .cover .top { margin-top: 30mm; }
+  .cover .kicker { color: var(--accent); font-weight: 700; letter-spacing: 1px; font-size: 10pt; }
+  .cover .title { font-size: 30pt; font-weight: 800; line-height: 1.25; margin: 4mm 0 5mm; letter-spacing: -0.8px; }
+  .cover .sub { font-size: 12pt; color: var(--muted); }
+  .cover .meta { border-top: 1px solid var(--line); padding-top: 4mm; font-size: 9.5pt; color: var(--muted); }
+  .toc { page-break-before: always; }
+  .toc h2 { font-size: 15pt; margin-top: 0; }
+  .toc ol { padding-left: 6mm; font-size: 10.5pt; }
+  .toc li { margin: 2mm 0; }
+  .toc .d { color: var(--muted); font-size: 9pt; }
+  .tag { display: inline-block; font-size: 8pt; font-weight: 700; padding: 0.2mm 2mm; border-radius: 10px; background: var(--accent-soft); color: var(--accent); margin-right: 1mm; }
+  .levels { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3mm; margin-bottom: 4mm; }
+  .levels > div { border: 1px solid var(--line); border-radius: 6px; padding: 3mm 3.5mm; page-break-inside: avoid; }
+  .levels .lv { color: var(--accent); font-weight: 800; font-size: 9pt; }
+  .levels ul { margin: 1mm 0 0; font-size: 9pt; }
+  .toc-first { font-size: 10.5pt; margin: 0 0 2mm; }
+  .summary { page-break-before: always; }
+  .summary h1.sum-h { page-break-before: avoid; }
+  .sgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin-bottom: 3mm; }
+  .scard { border: 1px solid var(--line); border-radius: 6px; padding: 2.5mm 3.5mm; font-size: 9pt; line-height: 1.6; }
+  .scard.wide { margin-bottom: 3mm; }
+  .scard h3 { margin: 0 0 1.2mm; font-size: 10pt; color: var(--accent); }
+  .scard ol, .scard ul { margin: 0; }
+  .scard pre { margin: 0; font-size: 8.5pt; }
+  .scard p { margin: 0; }
+  .gloss { font-size: 8.7pt; }
+  .gloss td { padding: 1.1mm 2.2mm; line-height: 1.5; }
+  .gloss td:first-child { font-weight: 700; width: 26%; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="top">
+    <div class="kicker">2026 KDT FINAL PROJECT · 3조 백수 탈출기</div>
+    <div class="title">바이브 코딩<br>팀 가이드</div>
+    <div class="sub">AI와 함께 개발할 때, 사람이 알아야 할 것들</div>
+  </div>
+  <div class="meta">
+    대상: 팀원 6명 (AI 코딩이 처음인 사람 기준)<br>
+    기준일: 2026-10-31 · 작성: 문서 담당<br>
+    AI가 읽는 규칙은 저장소의 <code>AGENTS.md</code>에 있습니다. 이 문서는 그 규칙의 <b>이유</b>와 <b>잘 쓰는 법</b>을 설명합니다.
+  </div>
+</section>
+
+<section class="toc">
+  <h2>목차</h2>
+  <p class="toc-first"><span class="tag">먼저 읽기</span> <b>한 장 요약</b> <span class="d">— 다음 쪽. 처음이라면 이 한 장만 읽고 시작해도 됩니다.</span></p>
+  <ol>
+    <li>이 폴더 사용법 <span class="d">— 무엇을 누가 읽나</span></li>
+    <li>팀 원칙과 그 이유</li>
+    <li>도구별 사용법 <span class="d">— Claude, ChatGPT·Codex, Gemini, Google AI Mode</span></li>
+    <li>프롬프트 작성법 <span class="d">— 요청 템플릿, 좋은 요청과 나쁜 요청</span></li>
+    <li>토큰·한도 아끼는 습관</li>
+    <li>매일 쓰는 체크리스트와 숙련 단계</li>
+    <li>Git · PR · 작업 로그 흐름</li>
+    <li>팀이 결정할 때 참고할 초안</li>
+    <li>범위 외 아이디어</li>
+    <li>부록 <span class="d">— WBS 일정 ↔ N-ID, 팀원 MD 통합 기록</span></li>
+    <li>용어집 <span class="d">— 모르는 단어가 나오면 여기부터</span></li>
+  </ol>
+  <div class="box">
+    <b class="t">이 문서를 읽는 순서</b>
+    <p>한 장 요약 → 일하면서 막히는 장만 골라 읽기 → 모르는 단어는 맨 뒤 11장 용어집. 처음부터 끝까지 다 읽을 필요는 없습니다.</p>
+  </div>
+</section>
+
+<section class="summary">
+  <h1 class="sum-h"><span class="no">★</span>한 장 요약</h1>
+  <div class="sgrid">
+    <div class="scard">
+      <h3>꼭 지킬 5가지</h3>
+      <ol>
+        <li><b>CSS·디자인은 AI에게 맡기지 않는다.</b> 프론트 담당자의 영역.</li>
+        <li><b>요청한 부분만 고치게 한다.</b> 다른 파일이 바뀌었으면 되돌린다.</li>
+        <li><b>DB·API를 바꿨으면 로그를 남긴다.</b> <code>docs/logs/</code></li>
+        <li><b>정해지지 않은 건 AI가 정하지 않는다.</b> 선택지를 받아 팀에 가져온다.</li>
+        <li><b>설명할 수 없는 코드는 커밋하지 않는다.</b></li>
+      </ol>
+    </div>
+    <div class="scard">
+      <h3>도구별 시작 방법</h3>
+      <ul>
+        <li><b>Claude Code · Codex · Gemini 코딩 도구:</b> 이 폴더(<code>AGENTS.md</code>가 있는 곳)를 열면 규칙을 알아서 읽는다.</li>
+        <li><b>웹 채팅 (무료 포함):</b> 첫 메시지에 <code>docs/ai/PASTE.md</code> 블록을 붙여 넣는다.</li>
+        <li><b>Google AI Mode:</b> 코드보다 개념 이해·에러 검색용.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="scard wide">
+    <h3>AI에게 요청할 때 — 이 틀을 복사해서 쓰기</h3>
+<pre>[N-__] (기능 이름)
+- 할 일:
+- 범위: (파일 / 폴더 / 계층)
+- 하지 말 것: CSS·스타일, 범위 밖 파일
+- 확인 방법:
+- 모르는 게 있으면 추측하지 말고 먼저 물어봐 줘. 끝나면 바꾼 파일과 이유를 짧게 정리해 줘.</pre>
+  </div>
+  <div class="sgrid">
+    <div class="scard">
+      <h3>시작 전</h3>
+      <ul class="check">
+        <li>최신 <code>develop</code> 받기</li>
+        <li>오늘 기능의 N-ID 확인 (<code>features.md</code>)</li>
+        <li>최근 로그 훑어보기 (<code>docs/logs/</code>)</li>
+      </ul>
+    </div>
+    <div class="scard">
+      <h3>커밋 전</h3>
+      <ul class="check">
+        <li>바뀐 파일 직접 확인 — CSS·범위 밖 변경 없음</li>
+        <li>실제로 실행해 봄</li>
+        <li>주석 1~2문장 + N-ID, 필요하면 로그</li>
+      </ul>
+    </div>
+  </div>
+  <div class="scard wide">
+    <h3>한도를 아끼려면</h3>
+    <p>한 대화에는 한 작업만. 길어지면 "지금까지 요약해 줘" → 새 대화. 파일·에러는 관련 부분만 붙여 넣기.</p>
+  </div>
+  <div class="box ok" style="margin-top:3mm">
+    <b class="t">막히면 어디를 보나</b>
+    <p>모르는 단어 → <b>11장 용어집</b> · 요청이 잘 안 먹힘 → 4장 · 한도가 빨리 참 → 5장 · Git·PR → 7장 · 왜 이런 규칙? → 2장</p>
+  </div>
+</section>
+
+
+<!-- 1 -->
+<h1><span class="no">1</span>이 폴더 사용법</h1>
+<p>문서를 <b>AI가 읽는 것</b>, <b>사람이 읽는 것</b>, <b>둘 다 읽는 것</b>으로 나눴습니다.</p>
+<pre>(저장소 루트)
+├─ AGENTS.md     AI 공통 규칙 원본 — Codex 등이 자동으로 읽음
+├─ CLAUDE.md     AGENTS.md를 불러옴 + Claude Code 전용 몇 줄
+├─ GEMINI.md     AGENTS.md를 불러옴
+├─ README.md     사람용 첫 화면
+├─ .claude/settings.json   Claude Code 확인 창 설정 (CSS 수정, git push 등)
+└─ docs/
+   ├─ ai/        AI가 작업 전에 확인
+   │   ├─ features.md    기능 명세 사본 (N-ID 기준)
+   │   ├─ decisions.md   확정 · 미정 사항
+   │   └─ PASTE.md       웹 채팅용 붙여넣기 요약
+   ├─ logs/      사람·AI 공통 작업 로그 + 검수
+   └─ guide/     이 문서 (PDF와 원본 HTML)</pre>
+
+<table>
+  <tr><th style="width:28%">파일</th><th style="width:18%">누가</th><th>언제</th></tr>
+  <tr><td><code>AGENTS.md</code> 등 루트 파일</td><td>AI (자동)</td><td>코딩 도구가 대화를 시작할 때 스스로 읽습니다. 사람이 따로 할 일은 없습니다.</td></tr>
+  <tr><td><code>docs/ai/features.md</code></td><td>AI · 사람</td><td>기능을 만들기 전에 해당 N-ID의 입력·처리·출력을 확인합니다.</td></tr>
+  <tr><td><code>docs/ai/decisions.md</code></td><td>AI · 사람</td><td>확정된 것은 따르고, 미정(D-xx)인 것은 팀에서 정합니다. 바꾸는 사람은 문서 담당입니다.</td></tr>
+  <tr><td><code>docs/ai/PASTE.md</code></td><td>사람 → AI</td><td>저장소를 못 읽는 웹 채팅에 첫 메시지로 붙여 넣습니다 (3장).</td></tr>
+  <tr><td><code>docs/logs/</code></td><td>사람 · AI</td><td>DB·API·대량 백엔드 변경 후 작성하고, 지정된 검수 담당이 확인합니다 (7장).</td></tr>
+</table>
+
+<div class="box warn">
+  <b class="t">md에 일부러 넣지 않은 것</b>
+  <p>DB 테이블·컬럼, API 형식, 폴더 구조, 환경 세팅, 학습 데이터 규칙은 <b>팀원이 직접 정할 영역</b>이라 AI 문서에서 뺐습니다. AI 문서에 초안을 적어 두면 AI가 그것을 "정해진 규칙"으로 받아들여 팀이 고민하기 전에 설계가 굳어집니다. 참고용 초안은 8장에 남겨 두었습니다.</p>
+</div>
+<div class="box">
+  <b class="t">"토큰 아끼기"를 md에 넣지 않은 이유</b>
+  <p>md는 모든 팀원의 AI가 매번 읽습니다. "짧게 답해라", "파일 읽지 마라" 같은 지시를 md에 넣으면 무료 사용자에게는 도움이 될 수 있어도, 자세한 설명이 필요한 순간이나 유료 사용자에게는 오히려 방해가 됩니다. 한도를 아끼는 건 <b>요청하는 방법</b>으로 하는 것이 맞습니다. 그래서 5장에 사람의 습관으로 정리했습니다.</p>
+</div>
+
+<!-- 2 -->
+<h1><span class="no">2</span>팀 원칙과 그 이유</h1>
+<p>AI는 <code>AGENTS.md</code>의 규칙을 지키도록 되어 있지만, 사람이 이유를 알아야 AI가 규칙을 벗어날 때 알아챌 수 있습니다.</p>
+
+<h2>① 브랜치를 합칠 때 오류가 나지 않게</h2>
+<p>6명이 기능별로 각자 브랜치에서 개발합니다. 문제는 여러 기능이 함께 쓰는 파일입니다 — <code>pom.xml</code>, <code>package.json</code>, 공통 설정, 공통 응답 클래스, 라우터, Security 설정, DB 스크립트. AI는 요청하지 않아도 "김에" 이런 파일의 포맷을 정리하거나 이름을 바꾸는 경향이 있어서, 합칠 때 충돌이 납니다.</p>
+<ul>
+  <li>공유 파일을 고쳐야 하면 <b>Discord <code>#개발</code>에 먼저 알린다.</b></li>
+  <li>AI가 요청과 상관없는 파일까지 바꿨다면 그 부분은 되돌리고 커밋한다.</li>
+  <li>명세에 "계산을 공유한다"고 적힌 기능(N-16·N-20, N-17·N-18·N-21, N-21·N-22)은 담당자끼리 함수 하나를 함께 쓰도록 미리 얘기한다.</li>
+</ul>
+
+<h2>② 스타일·CSS는 프론트 담당자의 영역</h2>
+<p>AI는 "더 보기 좋게" 하려고 색·간격·클래스명을 쉽게 바꿉니다. 각자 AI에게 화면을 맡기면 화면마다 디자인이 달라지고, 프론트 담당자가 만든 테마(기본/블랙)가 깨집니다.</p>
+<ul>
+  <li>AI는 CSS·<code>className</code>·인라인 스타일을 요청 없이 고치지 않고, 필요하면 <b>제안만</b> 합니다.</li>
+  <li>Claude Code에서는 CSS 파일을 고치려 하면 확인 창이 뜹니다(<code>.claude/settings.json</code>). <b>내가 프론트 담당이 아니면 거절</b>하세요.</li>
+</ul>
+
+<h2>③ 주석 1~2문장 + N-ID</h2>
+<p>중간 시연과 최종 발표에서 각자 자기 코드를 설명해야 하고, 팀원끼리 서로의 코드를 읽어야 합니다. AI가 만든 코드는 길고 낯설기 쉬워서, 함수마다 "무엇을 하는지" 한 줄이 있으면 읽는 속도가 크게 달라집니다.</p>
+<pre>// N-12 나의 신용 리포트 — 기존·대안 점수를 함께 조회한다.</pre>
+
+<h2>④ DB·API·대량 백엔드 변경은 반드시 로그</h2>
+<p>DB 컬럼 하나, API 응답 필드 하나가 바뀌면 다른 그룹의 화면과 기능이 바로 깨질 수 있습니다. 그래서 백엔드를 AI가 못 건드리게 막는 대신, <b>바꿨으면 반드시 기록하고 팀원이 확인하는</b> 방식으로 정했습니다.</p>
+<table>
+  <tr><th>로그를 반드시 남기는 경우</th></tr>
+  <tr><td>DB 관련 변경(테이블·컬럼·DDL) — 1건이라도</td></tr>
+  <tr><td>API 경로나 요청·응답 필드 추가·변경</td></tr>
+  <tr><td>한 작업에서 백엔드 파일 3개 이상 변경</td></tr>
+  <tr><td>빌드·의존성 파일이나 공통 설정 변경</td></tr>
+</table>
+
+<h2>⑤ 모르면 추측하지 않는다</h2>
+<p>등급 경계, 응답 형식, 타임아웃, 테이블 이름 등 아직 정하지 않은 것(<code>decisions.md</code>의 D-xx)이 많습니다. AI는 모르는 것도 그럴듯하게 지어내므로, 미정 항목은 상수로 빼고 <code>TODO(D-xx)</code>를 달도록 했습니다. AI가 선택지를 물어보면 <b>혼자 고르지 말고 팀에 가져오세요.</b></p>
+<div class="box"><b class="t">미정 사항은 AI의 판단보다 사용자의 의견이 우선</b><p>AI가 "이게 더 좋아 보인다"며 미정 사항을 정해 버리면, 팀이 결정했을 때 다시 고쳐야 합니다. 그래서 <code>AGENTS.md</code>와 <code>decisions.md</code>에 "미정 항목은 AI가 스스로 정하지 않고, 선택지를 보여 주고 사용자가 고르게 한다"고 적어 두었습니다. AI가 이 규칙을 어기고 혼자 정했다면 그 부분을 되돌리고 다시 물어보게 하세요.</p></div>
+
+<h2>그 밖의 약속</h2>
+<ul>
+  <li>합성 데이터만 쓰고, 실제 개인정보·API 키는 프롬프트에도 넣지 않는다.</li>
+  <li>대안 점수가 더 낮은 집단도 숨기지 않는다. 금리·한도는 "참고 정보"로만 보여 준다.</li>
+  <li>AI는 <code>push</code>·병합을 스스로 하지 않는다. 올리는 건 사람이 한다.</li>
+</ul>
+
+<!-- 3 -->
+<h1><span class="no">3</span>도구별 사용법</h1>
+<p>도구마다 규칙 파일을 읽는 방식이 다릅니다. <b>저장소 폴더를 직접 여는 코딩 도구</b>는 규칙을 스스로 읽고, <b>웹 채팅</b>은 우리가 붙여 넣어야 합니다.</p>
+<table>
+  <tr><th style="width:30%">도구</th><th style="width:25%">규칙을 읽는 방식</th><th>할 일</th></tr>
+  <tr><td><b>Claude Code</b> (VS Code 확장)<br><span class="muted small">Claude Pro 이상</span></td><td>루트 <code>CLAUDE.md</code> 자동 → <code>AGENTS.md</code> 불러옴</td><td>저장소 루트 폴더를 VS Code로 열고 시작하면 됩니다.</td></tr>
+  <tr><td><b>Codex</b><br><span class="muted small">ChatGPT Plus</span></td><td>루트 <code>AGENTS.md</code> 자동</td><td>저장소 루트에서 시작합니다.</td></tr>
+  <tr><td><b>Gemini 코딩 도구</b><br><span class="muted small">Gemini CLI · Code Assist</span></td><td>루트 <code>GEMINI.md</code> 자동 → <code>AGENTS.md</code> 불러옴</td><td>저장소 루트에서 시작합니다. 불러오기가 안 되는 것 같으면 첫 메시지에 "AGENTS.md를 먼저 읽어 줘"라고 적습니다.</td></tr>
+  <tr><td><b>웹 채팅</b><br><span class="muted small">Claude·ChatGPT·Gemini 웹, 무료 포함</span></td><td>저장소를 못 읽음</td><td>대화 첫 메시지에 <code>docs/ai/PASTE.md</code>의 블록을 붙여 넣고, 고칠 파일 내용을 함께 붙입니다.</td></tr>
+  <tr><td><b>Google AI Mode</b></td><td>지침을 기억하지 못함</td><td>코드 작성보다 <b>개념 이해·에러 검색·학습</b>에 씁니다. 코드를 받아 쓸 때는 우리 규칙(CSS·주석)을 직접 확인합니다.</td></tr>
+</table>
+
+<h2>Claude Code를 쓸 때</h2>
+<ul>
+  <li><b>계획 모드(plan 모드)</b>: 파일을 여러 개 고치는 작업은 먼저 계획을 보여 달라고 하세요. 계획을 읽고 "1, 3번만 진행해"처럼 고를 수 있습니다.</li>
+  <li><b>확인 창</b>: CSS 수정, <code>git push</code>, <code>rm</code> 등을 하려 하면 확인 창이 뜹니다. 무엇을 왜 하려는지 읽고 허락하세요. 습관적으로 "항상 허용"을 누르지 마세요.</li>
+  <li><b>파일 지정</b>: 대화에 파일을 지정(<code>@파일명</code>)하면 AI가 엉뚱한 파일을 찾아 헤매지 않습니다.</li>
+  <li>Claude 앱(웹·데스크톱)은 문서 정리·설계 상의에, VS Code 확장은 실제 코드 작업에 나눠 쓰면 편합니다.</li>
+</ul>
+
+<h2>웹 채팅을 쓸 때</h2>
+<ol>
+  <li>새 대화 → <code>PASTE.md</code> 블록 붙여 넣기</li>
+  <li>해당 기능의 <code>features.md</code> 내용(그 N-ID 부분만) 붙여 넣기</li>
+  <li>고칠 파일의 <b>관련 부분만</b> 붙여 넣고 요청 (4장 템플릿)</li>
+  <li>받은 코드를 내 파일에 옮긴 뒤, CSS·주석 규칙을 지켰는지 직접 확인</li>
+</ol>
+<div class="box warn">
+  <b class="t">웹 채팅에서 자주 생기는 문제</b>
+  <p>웹 채팅은 우리 저장소의 다른 파일을 모르기 때문에 이미 있는 함수와 같은 일을 하는 함수를 새로 만들거나, 다른 이름을 지어 오는 경우가 많습니다. 붙여 넣기 전에 "이미 비슷한 게 있는지"를 확인하세요.</p>
+</div>
+
+<h2>심화: 스킬(Skills) — 익숙해진 뒤에</h2>
+<p class="small">Claude Code에는 <code>.claude/skills/이름/SKILL.md</code>에 "특정 작업용 매뉴얼"을 넣어 두는 기능이 있습니다. 평소엔 이름만 알고 있다가 관련 작업에서 꺼내 읽습니다. 지금은 팀 설계가 정해지지 않아 넣지 않았습니다. 나중에 그룹별로 API 형식이나 모델 서버 구조가 확정되면, 그 그룹이 직접 자기 기능의 스킬을 만들어 보는 것을 권합니다. 꼭 지켜야 하는 규칙은 스킬이 아니라 <code>AGENTS.md</code>에 둡니다.</p>
+
+<!-- 4 -->
+<h1><span class="no">4</span>프롬프트 작성법</h1>
+<p>AI의 결과물이 나쁜 이유의 대부분은 <b>요청이 모호해서</b>입니다. 아래 네 가지만 적어도 결과가 확연히 달라지고, 다시 시키는 횟수가 줄어 한도도 아낄 수 있습니다.</p>
+
+<table>
+  <tr><th style="width:22%">요소</th><th>쓰는 법</th><th style="width:32%">예</th></tr>
+  <tr><td><b>무엇</b> (N-ID)</td><td>어떤 기능의 어떤 부분인지</td><td>N-12 리포트의 점수 조회 API</td></tr>
+  <tr><td><b>어디</b> (범위)</td><td>고칠 파일·계층을 명시</td><td>Controller와 Service만</td></tr>
+  <tr><td><b>하지 말 것</b></td><td>건드리면 안 되는 것</td><td>CSS, 다른 기능 파일, DB 스크립트</td></tr>
+  <tr><td><b>확인 방법</b></td><td>"됐다"의 기준</td><td>Swagger에서 200 응답과 두 점수 확인</td></tr>
+</table>
+
+<h2>요청 템플릿 (복사해서 쓰기)</h2>
+<pre>[N-__] (기능 이름)
+- 할 일:
+- 범위: (파일 / 폴더 / 계층)
+- 하지 말 것: CSS·스타일, 범위 밖 파일
+- 확인 방법:
+- 모르는 게 있으면 추측하지 말고 먼저 물어봐 줘.
+- 끝나면 바꾼 파일과 이유를 짧게 정리해 줘.</pre>
+
+<h2>좋은 요청과 나쁜 요청</h2>
+<div class="pair">
+  <div class="bad"><span class="lbl">✕ 모호함</span><pre>신용 리포트 만들어줘</pre></div>
+  <div class="good"><span class="lbl">○ 범위가 분명함</span><pre>[N-12] 나의 신용 리포트
+- 할 일: 기존·대안 점수를 함께 돌려주는
+  조회 API의 Controller·Service
+- 범위: backend의 credit 관련 파일만
+- 모델 서버는 아직 없으니 mock 응답으로
+- 응답 형식은 미정(D-20)이니 먼저 제안해 줘</pre></div>
+</div>
+<div class="pair">
+  <div class="bad"><span class="lbl">✕ 결과만 요구</span><pre>에러 나 고쳐줘
+(로그 300줄 붙여넣기)</pre></div>
+  <div class="good"><span class="lbl">○ 상황과 핵심만</span><pre>회원가입 API 호출 시 500 에러.
+- 한 일: N-02 가입 DTO에 연령대 필드 추가
+- 에러 핵심 5줄: (Caused by 부분)
+- 원인 후보를 먼저 설명하고,
+  고칠 곳은 내가 확인한 뒤 진행해 줘</pre></div>
+</div>
+<div class="pair">
+  <div class="bad"><span class="lbl">✕ AI에게 판단을 넘김</span><pre>화면 좀 예쁘게 다듬어줘</pre></div>
+  <div class="good"><span class="lbl">○ 로직만 맡김</span><pre>[N-16] 슬라이더 값이 바뀌면 비율을
+다시 계산하는 로직만 추가해 줘.
+마크업·className·CSS는 그대로 두고,
+스타일이 필요하면 제안만 해 줘.</pre></div>
+</div>
+
+<h2>더 잘 쓰는 요령</h2>
+<ul>
+  <li><b>계획 먼저</b>: 큰 작업은 "바로 코드 짜지 말고 단계별 계획부터 보여 줘"로 시작합니다. 계획에서 틀린 걸 고치는 게 코드에서 고치는 것보다 훨씬 쌉니다.</li>
+  <li><b>작게 자르기</b>: "N-16 전체"보다 "N-16 비율 계산 함수 → 그다음 API → 그다음 화면 연결" 순서로.</li>
+  <li><b>설명 요청</b>: 받은 코드에서 모르는 부분은 "이 부분이 왜 필요한지 두 줄로 설명해 줘". 발표 준비가 따로 필요 없어집니다.</li>
+  <li><b>반대 의견 허락</b>: "더 단순한 방법이 있으면 말해 줘"를 붙이면 과하게 복잡한 코드가 줄어듭니다.</li>
+  <li><b>테스트로 목표 정하기</b>: "버그 고쳐 줘" 대신 "이 버그를 재현하는 테스트를 먼저 쓰고, 통과하게 고쳐 줘".</li>
+</ul>
+
+<!-- 5 -->
+<h1><span class="no">5</span>토큰·한도 아끼는 습관</h1>
+<p>무료 등급은 하루·시간당 한도가 빨리 찹니다. 한도는 <b>대화 길이</b>와 <b>붙여 넣는 양</b>에 가장 크게 좌우됩니다.</p>
+<table>
+  <tr><th style="width:34%">습관</th><th>이유와 방법</th></tr>
+  <tr><td><b>한 대화 = 한 작업</b></td><td>AI는 매번 대화 전체를 다시 읽습니다. 대화가 길수록 한 번의 질문이 비싸지고, 앞의 내용을 헷갈리기 시작합니다.</td></tr>
+  <tr><td><b>길어지면 요약해서 새 대화</b></td><td>"지금까지 결정한 것과 남은 일을 5줄로 요약해 줘" → 새 대화에 그 요약을 붙여 시작.</td></tr>
+  <tr><td><b>필요한 부분만 붙이기</b></td><td>파일 전체 대신 관련 함수만, 에러 로그 전체 대신 <code>Caused by</code> 주변 몇 줄만. CSV·모델 파일은 붙이지 않고 컬럼 목록 정도만.</td></tr>
+  <tr><td><b>출력 형태 지정</b></td><td>"바뀐 부분만 보여 줘", "설명은 3줄 이내" 처럼 <b>그때그때</b> 정합니다(md에 고정하지 않는 이유는 1장).</td></tr>
+  <tr><td><b>같은 걸 다시 시키지 않기</b></td><td>마음에 안 들면 처음부터 다시 시키기보다 "2번 함수에서 예외 처리만 바꿔 줘"처럼 고칠 곳을 짚습니다.</td></tr>
+  <tr><td><b>도구를 나눠 쓰기</b></td><td>개념 이해·검색은 Google AI Mode나 무료 채팅, 실제 코드 수정은 저장소를 읽는 도구. 설계처럼 어려운 질문에 좋은 모델을 아껴 씁니다.</td></tr>
+  <tr><td><b>같은 실수를 반복하면 끊기</b></td><td>AI가 같은 오류를 두세 번 반복하면 대화를 이어 가지 말고, 요약과 함께 새 대화를 엽니다.</td></tr>
+</table>
+<div class="box ok">
+  <b class="t">한도를 가장 많이 아끼는 방법</b>
+  <p>4장의 템플릿대로 처음부터 범위를 정해 주는 것입니다. "다시 해 줘"가 줄어드는 만큼 한도가 남습니다.</p>
+</div>
+
+<!-- 6 -->
+<h1><span class="no">6</span>매일 쓰는 체크리스트와 숙련 단계</h1>
+<h2>작업 시작 전</h2>
+<ul class="check">
+  <li>최신 <code>develop</code>을 받았다 (<code>git pull origin develop</code>)</li>
+  <li>오늘 할 기능의 N-ID와 <code>features.md</code> 내용을 확인했다</li>
+  <li><code>docs/logs/</code>에서 최근 로그를 훑어봤다 (내가 쓸 파일을 누가 바꿨는지)</li>
+  <li>관련된 미정 항목(D-xx)이 있는지 <code>decisions.md</code>를 봤다</li>
+</ul>
+<h2>AI에게 맡길 때</h2>
+<ul class="check">
+  <li>요청에 N-ID · 범위 · 하지 말 것 · 확인 방법을 적었다</li>
+  <li>여러 파일이 바뀌는 작업은 계획부터 받았다</li>
+  <li>AI가 물어본 미정 사항을 혼자 정하지 않고 팀에 가져갔다</li>
+</ul>
+<h2>끝나고 커밋 전</h2>
+<ul class="check">
+  <li>바뀐 파일 목록(diff)을 직접 확인했다 — 요청 밖 파일, CSS 변경이 없다</li>
+  <li>실제로 실행해 봤다 (빌드·화면·Swagger)</li>
+  <li>새 함수·API에 1~2문장 주석과 N-ID가 있다</li>
+  <li>이 코드를 팀원에게 <b>내 말로 설명할 수 있다</b></li>
+  <li>DB·API·백엔드 3개 이상·공통 설정을 바꿨다면 로그를 썼다</li>
+</ul>
+
+<h2>숙련 단계 — 하루하루 올라가기</h2>
+<div class="levels">
+  <div><span class="lv">1단계 · 따라 하기</span><ul><li>템플릿을 그대로 복사해서 요청</li><li>함수 하나 단위로 작게 맡기기</li><li>받은 코드를 한 줄씩 설명 요청</li></ul></div>
+  <div><span class="lv">2단계 · 범위 다루기</span><ul><li>계획 먼저 받고 골라서 진행</li><li>대화가 길어지면 요약 후 새 대화</li><li>diff 확인이 습관이 됨</li></ul></div>
+  <div><span class="lv">3단계 · 팀과 맞추기</span><ul><li>로그 작성·남의 로그 검수</li><li>공유 파일 변경 전 공지</li><li>AI의 선택지를 팀 결정으로 연결</li></ul></div>
+  <div><span class="lv">4단계 · 도구 다루기</span><ul><li>도구를 목적별로 나눠 쓰기</li><li>테스트로 목표를 정하고 맡기기</li><li>(선택) 그룹별 스킬 만들어 보기</li></ul></div>
+</div>
+
+<!-- 7 -->
+<h1><span class="no">7</span>Git · PR · 작업 로그 흐름</h1>
+<h2>하루 작업 흐름</h2>
+<pre>1. git checkout develop &amp;&amp; git pull origin develop
+2. git checkout -b feature/FP-12-credit-report     (Jira 이슈가 없으면 feature/기능명)
+3. AI와 작업 → diff 확인 → 실행 확인
+4. git commit -m "feat - N-12 신용 리포트 조회 API 추가"
+5. (PR 직전) 최신 develop 다시 반영 → 다시 실행 확인
+6. 해당되면 docs/logs/에 로그 파일 추가
+7. git push → GitHub에서 PR 생성 → 검토 후 병합</pre>
+
+<table>
+  <tr><th style="width:25%">구분</th><th>규칙</th></tr>
+  <tr><td>브랜치</td><td><code>feature/…</code>, <code>fix/…</code>를 <code>develop</code>에서 만든다 → PR → <code>develop</code> → <code>main</code>. <code>main</code>·<code>develop</code>에 직접 push 금지.</td></tr>
+  <tr><td>커밋 메시지</td><td><code>행위 - 내용</code>, 관련 N-ID 포함. 행위: feat, fix, docs, style, refactor, test, chore. (형식 재논의 여지: D-17)</td></tr>
+  <tr><td>충돌</td><td>다른 사람의 코드를 지우는 쪽으로 해결하지 않는다. AI에게 "충돌 부분과 선택지를 보여 줘"라고 하고, 필요하면 해당 담당자와 같이 본다.</td></tr>
+  <tr><td>비밀값</td><td><code>.env</code>, <code>application-local.yml</code>은 올리지 않는다. 실수로 올렸다면 바로 Discord에 알리고 키를 다시 발급한다.</td></tr>
+</table>
+
+<h2>PR 템플릿</h2>
+<pre>## 작업 내용
+-
+## 관련 N-ID / Jira
+- N-   / FP-
+## 확인 방법
+-
+## 체크리스트
+- [ ] 최신 develop 반영 후 실행·테스트 확인
+- [ ] 공유 파일(빌드·공통 설정·공통 DTO·DB) 변경 시 사전 공지
+- [ ] CSS 변경은 프론트 담당자가 요청·확인함
+- [ ] 로그 조건에 해당하면 docs/logs/ 로그 추가
+- [ ] 비밀키·개인 설정 파일 미포함</pre>
+
+<h2>작업 로그와 검수</h2>
+<ul>
+  <li>작업 하나에 파일 하나: <code>docs/logs/YYYY-MM-DD_작성자_요약.md</code> — 한 파일에 이어 쓰면 합칠 때 충돌이 납니다.</li>
+  <li>양식은 <code>_TEMPLATE.md</code>를 복사합니다. AI에게 "이번 작업 로그를 템플릿대로 써 줘"라고 하면 초안을 만들어 줍니다. 단, <b>"확인함"에는 실제로 해 본 것만</b> 남기세요.</li>
+  <li>검수 담당과 PR 병합 절차는 <code>docs/logs/README.md</code>에 정리되어 있습니다. 다른 사람의 로그를 읽다가 문제가 보이면 Discord <code>#개발</code>에 알려 주세요.</li>
+  <li>AI는 검수 칸에 대신 서명하지 않습니다. 검수는 사람이 합니다.</li>
+</ul>
+
+<!-- 8 -->
+<h1><span class="no">8</span>팀이 결정할 때 참고할 초안</h1>
+<p>팀원 MD에 들어 있던 설계 초안입니다. <b>정해진 것이 아니며 AI 문서에서는 뺐습니다.</b> 팀에서 D-xx를 결정할 때 출발점으로 쓰고, 결정되면 문서 담당이 <code>decisions.md</code> 확정 표에 올립니다.</p>
+<table>
+  <tr><th style="width:15%">ID</th><th style="width:22%">항목</th><th>팀원 문서의 초안</th></tr>
+  <tr><td>D-20</td><td>공통 응답 형식</td><td>안 A: <code>{ success, data, error{code, message} }</code> · 안 B: <code>{ success, data, message, errorCode }</code></td></tr>
+  <tr><td>D-18</td><td>외부 호출 타임아웃</td><td>안 A: FastAPI 연결 1초 / 응답 3초 (배치 30초) · 안 B: 연결 3초 / 읽기 5초. 공통 의견: Gemini가 실패해도 점수 등 핵심 기능은 멈추지 않고 요약만 생략</td></tr>
+  <tr><td>D-14</td><td>저장소 폴더 구조</td><td><code>frontend/</code> <code>backend/</code>(Maven) <code>model-server/</code>(FastAPI) <code>ml/</code>(학습) <code>db/</code> <code>docs/</code>. 모델 서버 폴더명은 <code>model-server</code> / <code>ml-server</code>로 갈렸음</td></tr>
+  <tr><td>D-17</td><td>커밋 형식</td><td>현재 <code>행위 - 내용</code> · 대안 <code>타입: 내용</code>(Conventional Commits)</td></tr>
+  <tr><td>D-01</td><td>등급 경계·점수 변환</td><td>부실 확률 → 300~900점 변환(PDO: odds 20:1 = 600점, odds 2배마다 +50점). 명세 초안 경계: Good 780↑ · Standard 665~779 · Poor 664↓</td></tr>
+  <tr><td>D-15</td><td>프론트 도구</td><td>JavaScript 확정(TypeScript 미사용). 차트는 문서 담당의 UI 시안(Claude 아티팩트)에서 쓴 방식을 따를 예정 — 라이브러리 이름 확인 필요. 그 밖의 후보: Vite, React Router, Axios</td></tr>
+  <tr><td>—</td><td>DB 명명</td><td>대문자 스네이크, 모든 테이블·컬럼에 <code>COMMENT</code>, 금액 <code>NUMBER(15)</code>, 한글은 <code>VARCHAR2(n CHAR)</code></td></tr>
+  <tr><td>—</td><td>모델 서버 운영</td><td>모델은 서버 시작 시 1회 로드, 모델 서버는 DB 접근 없이 계산만, 백엔드와 내부 키(<code>X-Internal-Key</code>)로 통신</td></tr>
+  <tr><td>—</td><td>개발 환경</td><td>JDK 17, Node 20 LTS, Python 3.11, STS 4 + Lombok, STS 인코딩 UTF-8 통일</td></tr>
+</table>
+
+<!-- 9 -->
+<h1><span class="no">9</span>범위 외 아이디어</h1>
+<p>팀원 MD에는 있었지만 <b>기능 명세 v1에 N-ID가 없는</b> 내용입니다. 명세에 없는 기능은 AI가 만들지 않도록 했으므로, 하고 싶다면 먼저 팀에서 명세에 추가할지 정해야 합니다.</p>
+<table>
+  <tr><th style="width:30%">아이디어</th><th>내용</th><th style="width:22%">가까운 기능</th></tr>
+  <tr><td>관리자 PD 일괄 재계산</td><td>전체 합성 사용자의 부실 확률을 관리자가 한 번에 다시 계산</td><td>N-25, N-26</td></tr>
+  <tr><td>관리자 리스크 히트맵</td><td>행정동·업종별 평균 부실 확률을 카카오맵 히트맵과 표로 표시</td><td>N-24, N-26</td></tr>
+  <tr><td>고위험군 목록</td><td>부실 확률이 높은 사용자 목록 조회</td><td>N-26</td></tr>
+  <tr><td>지도 기반 현금흐름 시뮬레이터</td><td>지도에서 행정동·업종 선택 → 상권 매출을 반영해 월별 현금흐름 계산</td><td>N-21, N-24</td></tr>
+  <tr><td>스트레스 테스트 AI 요약</td><td>금리·소득 시나리오 결과를 Gemini로 쉬운 말 요약</td><td>N-17, N-31</td></tr>
+  <tr><td>사회초년생 별도 직군</td><td><code>NEW_GRAD</code>를 직군으로 추가하는 안 — 직군은 3분류로 확정됐으므로, 연령대·금융 이력 길이로 표현하는 쪽이 맞음</td><td>N-08, N-13</td></tr>
+  <tr><td>모델 서버 장애 시 간이 점수</td><td>규칙 기반 대체 점수를 보여 주는 안 — "점수는 항상 모델이 계산" 의견과 충돌해 보류</td><td>N-12</td></tr>
+</table>
+
+<!-- 10 -->
+<h1><span class="no">10</span>부록</h1>
+<h2>A. WBS 일정 ↔ N-ID</h2>
+<p class="small muted">출처: WBS 자동화 시트지 「WBS (작업공간)」 탭, 2026-10-30 기준. 일정은 WBS 원본이 우선합니다.</p>
+<h4>3단계 · 1차 설계 및 개발 (10/26 ~ 11/18)</h4>
+<table>
+<thead>
+<tr>
+<th>작업</th>
+<th>파트</th>
+<th>기간</th>
+<th>관련 N-ID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>시스템 구조 및 API 규격 확정</td>
+<td>(미정)</td>
+<td>10/26 ~ 10/30</td>
+<td>01~10, 12~27, 30~32</td>
+</tr>
+<tr>
+<td>데이터 수집, 전처리 및 피처 구성</td>
+<td>데이터 모형</td>
+<td>10/26 ~ 11/04</td>
+<td>05, 12~18, 20~26</td>
+</tr>
+<tr>
+<td>DB 및 공통 API 기반 구축</td>
+<td>백엔드</td>
+<td>10/29 ~ 11/04</td>
+<td>1~5, 12, 14, 16, 25~27</td>
+</tr>
+<tr>
+<td>공통 레이아웃 및 화면 구조</td>
+<td>프론트엔드</td>
+<td>11/02 ~ 11/05</td>
+<td>1, 8, 12</td>
+</tr>
+<tr>
+<td>기존, 대안 신용평가 모델 개발</td>
+<td>데이터 모형</td>
+<td>11/02 ~ 11/10</td>
+<td>12, 14, 18, 25</td>
+</tr>
+<tr>
+<td>회원가입, 로그인 인증 API</td>
+<td>백엔드</td>
+<td>11/02 ~ 11/10</td>
+<td>1, 2</td>
+</tr>
+<tr>
+<td>데이터 입력, 모의 연동 API</td>
+<td>백엔드</td>
+<td>11/04 ~ 11/09</td>
+<td>5</td>
+</tr>
+<tr>
+<td>회원가입, 로그인, 데이터 입력화면</td>
+<td>프론트엔드</td>
+<td>11/04 ~ 11/10</td>
+<td>1, 2, 5</td>
+</tr>
+<tr>
+<td>SHAP 영향 요인 분석</td>
+<td>데이터 모형</td>
+<td>11/09 ~ 11/13</td>
+<td>14, 23</td>
+</tr>
+<tr>
+<td>신용평가 예측, 리포트 API</td>
+<td>백엔드</td>
+<td>11/09 ~ 11/13</td>
+<td>12, 14</td>
+</tr>
+<tr>
+<td>신용 리포트 및 영향 요인 시각화</td>
+<td>프론트엔드</td>
+<td>11/09 ~ 11/13</td>
+<td>12, 14</td>
+</tr>
+<tr>
+<td>마이 페이지, 계정 복구 API</td>
+<td>백엔드</td>
+<td>11/09 ~ 11/13</td>
+<td>3, 4</td>
+</tr>
+<tr>
+<td>직군별 화면 분기 및 공통 UI 구현</td>
+<td>프론트엔드</td>
+<td>11/09 ~ 11/13</td>
+<td>8</td>
+</tr>
+<tr>
+<td>소득 변동성 진단 기본 기능 개발</td>
+<td>데이터 모형</td>
+<td>11/09 ~ 11/13</td>
+<td>22</td>
+</tr>
+<tr>
+<td>관리자 모델 성능 비교, 통계 기본 구현</td>
+<td>백엔드</td>
+<td>11/09 ~ 11/13</td>
+<td>25, 26</td>
+</tr>
+<tr>
+<td>마이페이지, 자산부채 건전성 화면</td>
+<td>프론트엔드</td>
+<td>11/10 ~ 11/13</td>
+<td>4, 16</td>
+</tr>
+<tr>
+<td>관리자 계정, 권한 관리 기본 구현</td>
+<td>백엔드</td>
+<td>11/10 ~ 11/13</td>
+<td>27</td>
+</tr>
+<tr>
+<td>회원 인증, 계정 관리, 신용평가 API 단위 테스트</td>
+<td>백엔드</td>
+<td>11/11 ~ 11/13</td>
+<td>1~5, 12, 14, 27</td>
+</tr>
+<tr>
+<td>핵심 서비스, 관리자 화면 기능 테스트</td>
+<td>프론트엔드</td>
+<td>11/12 ~ 11/16</td>
+<td>1~5, 8, 12, 14, 16, 25~27</td>
+</tr>
+<tr>
+<td>핵심 서비스 연동 및 중간 시연 점검</td>
+<td>팀원 전체</td>
+<td>11/16 ~ 11/18</td>
+<td>1~5, 8, 12, 14, 16, 22, 25~27</td>
+</tr>
+</tbody>
+</table>
+<h4>4단계 · 2차 개발 (11/19 ~ 12/03)</h4>
+<table>
+<thead>
+<tr>
+<th>작업</th>
+<th>파트</th>
+<th>기간</th>
+<th>관련 N-ID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>직군별 신용 분석 및 비교 통계 개발</td>
+<td>데이터 모형</td>
+<td>11/19 ~ 11/25</td>
+<td>13, 15, 26</td>
+</tr>
+<tr>
+<td>DSR, 시나리오 시뮬레이션, 재무 진단 고도화 API</td>
+<td>백엔드</td>
+<td>11/19 ~ 11/25</td>
+<td>16, 17, 20</td>
+</tr>
+<tr>
+<td>직군별 특화 분석 및 비교 화면</td>
+<td>프론트엔드</td>
+<td>11/19 ~ 11/26</td>
+<td>13, 15, 21~24</td>
+</tr>
+<tr>
+<td>신용, 금리, 현금흐름 시뮬레이터 화면</td>
+<td>프론트엔드</td>
+<td>11/19 ~ 11/27</td>
+<td>17, 18, 21</td>
+</tr>
+<tr>
+<td>현금흐름, 상권 분석 고도화</td>
+<td>데이터 모형</td>
+<td>11/19 ~ 11/27</td>
+<td>21, 22, 24</td>
+</tr>
+<tr>
+<td>직군별 시뮬레이션, 분석 API</td>
+<td>백엔드</td>
+<td>11/19 ~ 11/27</td>
+<td>18, 21~24</td>
+</tr>
+<tr>
+<td>마이페이지, 관리자 기능 고도화 API</td>
+<td>백엔드</td>
+<td>11/23 ~ 11/27</td>
+<td>4, 25~27</td>
+</tr>
+<tr>
+<td>게시판 기능 개발</td>
+<td>백엔드</td>
+<td>11/24 ~ 11/27</td>
+<td>6</td>
+</tr>
+<tr>
+<td>마이페이지, 관리자 대시보드 고도화</td>
+<td>프론트엔드</td>
+<td>11/23 ~ 11/30</td>
+<td>4, 25~27</td>
+</tr>
+<tr>
+<td>화면 환경 설정 기능 개발</td>
+<td>프론트엔드</td>
+<td>11/24 ~ 11/30</td>
+<td>9</td>
+</tr>
+<tr>
+<td>금융 용어 챗봇, AI 요약 API</td>
+<td>백엔드</td>
+<td>11/23 ~ 12/01</td>
+<td>31, 32</td>
+</tr>
+<tr>
+<td>신용평가 모델 성능 개선 및 검증</td>
+<td>데이터 모형</td>
+<td>11/24 ~ 12/02</td>
+<td>12, 14, 25</td>
+</tr>
+<tr>
+<td>AI 요약, 금융 용어 챗봇, 쉬운 금융사전 UI</td>
+<td>프론트엔드</td>
+<td>11/25 ~ 12/02</td>
+<td>30~32</td>
+</tr>
+<tr>
+<td>직군별 분석 및 모델 고도화 결과 검증</td>
+<td>데이터 모형</td>
+<td>11/27 ~ 12/02</td>
+<td>12~18, 20~26</td>
+</tr>
+<tr>
+<td>추가 기능, AI 서비스 API 테스트</td>
+<td>백엔드</td>
+<td>11/30 ~ 12/02</td>
+<td>4, 6, 13, 15~18, 20~27, 31, 32</td>
+</tr>
+<tr>
+<td>추가 기능, 시뮬레이터, AI 화면 테스트</td>
+<td>프론트엔드</td>
+<td>11/30 ~ 12/03</td>
+<td>4, 6, 9, 13, 15~18, 20~27, 30~32</td>
+</tr>
+<tr>
+<td>추가 기능 연동 및 개발 완료 점검</td>
+<td>팀원 전체</td>
+<td>12/02 ~ 12/03</td>
+<td>6, 9, 13, 15, 17, 18, 20~24, 30~32</td>
+</tr>
+</tbody>
+</table>
+
+<h2>B. 팀원 MD 통합 기록 (2026-10-30)</h2>
+<p class="small">팀원·조장이 각자 만든 AI 바이브 코딩용 MD 4묶음을 하나로 합친 기록입니다. 출처 표기: GH = AGENTS - GH.md · AV = Avenue MD · JWC = JWC MD · M3 = MD 3. 원본 폴더는 수정하지 않았습니다.</p>
+<h4>원본 → 통합본 대응</h4>
+<table>
+<thead>
+<tr>
+<th>원본</th>
+<th>통합본에서의 위치</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AGENTS - GH.md</code></td>
+<td><code>AGENTS.md</code> 4-3(모델 무결성), 5-2·5-3·5-5·5-6 / 일부 <code>RECOMMENDED.md</code> 5장</td>
+</tr>
+<tr>
+<td><code>JWC MD/AGENTS.md</code></td>
+<td><code>AGENTS.md</code> 뼈대(개요·문서 지도·시스템 구성·구현 순서·모를 때)</td>
+</tr>
+<tr>
+<td><code>JWC MD/CLAUDE.md</code></td>
+<td><code>CLAUDE.md</code> (<code>@AGENTS.md</code> 불러오기 방식 유지)</td>
+</tr>
+<tr>
+<td><code>JWC MD/docs/spec/features.md</code></td>
+<td><code>docs/spec/features.md</code> (<strong>내용 변경 없음</strong> — 원본 시트 사본이므로)</td>
+</tr>
+<tr>
+<td><code>JWC MD/docs/decisions.md</code></td>
+<td><code>docs/decisions.md</code> (10-30 팀 결정 반영, D-17~D-20 추가)</td>
+</tr>
+<tr>
+<td><code>Avenue MD/README.md</code></td>
+<td><code>README.md</code> (기능 표를 N-ID 기준으로, 구조·문서 목록 갱신)</td>
+</tr>
+<tr>
+<td><code>Avenue MD/CLAUDE.md</code> 1부</td>
+<td><code>AGENTS.md</code> 1·3·5장, <code>README.md</code></td>
+</tr>
+<tr>
+<td><code>Avenue MD/CLAUDE.md</code> 2부(Karpathy 원칙)</td>
+<td>겹치는 부분 → <code>AGENTS.md</code> 5-2 / 나머지 → <code>RECOMMENDED.md</code> 1·2장</td>
+</tr>
+<tr>
+<td><code>Avenue MD/docs/*.md</code> 7개</td>
+<td><code>docs/</code> 같은 이름으로 유지 + 정합화(아래 4장)</td>
+</tr>
+<tr>
+<td><code>MD 3/CLAUDE.md</code></td>
+<td><code>AGENTS.md</code> 5-1, <code>CLAUDE.md</code>(Edit 도구·토큰 절약), <code>CONVENTIONS.md</code></td>
+</tr>
+<tr>
+<td><code>MD 3/.claude/skills/*</code> 4개</td>
+<td><code>.claude/skills/*</code> — 이 프로젝트에 맞게 다시 작성(아래 5장)</td>
+</tr>
+<tr>
+<td><code>MD 3/Part1.png</code>, <code>Part2.png</code> (검토 메모)</td>
+<td><code>CLAUDE.md</code> 스킬 호출 방식, <code>RECOMMENDED.md</code> 8장, <code>CONVENTIONS.md</code> .gitignore</td>
+</tr>
+<tr>
+<td>(신규)</td>
+<td><code>GEMINI.md</code>, <code>.claude/settings.json</code>, <code>docs/guides/RECOMMENDED.md</code>, <code>docs/logs/</code></td>
+</tr>
+</tbody>
+</table>
+<h4>충돌을 정리한 방식</h4>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>문서별 차이</th>
+<th>통합본 처리</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>모델 서버 폴더명</td>
+<td><code>model-server</code>(JWC·M3) / <code>ml-server</code>(AV)</td>
+<td>다수안 <code>model-server</code>로 통일, 학습 코드는 AV안 <code>ml/</code> 유지. 최종은 D-14</td>
+</tr>
+<tr>
+<td>직군 분류</td>
+<td>GH·JWC 3분류 / AV 4분류(NEW_GRAD 포함)</td>
+<td>10-30 팀 결정대로 3분류. DATA_AND_MODEL·DATABASE·API_SPEC 수정</td>
+</tr>
+<tr>
+<td>등급</td>
+<td>AV A~E 5등급 / features·decisions 3등급</td>
+<td>Good·Standard·Poor 3단계, 경계는 설정값 <code>TODO(D-01)</code></td>
+</tr>
+<tr>
+<td>인증</td>
+<td>features "세션" / AV·M3 JWT</td>
+<td>10-30 팀 결정대로 토큰(JWT). features 원본 시트 갱신 필요 표시</td>
+</tr>
+<tr>
+<td>관리자 역할</td>
+<td>features 4역할 / AV 2역할</td>
+<td>10-30 팀 결정대로 관리자 1개(<code>ROLE_ADMIN</code>)</td>
+</tr>
+<tr>
+<td>커밋 메시지</td>
+<td>README·JWC <code>feat - 내용</code> / AV·M3 <code>feat: 내용</code></td>
+<td>저장소 README 확정안 유지, D-17로 재논의 여지 기록</td>
+</tr>
+<tr>
+<td>브랜치명</td>
+<td>JWC <code>feature/기능명</code> / AV·M3 <code>feature/{티켓}-{설명}</code></td>
+<td><code>feature/FP-12-…</code> 권장, 티켓 없으면 <code>feature/기능명</code> 허용</td>
+</tr>
+<tr>
+<td>Jira 키</td>
+<td>AV 예시 <code>AVN</code></td>
+<td>실제 Jira 프로젝트 키 <code>FP</code>로 교체</td>
+</tr>
+<tr>
+<td>응답 형식</td>
+<td>AV <code>error{code,message}</code> / M3 <code>message, errorCode</code></td>
+<td>AV안(API_SPEC) 기준, D-20 기록</td>
+</tr>
+<tr>
+<td>타임아웃</td>
+<td>AV 1초/3초 / M3 3초/5초</td>
+<td>설정값으로 분리, D-18 기록</td>
+</tr>
+<tr>
+<td>FastAPI 장애 시</td>
+<td>M3 "간이 점수 반환 가능" / AV "점수는 항상 모델이 계산"</td>
+<td>대체 점수 금지(AV·JWC 원칙 우선), 에러 코드로 응답</td>
+</tr>
+<tr>
+<td>기능 번호</td>
+<td>AV 기능 0·2·3·5 / features N-ID</td>
+<td>API_SPEC·ARCHITECTURE 상단에 대응표 추가, N-ID가 기준</td>
+</tr>
+<tr>
+<td>AI 규칙 원본 파일</td>
+<td>AV <code>CLAUDE.md</code> 원본 / GH·JWC <code>AGENTS.md</code> 원본</td>
+<td><code>AGENTS.md</code> 원본(Claude·GPT·Gemini 공통), <code>CLAUDE.md</code>·<code>GEMINI.md</code>는 불러오기만</td>
+</tr>
+</tbody>
+</table>
+<p class="small muted">2026-10-31에 이 통합본을 다시 AI용 md / 사람용 PDF / 공통 로그로 나눴습니다. 바뀐 내용은 <code>docs/logs/2026-10-31_문서담당_문서구조-정리.md</code>를 보세요.</p>
+
+<h1><span class="no">11</span>용어집</h1>
+<p class="small">AI가 낯선 단어를 쓰면 길게 설명을 시키지 말고 여기서 먼저 찾아보세요. 한도를 아끼는 가장 쉬운 방법입니다.</p>
+
+<h2>AI · 바이브 코딩</h2>
+<table class="gloss">
+  <tr><td>바이브 코딩</td><td>코드를 직접 다 쓰는 대신 AI에게 말로 요청해서 코드를 만들고, 사람은 확인·수정하는 개발 방식.</td></tr>
+  <tr><td>프롬프트</td><td>AI에게 보내는 요청 문장. 4장의 템플릿이 좋은 프롬프트의 틀.</td></tr>
+  <tr><td>토큰 (AI)</td><td>AI가 글을 처리하는 단위. 대화가 길고 붙여 넣는 양이 많을수록 많이 쓰고, 무료 한도가 빨리 찬다. 로그인용 "토큰(JWT)"과는 다른 말.</td></tr>
+  <tr><td>컨텍스트</td><td>AI가 한 대화에서 기억하고 있는 내용 전체. 너무 길어지면 앞 내용을 헷갈린다 → 새 대화로.</td></tr>
+  <tr><td>md (마크다운)</td><td><code>#</code>, <code>-</code> 같은 기호로 제목·목록을 표시하는 텍스트 파일 형식. 확장자 <code>.md</code>.</td></tr>
+  <tr><td>AGENTS.md / CLAUDE.md / GEMINI.md</td><td>코딩 도구가 대화를 시작할 때 자동으로 읽는 규칙 파일. 원본은 AGENTS.md.</td></tr>
+  <tr><td>Claude Code</td><td>Claude가 내 프로젝트 폴더의 파일을 직접 읽고 고치는 코딩 도구. VS Code 확장으로 쓸 수 있다.</td></tr>
+  <tr><td>plan 모드 (계획 모드)</td><td>AI가 코드를 바로 고치지 않고 계획만 먼저 보여 주는 모드. 여러 파일을 바꾸는 작업 전에 쓴다.</td></tr>
+  <tr><td>확인 창 (권한 요청)</td><td>AI가 CSS 수정·<code>git push</code> 같은 작업을 하기 전에 허락을 묻는 창. 이유를 읽고 누른다.</td></tr>
+  <tr><td>스킬</td><td>Claude Code에서 특정 작업용 매뉴얼을 넣어 두는 기능. 지금은 쓰지 않는다 (3장).</td></tr>
+  <tr><td>웹 채팅</td><td>브라우저·앱에서 쓰는 Claude·ChatGPT·Gemini 대화창. 저장소 파일을 못 읽어서 PASTE.md를 붙여 넣는다.</td></tr>
+</table>
+
+<h2>우리 문서</h2>
+<table class="gloss">
+  <tr><td>N-ID (N-12 등)</td><td>기능 명세서의 기능 번호. 요청·커밋·주석에 항상 붙인다. 목록은 <code>docs/ai/features.md</code>.</td></tr>
+  <tr><td>D-xx (D-01 등)</td><td><code>decisions.md</code>의 결정 사항 번호. 미정 항목은 AI가 정하지 않고 팀이 정한다.</td></tr>
+  <tr><td>P0 ~ P4</td><td>기능 우선순위. P0 필수 · P1 핵심 흐름 · P2 여유 있을 때 · P3 제외 권장 · P4 정의 미정.</td></tr>
+  <tr><td>작업 로그</td><td>DB·API 등 여러 곳을 바꾼 작업의 기록. <code>docs/logs/</code>에 작업마다 파일 하나.</td></tr>
+  <tr><td>검수</td><td>로그·작업물을 지정된 담당이 확인하는 것.</td></tr>
+  <tr><td>TODO(D-xx)</td><td>"이 값은 D-xx가 정해지면 바꿔야 함"이라는 코드 주석 표시.</td></tr>
+</table>
+
+<h2>Git · 협업</h2>
+<table class="gloss">
+  <tr><td>저장소 (repo)</td><td>프로젝트 코드 전체와 변경 기록이 들어 있는 곳. 우리는 GitHub를 쓴다.</td></tr>
+  <tr><td>브랜치</td><td>각자 작업하는 갈래. <code>main</code>(발표용 안정본) · <code>develop</code>(합치는 곳) · <code>feature/…</code>(개인 작업).</td></tr>
+  <tr><td>커밋 (commit)</td><td>변경 내용을 한 단위로 저장하는 것. 메시지 형식 <code>행위 - 내용</code>.</td></tr>
+  <tr><td>pull / push</td><td>pull: 서버의 최신 코드를 받아 오기. push: 내 커밋을 서버에 올리기.</td></tr>
+  <tr><td>PR (Pull Request)</td><td>"내 브랜치를 develop에 합쳐 주세요"라는 요청. 검토를 거쳐 병합된다.</td></tr>
+  <tr><td>병합 (merge)</td><td>두 브랜치의 변경을 하나로 합치는 것.</td></tr>
+  <tr><td>충돌 (conflict)</td><td>두 사람이 같은 곳을 다르게 바꿔서 자동으로 합칠 수 없는 상태. 남의 코드를 지우지 말고 같이 본다.</td></tr>
+  <tr><td>diff</td><td>무엇이 바뀌었는지 보여 주는 비교 화면. 커밋 전에 꼭 본다.</td></tr>
+  <tr><td>Jira (FP)</td><td>팀 작업(이슈) 관리 도구. 브랜치 이름에 <code>FP-12</code> 같은 이슈 키를 넣으면 연결된다.</td></tr>
+</table>
+
+<h2>개발</h2>
+<table class="gloss">
+  <tr><td>프론트엔드 / 백엔드</td><td>프론트: 사용자가 보는 화면(React). 백엔드: 로그인·DB·계산을 처리하는 서버(Spring Boot).</td></tr>
+  <tr><td>모델 서버</td><td>신용점수와 SHAP을 계산하는 별도 서버(FastAPI). 백엔드만 호출한다.</td></tr>
+  <tr><td>API / 엔드포인트</td><td>API: 서버끼리 주고받는 약속. 엔드포인트: 그 약속의 주소(예: <code>/api/v1/...</code>).</td></tr>
+  <tr><td>요청 · 응답 필드</td><td>API로 보내고 받는 데이터의 항목 이름. 바꾸면 다른 기능이 깨질 수 있어 로그 대상.</td></tr>
+  <tr><td>DTO</td><td>API로 주고받는 데이터를 담는 Java 클래스.</td></tr>
+  <tr><td>DB · 테이블 · 컬럼</td><td>데이터 저장소(Oracle) · 엑셀의 시트 같은 표 · 표의 열.</td></tr>
+  <tr><td>DDL</td><td>테이블을 만들거나 바꾸는 SQL 문(<code>CREATE TABLE</code> 등).</td></tr>
+  <tr><td>스키마</td><td>데이터의 구조(어떤 항목이 어떤 형식으로 들어가는지)를 정의한 것.</td></tr>
+  <tr><td>mock (목)</td><td>상대 서버가 아직 없을 때 쓰는 가짜 응답. 실제 응답과 같은 모양으로 만든다.</td></tr>
+  <tr><td>JWT (토큰 인증)</td><td>로그인하면 서버가 발급하는 출입증. 요청마다 함께 보내 본인임을 증명한다.</td></tr>
+  <tr><td>SHAP</td><td>모델 점수에 각 항목이 얼마나 영향을 줬는지 보여 주는 방법. 원인(인과)을 증명하지는 않는다.</td></tr>
+  <tr><td>합성 데이터</td><td>실제 사람 정보가 아니라 규칙에 따라 만들어 낸 가짜 데이터.</td></tr>
+  <tr><td>마스킹</td><td>개인정보 일부를 가리는 것(예: 010-****-1234).</td></tr>
+  <tr><td>하드코딩 / 상수·설정값</td><td>하드코딩: 값을 코드 곳곳에 직접 박아 넣는 것. 상수·설정값: 한곳에 모아 이름을 붙여 두는 것 → 바꾸기 쉽다.</td></tr>
+  <tr><td>의존성 / 라이브러리</td><td>프로젝트가 가져다 쓰는 외부 코드. <code>pom.xml</code>·<code>package.json</code>에 적힌다.</td></tr>
+  <tr><td>환경 변수 / .env</td><td>비밀번호·API 키처럼 코드에 직접 쓰면 안 되는 값을 따로 두는 곳. 절대 올리지 않는다.</td></tr>
+  <tr><td>Swagger</td><td>백엔드 API를 브라우저에서 직접 호출해 볼 수 있는 화면.</td></tr>
+  <tr><td>리팩터링</td><td>동작은 그대로 두고 코드 구조만 다듬는 것. 요청 없이 시키지 않는다.</td></tr>
+</table>
+
+</body>
+</html>

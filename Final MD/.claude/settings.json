@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "ask": [
+      "Edit(**/*.css)",
+      "Edit(**/*.scss)",
+      "Edit(**/styles/**)",
+      "Bash(rm:*)",
+      "Bash(git push:*)",
+      "Bash(git merge:*)",
+      "Bash(git rebase:*)",
+      "Bash(git reset:*)",
+      "Bash(git branch -D:*)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/application-local.yml)"
+    ]
+  }
+}
