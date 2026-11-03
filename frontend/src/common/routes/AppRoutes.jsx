@@ -14,6 +14,9 @@ import FindIdPage from '../../features/auth/pages/FindIdPage.jsx'
 import FindPasswordPage from '../../features/auth/pages/FindPasswordPage.jsx'
 import LoginPage from '../../features/auth/pages/LoginPage.jsx'
 import SignupPage from '../../features/auth/pages/SignupPage.jsx'
+import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
+import DataInputPage from '../../features/dataInput/pages/DataInputPage.jsx'
+import JobSelectPage from '../../features/dataInput/pages/JobSelectPage.jsx'
 
 // N-08 직군별 재무 진단 서브탭 내용. 담당 팀은 해당 PlaceholderPage를 자기 화면으로 바꾼다.
 const DIAGNOSIS_CONTENTS = {
@@ -40,8 +43,8 @@ export default function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route path={PATHS.HOME} element={<HomeRedirect />} />
           <Route path={PATHS.FORBIDDEN} element={<ForbiddenPage />} />
-          {/* 직군 선택 화면은 다음 작업에서 만든다 */}
-          <Route path={PATHS.SELECT_JOB} element={<PlaceholderPage title="직군 선택" nId="N-08" />} />
+          {/* 직군 선택 (FP-85 N-08) — 직군이 없는 사용자만 머문다 */}
+          <Route path={PATHS.SELECT_JOB} element={<JobSelectPage />} />
 
           {/* 일반 사용자 전용 + 직군 선택 완료 */}
           <Route element={<RouteGuard requiredRole={ROLES.USER} requireJobType />}>
@@ -49,6 +52,7 @@ export default function AppRoutes() {
             <Route path={`${PATHS.DIAGNOSIS}/:subTab?`} element={<DiagnosisPage contents={DIAGNOSIS_CONTENTS} />} />
             <Route path={PATHS.SIMULATOR} element={<PlaceholderPage title="점수·금리 시뮬레이터" nId="N-18" />} />
             <Route path={PATHS.MY_PAGE} element={<PlaceholderPage title="마이 페이지" nId="N-04" />} />
+            <Route path={DATA_INPUT_PATHS.DATA_INPUT} element={<DataInputPage />} />
           </Route>
 
           {/* 관리자 전용 */}
