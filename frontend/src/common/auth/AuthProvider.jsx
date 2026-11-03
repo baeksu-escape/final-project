@@ -4,12 +4,14 @@ import { UNAUTHORIZED_EVENT } from '../api/client.js'
 import { AuthContext } from './AuthContext.js'
 import { tokenStorage } from './tokenStorage.js'
 
+// 로그인하지 않은 상태의 기본값.
 const ANONYMOUS = { status: 'anonymous', user: null }
 
 // N-01 로그인 상태 제공자 — 토큰 보관·삭제와 현재 사용자 정보를 관리한다. 새로고침하면 저장된 토큰으로 사용자를 다시 불러온다.
 export default function AuthProvider({ children }) {
   const [auth, setAuth] = useState(() => (tokenStorage.get() ? { status: 'loading', user: null } : ANONYMOUS))
 
+  // 새로고침 시 저장된 토큰이 있으면 내 정보를 다시 불러와 로그인 상태를 복원한다. 실패하면 로그아웃 상태로 둔다.
   useEffect(() => {
     if (!tokenStorage.get()) return undefined
     let cancelled = false
@@ -32,6 +34,7 @@ export default function AuthProvider({ children }) {
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized)
   }, [])
 
+  // 로그인 API를 호출하고, 성공하면 토큰을 저장한 뒤 사용자 정보를 돌려준다. 실패하면 ApiError를 그대로 던진다.
   const login = useCallback(async (loginId, password) => {
     const { accessToken, user } = await requestLogin(loginId, password)
     tokenStorage.set(accessToken)
@@ -39,6 +42,7 @@ export default function AuthProvider({ children }) {
     return user
   }, [])
 
+  // 서버에 로그아웃을 알린 뒤 토큰을 지우고 로그아웃 상태로 바꾼다.
   const logout = useCallback(async () => {
     try {
       await requestLogout()
@@ -49,6 +53,7 @@ export default function AuthProvider({ children }) {
     setAuth(ANONYMOUS)
   }, [])
 
+  // 화면에 들고 있는 사용자 정보의 일부만 바꾼다(예: 직군 선택 저장 후 { jobType }). 서버 저장은 호출하는 쪽에서 한다.
   const updateUser = useCallback((patch) => {
     setAuth((prev) => (prev.user ? { ...prev, user: { ...prev.user, ...patch } } : prev))
   }, [])

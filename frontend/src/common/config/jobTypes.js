@@ -5,6 +5,7 @@ export const JOB_TYPES = Object.freeze({
   FREELANCER: 'FREELANCER',
 })
 
+// 직군 코드 → 화면에 보일 한국어 이름.
 export const JOB_TYPE_LABELS = Object.freeze({
   [JOB_TYPES.EMPLOYEE]: '급여소득자',
   [JOB_TYPES.SELF_EMPLOYED]: '자영업자',

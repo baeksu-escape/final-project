@@ -6,6 +6,7 @@ import { ApiError } from './ApiError.js'
 // 401을 받으면 이 이름의 이벤트를 보낸다. AuthProvider가 받아서 로그아웃 상태로 바꾼다.
 export const UNAUTHORIZED_EVENT = 'auth:unauthorized'
 
+// 응답 본문을 JSON으로 읽는다. JSON이 아니면(빈 본문, HTML 오류 페이지 등) null을 돌려준다.
 function parseJson(text) {
   try {
     return JSON.parse(text)
@@ -55,6 +56,8 @@ export async function apiRequest(method, path, body) {
   }
 }
 
+// HTTP 메서드별 줄임 함수 — apiRequest와 같고 메서드만 정해져 있다. body는 객체로 넘기면 JSON으로 보낸다.
+// 사용 예: await apiPost('/api/income', { month: '2026-11', amount: 3000000 })
 export const apiGet = (path) => apiRequest('GET', path)
 export const apiPost = (path, body) => apiRequest('POST', path, body)
 export const apiPatch = (path, body) => apiRequest('PATCH', path, body)
