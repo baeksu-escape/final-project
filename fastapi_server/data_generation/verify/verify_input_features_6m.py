@@ -36,13 +36,33 @@ def main():
                       income_cv_6m=np.where(mean > 0, inc.std(1) / np.where(mean > 0, mean, 1), np.nan),
                       zero_income_months_6m=(inc == 0).sum(1), deficit_months_6m=(net < 0).sum(1),
                       worst_month_net_cash_6m_krw=net.min(1), dp_payment_amount_6m_krw=dp, dp_amount_to_income_6m=ratio(dp))
+        # v3.5.10: 기록(anomaly_log.csv)에 있는 칸은 "기록의 원래 값 = 재계산 값"이고 "파일 값 = 기록의 넣은 값"인지 보고,
+        # 원래 값으로 되돌린 표를 기존처럼 정확히 비교한다. 종류·열별 개수는 설정 비율과 맞아야 한다.
+        spec = json.loads((ROOT/'reference/anomaly_injection.json').read_text(encoding='utf-8'))
+        log = pd.read_csv(d/spec['log_file'], encoding='utf-8-sig')
+        assert not log.duplicated(['customer_id', 'column']).any(), (folder, 'one anomaly per cell')
+        want = {(r['type'], c): int(len(f) * r['rate']['value'] + 0.5) for r in spec['rules'] for c in r['columns']}
+        assert log.groupby(['anomaly_type', 'column']).size().to_dict() == want, (folder, 'anomaly counts')
+        factors = {r['type']: r.get('factor', {}).get('value') for r in spec['rules']}
+        position = {cid: i for i, cid in enumerate(f.index)}
+        restored = f.astype(float)
+        for r in log.itertuples():
+            i = position[r.customer_id]
+            assert float(r.original_value) == float(expect[r.column][i]), (folder, r.customer_id, r.column, 'original value')
+            value = f[r.column].iloc[i]
+            if r.anomaly_type == 'missing':
+                assert pd.isna(value) and pd.isna(r.injected_value), (folder, r.customer_id, r.column, 'missing')
+            else:
+                assert float(value) == float(r.injected_value) == float(r.original_value) * factors[r.anomaly_type] != 0, (folder, r.customer_id, r.column, r.anomaly_type)
+            restored.iloc[i, restored.columns.get_loc(r.column)] = r.original_value
+        injected_cells = len(log)
         for c, v in expect.items():
-            got = f[c].to_numpy(dtype=float)
+            got = restored[c].to_numpy(dtype=float)
             assert np.array_equal(np.isnan(got), np.isnan(v)), (folder, c, 'null pattern')
             assert np.allclose(got[~np.isnan(v)], v[~np.isnan(v)], rtol=1e-12, atol=0), (folder, c)
-        assert (f.dsr_6m.isna() == (f.income_6m_krw == 0)).all()
-        report[folder] = dict(customers=len(f), zero_income_6m_customers=int((f.income_6m_krw == 0).sum()),
-                              mean_dsr_6m=round(float(f.dsr_6m.mean()), 4))
+        assert (restored.dsr_6m.isna().to_numpy() == (si == 0)).all()
+        report[folder] = dict(customers=len(f), zero_income_6m_customers=int((si == 0).sum()),
+                              mean_dsr_6m=round(float(f.dsr_6m.mean()), 4), injected_cells=injected_cells)
     report['status'] = 'PASS'
     print(json.dumps(report, ensure_ascii=False, indent=2))
 

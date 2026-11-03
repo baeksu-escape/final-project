@@ -61,6 +61,15 @@
 | `worst_month_net_cash_6m_krw` | 6개월 중 최저 (소득 − 지출 − 상환) |
 | `dp_payment_amount_6m_krw`, `dp_amount_to_income_6m` | 6개월 간편결제 금액, 그 금액 / 6개월 소득 |
 
+- **전처리 시연용 결측·이상치(v3.5.10).** 모델 파트가 결측 처리와 이상치 탐지·처리를 시연할 수 있도록 `input_features_6m.csv`(두 폴더)에 조금 넣었다. 생성 단계에서 넣어 데이터는 하나이고, 원래 값은 같은 폴더의 `anomaly_log.csv`(`customer_id, column, anomaly_type, original_value, injected_value`)에 있다. 설정은 `reference/anomaly_injection.json` 한 곳이며 비율은 모두 교육용 가정이고 통계 근거가 없다.
+
+  | 종류 | 대상 열 | 비율(파일별, 열마다) | 넣는 값 |
+  |---|---|---|---|
+  | `missing` | `income_6m_krw`, `expense_6m_krw`, `debt_service_6m_krw` | 1% | 빈 값 |
+  | `unit_error` | `income_6m_krw`, `expense_6m_krw` | 0.5% | 원래 값 × 1,000 (원·천원 혼동) |
+  | `negative` | `debt_service_6m_krw` | 0.3% | 원래 값 × −1 (원래 값이 0이 아닌 칸만) |
+
+  한 칸에는 하나만 넣고, 라벨·위험도와 무관한 별도 seed의 난수로 뽑는다. 단위 착오도 원래 값이 0인 칸은 바뀌지 않으므로 뽑지 않는다. 파생 비율 열(`expense_ratio_6m`, `dsr_6m` 등)은 깨끗한 값으로 계산된 그대로라서 입력 열과 맞지 않는 칸이 있다(실제 데이터에서도 흔한 모습). `age`와 다른 파일은 바꾸지 않았다.
 - 원천 월자료(`monthly_history.csv`)와 `profiles.csv`의 12개월 집계는 바꾸지 않는다. 다만 전달 묶음의 **모델 표에는 12개월 소득 집계 대신 6개월 집계가 들어간다.** 모델 표에서 뺀 열과 이유는 학습 묶음 README(`tools/handoff_README.md`)에 있다.
 - 간편결제·사회보험·통신·공과금처럼 외부 API로 받는 정보는 회원 부담이 없으므로 12개월 집계를 그대로 쓴다.
 - 라벨(향후 12개월 연체)은 예측 기간이며 입력 기간과 별개라 그대로다. 비금융 효과 라벨은 12개월 원천으로 만든 "실제로 일어난 일" 역할이고 바꾸지 않았다.
@@ -84,7 +93,7 @@
 | 시나리오 예시 | `data/scenarios.csv`, `thinfile/scenarios.csv` (과거 12개월에 소득 20% 감소를 적용한 예시) |
 | 간편결제·사회보험 원천(v3.5.0) | `digital_payment_monthly.csv`, `social_insurance_monthly.csv`, `nonfinancial_source_features.csv`(두 폴더 각각, `NONFINANCIAL_SOURCES.md`) |
 | 비금융 효과 라벨 | `data/labels_nonfinancial.csv`, `thinfile/labels_nonfinancial.csv` |
-| 6개월 입력 집계(v3.5.7) | `data/input_features_6m.csv`, `thinfile/input_features_6m.csv` |
+| 6개월 입력 집계(v3.5.7) | `data/input_features_6m.csv`, `thinfile/input_features_6m.csv` (v3.5.10부터 결측·이상치 포함, 기록은 각 폴더 `anomaly_log.csv`) |
 | 서비스 개발용 더미 | `service_dummy/` (학습에 쓰지 않는다, `SERVICE_DUMMY_DATA.md`) |
 | 생성 설계·참고 | `thinfile/plan.csv`, `availability.csv`, `target_metadata.csv`, `cohort_summary.csv`, `*_metadata.csv` |
 

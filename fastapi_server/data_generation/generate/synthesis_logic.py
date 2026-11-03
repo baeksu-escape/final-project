@@ -1,6 +1,7 @@
 """Pure transformations; callers supply randomness. No dataset generation or I/O."""
 from decimal import Decimal, ROUND_HALF_UP, localcontext
 import numpy as np
+import pandas as pd
 from scipy.stats import norm, rankdata
 
 
@@ -146,3 +147,40 @@ def amortization_rows(balance, months, annual_rate, method):
         rows.append((principal, interest))
         bal -= principal
     return rows
+
+
+def inject_anomalies(frame, spec, rng):
+    """전처리 시연용 결측·이상치를 표에 넣고 (오염된 표, 기록 표)를 돌려준다.
+
+    종류·열마다 행 수 x 비율만큼 칸을 뽑고(한 칸에는 하나만), 원래 값과 넣은 값을 기록에 남긴다. 난수는 호출자가 준다.
+    """
+    out = frame.copy()
+    used = {}
+    log = []
+    n_rows = len(out)
+    for rule in spec['rules']:
+        kind = rule['type']
+        factor = rule.get('factor', {}).get('value')
+        for col in rule['columns']:
+            if not pd.api.types.is_integer_dtype(out[col]):
+                raise ValueError('integer column required: ' + col)
+            out[col] = out[col].astype('Int64')
+            taken = used.setdefault(col, np.zeros(n_rows, dtype=bool))
+            values = out[col]
+            eligible = ~taken & values.notna().to_numpy()
+            if kind != 'missing':
+                eligible &= (values.fillna(0) != 0).to_numpy()
+            pool = np.flatnonzero(eligible)
+            count = int(n_rows * rule['rate']['value'] + 0.5)
+            if count > len(pool):
+                raise ValueError('not enough eligible cells: ' + kind + ' ' + col)
+            for pos in np.sort(rng.choice(pool, size=count, replace=False)):
+                original = int(values.iloc[pos])
+                injected = None if kind == 'missing' else original * int(factor)
+                out.iloc[pos, out.columns.get_loc(col)] = pd.NA if injected is None else injected
+                taken[pos] = True
+                log.append(dict(customer_id=out['customer_id'].iloc[pos], column=col, anomaly_type=kind,
+                                original_value=original, injected_value=injected))
+    log = pd.DataFrame(log, columns=['customer_id', 'column', 'anomaly_type', 'original_value', 'injected_value'])
+    log[['original_value', 'injected_value']] = log[['original_value', 'injected_value']].astype('Int64')
+    return out, log

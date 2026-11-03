@@ -2,6 +2,14 @@
 
 데이터 생성과 해석에 영향을 주는 변경만 적는다. 최신 항목이 위에 있다. 문서 표현만 고친 버전은 한 줄로 줄였다.
 
+## v3.5.10 (2026-11-03) — 학습용 6개월 입력 집계에 전처리 시연용 결측·이상치 추가
+
+- **배경.** 모델 파트가 결측 처리와 이상치 탐지·처리를 시연할 수 있도록, `input_features_6m.csv`(`data/`, `thinfile/`)에 결측·이상치를 조금 넣었다. 생성 단계에서 넣어 데이터는 하나이고, 원래 값은 새 `anomaly_log.csv`(각 폴더)에 남겼다.
+- **규칙(교육용 가정, 통계 근거 없음).** 결측 1%(소득·지출·상환 합계), 단위 착오 0.5%(소득·지출, 원래 값 × 1,000), 음수 0.3%(상환 합계, 원래 값 × −1). 파일별·열마다 비율을 적용하고 한 칸에는 하나만 넣는다. 설정은 `reference/anomaly_injection.json`, seed는 기존과 겹치지 않는 20261110이다.
+- **코드.** 순수 함수 `inject_anomalies`(`generate/synthesis_logic.py`), `generate/build_input_features_6m.py`가 집계 뒤 저장 전에 적용. `verify/verify_input_features_6m.py`는 기록 칸을 "원래 값 = 재계산 값, 파일 값 = 넣은 값"으로 확인하고 종류·열별 개수를 설정 비율과 대조한다. `tools/build_handoff.py`는 `anomaly_log.csv`를 `3_reference`에 넣는다.
+- **바뀐 출력.** `input_features_6m.csv` 2개, 새 `anomaly_log.csv` 2개, 전달 묶음 모델 표의 해당 열 값. 파생 비율 열과 `age`는 그대로다.
+- **바뀌지 않은 것.** 그 밖의 모든 생성 결과(라벨, 207열, profiles, monthly_history, loan_extension, 서비스 더미, DB 시드).
+
 ## v3.5.9 (2026-11-03) — 상환방식 3종 배정, 대출 종류 코드 8번 정의
 
 - **상환방식 3종.** 모든 계좌를 원금균등으로 가정하던 것을 만기일시(`bullet`)·원리금균등(`equal_payment`)·원금균등(`equal_principal`)으로 나눈다. 대출 종류별 확률표는 `reference/repayment_method_assumptions.json`(값마다 `basis`·`source`·`note`)에 있고, 계좌 ID 해시로 배정한다. 위험도·라벨과 무관하며 근거 열 `repayment_method_basis`(`kind_probability_assumption_v1`)를 추가했다. 기존 열 이름은 그대로다.

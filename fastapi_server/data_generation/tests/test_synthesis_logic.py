@@ -1,7 +1,7 @@
 """Fixed-fixture regressions only: no generator calls, RNG draws, or file writes."""
 import unittest
 import numpy as np
-from generate.synthesis_logic import income_latent, allocate_card_components, card_subsets, quantize_rate, amortization_rows
+from generate.synthesis_logic import income_latent, allocate_card_components, card_subsets, quantize_rate, amortization_rows, inject_anomalies
 
 
 class LogicRegressionTests(unittest.TestCase):
@@ -91,6 +91,34 @@ class LogicRegressionTests(unittest.TestCase):
         self.assertEqual(sum(p for p, _ in amortization_rows(500_000, 5, 0.0, 'equal_payment')), 500_000)
         with self.assertRaises(ValueError):
             amortization_rows(1, 1, 0.1, 'unknown')
+
+    def test_inject_anomalies_fixed_example(self):
+        # 같은 난수면 같은 칸이 뽑히고, 기록의 원래 값으로 되돌리면 입력 표와 같아야 한다.
+        import pandas as pd
+        n = 200
+        frame = pd.DataFrame(dict(customer_id=[f'C{i}' for i in range(n)], a=np.arange(n) * 10, b=np.arange(n) * 7))
+        spec = {'rules': [
+            {'type': 'missing', 'columns': ['a', 'b'], 'rate': {'value': 0.05}},
+            {'type': 'unit_error', 'columns': ['a'], 'rate': {'value': 0.02}, 'factor': {'value': 1000}},
+            {'type': 'negative', 'columns': ['b'], 'rate': {'value': 0.01}, 'factor': {'value': -1}}]}
+        out, log = inject_anomalies(frame, spec, np.random.default_rng(1))
+        out2, log2 = inject_anomalies(frame, spec, np.random.default_rng(1))
+        pd.testing.assert_frame_equal(out, out2)
+        self.assertEqual(log.groupby(['anomaly_type', 'column']).size().to_dict(),
+                         {('missing', 'a'): 10, ('missing', 'b'): 10, ('unit_error', 'a'): 4, ('negative', 'b'): 2})
+        self.assertFalse(log.duplicated(['customer_id', 'column']).any())
+        restored = out[['a', 'b']].astype('float')
+        for r in log.itertuples():
+            i = int(r.customer_id[1:])
+            self.assertEqual(frame.loc[i, r.column], r.original_value)
+            if r.anomaly_type == 'missing':
+                self.assertTrue(pd.isna(out.loc[i, r.column]))
+            else:
+                self.assertEqual(out.loc[i, r.column], r.injected_value)
+                self.assertEqual(r.injected_value, r.original_value * (1000 if r.anomaly_type == 'unit_error' else -1))
+                self.assertNotEqual(r.original_value, 0)
+            restored.loc[i, r.column] = r.original_value
+        pd.testing.assert_frame_equal(restored, frame[['a', 'b']].astype('float'))
 
 
 if __name__ == '__main__':

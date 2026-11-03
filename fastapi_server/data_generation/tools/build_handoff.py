@@ -45,9 +45,9 @@ DETAIL = {
 }
 REFERENCE = {
     'data': ['labels_nonfinancial_metadata.csv', 'effective_config.json', 'segment_summary.csv', 'validation.json',
-             'nonfinancial_sources_summary.json', 'rho_sensitivity.csv', 'expense_sensitivity.csv'],
+             'nonfinancial_sources_summary.json', 'rho_sensitivity.csv', 'expense_sensitivity.csv', 'anomaly_log.csv'],
     'thinfile': ['labels_nonfinancial_metadata.csv', 'target_metadata.csv', 'plan.csv', 'availability.csv',
-                 'cohort_summary.csv', 'generation_summary.json', 'column_dictionary_207.csv'],
+                 'cohort_summary.csv', 'generation_summary.json', 'column_dictionary_207.csv', 'anomaly_log.csv'],
 }
 DOCS = ['DATA_DICTIONARY.csv', 'DATA_SPEC.md', 'THINFILE.md', 'NONFINANCIAL_LABEL.md', 'NONFINANCIAL_SOURCES.md']
 # profile columns that describe how the row was designed, not the customer

@@ -9,6 +9,7 @@ from pathlib import Path
 import argparse, json
 import numpy as np
 import pandas as pd
+from generate.synthesis_logic import inject_anomalies
 
 ROOT = Path(__file__).resolve().parents[1]
 COLUMNS = ['customer_id', 'income_6m_krw', 'expense_6m_krw', 'debt_service_6m_krw', 'expense_ratio_6m', 'dsr_6m',
@@ -45,15 +46,24 @@ def input_features_6m(monthly, payment, months):
     return f.reset_index()[COLUMNS]
 
 
+def anomaly_spec():
+    """전처리 시연용 결측·이상치 설정(reference/anomaly_injection.json)을 읽는다."""
+    return json.loads((ROOT/'reference/anomaly_injection.json').read_text(encoding='utf-8'))
+
+
 def run(folders=('data', 'thinfile')):
     months = input_months()
-    for folder in folders:
+    spec = anomaly_spec()
+    for i, folder in enumerate(folders):
         d = ROOT/folder
         monthly = pd.read_csv(d/'monthly_history.csv', encoding='utf-8-sig')
         payment = pd.read_csv(d/'digital_payment_monthly.csv', encoding='utf-8-sig')
         f = input_features_6m(monthly, payment, months)
-        f.to_csv(d/'input_features_6m.csv', index=False, encoding='utf-8-sig')
-        print(f'{folder}/input_features_6m.csv: {len(f)} customers, months {months[0]}~{months[-1]}')
+        # v3.5.10: 계산한 뒤 저장하기 전에 전처리 시연용 결측·이상치를 넣고 원래 값을 기록 파일에 남긴다.
+        f, log = inject_anomalies(f, spec, np.random.default_rng([spec['seed']['value'], i]))
+        f.to_csv(d/spec['target_file'], index=False, encoding='utf-8-sig')
+        log.to_csv(d/spec['log_file'], index=False, encoding='utf-8-sig')
+        print(f'{folder}/input_features_6m.csv: {len(f)} customers, months {months[0]}~{months[-1]}, {len(log)} anomaly cells')
 
 
 if __name__ == '__main__':

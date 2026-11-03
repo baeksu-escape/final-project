@@ -1,0 +1,60 @@
+{
+  "description": "학습용 6개월 입력 집계(input_features_6m.csv, data/·thinfile/)에 전처리 시연용 결측·이상치를 조금 넣는 설정(v3.5.10). 모든 비율과 값은 교육용 가정이며 통계 근거가 없다. 라벨·위험도와 무관하게 별도 seed의 난수로 뽑고, 한 칸에는 하나만 넣는다. 원래 값은 같은 폴더의 anomaly_log.csv에 남긴다. 파생 비율 열(expense_ratio_6m, dsr_6m 등)은 깨끗한 값 그대로 둔다.",
+  "seed": {
+    "value": 20261110,
+    "basis": "assumption",
+    "note": "기존 seed(20261029·20261030·20261101~20261105)와 겹치지 않는 별도 값. 폴더마다 [seed, 폴더 순번]으로 난수를 만든다"
+  },
+  "target_file": "input_features_6m.csv",
+  "log_file": "anomaly_log.csv",
+  "rate_unit": "각 파일에서 열마다 행 수 x 비율(반올림)칸",
+  "rules": [
+    {
+      "type": "missing",
+      "columns": [
+        "income_6m_krw",
+        "expense_6m_krw",
+        "debt_service_6m_krw"
+      ],
+      "rate": {
+        "value": 0.01,
+        "basis": "assumption",
+        "note": "교육용 가정, 통계 근거 없음"
+      },
+      "injected_value": "빈 값(null)"
+    },
+    {
+      "type": "unit_error",
+      "columns": [
+        "income_6m_krw",
+        "expense_6m_krw"
+      ],
+      "rate": {
+        "value": 0.005,
+        "basis": "assumption",
+        "note": "교육용 가정, 통계 근거 없음"
+      },
+      "factor": {
+        "value": 1000,
+        "basis": "assumption",
+        "note": "원·천원 혼동을 가정해 원래 값 x 1,000. 원래 값이 0이면 바뀌지 않으므로 0이 아닌 칸만 뽑는다. 교육용 가정, 통계 근거 없음"
+      }
+    },
+    {
+      "type": "negative",
+      "columns": [
+        "debt_service_6m_krw"
+      ],
+      "rate": {
+        "value": 0.003,
+        "basis": "assumption",
+        "note": "교육용 가정, 통계 근거 없음"
+      },
+      "factor": {
+        "value": -1,
+        "basis": "assumption",
+        "note": "원래 값 x -1. 원래 값이 0이 아닌 칸만 뽑는다. 교육용 가정, 통계 근거 없음"
+      }
+    }
+  ]
+}
