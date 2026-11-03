@@ -63,11 +63,13 @@ export default function DataInputPage() {
     setValues(updater)
     setJustSaved(false)
   }
+  // 기준월·칸 섹션·줄 섹션의 값이 바뀔 때 부르는 함수들 — 바뀐 부분만 새 값으로 바꾼다.
   const handleBaseMonthChange = (baseMonth) => change((prev) => ({ ...prev, baseMonth }))
   const handleFieldChange = (sectionKey) => (fieldKey, fieldValue) =>
     change((prev) => ({ ...prev, [sectionKey]: { ...prev[sectionKey], [fieldKey]: fieldValue } }))
   const handleListChange = (sectionKey) => (items) => change((prev) => ({ ...prev, [sectionKey]: items }))
 
+  // 저장 — 필수 항목 검사를 통과하면 요청 본문(모든 섹션에 기준월)을 보내고, 응답의 완료 현황으로 화면을 바꾼다.
   const handleSubmit = async (event) => {
     event.preventDefault()
     setSubmitted(true)

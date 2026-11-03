@@ -21,6 +21,7 @@ export default function JobSelectPage() {
   if (saved) return <Navigate to={DATA_INPUT_PATHS.DATA_INPUT} replace />
   if (isAdmin(user) || user?.jobType) return <Navigate to={getHomePath(user)} replace />
 
+  // 고른 직군을 저장한다. 성공하면 '저장됨'과 로그인 상태의 직군을 한 번에 바꿔 데이터 입력 화면으로 이동시킨다.
   const handleSubmit = async (event) => {
     event.preventDefault()
     if (!jobType) return

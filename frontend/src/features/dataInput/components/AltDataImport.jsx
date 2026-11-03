@@ -17,6 +17,7 @@ export default function AltDataImport({ baseMonth, imported, onImported }) {
   const [pendingKey, setPendingKey] = useState(null)
   const [errors, setErrors] = useState({})
 
+  // 종류 하나를 불러온다. 불러오는 동안 다른 [불러오기]는 막고, 실패하면 그 종류 아래에 오류를 보여 준다.
   const handleImport = async (source) => {
     setPendingKey(source.key)
     setErrors((prev) => ({ ...prev, [source.key]: '' }))
