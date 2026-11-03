@@ -1,0 +1,129 @@
+{
+  "description": "Nonfinancial-effect label (label_nonfin_effect_12m). Original labels are kept unchanged; this is an additional label column.",
+  "label_column": "label_nonfin_effect_12m",
+  "seed": 20261104,
+  "financial_features": [
+    "CB",
+    "SP",
+    "L00000001",
+    "L00000002",
+    "DQ1200001",
+    "KC5000016",
+    "LRZ021201",
+    "CL0631905"
+  ],
+  "log1p_features": [
+    "L00000002",
+    "LRZ021201"
+  ],
+  "bill_arrears_odds_ratio": {
+    "value": 2.5,
+    "basis": "assumption anchored to studies",
+    "meaning": "통신 또는 공과금 미납이 1개월 이상인 고객의 연체 승산비. 같은 금융 위험(기준 로짓) 안에서의 조건부 값",
+    "choice": "연구 결과 범위 중 보수(2.0)와 기준(3.0) 사이. 과장된 효과를 피하기 위해 상단 값(4.6)은 쓰지 않음",
+    "anchors": [
+      "PERC (2015) Predicting Financial Account Delinquencies with Utility and Telecom Payment Data: VantageScore 800~899 구간 안에서 통신·공과금 연체 경험자 카드 연체율 11.4% vs 2.7% (승산비 약 4.6)",
+      "Björkegren & Grissen (2020) World Bank Economic Review 34(3): 휴대폰 이용 기반 위험 상위 20%가 하위 20%보다 부도 2.8배",
+      "Óskarsdóttir et al. (2019) Applied Soft Computing: 통화 행태 추가 시 AUC +0.023 (랜덤포레스트), +0.025 (로지스틱)",
+      "Berg et al. (2020) Review of Financial Studies 33(7): 신용점수 AUC 0.683 → 디지털 흔적 결합 0.736"
+    ]
+  },
+  "cashflow_logit_per_sd": {
+    "value": 0.15,
+    "basis": "assumption (weak)",
+    "meaning": "현금흐름 압박 지수 1 표준편차당 로짓 증가. 지수 = 표준화(월말 유동자산 음수 개월 수)와 표준화(월소득 변동계수)의 평균",
+    "anchors": [
+      "FinRegLab (2019) The Use of Cash-Flow Data in Underwriting Credit: 6개 비은행 대출기관 자료에서 현금흐름 지표가 같은 신용점수 구간 안에서도 위험 예측을 개선. 수치 효과 크기는 공개 요약에 없음"
+    ]
+  },
+  "social_insurance_arrears_odds_ratio": {
+    "value": 2.0,
+    "basis": "assumption anchored to studies",
+    "added_in": "v3.5.0",
+    "meaning": "국민연금 또는 건강보험 납부 의무가 있는 달 중 기한을 넘기거나(late) 일부만 내거나(partial) 내지 않은(unpaid) 달이 1개월 이상인 고객의 연체 승산비. 같은 금융 위험(기준 로짓)·통신·공과금 미납 안에서의 조건부 값. 가입하지 않았거나 납부예외·피부양자라 의무가 없는 사람은 0(감점 없음)",
+    "choice": "KCB·국민연금공단 분석에서 같은 신용평점 구간 안 성실납부자의 불량률이 전체의 약 0.75배였다. 성실납부자 비중이 70~90%라면 비성실 대 성실 비율은 약 2.1~4.3배가 된다. 비중을 확인하지 못했고 불량률 정의(90일 이상 연체)가 이 프로젝트 라벨과 달라 범위의 하단 2.0을 쓴다",
+    "anchors": [
+      "보건복지부·금융위원회 보도자료 2020-07-14: 국민연금 가입자 235만 명 분석, 12개월 이상 미납 없는 성실납부자의 12개월 내 90일 이상 연체율이 같은 신용평점 구간 전체보다 낮음(832~1000점 0.06% vs 0.08%, 630~831점 0.85% vs 1.14%, 335~629점 13.4% vs 17.8%)",
+      "KCB 새 모형(2020-10): 성실납부 기간에 따라 최대 41점(1,000점 척도) 가점"
+    ]
+  },
+  "digital_payment_regularity_logit_per_sd": {
+    "value": -0.15,
+    "basis": "assumption anchored to studies",
+    "added_in": "v3.5.0",
+    "meaning": "간편결제 사용자 안에서 12개월 중 결제한 달 수의 표준점수 1당 로짓 변화. 한 번도 쓰지 않은 사람은 0(정보 없음, 감점 없음). 결제 금액 크기에는 방향을 주지 않는다",
+    "choice": "Ghosh·Vallée·Zeng(NBER w34148): 비현금 결제 이용 1 표준편차 증가가 신용점수를 통제하고도 부도확률 2%p(기준 대비 13%) 감소와 연관. 승산비 약 0.85, 로짓 약 -0.16. 인도 소상공인 자료를 개인 간편결제 규칙성에 옮긴 것은 가정이라 조금 낮은 -0.15를 쓴다",
+    "anchors": [
+      "Ghosh, Vallée, Zeng, FinTech Lending and Cashless Payments, NBER Working Paper 34148 (VoxChina 요약): 1 SD 증가 → 부도 −2%p(−13%)",
+      "Berg et al. (2020): 디지털 흔적은 신용점수를 대체하기보다 보완"
+    ]
+  },
+  "target_rate": "각 데이터셋의 원래 라벨 양성률(씬파일은 미래 신용 노출 고객 기준)에 절편을 맞춘다",
+  "expected_auc_lift_check": {
+    "overall": [
+      0.02,
+      0.05
+    ],
+    "thin_file": [
+      0.02,
+      0.06
+    ],
+    "set_on": "2026-11-01, v3.5.0 생성 전에 정함",
+    "basis": "효과 항목이 늘어 v3.4의 범위(전체 +0.01~0.03, 씬파일 +0.02~0.05)를 넓혔다. 하한은 단일 대안 정보의 상승(Óskarsdóttir +0.023~0.025, Agarwal 외 약 +0.02), 상한은 여러 디지털 정보를 결합한 Berg 외 +0.053. 씬파일은 이력이 짧을수록 대안 정보의 이점이 커진다는 Gambacorta 외(2024) 결과에 따라 상한을 조금 높였다. 생성기 검증이 아니라 최종 확인 단계에서 측정하고, 범위를 벗어나도 결과에 맞춰 효과 크기를 고치지 않고 기록한다",
+    "previous_v3_4": {
+      "overall": [
+        0.01,
+        0.03
+      ],
+      "thin_file": [
+        0.02,
+        0.05
+      ]
+    }
+  },
+  "sources": [
+    {
+      "name": "Berg, Burg, Gombović, Puri (2020) On the Rise of FinTechs: Credit Scoring Using Digital Footprints, RFS 33(7):2845-2897",
+      "url": "https://nber.org/papers/w24551",
+      "secondary": "https://cepr.org/voxeu/columns/digital-footprints-and-credit-scoring"
+    },
+    {
+      "name": "Óskarsdóttir et al. (2019) The value of big data for credit scoring, Applied Soft Computing",
+      "url": "https://arxiv.org/abs/2002.09931v1"
+    },
+    {
+      "name": "Björkegren & Grissen (2020) Behavior Revealed in Mobile Phone Usage Predicts Credit Repayment, World Bank Economic Review",
+      "url": "https://arxiv.org/abs/1712.05840v3"
+    },
+    {
+      "name": "PERC study summaries (2018), incl. 2015 utility/telecom delinquency study and 2012 AU/NZ study",
+      "url": "https://www.perc.net/wp-content/uploads/2020/05/ADI_PERC_Study-Summaries_042018.pdf"
+    },
+    {
+      "name": "FinRegLab (2019) Cash-flow data in credit underwriting",
+      "url": "https://finreglab.org/fact-sheet-cash-flow-data-in-credit-underwriting"
+    },
+    {
+      "name": "김영일·조만·박수진·신승도 (2023) 비금융 대안정보의 신용리스크 예측에 미치는 효과, 금융정보연구 12(2)",
+      "url": "https://archives.kdischool.ac.kr/handle/11125/49719?mode=full"
+    },
+    {
+      "name": "보건복지부·금융위원회 (2020-07-14) 국민연금 데이터 활용해 디지털 뉴딜 선도 (국민연금 성실납부자 불량률 분석)",
+      "url": "https://www.fsc.go.kr/no010101/74446"
+    },
+    {
+      "name": "Ghosh, Vallée, Zeng, FinTech Lending and Cashless Payments, NBER Working Paper 34148",
+      "url": "https://econpapers.repec.org/RePEc:nbr:nberwo:34148",
+      "secondary": "https://voxchina.org/show-3-457.html"
+    },
+    {
+      "name": "Agarwal, Alok, Ghosh, Gupta (2022) Financial Inclusion and Alternate Credit Scoring, Journal of Money, Credit and Banking",
+      "url": "https://www.jbs.cam.ac.uk/wp-content/uploads/2020/08/2020-06-conference-paper-agarwal-alok-ghosh-gupta.pdf"
+    },
+    {
+      "name": "Gambacorta, Huang, Qiu, Wang (2024) How do machine learning and non-traditional data affect credit scoring? Journal of Financial Stability (BIS WP 834)",
+      "url": "https://www.bis.org/publ/work834.htm"
+    }
+  ],
+  "checked_on": "2026-11-01"
+}
