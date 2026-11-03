@@ -30,6 +30,14 @@ function requireAccountByToken(token) {
   return account
 }
 
+// FP-85 등 다른 기능의 mock이 토큰 주인의 사용자 정보를 바꿀 때 쓴다(예: 직군 저장). patch를 비우면 조회만 한다.
+// 바뀐 사용자 정보의 복사본을 돌려주고, 잘못된 토큰이면 401을 던진다.
+export function patchMockAccountUser(token, patch = {}) {
+  const account = requireAccountByToken(token)
+  Object.assign(account.user, patch)
+  return structuredClone(account.user)
+}
+
 // 아이디 앞부분만 남기고 나머지를 *로 가린다. 예) jwc1226 → jwc****
 function maskLoginId(loginId) {
   const visible = Math.min(3, Math.max(1, loginId.length - 2))
