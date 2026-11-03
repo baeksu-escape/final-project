@@ -1,0 +1,49 @@
+﻿table,field,meaning,unit,basis
+profiles,customer_id,기존 식별구분과 같은 가상 고객 ID,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,segment,HAC_CD 1/2/7을 wage/selfemp/freelance로 연결,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,age,가정 연령; 기존 신용거래 기간과 성인 시작 조건으로 하한 보정,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,annual_income_krw,통계 기준 또는 직군 가정으로 만든 12개월 소득 합계,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,debt_balance_krw,기존 L00000002 × 1000,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,annual_debt_service_krw,기존 data/: LRZ021201×1000인 스냅샷 연간 상환추정액. thinfile/: 현재 계좌의 관측 월별 상환예산 합계. 두 집단의 산출 정의가 다르므로 통합 사용 시 구분 필요.,원,기존: LRZ021201. thinfile: loans 원장 및 loan_monthly_budget
+profiles,asset_total_krw,연소득에 가정한 로그정규 배율을 곱한 자산,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,liquid_assets_krw,자산 중 가정한 10~40% 유동자산,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,net_assets_krw,총자산 - 총부채,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,dsr,연 원리금 / 연소득; 교육용 간이 비율,비율(소수),provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,expense_ratio,12개월 생활지출 / 12개월 소득,비율(소수),provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,income_cv,12개월 소득의 모집단 표준편차 / 평균,비율(소수),provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,income_decile,생성 표본 전체의 연소득 순위 10분위; 공식 소득분위 아님,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,deficit_months,원리금까지 차감한 월 현금흐름 음수 개월 수,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,zero_income_months,월소득 0인 개월 수,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,worst_month_net_cash_krw,최저 월 현금흐름,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,annual_shortfall_krw,12개월 순현금 합계가 음수일 때의 부족액; 흑자면 0,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,shortfall_to_liquid_ratio,부족액 / 유동자산,비율(소수),provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,exceeds_drawdown_limit,부족액이 허용 인출액(유동자산 × 0.5)을 초과하면 1; 자금 부족 고객 표시,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,liquid_assets_insufficient,부족액이 유동자산 전부를 초과하면 1,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,ending_liquid_balance_krw,관측 12개월 말 유동자산 잔액 = 시작 유동자산 + 12개월 순현금; 음수면 자금 소진,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,min_liquid_balance_krw,12개월 중 월말 유동자산 잔액의 최저값,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,months_liquid_negative,월말 유동자산 잔액이 음수인 개월 수,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,telecom_late_months,12개월 내 통신 미납월 수; 현 버전 0 또는 1,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,utility_late_months,12개월 내 공과금 미납월 수; 현 버전 0 또는 1,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,telecom_on_time_streak,관측된 최근 12개월 창 내 연속 정시납부 개월 수,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,label_any_delinquency_12m,기존 미래 연체월 수 > 0; 모델 입력 제외,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+monthly_history,customer_id,기존 식별구분과 같은 가상 고객 ID,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+monthly_history,month,관측일 이전 완결된 월 YYYY-MM,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+monthly_history,income_krw,합성 월소득,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+monthly_history,fixed_expense_krw,합성 월 고정 생활지출,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+monthly_history,variable_expense_krw,합성 월 변동 생활지출,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+monthly_history,expense_total_krw,고정 + 변동 생활지출; 원리금 제외,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+monthly_history,debt_service_krw,기존 연 원리금을 균등 배분한 월 예산,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+monthly_history,net_cash_krw,월소득 - 생활지출 - 원리금,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+monthly_history,liquid_balance_krw,월말 유동자산 잔액 = 시작 유동자산(profiles.liquid_assets_krw) + 누적 순현금; 이자·수익·기타 자금흐름 없음; 음수는 자금 소진,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+monthly_history,telecom_late,가정 통신 미납 여부 0/1,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+monthly_history,utility_late,가정 공과금 미납 여부 0/1,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+scenarios,customer_id,기존 식별구분과 같은 가상 고객 ID,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+scenarios,scenario,소득만 20% 감소시키는 고정 조건 시나리오,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+scenarios,baseline_annual_net_cash_krw,기준 12개월 현금흐름 합계,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+scenarios,scenario_annual_net_cash_krw,소득 감소 후 12개월 현금흐름 합계,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+scenarios,baseline_min_liquid_balance_krw,기준 월말 유동자산 잔액 최저값,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+scenarios,scenario_min_liquid_balance_krw,소득 20% 감소 후 월말 유동자산 잔액 최저값,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+scenarios,baseline_months_liquid_negative,기준 월말 잔액 음수 개월 수,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+scenarios,scenario_months_liquid_negative,소득 20% 감소 후 월말 잔액 음수 개월 수,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+scenarios,baseline_dsr,기준 간이 DSR,비율(소수),provenance.json + reference/column_dictionary_207.csv + extension_config.json
+scenarios,scenario_dsr,소득 감소 후 간이 DSR,비율(소수),provenance.json + reference/column_dictionary_207.csv + extension_config.json

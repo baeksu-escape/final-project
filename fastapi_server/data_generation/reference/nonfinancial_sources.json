@@ -1,0 +1,57 @@
+{
+  "description": "간편결제(digital_payment_monthly)와 국민연금·건강보험(social_insurance_monthly) 원천 월자료 생성 설정. basis: statistic(공식 통계·제도 값), statute(법령·고시 값), assumption(설계 가정). 설계 원문은 docs/NONFINANCIAL_CANDIDATES.md, 생성 규칙은 docs/NONFINANCIAL_SOURCES.md",
+  "seed": 20261105,
+  "months": ["2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08"],
+  "as_of_date": "2026-09-18",
+
+  "digital_payment": {
+    "provider_scope": "npay_synthetic",
+    "ever_used_probability": {"value": 0.85, "basis": "statistic", "source": "NAVER 2025-06-26 보도자료: 국내 20~60대의 85%가 Npay 결제 경험", "note": "경험률을 고객 전체의 참고점으로만 쓴다. 연령·직군별로 나누지 않는다"},
+    "customer_month_active_target": {"value": 0.58, "basis": "statistic", "source": "한국은행 2021 지급수단·모바일금융서비스 이용행태 조사: 최근 1개월 모바일 지급서비스 이용 58.0%", "note": "오래된 전체 모바일 지급서비스 응답률을 현재 Npay 고객-월 활성률로 옮긴 것은 가정. 미사용자의 활성 0을 포함한 전체 평균이 이 값이 되도록 사용자별 활성 성향의 평균을 0.58/0.85로 둔다(목표를 맞추기 위한 산술이며 조건부 확률 통계가 아니다)"},
+    "activity_propensity_concentration": {"value": 3.0, "basis": "assumption", "note": "사용자별 월 활성 성향 ~ Beta(평균 m, 집중도 3). 매달 쓰는 사람과 가끔 쓰는 사람이 섞이도록 넓게 둔다"},
+    "spend_share_of_living_expense": {"median": 0.15, "log_sigma": 0.5, "clip": [0.02, 0.60], "sensitivity_values": [0.05, 0.15, 0.30], "basis": "assumption", "note": "활성월 생활지출 중 간편결제 몫. 설계안의 낮음·기준·높음(5%·15%·30%) 중 기준값을 사람별 로그정규 중앙값으로 쓴다. 생활지출의 부분집합이며 지출에 더하지 않는다"},
+    "monthly_amount_noise_log_sigma": {"value": 0.25, "basis": "assumption"},
+    "ticket_krw": {"median": 31100, "log_sigma": 0.4, "basis": "statistic+assumption", "source": "한국은행 2025년중 전자지급서비스 이용현황: 간편지급 일평균 1조 1,053억원 / 3,557만 건 = 약 31,100원/건", "note": "중앙값은 전체 간편지급 거시 평균에서 계산한 값, 사람별 분산(log_sigma)은 가정"}
+  },
+
+  "social_insurance": {
+    "due_day_of_next_month": {"value": 10, "basis": "statute", "note": "국민연금·건강보험료 납부기한은 다음 달 10일"},
+    "national_pension": {
+      "eligible_age": {"min": 18, "max": 59, "basis": "statute", "note": "의무가입 18세 이상 60세 미만. 60세 이상은 not_covered(임의계속가입은 만들지 않음)"},
+      "rate_by_year": {"2025": 0.09, "2026": 0.095, "basis": "statute", "source": "연금개혁(2025-03 국회 통과): 2026년 9.5%, 이후 매년 0.5%p"},
+      "income_base_limits_krw": [
+        {"from": "2025-07", "to": "2026-06", "min": 400000, "max": 6370000},
+        {"from": "2026-07", "to": "2026-12", "min": 410000, "max": 6590000}
+      ],
+      "income_base_limits_basis": "statute (보건복지부 고시, 기준소득월액 상·하한)",
+      "payer_type_by_segment": {
+        "wage": {"workplace": 0.92, "regional": 0.03, "not_covered": 0.05},
+        "selfemp": {"workplace": 0.05, "regional": 0.85, "not_covered": 0.10},
+        "freelance": {"workplace": 0.15, "regional": 0.70, "not_covered": 0.15},
+        "basis": "assumption", "note": "직군과 가입유형은 일대일이 아니다. 급여소득자 일부는 단시간·적용제외, 자영업자 일부는 직원이 있어 사업장가입, 프리랜서 일부는 사업장가입으로 둔다"
+      },
+      "regional_exempt_probability": {"low_income_deciles": [1, 2, 3], "low_income": 0.30, "other": 0.10, "zero_income_month_add": 0.40, "cap": 0.90, "basis": "assumption", "reference": "국민연금 공표통계 2024-07: 지역가입자 638.8만 명 중 납부예외 283.0만 명(44.3%). 대출 보유자 중심의 합성 모집단과 달라 목표로 맞추지 않고 결과를 참고로만 비교한다"},
+      "on_time_amount_ratio_target": {"workplace": 0.954, "regional": 0.717, "basis": "statistic", "source": "국민연금연구원 연금포럼 Vol.101 부록(2025-12 말): 당월 금액 징수율 사업장 95.4%, 지역 71.7%", "note": "집단 합산 금액비율 목표. 납부기한 안에 낸 본인 부담액 / 본인 부담 고지액. 개인별 정시납부 확률로 해석하지 않는다"}
+    },
+    "health_insurance": {
+      "rate_by_year": {"2025": 0.0709, "2026": 0.0719, "basis": "statute", "source": "국민건강보험공단 2026년 달라지는 제도: 2026년 7.19%(2025년 7.09%)"},
+      "long_term_care_included": false,
+      "payer_type_by_segment": {
+        "wage": {"workplace": 0.98, "regional": 0.02, "dependent": 0.0, "not_covered": 0.0},
+        "selfemp": {"workplace": 0.05, "regional": 0.90, "dependent": 0.05, "not_covered": 0.0},
+        "freelance": {"workplace": 0.10, "regional": 0.70, "dependent": 0.20, "not_covered": 0.0},
+        "basis": "assumption"
+      },
+      "dependent_low_income_multiplier": {"value": 2.0, "deciles": [1, 2, 3], "basis": "assumption", "note": "소득 하위 3분위 자영업자·프리랜서는 피부양자일 가능성을 2배로 둔다(상한 0.6)"},
+      "medical_aid_probability_decile1": {"value": 0.10, "basis": "assumption", "note": "소득 1분위의 10%는 의료급여 수급자로 보고 건강보험 not_covered"},
+      "regional_premium_rule": {"basis": "assumption", "note": "지역가입자는 실제로 소득·재산 점수로 세대 단위 부과된다. 여기서는 월평균 소득 × 보험료율로 단순화하고, 1인 세대(본인 = 세대주)로 보아 고지액 = 본인 부담으로 둔다"},
+      "non_on_time_mean": {"workplace": 0.003, "regional": 0.03, "basis": "assumption", "reference": "국민건강보험공단 2025년 금액 징수율 직장 99.7%, 지역 98.1%. 이 값은 연간·체납회수 포함 지표라 월 정시납부 목표로 쓰지 않고, 월 비정시 비율 평균은 그보다 조금 높은 가정값으로 둔다"}
+    },
+    "propensity_concentration": {"value": 1.0, "basis": "assumption", "note": "사람별 비정시 성향 ~ Beta(평균, 집중도 1): 대부분은 거의 항상 제때 내고 일부는 장기 체납하는 U자형. 국민연금 지역가입자 장기체납 12.8%(2023, 국회 토론회 자료) 같은 장기 체납 집단을 표현"},
+    "same_person_copula": {"basis": "assumption", "note": "한 사람의 국민연금·건강보험 비정시 성향은 같은 균등난수에서 뽑아 함께 움직이게 한다"},
+    "risk_multiplier_recent_financial_delinquency": {"value": 3.0, "basis": "assumption", "note": "최근 금융 연체(SP=1 또는 DQ1200001>0)가 있으면 비정시 성향의 승산을 3배로. 통신·공과금 미납 규칙(alt.arrears_risk_multiplier)과 같은 값"},
+    "low_income_multiplier": {"value": 1.5, "deciles": [1, 2, 3], "basis": "assumption", "reference": "생계형 건강보험 체납(월 보험료 5만원 이하) 세대가 체납 세대의 67.4%(시민건강증진연구소 2017)"},
+    "non_on_time_outcome": {"late": 0.50, "partial": 0.10, "unpaid": 0.40, "chronic_threshold": 0.80, "late_days": [5, 40], "partial_paid_fraction": [0.3, 0.9], "basis": "assumption", "note": "비정시 달의 결과. 성향이 0.8 이상인 장기 체납형은 항상 unpaid. 늦게 낸 날이 기준일을 넘으면 unpaid로 남는다"},
+    "on_time_paid_days_before_due": {"value": [0, 9], "basis": "assumption"}
+  }
+}

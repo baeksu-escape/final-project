@@ -1,0 +1,303 @@
+{
+ "description": "Anchors and assumptions for service dummy data (loan products, members, external API). Values marked basis=assumption are project assumptions, not statistics.",
+ "as_of_date": "2026-09-18",
+ "legal_max_rate_pct": {
+  "value": 20.0,
+  "basis": "statute",
+  "note": "대부업법·이자제한법 최고금리 연 20% (2021-07-07 시행). 생성 시점 기준 변경 여부는 최종 생성 전에 다시 확인한다."
+ },
+ "rate_anchors_pct": {
+  "bank_credit": {
+   "value": 6.33,
+   "basis": "statistic",
+   "as_of": "2026-08",
+   "source": "한국은행 2026년 8월 금융기관 가중평균금리(신규취급액), 예금은행 일반신용대출. 머니투데이방송 2026-09-30 보도 https://news.mtn.co.kr/news-detail/2026093010503213340"
+  },
+  "savings_bank": {
+   "value": 10.23,
+   "basis": "statistic",
+   "as_of": "2026-08",
+   "source": "한국은행 2026년 8월 금융기관 가중평균금리, 상호저축은행 대출 평균(신용대출만의 값이 아님). https://news.mtn.co.kr/news-detail/2026093010503213340"
+  },
+  "credit_union": {
+   "value": 5.28,
+   "basis": "statistic",
+   "as_of": "2026-08",
+   "source": "한국은행 2026년 8월 금융기관 가중평균금리, 신용협동조합 대출 평균(담보대출 포함 평균). https://news.mtn.co.kr/news-detail/2026093010503213340"
+  },
+  "card_loan": {
+   "value": 14.66,
+   "basis": "statistic",
+   "as_of": "2026-07",
+   "source": "여신금융협회 공시 인용 보도, 롯데카드 카드론 평균금리 예시값. 신용점수 700점 이하 8개사 평균은 17.45%. SBS Biz 2026-08-21 https://biz.sbs.co.kr/amp/article/20000330006"
+  },
+  "capital": {
+   "value": 13.0,
+   "basis": "assumption",
+   "as_of": "",
+   "source": "캐피탈 신용대출 공식 평균을 확보하지 못해 저축은행과 카드론 사이 값으로 가정"
+  }
+ },
+ "product_templates": [
+  {
+   "product_type": "일반 신용대출",
+   "sector": 0,
+   "provider_prefix": "가상은행",
+   "n_products": 3,
+   "rate_anchor": "bank_credit",
+   "spread_down_pp": 2.0,
+   "spread_up_pp": 3.5,
+   "limit_min_krw": 5000000,
+   "limit_max_krw": 100000000,
+   "term_months": [
+    12,
+    60
+   ],
+   "eligible_segments": [
+    "wage",
+    "selfemp",
+    "freelance"
+   ],
+   "income_multiple_cap": 1.0,
+   "basis": "금리 기준점은 통계, 스프레드·한도·기간·연소득 배수 상한은 가정"
+  },
+  {
+   "product_type": "직장인 신용대출",
+   "sector": 0,
+   "provider_prefix": "가상은행",
+   "n_products": 2,
+   "rate_anchor": "bank_credit",
+   "spread_down_pp": 2.3,
+   "spread_up_pp": 2.5,
+   "limit_min_krw": 10000000,
+   "limit_max_krw": 150000000,
+   "term_months": [
+    12,
+    60
+   ],
+   "eligible_segments": [
+    "wage"
+   ],
+   "income_multiple_cap": 1.0,
+   "basis": "가정: 재직 확인 상품"
+  },
+  {
+   "product_type": "사업자 신용대출",
+   "sector": 0,
+   "provider_prefix": "가상은행",
+   "n_products": 2,
+   "rate_anchor": "bank_credit",
+   "spread_down_pp": 1.0,
+   "spread_up_pp": 4.0,
+   "limit_min_krw": 5000000,
+   "limit_max_krw": 100000000,
+   "term_months": [
+    12,
+    60
+   ],
+   "eligible_segments": [
+    "selfemp"
+   ],
+   "income_multiple_cap": 1.0,
+   "basis": "가정: 사업소득 확인 상품"
+  },
+  {
+   "product_type": "저축은행 신용대출",
+   "sector": 2,
+   "provider_prefix": "가상저축은행",
+   "n_products": 3,
+   "rate_anchor": "savings_bank",
+   "spread_down_pp": 3.0,
+   "spread_up_pp": 8.0,
+   "limit_min_krw": 1000000,
+   "limit_max_krw": 50000000,
+   "term_months": [
+    12,
+    60
+   ],
+   "eligible_segments": [
+    "wage",
+    "selfemp",
+    "freelance"
+   ],
+   "income_multiple_cap": null,
+   "basis": "가정: 스프레드·한도"
+  },
+  {
+   "product_type": "상호금융 신용대출",
+   "sector": 5,
+   "provider_prefix": "가상신협",
+   "n_products": 2,
+   "rate_anchor": "credit_union",
+   "spread_down_pp": 0.0,
+   "spread_up_pp": 5.0,
+   "limit_min_krw": 1000000,
+   "limit_max_krw": 50000000,
+   "term_months": [
+    12,
+    60
+   ],
+   "eligible_segments": [
+    "wage",
+    "selfemp",
+    "freelance"
+   ],
+   "income_multiple_cap": 1.0,
+   "basis": "가정: 기준점이 담보 포함 평균이라 하한 스프레드 0"
+  },
+  {
+   "product_type": "카드론",
+   "sector": 1,
+   "provider_prefix": "가상카드",
+   "n_products": 3,
+   "rate_anchor": "card_loan",
+   "spread_down_pp": 8.0,
+   "spread_up_pp": 5.0,
+   "limit_min_krw": 500000,
+   "limit_max_krw": 50000000,
+   "term_months": [
+    2,
+    36
+   ],
+   "eligible_segments": [
+    "wage",
+    "selfemp",
+    "freelance"
+   ],
+   "income_multiple_cap": null,
+   "basis": "가정: 카드 보유자 대상, 스프레드·한도"
+  },
+  {
+   "product_type": "캐피탈 신용대출",
+   "sector": 3,
+   "provider_prefix": "가상캐피탈",
+   "n_products": 2,
+   "rate_anchor": "capital",
+   "spread_down_pp": 4.0,
+   "spread_up_pp": 6.5,
+   "limit_min_krw": 1000000,
+   "limit_max_krw": 50000000,
+   "term_months": [
+    12,
+    60
+   ],
+   "eligible_segments": [
+    "wage",
+    "selfemp",
+    "freelance"
+   ],
+   "income_multiple_cap": null,
+   "basis": "가정 전체"
+  }
+ ],
+ "product_jitter": {
+  "rate_pp": 0.5,
+  "limit_round_krw": 1000000,
+  "basis": "assumption"
+ },
+ "members": {
+  "seed": 20261101,
+  "per_cohort": 100,
+  "id_prefix": "MEM",
+  "email_domain": "example.com",
+  "signup_start": "2026-01-01",
+  "external_consent_probability": {
+   "value": 0.8,
+   "basis": "assumption"
+  },
+  "input_delay_days": {
+   "min": 1,
+   "max": 10,
+   "basis": "assumption: 월 마감 후 입력까지 걸린 일수"
+  },
+  "note": "회원 원천은 학습용 씬파일 생성기를 다른 시드로 실행해 만든다. 학습 데이터 시드와 같으면 안 된다.",
+  "input_months": {
+   "value": [
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06",
+    "2026-07",
+    "2026-08"
+   ],
+   "basis": "assumption: 서비스 결정(v3.5.7). 회원은 기준일 전 최근 완결 6개월의 소득·지출·상환액만 입력한다. 12개월 입력은 가입 장벽이 크다고 판단했다. 학습 모델 표의 입력 기반 집계도 같은 6개월로 계산한다"
+  }
+ },
+ "telecom": {
+  "bill_median_krw": {
+   "value": 55000,
+   "basis": "assumption",
+   "anchors": "통계청 가계동향 2023년 가구당 통신서비스 월 10만 원(가구 단위), 이동통신 가입자당 ARPU 약 2.5~3만 원(2023년 말) 사이의 1인 요금으로 가정. 뉴스토마토 2024-03-04 https://newstomato.com/ReadNews.aspx?no=1221874"
+  },
+  "bill_sigma": {
+   "value": 0.35,
+   "basis": "assumption"
+  },
+  "bill_month_noise_sigma": {
+   "value": 0.05,
+   "basis": "assumption"
+  },
+  "bill_clip_krw": [
+   15000,
+   200000
+  ],
+  "due_day": {
+   "value": 25,
+   "basis": "assumption: 청구월 25일 납부기한"
+  },
+  "late_payment_delay_days": {
+   "min": 5,
+   "max": 40,
+   "basis": "assumption"
+  }
+ },
+ "utility": {
+  "bill_median_krw": {
+   "value": 60000,
+   "basis": "assumption: 1인 가구 전기·가스·수도 합산 월 고지액. 공식 개인 단위 통계를 확인하지 못했다"
+  },
+  "bill_sigma": {
+   "value": 0.4,
+   "basis": "assumption"
+  },
+  "bill_month_noise_sigma": {
+   "value": 0.15,
+   "basis": "assumption: 계절 변동을 따로 만들지 않고 월 잡음으로 둔다"
+  },
+  "bill_clip_krw": [
+   10000,
+   300000
+  ],
+  "due_day": {
+   "value": 20,
+   "basis": "assumption: 청구월 20일 납부기한"
+  },
+  "late_payment_delay_days": {
+   "min": 5,
+   "max": 40,
+   "basis": "assumption"
+  },
+  "note": "미납 여부는 회원 월별 원천의 utility_late(통신과 같은 생성 규칙, NONFINANCIAL_LABEL.md)를 따른다. 응답 형식은 연동 개발용 예시이며 실제 기관 규격이 아니다"
+ },
+ "credit_bureau": {
+  "provider": "dummy_credit_bureau_api",
+  "excluded_columns": {
+   "value": [
+    "결과값(연체회차)",
+    "PRE_LMT",
+    "PRE_RT"
+   ],
+   "basis": "결과값(연체회차)는 기존 라벨의 원천(미래 연체)이라 서비스가 알 수 없다. PRE_LMT·PRE_RT는 대출 신청 시 금융사가 제시하는 한도·금리이고 씬파일 생성기에서는 항상 0인 자리표시자라 신용평가사 응답에 넣지 않는다"
+  },
+  "extra_fields": {
+   "value": [
+    "credit_history_days",
+    "credit_card_observed_months",
+    "cb_available",
+    "credit_usage_available"
+   ],
+   "basis": "씬파일 model_inputs.csv의 신용이력 관련 열. 신용평가사가 제공하는 값으로 둔다"
+  },
+  "note": "207열 값은 씬파일 model_inputs.csv와 같은 규칙으로 미관측 값을 null로 둔다(CB=5 자리표시자 → null). CB는 1 우량~10 고위험 교육용 등급이며 서비스 3등급(GOOD/STANDARD/CAUTION)과 별개다"
+ }
+}

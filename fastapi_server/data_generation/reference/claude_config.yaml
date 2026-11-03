@@ -1,0 +1,284 @@
+# 신용모형 합성데이터 설정 (교육용 프로젝트)
+#
+# 값의 성격 구분
+#   stats(아래)       : 공식 통계에서 확인한 값. 출처·기준시점·모집단·연체 정의를 sources 에 기록
+#   derived           : 공식 통계에서 계산으로 도출한 값 (예: 소득 분포 모수)
+#   assumption        : 통계 없이 설계자가 정한 가정. 값을 통계에 맞춰 억지로 조정하지 않는다
+#
+# 원칙
+#   - 직업 세그먼트는 급여소득자 / 자영업자 / 프리랜서 3종이다.
+#   - 공식 통계는 세그먼트별로 대응하는 모집단에만 쓴다. 현재 확정된 공식 통계는 임금근로자(= 급여소득자)뿐이다.
+#     자영업자·프리랜서 값은 전부 가정이며 임금근로자 통계를 섞어 쓰지 않는다.
+#   - 대출잔액·대출건수 기준 연체율은 개인별 연체 확률(PD)이나 계수의 목표값으로 직접 쓰지 않는다.
+#     (합성 데이터에서 같은 방식으로 계산한 값과 비교만 한다: outputs/reference_checks.csv, 급여소득자 세그먼트 한정)
+#   - 직접 비교 가능한 개인 단위 구간별 목표 통계가 없으므로 validation.bins 의 targets 는 비워 둔다.
+
+seed: 42
+n: 200000
+
+meta:
+  population: "대출 보유자(차주, 합성). 직업 세그먼트 3종: 급여소득자(공식 임금근로자 통계에 대응), 자영업자·프리랜서(확정 공식 통계 없음, 가정)"
+  unit: "금액은 만원, 소득은 연소득(월소득 x 12). 자영업자·프리랜서의 소득은 사업·용역 소득"
+
+# 공식 통계와 대응하는 세그먼트 (소득·대출 분포 보정, 전체 연체율 기준 보정, 참고 비교에 사용)
+official_segment: wage
+
+# ---------------------------------------------------------------------------
+# 직업 세그먼트
+#   세그먼트 정의(팀 확정 필요): 급여소득자 = 임금근로자(근로소득),
+#   자영업자 = 개인사업자(사업소득), 프리랜서 = 고용관계 없이 용역계약으로 소득을 얻는 사람(용역·사업소득)
+#   share, age_share(20s,30s,40s,50s,60p 순서), income_*, loan_mult, vol_mult 는 급여소득자의 소득·대출 평균 보정을 제외하고 모두 assumption
+# ---------------------------------------------------------------------------
+segments:
+  wage:
+    label: 급여소득자
+    share: 0.60
+    age_share: [0.19, 0.21, 0.25, 0.24, 0.11]
+    income_median_mult: 1.0      # 공식 월 중위소득 기준 (derived)
+    income_sigma: null           # null = 공식 월평균·중위소득에서 도출한 값(derived) 사용
+    loan_mult: 1.0               # 급여소득자는 공식 평균대출 보정값을 그대로 사용
+    vol_mult: 1.0                # 소득 변동성 배율 (기준)
+    input_basis: "소득 분포와 평균 대출은 공식 임금근로자 통계 기반 (대출자 비중은 가정). 구성비·연령 분포·변동성은 가정"
+  selfemp:
+    label: 자영업자
+    share: 0.25
+    age_share: [0.05, 0.17, 0.30, 0.30, 0.18]
+    income_median_mult: 1.0
+    income_sigma: 0.90
+    loan_mult: 1.6               # 급여소득자 같은 연령군 평균 대출 대비 배율
+    vol_mult: 1.7
+    input_basis: "전부 가정 (확정된 공식 통계 없음)"
+  freelance:
+    label: 프리랜서
+    share: 0.15
+    age_share: [0.22, 0.36, 0.24, 0.12, 0.06]
+    income_median_mult: 0.8
+    income_sigma: 0.90
+    loan_mult: 0.9
+    vol_mult: 2.0
+    input_basis: "전부 가정 (공식 통계 미확보)"
+
+# ---------------------------------------------------------------------------
+# 출처 (공식 통계)
+# ---------------------------------------------------------------------------
+sources:
+  wage_income_2024:
+    title: "2024년 임금근로일자리 소득(보수) 결과"
+    agency: "국가데이터처 / 일자리행정통계"
+    reference_date: "2024-12"
+    published: "2026-02-23"
+    population: "임금근로자 (임금근로일자리 기준)"
+    url: "https://mods.go.kr/board.es?act=view&bid=11113&list_no=443648&mid=a10301030500"
+  wage_debt_2024:
+    title: "2024년 일자리행정통계 임금근로자 부채"
+    agency: "국가데이터처 / 일자리행정통계"
+    reference_date: "2024-12 말"
+    population: "임금근로자 (2024년 일자리행정통계 임금근로 일자리에서 하루 이상 일한 근로자. 외국인·개인사업 겸업자 제외)"
+    average_loan_basis: "평균대출은 전체 임금근로자 1인당 (대출이 없는 임금근로자 포함). 대출자 1인당이 아님"
+    delinquency_definition: "개인대출 원금·이자 등 3개월 이상 연체, 2024년 12월 말 시점. 연체율은 대출잔액·대출건수·대출차주수 기준이 서로 다름"
+    url: "https://www.mods.go.kr/boardDownload.es?bid=11113&list_no=444177&seq=1"
+  selfemp_debt_2024:
+    title: "2024년 개인사업자 부채 통계"
+    population: "개인사업자"
+    note: "자영업자 세그먼트에 대응하는 통계이나 원문 확인과 연체 정의 대조 전이라 아직 사용하지 않음 (기록만 유지). 프리랜서 대응 통계는 확보하지 못함"
+  kcb_2024:
+    title: "KCB 개인신용평가체계 공시 (2024.04.01)"
+    population: "KCB 개인신용평점 대상 정상 금융거래 고객 (전체 CB 모집단)"
+    note: "점수 표시 변환(score)의 임시 설정 참고용. 임금근로자 통계 아님"
+
+# ---------------------------------------------------------------------------
+# 공식 통계 확인값
+#   used_as: input_calibration = 입력 분포 보정에 사용 (급여소득자 세그먼트)
+#            reference_check   = 합성 결과와 비교만 (조정 근거로 쓰지 않음, 급여소득자 세그먼트)
+#            reference_level   = 임시 가정값(target_anchor_pd)의 참고 수준으로만 사용
+#            reference_only    = 기록만 (합성 데이터에 같은 기준의 지표가 없어 비교하지 않음)
+#            not_used          = 사용하지 않음
+# ---------------------------------------------------------------------------
+stats:
+  wage_income_monthly_mean:   {value: 375,  unit: "만원/월", basis: "월평균 소득", source_id: wage_income_2024, used_as: input_calibration}
+  wage_income_monthly_median: {value: 288,  unit: "만원/월", basis: "월 중위소득", source_id: wage_income_2024, used_as: input_calibration}
+  wage_loan_mean:             {value: 5275, unit: "만원", basis: "평균대출 (전체 임금근로자 1인당, 대출 없는 사람 포함)", source_id: wage_debt_2024, used_as: input_calibration}
+  wage_loan_mean_40s:         {value: 8186, unit: "만원", basis: "40대 평균대출 (전체 40대 임금근로자 1인당, 대출 없는 사람 포함)", source_id: wage_debt_2024, used_as: input_calibration}
+  wage_delinq_overall_balance_basis:  {value: 0.0053, unit: "비율", basis: "전체 연체율 (대출잔액 기준, 2024.12말 시점, 3개월 이상 연체)", source_id: wage_debt_2024, used_as: reference_check}
+  wage_delinq_overall_count_basis:    {value: 0.0155, unit: "비율", basis: "전체 연체율 (대출건수 기준, 2024.12말 시점)", source_id: wage_debt_2024, used_as: reference_only}
+  wage_delinq_overall_borrower_basis: {value: 0.0212, unit: "비율", basis: "전체 연체율 (대출차주수 기준, 2024.12말 시점)", source_id: wage_debt_2024, used_as: reference_level}
+  wage_delinq_60s_balance_basis:      {value: 0.0094, unit: "비율", basis: "60대(60~69세) 연체율 (대출잔액 기준)", source_id: wage_debt_2024, used_as: reference_check}
+  wage_delinq_3plus_loans_balance_basis: {value: 0.0082, unit: "비율", basis: "대출 3건 이상 연체율 (대출잔액 기준)", source_id: wage_debt_2024, used_as: reference_check}
+  selfemp_delinq_overall:     {value: 0.0098, unit: "비율", basis: "개인사업자 전체 연체율 (대출잔액 기준)", source_id: selfemp_debt_2024, used_as: not_used}
+
+# 원문 대조 전 값. 코드에서 읽지 않으며, 확정 전에는 어떤 목표값으로도 쓰지 않는다.
+unverified_stats:
+  selfemp_delinq_by_age_borrower_basis:
+    population: "개인사업자"
+    basis: "연령별 차주 수 기준 연체율"
+    status: "원문 대조 전 (확정값 아님)"
+    used_as: not_used
+    values: {"29세 이하": 0.0364, "30~39세": 0.0277, "40~49세": 0.0276, "50~59세": 0.0214}
+  wage_debt_by_age_read_from_source:
+    population: "임금근로자"
+    status: "원문을 도구로 읽어 얻은 값. 표 대조 전이라 사용하지 않음 (이미 확인된 40대 평균대출, 60대·3건 이상 연체율과는 일치)"
+    used_as: not_used
+    avg_loan_manwon_all_wage_earners: {"29세 이하": 1572, "30대": 7153, "40대": 8186, "50대": 6085, "60대": 3764, "70세 이상": 1859}
+    delinq_balance_basis: {"29세 이하": 0.0047, "30대": 0.0029, "40대": 0.0044, "50대": 0.0072, "60대": 0.0094, "70세 이상": 0.0087}
+    delinq_count_basis: {"29세 이하": 0.0109, "30대": 0.0125, "40대": 0.0157, "50대": 0.0179, "60대": 0.0215, "70세 이상": 0.0210}
+    delinq_balance_basis_by_loan_count: {"1건": 0.0022, "2건": 0.0033, "3건 이상": 0.0082}
+
+# 연체 라벨 정의
+label:
+  name: default_90d_1y
+  definition: "관측시점 이후 1년 내 개인대출 원금·이자 3개월(90일) 이상 연체가 발생했는지 여부 (차주 단위 이진, 1=연체)"
+  comparability: >-
+    공식 임금근로자 부채 통계의 연체율은 2024년 12월 말 '시점'에 3개월 이상 연체 중인 비중(시점 연체율, prevalence)이다.
+    합성 라벨은 관측시점 이후 12개월 동안 새로 3개월 이상 연체가 발생한 비율(발생률, incidence)이며 같은 지표가 아니다.
+    공식 연체율은 기준(대출잔액 0.53%, 대출건수 1.55%, 대출차주수 2.12%)별로 값이 다르다.
+    개인 단위 0/1 라벨의 급여소득자 세그먼트 수준은 차주수 기준 2.12%를 참고했지만, 시점 연체율과 12개월 발생률을 같게 둔 것은 임시 가정이다.
+    자영업자·프리랜서 세그먼트의 연체 수준은 공식 통계 없이 세그먼트 가산(coef.segment)으로 정한 가정이다.
+    잔액·건수 기준 값은 개인별 확률로 직접 쓰지 않고 reference_checks 에서 참고 비교만 한다.
+
+# ---------------------------------------------------------------------------
+# 입력 분포
+# ---------------------------------------------------------------------------
+# 연령대 구간. 구성비는 세그먼트별 age_share(assumption).
+# 60p = 60~69세 (공식 통계의 '60대'와 같은 구간). 70세 이상은 모집단에 포함하지 않는다.
+age_groups:
+  20s: {min: 20, max: 29}
+  30s: {min: 30, max: 39}
+  40s: {min: 40, max: 49}
+  50s: {min: 50, max: 59}
+  60p: {min: 60, max: 69}
+
+# 소득: 급여소득자는 월 중위소득·월평균 소득(stats)에서 로그정규 모수를 도출한다 (derived).
+#   median = 288 x 12, sigma = sqrt(2 ln(mean/median)) ~ 0.73
+# 다른 세그먼트는 segments 의 income_median_mult, income_sigma (assumption).
+# 분포 형태(로그정규), 연령과 소득의 독립, '대출 보유자 소득분포 = 전체 임금근로자 분포'는 가정(assumption).
+# 소득분위는 전체 세그먼트를 합친 소득의 순위로 계산한다.
+income:
+  annual_months: 12
+
+# 대출 (대출 보유자 모집단)
+loan:
+  # 공식 평균대출(5,275, 40대 8,186)은 대출 없는 임금근로자를 포함한 전체 임금근로자 1인당 값이다.
+  # 대출자 평균 = 공식 평균 / 대출자 비중 으로 환산한다 (급여소득자 세그먼트에만 적용).
+  # 대출자 비중은 원문에 없어 가정(assumption)이며, 모든 연령군에서 같다고 둔다.
+  # 자영업자·프리랜서는 같은 연령군 급여소득자 대출자 평균 x segments.*.loan_mult (assumption).
+  borrower_share: 0.60
+  anchor_group: 40s
+  # 40대를 제외한 연령군의 평균 대출 상대 크기 (assumption). 전체 평균이 통계와 맞도록 비례계수는 코드에서 계산한다.
+  balance_age_shape: {20s: 0.5, 30s: 1.0, 50s: 1.0, 60p: 0.5}
+  balance_ratio_sigma: 0.9                                  # assumption: 대출/소득 비율의 개인간 산포
+  extra_count_lambda_by_age: [0.4, 0.8, 1.0, 0.9, 0.6]      # assumption: 건수 = 1 + Poisson(lambda), 순서 20s,30s,40s,50s,60p
+  max_count: 8
+  secured_mean_low: 0.25     # assumption: 소득 1분위 담보대출 비중 평균
+  secured_mean_high: 0.65    # assumption: 소득 10분위
+  secured_concentration: 6
+
+# 신용거래기간 (assumption: 통계 미확보)
+history:
+  late_start_scale: 3.0      # 성인(19세) 이후 첫 신용거래까지 지연(년), 지수분포 평균
+  min_years: 0.5
+
+# 과거 장기연체 경험 플래그 (assumption: 이력 분포 통계 부족, 세그먼트 공통)
+past_delinquency:
+  p_by_age: [0.06, 0.07, 0.07, 0.06, 0.05]
+
+# 대안 변수 (전체 assumption: 소득분위별 통계 값은 아직 반영하지 않은 임시값)
+alt:
+  utility_arrears_by_decile: [0.12, 0.08, 0.06, 0.05, 0.04, 0.035, 0.03, 0.025, 0.02, 0.015]
+  telecom_base: 0.03
+  telecom_given_utility: 0.25
+  # v3.2.0: 최근 금융 연체(SP 또는 DQ1200001>0)가 있으면 공과금·통신 미납 발생확률을 배로 올린다 (assumption).
+  # 근거: PERC(2015) 통신·공과금 심각 연체자의 카드 연체율 47.7% vs 비연체자 4.5% — 두 연체가 강하게 함께 나타남.
+  #       통신·금융 통합채무조정 이용자의 52.3%가 취약계층(과기정통부·금융위, 2025-03). 배수 3.0 자체는 가정이다.
+  arrears_risk_multiplier: 3.0
+  # 미납 지속: 미납 첫 달 이후 다음 달도 미납일 확률 (assumption, 공개 통계 미확인). 평균 지속 약 1.4개월.
+  arrears_persistence: 0.30
+  expense_ratio_by_decile: [1.45, 0.95, 0.85, 0.78, 0.74, 0.70, 0.66, 0.62, 0.58, 0.50]
+  expense_sigma: 0.15
+  debt_service_rate: 0.12        # 연 원리금상환액 / 대출잔액
+  vol_mean_low: 0.35             # 소득 변동성(CV) 평균, 1분위 (급여소득자 기준. 세그먼트별 배율은 segments.*.vol_mult)
+  vol_mean_high: 0.12            # 10분위
+  vol_concentration: 20
+
+# 위험 로짓에서 변수 표준화에 쓰는 고정 상수 (설계 상수. 프론트 시뮬레이터에서도 그대로 사용 가능)
+features:
+  log_balance:    {center: 8.0, scale: 1.2}
+  loan_count:     {center: 2.0, scale: 1.2}
+  credit_years:   {center: 10.0, scale: 8.0}
+  income_decile:  {center: 5.5, scale: 2.9}
+  expense_ratio:  {center: 0.8, scale: 0.3}
+  dsr:            {center: 0.1, scale: 0.1}
+  income_vol:     {center: 0.2, scale: 0.1}
+
+# 위험 로짓 계수: 전부 설계 가정(assumption). 통계나 AUC에 맞춰 조정하지 않는다.
+# 크기 순서만 KCB 공시 평가요소 비중(상환이력 > 신용거래형태 ≈ 부채수준 > 신용거래기간)을 참고했다.
+coef:
+  latent_sigma: 0.7   # 관측되지 않는 위험요인 (로짓 정규잡음)
+  base:
+    log_balance:     {value: 0.45, source: assumption}
+    loan_count:      {value: 0.25, source: assumption}
+    unsecured_share: {value: 0.60, source: assumption}
+    past_delinq:     {value: 1.30, source: assumption}
+    credit_years:    {value: -0.30, source: assumption}
+  segment:        # 급여소득자 기준 가산. 자영업자·프리랜서는 공식 통계 없이 정한 값
+    wage:      {value: 0.00, source: assumption}
+    selfemp:   {value: 0.40, source: assumption}
+    freelance: {value: 0.30, source: assumption}
+  age_group:      # 30s 기준 가산
+    20s: {value: 0.30, source: assumption}
+    30s: {value: 0.00, source: assumption}
+    40s: {value: -0.10, source: assumption}
+    50s: {value: 0.00, source: assumption}
+    60p: {value: 0.20, source: assumption}
+  alt:            # 아래 전체에 alt_effect_scale 이 곱해짐 (민감도 실험)
+    income_decile:   {value: -0.25, source: assumption}
+    expense_ratio:   {value: 0.30, source: assumption}
+    dsr:             {value: 0.30, source: assumption}
+    utility_arrears: {value: 0.50, source: assumption}
+    telecom_late:    {value: 0.40, source: assumption}
+    income_vol:      {value: 0.20, source: assumption}
+
+# 절편 보정: 공식 통계와 대응하는 세그먼트(official_segment = 급여소득자)의 평균 PD 를 목표에 맞춘다.
+# 목표 수준은 공식 대출차주수 기준 연체율 2.12% (2024.12말 시점 연체율)를 참고한 임시 가정이다.
+# 시점 연체율과 12개월 발생률은 같은 지표가 아니므로 둘을 같게 둔 것은 가정이다 (label.comparability 참고).
+# 다른 세그먼트의 연체율은 coef.segment 가산의 결과이며 공식 통계 근거가 없다. 전체 연체율은 세그먼트 구성비에 따라 달라진다.
+calibration:
+  target_anchor_pd: 0.0212
+  target_anchor_pd_source: assumption_referencing_official
+  target_anchor_pd_reference: wage_delinq_overall_borrower_basis
+
+# PD -> 점수(1~1000) 변환: 표시용 임시 설정 (assumption). KCB 공시표(700점대 불량률 약 2.7%)를 대략 참고했으며 임금근로자 통계가 아니다.
+score:
+  base_score: 700
+  base_pd: 0.0268
+  pdo: 65
+
+# 개인 단위 구간별 연체율 검증표.
+# 직접 비교 가능한 공식 목표 통계가 없어 targets 는 모두 null (관측값만 출력).
+# 공식 통계와의 참고 비교는 reference_checks.csv 를 본다 (급여소득자 세그먼트 한정).
+validation:
+  rel_tolerance: 0.30
+  bins:
+    loan_balance:   # 만원
+      edges: [0, 1000, 3000, 10000, 30000, .inf]
+      targets: [null, null, null, null, null]
+    loan_count:
+      edges: [0, 1, 2, 3, 100]
+      targets: [null, null, null, null]
+    age:
+      edges: [19, 29, 39, 49, 59, .inf]
+      targets: [null, null, null, null, null]
+
+# 블록별 출처 구분 (outputs/assumption_register.csv 로 출력)
+source_register:
+  - {block: segments, source: assumption, note: "세그먼트 구성비, 연령 분포, 소득·대출·변동성 배율은 가정. 급여소득자만 소득 분포와 평균 대출이 공식 통계 기반. 세그먼트 정의는 팀 확정 필요"}
+  - {block: age_groups, source: assumption, note: "연령 구성비는 세그먼트별 age_share 로 가정. 60p = 60~69세, 70세 이상 제외"}
+  - {block: income, source: derived_from_official, note: "급여소득자: 월 중위·평균 소득에서 로그정규 모수 도출. 자영업자·프리랜서: 가정. 분포 형태, 연령과 소득의 독립, 대출 보유자 소득분포 동일성은 가정"}
+  - {block: loan, source: mixed, note: "급여소득자: 전체 임금근로자 평균·40대 평균 대출은 공식 통계이고 대출자 비중(0.60)으로 환산하는데 이 비중은 가정. 자영업자·프리랜서: 급여소득자 대비 배율 가정. 그 외 연령군 평균 형태, 비율 산포, 건수 분포, 담보 비중도 가정"}
+  - {block: history, source: assumption, note: "신용거래기간 통계 미확보"}
+  - {block: past_delinquency, source: assumption, note: "과거 연체 이력 분포 통계 부족"}
+  - {block: alt, source: assumption, note: "소득분위별 공과금 미납률·지출 비율 등은 아직 통계 미반영 임시값. 소득 변동성은 세그먼트 배율도 가정"}
+  - {block: features, source: design_constant, note: "표준화 기준 상수"}
+  - {block: coef, source: assumption, note: "모든 계수와 세그먼트 가산은 설계 가정. 통계·AUC에 맞춰 조정하지 않음"}
+  - {block: calibration, source: assumption_referencing_official, note: "급여소득자 세그먼트 목표 2.12%는 공식 차주수 기준 시점 연체율을 참고한 임시 가정. 시점 연체율과 12개월 발생률은 다른 지표. 다른 세그먼트 연체율은 근거 없는 가정의 결과"}
+  - {block: score, source: assumption, note: "점수 표시 변환용 임시 설정"}
+  - {block: validation, source: not_applicable, note: "직접 비교 가능한 개인 단위 구간별 목표 통계 없음 (targets 전부 null)"}

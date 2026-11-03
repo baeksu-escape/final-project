@@ -1,0 +1,166 @@
+{
+  "description": "대출 종류(kind 코드)별 상환방식 배정 확률. generate/build_loan_extension.py가 계좌 ID 해시로 이 표에서 상환방식을 고른다. basis: statistic(공식 통계), product_structure(상품 구조), assumption(설계 가정). 근거가 없는 값은 모두 assumption이다. 상환방식은 부도 라벨과 무관하게 배정하므로 예측력이 없는 것이 정상이다. 통계는 은행 기준이지만 모든 업권에 똑같이 적용한다.",
+  "assignment_basis": "kind_probability_assumption_v1",
+  "hash_salt": "repayment_method:",
+  "method_order": [
+    "bullet",
+    "equal_payment",
+    "equal_principal"
+  ],
+  "kinds": {
+    "0": {
+      "name": "신용(무담보)",
+      "bullet": {
+        "value": 0.8,
+        "basis": "product_structure+assumption",
+        "source": "https://www.kebhana.com/cont/mall/mall08/mall0802/mall080204/1462446_115200.jsp",
+        "note": "은행 신용대출은 만기일시가 기본 구조라는 상품 설명이 근거. 0.80이라는 비율 값 자체는 가정"
+      },
+      "equal_payment": {
+        "value": 0.15,
+        "basis": "assumption",
+        "note": "비율 값은 가정"
+      },
+      "equal_principal": {
+        "value": 0.05,
+        "basis": "assumption",
+        "note": "비율 값은 가정"
+      }
+    },
+    "1": {
+      "name": "주택담보",
+      "bullet": {
+        "value": 0.48,
+        "basis": "statistic",
+        "source": "https://www.hankyung.com/article/201903033681Y",
+        "note": "은행 주택담보대출 중 비거치 분할상환 51.6%(2018년 말, 금융위원회 자료를 인용한 기사)를 0.52로 반올림하고 1에서 뺀 값"
+      },
+      "equal_payment": {
+        "value": 0.39,
+        "basis": "assumption",
+        "note": "분할 안의 원리금균등:원금균등 = 3:1은 통계가 없는 가정"
+      },
+      "equal_principal": {
+        "value": 0.13,
+        "basis": "assumption",
+        "note": "분할 안의 원리금균등:원금균등 = 3:1은 통계가 없는 가정"
+      }
+    },
+    "2": {
+      "name": "신차 할부",
+      "bullet": {
+        "value": 0,
+        "basis": "assumption",
+        "note": "할부는 매달 같은 금액을 갚는 구조라고 가정. 출처는 확인하지 않았다"
+      },
+      "equal_payment": {
+        "value": 1.0,
+        "basis": "assumption",
+        "note": "할부는 매달 같은 금액을 갚는 구조라고 가정. 출처는 확인하지 않았다"
+      },
+      "equal_principal": {
+        "value": 0,
+        "basis": "assumption"
+      }
+    },
+    "3": {
+      "name": "예적금담보",
+      "bullet": {
+        "value": 1.0,
+        "basis": "assumption",
+        "note": "담보 만기에 맞춰 일시 상환한다고 가정"
+      },
+      "equal_payment": {
+        "value": 0,
+        "basis": "assumption"
+      },
+      "equal_principal": {
+        "value": 0,
+        "basis": "assumption"
+      }
+    },
+    "4": {
+      "name": "유가증권담보",
+      "bullet": {
+        "value": 1.0,
+        "basis": "assumption",
+        "note": "담보 만기에 맞춰 일시 상환한다고 가정"
+      },
+      "equal_payment": {
+        "value": 0,
+        "basis": "assumption"
+      },
+      "equal_principal": {
+        "value": 0,
+        "basis": "assumption"
+      }
+    },
+    "5": {
+      "name": "보증",
+      "bullet": {
+        "value": 1.0,
+        "basis": "assumption",
+        "note": "보증부 대출은 만기일시가 많다고 가정"
+      },
+      "equal_payment": {
+        "value": 0,
+        "basis": "assumption"
+      },
+      "equal_principal": {
+        "value": 0,
+        "basis": "assumption"
+      }
+    },
+    "6": {
+      "name": "학자금",
+      "bullet": {
+        "value": 0,
+        "basis": "assumption"
+      },
+      "equal_payment": {
+        "value": 1.0,
+        "basis": "assumption",
+        "note": "일반상환 학자금은 원리금균등이라고 가정. 원문은 확인하지 않았다"
+      },
+      "equal_principal": {
+        "value": 0,
+        "basis": "assumption"
+      }
+    },
+    "7": {
+      "name": "기타 부동산담보",
+      "bullet": {
+        "value": 0.48,
+        "basis": "assumption",
+        "note": "주택담보(1) 값을 그대로 옮긴 가정"
+      },
+      "equal_payment": {
+        "value": 0.39,
+        "basis": "assumption",
+        "note": "주택담보(1) 값을 그대로 옮긴 가정"
+      },
+      "equal_principal": {
+        "value": 0.13,
+        "basis": "assumption",
+        "note": "주택담보(1) 값을 그대로 옮긴 가정"
+      }
+    },
+    "8": {
+      "name": "신차 외 할부(중고차 할부 등, 추정 정의)",
+      "bullet": {
+        "value": 0,
+        "basis": "assumption",
+        "note": "신차 할부(2)와 같은 가정"
+      },
+      "equal_payment": {
+        "value": 1.0,
+        "basis": "assumption",
+        "note": "신차 할부(2)와 같은 가정"
+      },
+      "equal_principal": {
+        "value": 0,
+        "basis": "assumption"
+      }
+    }
+  }
+}
