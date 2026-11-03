@@ -1,0 +1,10 @@
+// 공통 컴포넌트 모음. 다른 팀은 여기서 불러 쓴다.
+// 사용 예: import { Card, MoneyInput, EditableList } from '../../common/components/index.js'
+export { default as Card } from './Card.jsx'
+export { default as Checkbox } from './Checkbox.jsx'
+export { default as EditableList } from './EditableList.jsx'
+export { default as FieldError } from './FieldError.jsx'
+export { default as MoneyInput } from './MoneyInput.jsx'
+export { default as NumberInput } from './NumberInput.jsx'
+export { default as Select } from './Select.jsx'
+export { default as Slider } from './Slider.jsx'
