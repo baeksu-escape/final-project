@@ -64,7 +64,7 @@
   "tests/test_synthesis_logic.py": "920455fe9098871f1b07f19f418f66ae32e1b27f2852eef4da0cd3c3f47ee57d",
   "tools/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "tools/build_handoff.py": "04d8de932138ee5c3bfa3c38c5c4c93dc7195737c43ee5bc807b0b6e351e64e8",
-  "tools/handoff_README.md": "ef9e30944f69095d5e7e668a5d3d9ff4db81c172fe55447a2865864dceb37800",
+  "tools/handoff_README.md": "a4375596ef24ea0a21dbb2aed5c546a3779caa3a5b17b0f888f21db96350681a",
   "verify/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "verify/verify.py": "d8ed1ce0c4a556eb641bc2595709253aec8439a880ea739b22ef279fe03edc0e",
   "verify/verify_assumption_sensitivity.py": "9da704716a4dac58fd74178263132748e1a4f9e10d74eebcd98ea8506f094ff2",

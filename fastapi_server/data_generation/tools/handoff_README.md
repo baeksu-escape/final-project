@@ -1,6 +1,8 @@
-# 학습용 합성 데이터 v3.5.7 — 이것부터 보세요
+# 학습용 합성 데이터 v3.5.10 — 이것부터 보세요
 
-모든 값은 합성 데이터다. 성능 수치는 실제 예측력의 근거가 아니다. 데이터 패키지 `credit_extension_light_v3_5_7`을 기본 설정으로 생성했고 검증기 10종·테스트 74건을 통과했다.
+모든 값은 합성 데이터다. 성능 수치는 실제 예측력의 근거가 아니다. 저장소의 생성 코드 v3.5.10(`fastapi_server/data_generation/`)을 기본 설정으로 생성했고 검증기를 모두 통과했다.
+
+이 폴더는 저장소의 `fastapi_server/data/training/`에 두는 것을 전제로 한다. 압축 푸는 위치와 폴더 구조는 저장소의 `fastapi_server/data/README.md`에 있다.
 
 ## 처음 볼 파일은 두 개
 
@@ -82,4 +84,4 @@
 
 - 직군 코드는 원본 값 `wage/selfemp/freelance`다(서비스 코드 `EMPLOYEE/SELF_EMPLOYED/FREELANCER`).
 - 대출 상환 일정(`loan_extension/`, 약 440MB)은 크기 때문에 뺐다. 필요하면 패키지에서 `python -m generate.build_loan_extension`으로 만든다.
-- 생성 환경은 numpy 2.5.3·pandas 3.0.5로 `requirements.txt`의 고정 버전보다 새 버전이다. 고정 버전으로 다시 만들면 소수점 마지막 자리가 다를 수 있다.
+- 생성 환경은 `requirements.txt`의 고정 버전(numpy 2.3.5·pandas 2.2.3·scipy 1.17.0·scikit-learn 1.8.0)이다. 다른 버전으로 다시 만들면 소수점 마지막 자리가 다를 수 있다.
