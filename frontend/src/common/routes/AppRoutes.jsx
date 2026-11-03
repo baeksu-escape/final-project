@@ -8,6 +8,12 @@ import ForbiddenPage from '../pages/ForbiddenPage.jsx'
 import HomeRedirect from '../pages/HomeRedirect.jsx'
 import NotFoundPage from '../pages/NotFoundPage.jsx'
 import PlaceholderPage from '../pages/PlaceholderPage.jsx'
+import { AUTH_PATHS } from '../../features/auth/authPaths.js'
+import GuestOnlyRoute from '../../features/auth/components/GuestOnlyRoute.jsx'
+import FindIdPage from '../../features/auth/pages/FindIdPage.jsx'
+import FindPasswordPage from '../../features/auth/pages/FindPasswordPage.jsx'
+import LoginPage from '../../features/auth/pages/LoginPage.jsx'
+import SignupPage from '../../features/auth/pages/SignupPage.jsx'
 
 // N-08 직군별 재무 진단 서브탭 내용. 담당 팀은 해당 PlaceholderPage를 자기 화면으로 바꾼다.
 const DIAGNOSIS_CONTENTS = {
@@ -21,8 +27,13 @@ const DIAGNOSIS_CONTENTS = {
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* 로그인 전 — 로그인 화면은 다음 작업(N-01)에서 만든다 */}
-      <Route path={PATHS.LOGIN} element={<PlaceholderPage title="로그인" nId="N-01" />} />
+      {/* 로그인 전 (FP-87 N-01~N-03) — 이미 로그인했으면 첫 화면으로 보낸다 */}
+      <Route element={<GuestOnlyRoute />}>
+        <Route path={AUTH_PATHS.LOGIN} element={<LoginPage />} />
+        <Route path={AUTH_PATHS.SIGNUP} element={<SignupPage />} />
+        <Route path={AUTH_PATHS.FIND_ID} element={<FindIdPage />} />
+        <Route path={AUTH_PATHS.FIND_PASSWORD} element={<FindPasswordPage />} />
+      </Route>
 
       {/* 로그인 필요 */}
       <Route element={<RouteGuard />}>
