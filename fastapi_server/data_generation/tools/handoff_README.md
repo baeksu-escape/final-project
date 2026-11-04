@@ -13,9 +13,9 @@
 
 열마다 역할이 `1_model/model_table_columns.csv`에 있다(`id`, `group`, `feature`, `label`, `eval_only`). **`feature`인 열만 모델에 넣는다.**
 
-## 서비스 회원에게도 있는 피처만 들어 있다 (v3.5.7)
+## 서비스 회원에게도 있는 피처만 들어 있다
 
-학습한 모델로 서비스 회원의 점수를 계산하려면, 모델의 입력이 회원 데이터에도 있어야 한다. 그래서 모델 표의 `feature`는 회원이 입력하거나 외부 API로 받는 값만 담는다. 회원 쪽 원천은 데이터 패키지의 `docs/SERVICE_DUMMY_DATA.md`에 있다.
+학습한 모델로 서비스 회원의 점수를 계산하려면, 모델의 입력이 회원 데이터에도 있어야 한다. 그래서 모델 표의 `feature`는 회원이 입력하거나 외부 API로 받는 값만 담는다. 회원 쪽 원천은 저장소의 `fastapi_server/data_generation/docs/SERVICE_DUMMY_DATA.md`에 있다.
 
 | 모델 표의 피처 | 회원 쪽 원천 |
 |---|---|
@@ -40,11 +40,11 @@
 
 - `customer_id`, `dataset`, `cohort`: 식별·평가 구분용이다. `cohort`는 집단별로 결과를 나눠 볼 때 쓴다.
 - `label_any_delinquency_12m`, `label_nonfin_effect_12m`: 정답이다.
-- `eval_future_credit_exposure`(씬파일): 미래에 신용을 쓸 사람 표시다. 0인 사람(869명, 주로 `no_credit`·`sparse_history`)은 라벨이 항상 0이다. **씬파일은 학습과 평가 모두 이 값이 1인 고객(1,531명)으로 한다.** 2,400명 전체로 학습하면 "신용이력 없음 = 저위험"이라는, 미래에 신용을 쓰지 않아서 생긴 가짜 패턴을 배운다. 패키지의 AUC 상승 측정(`experiments/measure_nonfinancial_label_lift.py`)도 같은 기준으로 거른다.
+- `eval_future_credit_exposure`(씬파일): 미래에 신용을 쓸 사람 표시다. 0인 사람(869명, 주로 `no_credit`·`sparse_history`)은 라벨이 항상 0이다. **씬파일은 학습과 평가 모두 이 값이 1인 고객(1,531명)으로 한다.** 2,400명 전체로 학습하면 "신용이력 없음 = 저위험"이라는, 미래에 신용을 쓰지 않아서 생긴 가짜 패턴을 배운다. 생성 코드의 AUC 상승 측정(`data_generation/experiments/measure_nonfinancial_label_lift.py`)도 같은 기준으로 거른다.
 - 원본 207열의 `결과값(연체회차)`는 기존 라벨을 만든 미래 연체 월 수라 **모델 표에서 뺐다**. `2_detail/`의 `base_207.csv`를 직접 쓸 때도 이 열은 빼야 한다.
 - `3_reference/` 폴더 전체(설계 확률·점검 결과).
 
-## 등급 이름 (v3.5.7)
+## 등급 이름
 
 - `CB`는 교육용 신용등급이고 **1이 우량, 10이 고위험**이다. 기존 집단에서 미래 연체 비율이 1등급 5.2%, 5등급 11.9%, 8등급 38.5%, 10등급 75%로 등급과 함께 커진다.
 - 서비스가 회원에게 보여 줄 등급은 `CB`가 아니라 **모델 점수**를 구간으로 나눈 3단계다: `GOOD` / `STANDARD` / `CAUTION`. 구간 기준은 모델 팀이 정한다.
@@ -64,7 +64,7 @@
 - 씬파일에서 신용이력이 없어 관측되지 않은 값(`CB`, `SP`, `DQ1200001`, `KC5000016`, `CL0631905`)은 빈 값이다. 0으로 채우지 않는다. 원본의 자리표시자 중 등급 미산출 `CB=5`는 빈 값으로 바꿨고, 항상 0인 `PRE_LMT`·`PRE_RT`는 씬파일 표에서 뺐다.
 - 정시납부율(`np_on_time_rate`, `hi_on_time_rate`)은 납부 의무가 없으면 빈 값이다(정보 없음 ≠ 나쁜 기록).
 - 대출 0건·잔액 0·소득 0원인 달은 실제 0이다.
-- **6개월 입력 열(`income_6m_krw`, `expense_6m_krw`, `debt_service_6m_krw`)의 결측·이상치는 일부러 넣은 것이다.** 결측(빈 값), 단위 착오(원래 값 × 1,000), 음수 상환액이 조금씩 섞여 있고, 원래 값은 `3_reference/*/anomaly_log.csv`에 있다. 전처리 시연용이며 모델 입력으로 쓰지 않는다. 파생 비율 열(`dsr_6m` 등)은 깨끗한 값 그대로라 입력 열과 맞지 않는 칸이 있다.
+- **6개월 입력 열(`income_6m_krw`, `expense_6m_krw`, `debt_service_6m_krw`)의 결측·이상치는 일부러 넣은 것이다.** 결측(빈 값), 단위 착오(원래 값 × 1,000), 음수 상환액이 조금씩 섞여 있고, 이 세 열은 `feature`이므로 **학습 전에 결측 처리와 이상치 처리를 해야 한다.** 넣은 칸과 원래 값은 `3_reference/*/anomaly_log.csv`에 있다. 이 기록은 전처리가 제대로 잡아냈는지 확인하는 정답지이며 모델 입력에 쓰지 않는다. 파생 비율 열(`dsr_6m` 등)은 깨끗한 값 그대로라 입력 열과 맞지 않는 칸이 있다.
 
 ## 나머지 폴더
 
@@ -76,12 +76,12 @@
 
 ## 다시 만들기
 
-데이터 패키지에서 README 순서대로 생성한 뒤 `python -m tools.build_handoff --out <새 폴더>`를 실행하면 이 구조가 그대로 나온다. 모델 표는 원본 파일과 값 하나하나를 대조한 뒤에만 저장된다.
+저장소의 `fastapi_server/data_generation/`에서 그 폴더 README 순서대로 생성한 뒤 `python -m tools.build_handoff --out <새 폴더>`를 실행하면 이 구조가 그대로 나온다. 모델 표는 원본 파일과 값 하나하나를 대조한 뒤에만 저장된다.
 
-- 출력 폴더는 패키지 밖의 새 경로로 준다. 이미 있으면 멈춘다. 심볼릭 링크 경로는 받지 않으므로 실제 폴더 경로를 준다.
+- 출력 폴더는 `data_generation/` 밖의 새 경로로 준다. 이미 있으면 멈춘다. 심볼릭 링크 경로는 받지 않으므로 실제 폴더 경로를 준다.
 - 이 묶음을 다시 만들 때만 `--overwrite`를 붙인다. `.handoff_bundle`에는 도구가 쓴 파일 목록과 SHA256이 들어 있고, 폴더 내용이 그 목록과 정확히 같을 때만 목록의 파일을 지운다. 파일을 하나라도 더하거나 고쳤으면 아무것도 지우지 않고 멈추므로, 이 폴더에 메모나 결과 파일을 넣고 싶으면 다른 폴더를 쓴다.
 - 데이터 사전에 전달용으로 등록되지 않은 열이 생기면 `feature`로 넣지 않고 멈춘다. 새 열을 피처로 쓰려면 먼저 `DATA_DICTIONARY.csv`에 등록한다.
 
 - 직군 코드는 원본 값 `wage/selfemp/freelance`다(서비스 코드 `EMPLOYEE/SELF_EMPLOYED/FREELANCER`).
-- 대출 상환 일정(`loan_extension/`, 약 440MB)은 크기 때문에 뺐다. 필요하면 패키지에서 `python -m generate.build_loan_extension`으로 만든다.
+- 대출 상환 일정(`loan_extension/`, 약 440MB)은 크기 때문에 뺐다. 필요하면 `data_generation/`에서 `python -m generate.build_loan_extension`으로 만든다.
 - 생성 환경은 `requirements.txt`의 고정 버전(numpy 2.3.5·pandas 2.2.3·scipy 1.17.0·scikit-learn 1.8.0)이다. 다른 버전으로 다시 만들면 소수점 마지막 자리가 다를 수 있다.
