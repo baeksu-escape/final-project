@@ -4,8 +4,10 @@ import { ROLES } from '../../../common/config/roles.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { patchMockAccountUser } from '../../auth/mocks/authMockHandlers.js'
 import { ALT_DATA_SOURCES } from '../config/altDataSources.js'
-import { getSectionsForJob } from '../config/inputSections.js'
-import { getSectionStatus } from '../utils/inputValues.js'
+import { BASE_MONTH_FIELD, getSectionsForJob } from '../config/inputSections.js'
+import { getSectionStatus, toValues } from '../utils/inputValues.js'
+import { validateFinancialInput } from '../validation/inputValidation.js'
+import { INPUT_ERROR_CODE, toServerFieldErrors } from '../validation/serverErrors.js'
 import { createAltDataRows } from './altDataMock.js'
 
 // 사용자별 저장값 — 메모리에만 있어 새로고침하면 사라진다.
@@ -20,6 +22,12 @@ function statusOf(user) {
     sections: getSectionStatus(input, getSectionsForJob(user.jobType)),
     altData: Object.fromEntries(ALT_DATA_SOURCES.map((source) => [source.key, Boolean(altData[source.key])])),
   }
+}
+
+// FP-86 입력값 오류 응답(400)을 만든다. 칸별 오류는 data.fieldErrors에 담는다(형식은 validation/serverErrors.js 참고).
+function invalidInputError(fieldErrors) {
+  const message = '입력값을 확인해 주세요.'
+  return new ApiError(400, message, { code: INPUT_ERROR_CODE, message, fieldErrors })
 }
 
 // 직군을 고른 일반 사용자인지 확인한다.
@@ -65,10 +73,17 @@ registerMockHandlers({
   },
 
   // N-05 입력 저장 — 기준월과 직군을 확인하고 덮어쓴다.
+  // FP-86: 서버처럼 화면과 같은 규칙으로 다시 검사하고, 오류가 있으면 400과 칸별 오류(fieldErrors)를 돌려준다.
   'PUT /api/members/me/financial-input': ({ body, token }) => {
     const user = requireUserWithJob(token)
-    if (!body?.baseMonth) throw new ApiError(400, '기준월을 입력해 주세요.')
+    if (!body?.baseMonth) {
+      throw invalidInputError([{ field: BASE_MONTH_FIELD.key, message: '기준월을 입력해 주세요.' }])
+    }
     if (body.jobType !== user.jobType) throw new ApiError(400, '직군 정보가 맞지 않습니다.')
+    const sections = getSectionsForJob(user.jobType)
+    const values = toValues(body, sections)
+    const errors = validateFinancialInput(values, sections)
+    if (Object.keys(errors).length > 0) throw invalidInputError(toServerFieldErrors(errors, values))
     const savedAt = new Date().toISOString()
     savedInputs.set(user.userId, { ...structuredClone(body), savedAt })
     return { savedAt, status: statusOf(user) }
