@@ -119,22 +119,30 @@ class ExternalApi(unittest.TestCase):
 
 
 class SixMonthInputs(unittest.TestCase):
-    """v3.5.7: members enter only the latest 6 complete months."""
+    """회원은 최근 완결 12개월을 입력한다(v3.5.11, v3.5.7~v3.5.10은 6개월). 클래스 이름은 기존 이름을 유지한다."""
     MONTHS = [f'{y}-{m:02d}' for y, m in [(2025, 9), (2025, 10), (2025, 11), (2025, 12)] + [(2026, k) for k in range(1, 9)]]
 
-    def build(self, seed=0):
+    def build(self, seed=0, extra_months=()):
         profiles, ages, _, *_ = fixture()
         monthly = pd.DataFrame([dict(customer_id=c, month=m, income_krw=1_000_000, expense_total_krw=700_000, debt_service_krw=0)
-                                for c in profiles.customer_id for m in self.MONTHS])
+                                for c in profiles.customer_id for m in list(extra_months) + self.MONTHS])
         rng = np.random.default_rng(seed)
         members, ids = s.make_members(profiles, ages, ANCHORS['members'], AS_OF, rng)
         return members, s.make_monthly_inputs(monthly, members, ids, ANCHORS['members'], AS_OF, rng)
 
     def test_only_input_months_are_kept(self):
         want = ANCHORS['members']['input_months']['value']
-        self.assertEqual(want, ['2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08'])
+        self.assertEqual(want, self.MONTHS)
         members, inputs = self.build()
-        self.assertEqual(len(inputs), 6 * len(members))
+        self.assertEqual(len(inputs), 12 * len(members))
+        self.assertEqual(s.check_members(members, inputs, AS_OF, 20261030, 20261101, input_months=want), [])
+
+    def test_months_outside_input_months_are_dropped(self):
+        # 원천에 입력 기간보다 앞선 달이 있어도 회원 입력에는 입력 기간 12개월만 남는다.
+        want = ANCHORS['members']['input_months']['value']
+        members, inputs = self.build(extra_months=['2025-07', '2025-08'])
+        self.assertEqual(sorted(inputs.month.unique()), want)
+        self.assertEqual(len(inputs), 12 * len(members))
         self.assertEqual(s.check_members(members, inputs, AS_OF, 20261030, 20261101, input_months=want), [])
 
     def test_missing_month_is_reported(self):

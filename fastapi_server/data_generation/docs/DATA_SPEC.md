@@ -50,7 +50,7 @@
 
 ## 6개월 입력 집계 (v3.5.7)
 
-서비스 회원은 최근 완결 6개월(2026-03~2026-08)의 소득·생활지출·상환액만 입력한다. 학습한 모델을 회원에게 그대로 쓰려면 같은 기간의 값으로 학습해야 하므로, 두 집단 모두 `input_features_6m.csv`를 만든다(`generate/build_input_features_6m.py`, 검증 `verify/verify_input_features_6m.py`).
+서비스 회원은 최근 완결 12개월(2025-09~2026-08)의 소득·생활지출·상환액을 입력한다(v3.5.11, v3.5.7~v3.5.10은 6개월). 모델 표의 입력 기반 집계는 그중 **최근 6개월(2026-03~2026-08)**로 계산한다. 기간은 `reference/service_dummy_anchors.json`의 `members.model_feature_months`가 정하며, 회원 입력 기간(`members.input_months`)의 마지막 6개월이어야 한다. 학습한 모델을 회원에게 그대로 쓰려면 같은 기간의 값으로 학습해야 하므로, 두 집단 모두 `input_features_6m.csv`를 만든다(`generate/build_input_features_6m.py`, 검증 `verify/verify_input_features_6m.py`). v3.5.11에서 회원 입력 기간이 늘었어도 이 파일의 기간·값은 바뀌지 않았다.
 
 | 열 | 정의 |
 |---|---|

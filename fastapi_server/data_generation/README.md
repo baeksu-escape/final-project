@@ -1,4 +1,4 @@
-# Credit Extension 합성 데이터 v3.5.10
+# Credit Extension 합성 데이터 v3.5.11
 
 신용평가 교육·시연용 합성 데이터의 생성 코드, 설정, 통계 원자료, 문서다. 모든 데이터는 합성 데이터이며 실제 개인·금융기관 자료가 아니다. 결과는 시연용이고 실제 모집단의 통계나 예측력 근거로 쓰지 않는다.
 
@@ -11,8 +11,8 @@
 | 간편결제·사회보험 원천 | 두 집단의 간편결제 월자료, 국민연금·건강보험 고지·납부 월자료, 고객 단위 집계(v3.5.0) | `generate/build_nonfinancial_sources.py` | `docs/NONFINANCIAL_SOURCES.md` |
 | 비금융 효과 라벨 | 기존 라벨 옆에 비금융 효과를 가정한 라벨 열을 추가한다 | `generate/build_nonfinancial_labels.py` | `docs/NONFINANCIAL_LABEL.md` |
 | 대출 원장·상환 일정 | 두 집단의 대출 계좌별 상환 일정(만기일시·원리금균등·원금균등)과 금리 시나리오 | `generate/build_loan_extension.py` | `docs/LOAN_EXTENSION.md` |
-| 6개월 입력 집계 | 회원이 입력하는 소득·지출·상환액과 같은 최근 6개월(2026-03~2026-08) 집계. 모델 표의 소득·지출 피처(v3.5.7) | `generate/build_input_features_6m.py` | `docs/DATA_SPEC.md` |
-| 서비스 개발용 더미 | 가상 대출상품, 가입 회원(6개월 입력), 외부 금융·통신·간편결제·공공보험·신용평가사·공과금 API 응답. **학습에 쓰지 않는다** | `generate/build_loan_products.py`, `build_members.py`, `build_external_api.py` | `docs/SERVICE_DUMMY_DATA.md` |
+| 6개월 입력 집계 | 회원이 입력하는 소득·지출·상환액 중 최근 6개월(2026-03~2026-08) 집계. 모델 표의 소득·지출 피처(v3.5.7, 회원 입력은 v3.5.11부터 12개월) | `generate/build_input_features_6m.py` | `docs/DATA_SPEC.md` |
+| 서비스 개발용 더미 | 가상 대출상품, 가입 회원(12개월 입력, v3.5.11), 외부 금융·통신·간편결제·공공보험·신용평가사·공과금 API 응답. **학습에 쓰지 않는다** | `generate/build_loan_products.py`, `build_members.py`, `build_external_api.py` | `docs/SERVICE_DUMMY_DATA.md` |
 | 가정 민감도·비금융 실험 | 가정을 바꿨을 때의 변화, 라벨 신호 확인, 비금융 효과 라벨의 AUC 상승 측정 | `experiments/` 5개 스크립트 | `docs/ASSUMPTION_SENSITIVITY.md`, `docs/NONFINANCIAL_EXPERIMENT.md`, `docs/NONFINANCIAL_LABEL.md` |
 
 필드 정의는 `docs/DATA_DICTIONARY.csv`가 기준이다. 출처와 가정은 `docs/SOURCES_AND_ASSUMPTIONS.md`, 변경 이력은 `docs/CHANGES.md`에 있다. 간편결제·사회보험 데이터는 설계안(`docs/NONFINANCIAL_CANDIDATES.md`)대로 v3.5.0에서 생성했고, 실제 규칙·근거·가정은 `docs/NONFINANCIAL_SOURCES.md`가 기준이다.

@@ -1,8 +1,8 @@
 """6-month aggregates of the figures a service member enters (income, living expense, debt service), for both cohorts.
 
-v3.5.7. Members enter only the latest 6 complete months (reference/service_dummy_anchors.json
-members.input_months), so the model table uses these aggregates instead of the 12-month ones in
-profiles.csv. Reads monthly_history.csv and digital_payment_monthly.csv; writes input_features_6m.csv
+v3.5.7. 모델 표는 profiles.csv의 12개월 집계 대신 최근 완결 6개월 집계를 쓴다. v3.5.11부터 회원 입력은
+12개월(members.input_months)이고, 집계 기간은 별도 키 members.model_feature_months(6개월)가 정한다.
+Reads monthly_history.csv and digital_payment_monthly.csv; writes input_features_6m.csv
 next to them. Does not change any other file. Run after build_nonfinancial_sources.
 """
 from pathlib import Path
@@ -18,8 +18,9 @@ COLUMNS = ['customer_id', 'income_6m_krw', 'expense_6m_krw', 'debt_service_6m_kr
 
 
 def input_months():
+    """모델 집계 기간(6개월)을 읽는다. v3.5.11부터 회원 입력 기간(input_months)이 아니라 model_feature_months를 읽는다."""
     a = json.loads((ROOT/'reference/service_dummy_anchors.json').read_text(encoding='utf-8'))
-    return a['members']['input_months']['value']
+    return a['members']['model_feature_months']['value']
 
 
 def input_features_6m(monthly, payment, months):

@@ -1,8 +1,12 @@
-"""Fixed-fixture checks for generate/build_input_features_6m.py (v3.5.7): no generator run, no file read or write."""
-import unittest
+"""Fixed-fixture checks for generate/build_input_features_6m.py (v3.5.7): no generator run, no file write.
+v3.5.11부터 집계 기간은 anchors의 model_feature_months(최근 6개월)이고, 기간 확인을 위해 anchors 파일만 읽는다."""
+import json, unittest
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from generate.build_input_features_6m import input_features_6m, input_months, COLUMNS
+
+ANCHORS = json.loads((Path(__file__).resolve().parents[1]/'reference/service_dummy_anchors.json').read_text(encoding='utf-8'))
 
 MONTHS = [f'2025-{m:02d}' for m in range(9, 13)] + [f'2026-{m:02d}' for m in range(1, 9)]
 
@@ -14,7 +18,9 @@ def monthly(income_by_month, expense=500_000, debt=100_000, cid='C1'):
 
 class InputFeatures6m(unittest.TestCase):
     def test_window_is_the_member_input_months(self):
+        """집계 기간(model_feature_months)이 회원 입력 기간(input_months, 12개월)의 마지막 6개월인지 본다. 이름은 v3.5.7 그대로 유지한다."""
         self.assertEqual(input_months(), MONTHS[-6:])
+        self.assertEqual(ANCHORS['members']['input_months']['value'], MONTHS)
 
     def test_only_the_last_six_months_count(self):
         h = monthly({'2025-09': 0, '2025-10': 9_000_000, '2026-08': 0})      # first two months are outside the window

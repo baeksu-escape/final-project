@@ -1,10 +1,10 @@
-# 서비스 더미 DB (Oracle 21c) v2.2
+# 서비스 더미 DB (Oracle 21c) v2.3
 
-서비스 개발용 더미 데이터(`service_dummy/`, 데이터 패키지 v3.5.7)를 Oracle에 넣는 DDL과 시드 스크립트다. v2.2에서 회원 월 입력이 6개월로 줄고, 신용평가사·공과금 응답 정리 테이블과 서비스 등급 결과 틀(`MEMBER_CREDIT_GRADE`)이 생겼다. 기존 테이블의 시드는 `MEMBER_MONTHLY_INPUT`과 `EXTERNAL_API_RESPONSE`(뒤에 800건 추가, 앞 1,600건은 그대로)만 바뀌었다. 학습용 데이터(`data/`, `thinfile/`)는 DB에 넣지 않고 CSV로 모델 팀에 넘긴다.
+서비스 개발용 더미 데이터(`service_dummy/`, 데이터 패키지 v3.5.11)를 Oracle에 넣는 DDL과 시드 스크립트다. v2.3에서 회원 월 입력이 다시 12개월로 늘었다(아래 「v2.2 → v2.3 변경」). v2.2에서 회원 월 입력이 6개월로 줄고, 신용평가사·공과금 응답 정리 테이블과 서비스 등급 결과 틀(`MEMBER_CREDIT_GRADE`)이 생겼다. 기존 테이블의 시드는 `MEMBER_MONTHLY_INPUT`과 `EXTERNAL_API_RESPONSE`(뒤에 800건 추가, 앞 1,600건은 그대로)만 바뀌었다. 학습용 데이터(`data/`, `thinfile/`)는 DB에 넣지 않고 CSV로 모델 팀에 넘긴다.
 
 ## 실행
 
-Oracle Database 21c Express Edition 21.3에서 적재를 확인했다(2026-11-02, `99_check.sql` 14개 테이블 일치·COMMENT 누락 0건). SQL Developer에서 `run_all.sql`을 열고 **스크립트 실행(F5)**을 누르거나, SQL*Plus에서 이 폴더로 이동해 `@run_all.sql`을 실행한다. 순서는 다음과 같다. `run_all.sql`은 머리말 바로 아래의 `WHENEVER SQLERROR EXIT FAILURE ROLLBACK` 때문에 오류가 나면 그 자리에서 멈춘다(v2.1). 시드는 500행마다 COMMIT하므로 멈춘 시점까지 들어간 행은 남는다. 원인을 고친 뒤 `run_all.sql`을 처음부터 다시 실행하면 `00_drop_all.sql`이 지우고 새로 넣는다.
+Oracle Database 21c Express Edition 21.3에서 적재를 확인했다(2026-11-02 v2.2 기준, `99_check.sql` 14개 테이블 일치·COMMENT 누락 0건). v2.3은 아직 Oracle에 적재해 확인하지 않았다. SQL Developer에서 `run_all.sql`을 열고 **스크립트 실행(F5)**을 누르거나, SQL*Plus에서 이 폴더로 이동해 `@run_all.sql`을 실행한다. 순서는 다음과 같다. `run_all.sql`은 머리말 바로 아래의 `WHENEVER SQLERROR EXIT FAILURE ROLLBACK` 때문에 오류가 나면 그 자리에서 멈춘다(v2.1). 시드는 500행마다 COMMIT하므로 멈춘 시점까지 들어간 행은 남는다. 원인을 고친 뒤 `run_all.sql`을 처음부터 다시 실행하면 `00_drop_all.sql`이 지우고 새로 넣는다.
 
 | 파일 | 내용 |
 |---|---|
@@ -21,7 +21,7 @@ Oracle Database 21c Express Edition 21.3에서 적재를 확인했다(2026-11-02
 | 테이블 | 행 수 | 내용 |
 |---|---:|---|
 | `APP_MEMBER` | 400 | 회원. 더미 회원은 `DUMMY_YN='Y'`, 비밀번호 NULL |
-| `MEMBER_MONTHLY_INPUT` | 2,400 | 회원이 입력한 월별 소득·지출·상환액 (회원당 최근 완결 6개월 2026-03~2026-08, v2.2) |
+| `MEMBER_MONTHLY_INPUT` | 4,800 | 회원이 입력한 월별 소득·지출·상환액 (회원당 최근 완결 12개월 2025-09~2026-08, v2.3) |
 | `LOAN_PRODUCT` | 17 | 더미 대출상품 (가상 기관명, 최고금리 20% 이하) |
 | `LOAN_PRODUCT_JOB_TYPE` | 43 | 상품별 대상 직군 |
 | `EXTERNAL_API_RESPONSE` | 2,400 | 외부 API 응답 원문 JSON (회원당 금융·통신·간편결제·공공보험·신용평가사·공과금 각 1건) |
@@ -46,7 +46,7 @@ Oracle Database 21c Express Edition 21.3에서 적재를 확인했다(2026-11-02
 - 공통 컬럼 `CREATED_AT`, `UPDATED_AT`을 정리 테이블에 둔다. 제약조건 이름은 테이블 약어를 쓴다(`MBR`, `MMI`, `LPRD`, `LPJT`, `EAR`, `MLN`, `MCD`, `MCU`, `MTB`, `MPM`, `MSI`).
 - **간편결제·사회보험(v2):** 코드 값은 다른 테이블처럼 대문자로 바꿨다(`on_time` → `ON_TIME`, `national_pension` → `NATIONAL_PENSION`). 사회보험은 `납부액 ≤ 본인 부담 ≤ 고지 총액`을 CHECK로 건다. 사업장·직장 가입자의 `BILLED_AMT`는 사용자분을 포함한 총액이고 본인 부담은 그 절반이다. 납부 의무가 없는 달(납부예외·피부양·미적용)은 금액 0, `NOT_APPLICABLE`이다. 생성 규칙은 데이터 패키지의 `docs/NONFINANCIAL_SOURCES.md`.
 - **신용평가사(v2.2):** 응답 원문에는 207열 전체가 있고, 정리 테이블 `MEMBER_CREDIT_BUREAU`에는 화면에 쓸 주요 항목 9개만 둔다. 다른 열이 필요하면 원문 JSON에서 꺼낸다. `CB_GRADE`는 **1 우량~10 고위험**의 교육용 등급이고 공식 점수가 아니며 서비스 등급과 별개다. 신용이력이 부족하면 NULL이고 `CB_AVAILABLE_YN='N'`이다(CHECK로 건다). 원문의 미관측 값도 null이다.
-- **서비스 등급 `MEMBER_CREDIT_GRADE`(v2.2, 틀만):** 산정할 때마다 한 행을 넣는다(회원별 이력). `GRADE_STATUS_CODE`는 `SCORED`(산정됨) / `NOT_SCORABLE`(산정 불가: 점수 계산에 필요한 정보 없음) / `INSUFFICIENT_INPUT`(입력 부족: 6개월 월 입력 미완료), `GRADE_BAND_CODE`는 `GOOD` / `STANDARD` / `CAUTION`. `SCORED`일 때만 등급과 점수가 있고, 그 밖의 상태에서는 둘 다 NULL이다(CHECK). 점수 산식·범위와 등급 구간은 모델 팀이 정한다. 입력 부족을 먼저 판정한다. 화면 문구(산정 불가, 입력 부족 등)는 DB에 넣지 않는다.
+- **서비스 등급 `MEMBER_CREDIT_GRADE`(v2.2, 틀만):** 산정할 때마다 한 행을 넣는다(회원별 이력). `GRADE_STATUS_CODE`는 `SCORED`(산정됨) / `NOT_SCORABLE`(산정 불가: 점수 계산에 필요한 정보 없음) / `INSUFFICIENT_INPUT`(입력 부족: 12개월 월 입력 미완료, v2.3), `GRADE_BAND_CODE`는 `GOOD` / `STANDARD` / `CAUTION`. `SCORED`일 때만 등급과 점수가 있고, 그 밖의 상태에서는 둘 다 NULL이다(CHECK). 점수 산식·범위와 등급 구간은 모델 팀이 정한다. 입력 부족을 먼저 판정한다. 화면 문구(산정 불가, 입력 부족 등)는 DB에 넣지 않는다.
 - **긴 JSON:** 원문 JSON은 1,000자씩 나눠 `TO_CLOB(...) || TO_CLOB(...)`로 줄마다 이어 붙인다. SQL 문자 상수 4,000바이트 제한과 SQL*Plus 한 줄 2,499자 제한(SP2-0027)을 피하기 위해서다. 생성기가 2,499자 넘는 줄이 없는지 확인한다.
 
 ## 넣지 않은 것과 남은 일
@@ -58,12 +58,18 @@ Oracle Database 21c Express Edition 21.3에서 적재를 확인했다(2026-11-02
 
 ## 다시 만들기
 
-SQL 파일은 손으로 고치지 않는다. `tools/build_db.py`는 데이터 패키지가 아니라 이 DB 묶음에 들어 있다. 데이터 패키지 루트에서 서비스 더미를 다시 생성한 뒤, 이 묶음의 `tools/build_db.py` 경로를 주어 아래처럼 실행한다. 생성기는 DDL과 같은 정의로 길이·자릿수·허용값·PK·UNIQUE·FK와 원장 대조(대출 잔액 합, 통신·공과금 연체와 행 수, 간편결제 금액, 사회보험 납부액·행 수, 신용평가사 주요 항목 값, 회원별 6개월 입력)를 먼저 검사하고, 하나라도 어긋나면 파일을 쓰지 않는다.
+SQL 파일은 손으로 고치지 않는다. `tools/build_db.py`는 데이터 패키지가 아니라 이 DB 묶음에 들어 있다. 데이터 패키지 루트에서 서비스 더미를 다시 생성한 뒤, 이 묶음의 `tools/build_db.py` 경로를 주어 아래처럼 실행한다. 생성기는 DDL과 같은 정의로 길이·자릿수·허용값·PK·UNIQUE·FK와 원장 대조(대출 잔액 합, 통신·공과금 연체와 행 수, 간편결제 금액, 사회보험 납부액·행 수, 신용평가사 주요 항목 값, 회원별 12개월 입력)를 먼저 검사하고, 하나라도 어긋나면 파일을 쓰지 않는다.
 
 ```bash
 # 데이터 패키지 루트에서 실행. <DB 묶음>은 이 README가 있는 db/ 폴더의 상위 폴더
 python3 -I <DB 묶음>/tools/build_db.py service_dummy <DB 묶음>/db
 ```
+
+## v2.2 → v2.3 변경
+
+- 회원 월 입력(`MEMBER_MONTHLY_INPUT`)이 최근 완결 6개월(2026-03~2026-08)에서 12개월(2025-09~2026-08)로 늘었다(2,400 → 4,800행). N-22 비수기 판별에 12개월 소득이 필요하다는 결정이다. 12개월을 다 입력하지 않으면 입력 부족(`INSUFFICIENT_INPUT`)이다.
+- 2026-03~2026-08 행의 금액·입력일은 v2.2와 같다. 행 순서(회원별 달 순)가 바뀌어 `INPUT_ID` 값은 새로 매겨진다.
+- 테이블·컬럼 구조는 그대로다. 바뀐 파일은 `01_create_tables.sql`(코멘트 2개), `12_seed_member_monthly_input.sql`, `99_check.sql`(기대 행 수)이고, 나머지 SQL 파일은 v2.2와 같다(줄바꿈 무시 비교).
 
 ## v2 → v2.1 변경
 

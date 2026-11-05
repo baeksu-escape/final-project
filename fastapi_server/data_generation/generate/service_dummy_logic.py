@@ -91,8 +91,8 @@ def make_members(profiles, ages, cfg, as_of, rng):
 
 def make_monthly_inputs(monthly, members, ids, cfg, as_of, rng):
     """Member-entered monthly figures with the date each month was entered.
-    v3.5.7: only the months in cfg['input_months'] (the latest 6 complete months) are kept. Dates are drawn
-    for every source month first so the kept months have the same input dates as the 12-month version."""
+    cfg['input_months']의 달만 남긴다. v3.5.11부터 최근 완결 12개월이다(v3.5.7~v3.5.10은 6개월).
+    입력일은 원천의 모든 달에 대해 먼저 뽑으므로 기간을 바꿔도 남는 달의 입력일은 같다."""
     as_of = pd.Timestamp(as_of)
     mm = monthly[monthly.customer_id.isin(ids)].copy()
     mm['member_id'] = mm.customer_id.map(ids)
@@ -119,7 +119,7 @@ def remap_ledger(frame, ids, account_prefix_col='account_id'):
 
 def check_members(members, monthly_inputs, as_of, training_seed, member_seed, input_months=None):
     errors = []
-    if input_months is not None:                       # v3.5.7: every member enters exactly these months
+    if input_months is not None:                       # 회원마다 입력 기간의 달을 정확히 입력해야 한다(v3.5.11부터 12개월)
         got = monthly_inputs.groupby('member_id').month.apply(lambda m: sorted(m) == sorted(input_months))
         if len(got) != len(members) or not got.all(): errors.append('every member must enter exactly the input months')
     as_of = pd.Timestamp(as_of)
