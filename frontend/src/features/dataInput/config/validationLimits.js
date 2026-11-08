@@ -1,0 +1,16 @@
+// N-05 입력 검증 기준값 — 검증 규칙(validation/inputRules.js)이 쓰는 숫자를 이 파일 한 곳에 모은다.
+// TODO(팀 결정) '임시'라고 적은 값은 팀에서 정하지 않은 값이다. 정해지면 여기 값만 바꾸면 된다.
+export const VALIDATION_LIMITS = Object.freeze({
+  // 임시 — 월 단위 금액(월급·월 소득·월 상환액·월 고정지출·기타 지출 월 금액)의 상한: 10억원
+  MONTHLY_AMOUNT_MAX: 1_000_000_000,
+  // 임시 — 쌓인 금액(대출 잔액·자산)의 상한: 1,000억원
+  BALANCE_AMOUNT_MAX: 100_000_000_000,
+  // 임시 — 대출 연 금리 상한(%)
+  ANNUAL_RATE_MAX_PERCENT: 100,
+  // 임시 — 대출 남은 기간 상한(개월, 50년)
+  REMAINING_MONTHS_MAX: 600,
+  // 확정 — 월별 소득은 기준월부터 거꾸로 최근 12개월까지만 받는다.
+  INCOME_MONTHS_MAX: 12,
+  // 확정 — 입력한 달이 6개월 미만이면 '정보 부족'으로 안내한다(감점하지 않음, N-22).
+  INCOME_MONTHS_SHORTAGE: 6,
+})

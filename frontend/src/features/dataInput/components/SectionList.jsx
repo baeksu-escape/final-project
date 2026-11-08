@@ -5,7 +5,8 @@ import FieldControl from './FieldControl.jsx'
 
 // N-05 줄 추가·삭제 섹션(월별 소득, 대출, 기타 지출) — 공통 EditableList에 설정의 itemFields를 한 줄씩 그린다.
 // onChange(items)로 바뀐 줄 목록 전체를 부모에 알린다. 섹션 전체 오류(최소 줄 수 등)는 목록 아래에 보여 준다.
-export default function SectionList({ section, items, onChange, errors }) {
+// FP-86: 설정의 maxItems만큼 줄이 차면 추가 버튼이 막히고, notice(오류가 아닌 안내 문구)가 있으면 목록 아래에 보여 준다.
+export default function SectionList({ section, items, onChange, errors, notice }) {
   return (
     <Card title={section.title} className={`input-section input-section--${section.key}`}>
       {section.description && <p className="input-section__description">{section.description}</p>}
@@ -15,6 +16,7 @@ export default function SectionList({ section, items, onChange, errors }) {
         createItem={() => createEmptyRow(section)}
         addLabel={section.addLabel}
         emptyMessage={section.emptyMessage}
+        maxItems={section.maxItems}
         renderItem={(item, update) =>
           section.itemFields.map((field) => (
             <FieldControl
@@ -28,6 +30,11 @@ export default function SectionList({ section, items, onChange, errors }) {
         }
       />
       <FieldError message={errors[errorKeyOf(section.key)]} />
+      {notice && (
+        <p className="input-section__notice" role="status">
+          {notice}
+        </p>
+      )}
     </Card>
   )
 }
