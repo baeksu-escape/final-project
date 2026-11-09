@@ -4,7 +4,7 @@ import {
   amountRule,
   countEnteredMonths,
   incomeMonthRule,
-  incomeShortageNotice,
+  incomeRemainingNotice,
   monthRule,
   numberRule,
 } from '../validation/inputRules.js'
@@ -29,7 +29,7 @@ const balanceAmountRule = amountRule(VALIDATION_LIMITS.BALANCE_AMOUNT_MAX)
 //   payloadExtra: 요청 본문에 함께 보낼 고정값   minItems·minItemsMessage: list 최소 줄 수
 //   derive(value): 요청 본문에 덧붙일 계산값   summary(value): 화면에 보여 줄 요약 문구
 //   FP-86 list 전용 — maxItems·maxItemsMessage: 최대 줄 수(추가 버튼도 막힌다)
-//     uniqueField·duplicateMessage: 이 칸 값이 앞줄과 같으면 오류   notice(rows): 오류가 아닌 안내 문구(없으면 null)
+//     uniqueField·duplicateMessage: 이 칸 값이 앞줄과 같으면 오류   notice(rows): 입력 완료 현황의 같은 key 항목 옆에 보여 줄 안내 문구(없으면 null, 오류 아님)
 //   N-05-2 list 전용 — fixedMonths: 기준월로 끝나는 이 개월 수만큼 줄을 미리 채운다(줄 추가·삭제 없음). readOnly 칸은 입력 칸을 그리지 않는다.
 //   isComplete(saved): 입력 완료 현황에서 이 섹션의 완료 조건이 따로 있을 때 쓴다.
 
@@ -68,10 +68,11 @@ const MONTHLY_INCOME_SECTION = {
   maxItemsMessage: `최근 ${VALIDATION_LIMITS.INCOME_MONTHS_MAX}개월까지만 입력할 수 있습니다.`,
   uniqueField: 'month',
   duplicateMessage: '같은 달이 이미 입력되어 있습니다.',
-  notice: incomeShortageNotice,
+  notice: incomeRemainingNotice,
   itemFields: [
     { key: 'month', label: '소득 월', input: 'month', required: true, readOnly: true, validate: incomeMonthRule },
-    { key: 'amount', label: '소득 금액', input: 'money', required: true, validate: monthlyAmountRule },
+    // N-05-7 빈칸은 미입력으로 저장하고, 12개월이 안 차면 입력 완료 현황에서 미완료로 둔다. 0원은 입력한 값이다.
+    { key: 'amount', label: '소득 금액', input: 'money', validate: monthlyAmountRule },
   ],
 }
 
@@ -89,7 +90,19 @@ function createPeriodSection(label) {
     key: 'workPeriod',
     title: label,
     kind: 'fields',
-    fields: [{ key: 'periodMonths', label, input: 'number', unit: '개월', min: 0, step: 1, required: true }],
+    fields: [
+      {
+        key: 'periodMonths',
+        label,
+        input: 'number',
+        unit: '개월',
+        min: 0,
+        max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX,
+        step: 1,
+        required: true,
+        validate: numberRule({ max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX, unit: '개월' }),
+      },
+    ],
   }
 }
 

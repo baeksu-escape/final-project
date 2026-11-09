@@ -37,6 +37,14 @@ function createFixedMonthRows(section, endMonth, previousRows = []) {
   )
 }
 
+// N-05-7 저장 본문의 달이 범위 안의 서로 다른 달뿐이면 빈 달을 채워 줄로 되돌린다. 아니면 그대로 두어 검증 규칙(범위·중복·최대 줄 수)이 오류로 잡게 한다.
+function restoreFixedMonthRows(section, endMonth, savedRows) {
+  const rows = createFixedMonthRows(section, endMonth, savedRows)
+  const months = savedRows.map((row) => row.month)
+  const isInRange = months.every((month) => rows.some((row) => row.month === month))
+  return isInRange && new Set(months).size === months.length ? rows : withItemIds(savedRows)
+}
+
 // N-05-2 기준월이 바뀌었을 때 달이 고정된 섹션의 줄을 새 기준월에 맞춘다. 겹치는 달의 금액은 유지한다.
 export function withFixedMonthRows(values, sections) {
   const next = { ...values }
@@ -75,7 +83,7 @@ export function toValues(input, sections) {
     const saved = input?.[section.key]
     if (!saved) continue
     if (section.fixedMonths) {
-      values[section.key] = createFixedMonthRows(section, values.baseMonth, saved.items ?? [])
+      values[section.key] = restoreFixedMonthRows(section, values.baseMonth, saved.items ?? [])
     } else if (section.kind === 'list') {
       values[section.key] = withItemIds(saved.items ?? [])
     } else {

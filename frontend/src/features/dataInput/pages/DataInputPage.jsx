@@ -16,7 +16,7 @@ import { monthRule } from '../validation/inputRules.js'
 import { errorKeyOf, getInputNotices, validateFinancialInput } from '../validation/inputValidation.js'
 import { fromServerFieldErrors } from '../validation/serverErrors.js'
 
-// N-05 데이터 입력 화면 — 내 직군의 소득 섹션과 공통 섹션(부채·자산·고정지출·기타 지출)을 설정대로 그리고,
+// N-05 데이터 입력 화면 — 내 직군의 소득 섹션과 공통 섹션(부채·자산·월 고정 지출·할부·정기결제)을 설정대로 그리고,
 // 기준월과 함께 저장한 뒤 입력 완료 현황을 보여 준다. 대안 데이터는 모의 연동으로 따로 불러온다.
 // FP-86: 잘못된 값은 입력 즉시, 빈 필수 칸은 첫 저장 시도 뒤부터 칸 옆에 오류를 보여 주고, 오류가 있으면 저장 버튼을 막는다.
 export default function DataInputPage() {
@@ -67,7 +67,7 @@ export default function DataInputPage() {
   // 입력할 때마다 다시 검사한다. 빈 필수 칸 오류는 처음 저장을 시도한 뒤부터 넣고, 서버가 돌려준 칸 오류도 함께 보여 준다.
   const errors = { ...validateFinancialInput(values, sections, { checkRequired: submitted }), ...serverErrors }
   const errorCount = Object.keys(errors).length
-  // 오류가 아닌 안내(월별 소득 6개월 미만 '정보 부족' 등). 저장은 막지 않는다.
+  // N-05-7 오류가 아닌 안내(월별 소득의 남은 달 수). 지금 입력 중인 값으로 세고, 저장은 막지 않는다.
   const notices = getInputNotices(values, sections)
   // 이미 저장한 기준월로 다시 저장하려 하면 덮어쓴다고 알려 준다.
   const willOverwrite = savedBaseMonth !== null && savedBaseMonth === values.baseMonth && !justSaved
@@ -102,6 +102,7 @@ export default function DataInputPage() {
 
   // 저장 — 검사를 통과하면 요청 본문(모든 섹션에 기준월)을 보내고, 응답의 완료 현황으로 화면을 바꾼다.
   // 서버가 400과 칸별 오류(fieldErrors)를 주면 해당 칸 옆에 보여 주고, 칸을 찾지 못한 오류는 폼 아래 문구에 붙인다.
+  // TODO(D-20) { code, message, fieldErrors }는 팀 공통 형식이 정해지지 않은 임시 형식이다.
   const handleSubmit = async (event) => {
     event.preventDefault()
     setSubmitted(true)
@@ -171,7 +172,6 @@ export default function DataInputPage() {
               items={values[section.key]}
               onChange={handleListChange(section.key)}
               errors={errors}
-              notice={notices[section.key]}
             />
           ) : (
             <SectionFields
@@ -208,7 +208,7 @@ export default function DataInputPage() {
         )}
       </form>
 
-      <InputStatus status={status} savedAt={savedAt} />
+      <InputStatus status={status} savedAt={savedAt} notices={notices} />
       <AltDataImport baseMonth={values.baseMonth} imported={altData} onImported={handleAltImported} />
 
       <button
