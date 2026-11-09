@@ -20,7 +20,7 @@ import { fromServerFieldErrors } from '../validation/serverErrors.js'
 // 기준월과 함께 저장한 뒤 입력 완료 현황을 보여 준다. 대안 데이터는 모의 연동으로 따로 불러온다.
 // FP-86: 잘못된 값은 입력 즉시, 빈 필수 칸은 첫 저장 시도 뒤부터 칸 옆에 오류를 보여 주고, 오류가 있으면 저장 버튼을 막는다.
 export default function DataInputPage() {
-  const { user } = useAuth()
+  const { user, updateUser } = useAuth()
   const navigate = useNavigate()
   const sections = useMemo(() => getSectionsForJob(user.jobType), [user.jobType])
 
@@ -35,7 +35,7 @@ export default function DataInputPage() {
   const [formError, setFormError] = useState('')
   const [justSaved, setJustSaved] = useState(false)
   const [serverErrors, setServerErrors] = useState({})
-  const [savedBaseMonth, setSavedBaseMonth] = useState(null)
+  const [savedBaseMonths, setSavedBaseMonths] = useState([])
   const [calculating, setCalculating] = useState(false)
   const [calculateError, setCalculateError] = useState('')
 
@@ -48,8 +48,8 @@ export default function DataInputPage() {
         if (result.input) {
           setValues(toValues(result.input, sections))
           setSavedAt(result.input.savedAt)
-          setSavedBaseMonth(result.input.baseMonth)
         }
+        setSavedBaseMonths(result.savedBaseMonths ?? [])
         setStatus(result.status)
         setAltData(result.altData ?? {})
       })
@@ -69,8 +69,8 @@ export default function DataInputPage() {
   const errorCount = Object.keys(errors).length
   // N-05-7 오류가 아닌 안내(월별 소득의 남은 달 수). 지금 입력 중인 값으로 세고, 저장은 막지 않는다.
   const notices = getInputNotices(values, sections)
-  // 이미 저장한 기준월로 다시 저장하려 하면 덮어쓴다고 알려 준다.
-  const willOverwrite = savedBaseMonth !== null && savedBaseMonth === values.baseMonth && !justSaved
+  // 이미 저장한 기준월로 다시 저장하려 하면 덮어쓴다고 알려 준다. 입력은 기준월별로 저장된다(D-16).
+  const willOverwrite = savedBaseMonths.includes(values.baseMonth) && !justSaved
 
   // 고친 칸의 서버 오류만 지운다 — key가 errorKey와 같거나 'errorKey.'로 시작하는 오류(줄 섹션이면 그 섹션 전체)를 뺀다.
   const clearServerErrors = (errorKey) =>
@@ -93,12 +93,19 @@ export default function DataInputPage() {
     }, BASE_MONTH_FIELD.key)
     setServerErrors({})
   }
+  // 칸 섹션은 칸 하나만, 줄 섹션은 목록 전체를 새 값으로 바꾼다.
   const handleFieldChange = (sectionKey) => (fieldKey, fieldValue) =>
     change(
       (prev) => ({ ...prev, [sectionKey]: { ...prev[sectionKey], [fieldKey]: fieldValue } }),
       errorKeyOf(sectionKey, fieldKey),
     )
   const handleListChange = (sectionKey) => (items) => change((prev) => ({ ...prev, [sectionKey]: items }), sectionKey)
+  // N-05-8 "대출 없음" 체크 — 체크하면 입력해 둔 줄을 비운다.
+  const handleNoItemsChange = (sectionKey) => (checked) =>
+    change(
+      (prev) => ({ ...prev, noItems: { ...prev.noItems, [sectionKey]: checked }, [sectionKey]: checked ? [] : prev[sectionKey] }),
+      sectionKey,
+    )
 
   // 저장 — 검사를 통과하면 요청 본문(모든 섹션에 기준월)을 보내고, 응답의 완료 현황으로 화면을 바꾼다.
   // 서버가 400과 칸별 오류(fieldErrors)를 주면 해당 칸 옆에 보여 주고, 칸을 찾지 못한 오류는 폼 아래 문구에 붙인다.
@@ -114,7 +121,7 @@ export default function DataInputPage() {
       const result = await saveFinancialInput(buildPayload(values, sections, user.jobType))
       setStatus(result.status)
       setSavedAt(result.savedAt)
-      setSavedBaseMonth(values.baseMonth)
+      setSavedBaseMonths(result.savedBaseMonths ?? [])
       setServerErrors({})
       setJustSaved(true)
     } catch (error) {
@@ -138,6 +145,7 @@ export default function DataInputPage() {
     setCalculateError('')
     try {
       await requestScoreCalculation()
+      updateUser({ hasScore: true })
       navigate(PATHS.REPORT)
     } catch (error) {
       setCalculateError(error.message)
@@ -171,6 +179,8 @@ export default function DataInputPage() {
               section={section}
               items={values[section.key]}
               onChange={handleListChange(section.key)}
+              noItems={values.noItems[section.key]}
+              onNoItemsChange={handleNoItemsChange(section.key)}
               errors={errors}
             />
           ) : (

@@ -1,10 +1,11 @@
-import { Card, EditableList, FieldError } from '../../../common/components/index.js'
+import { Card, Checkbox, EditableList, FieldError } from '../../../common/components/index.js'
 import { createEmptyRow } from '../utils/inputValues.js'
 import { errorKeyOf } from '../validation/inputValidation.js'
 import FieldControl from './FieldControl.jsx'
 
 // N-05-2 달이 고정된 줄(월별 소득 12개월) — 줄을 추가·삭제하지 않고, 달을 이름에 붙인 입력 칸만 그린다. 달 칸의 오류는 글로만 보여 준다.
 function FixedMonthRows({ section, items, onChange, errors }) {
+  // 고친 줄만 바꾼 새 목록을 부모에 넘긴다.
   const updateRow = (id, patch) => onChange(items.map((row) => (row.id === id ? { ...row, ...patch } : row)))
   return (
     <ul className="input-section__month-rows">
@@ -32,13 +33,15 @@ function FixedMonthRows({ section, items, onChange, errors }) {
 // N-05 줄 추가·삭제 섹션(월별 소득, 대출, 할부·정기결제) — 공통 EditableList에 설정의 itemFields를 한 줄씩 그린다.
 // onChange(items)로 바뀐 줄 목록 전체를 부모에 알린다. 섹션 전체 오류(최소 줄 수 등)는 목록 아래에 보여 준다.
 // FP-86: 설정의 maxItems만큼 줄이 차면 추가 버튼이 막힌다.
-export default function SectionList({ section, items, onChange, errors }) {
+// N-05-8: 설정에 noItemsLabel이 있으면 "없음" 체크를 보여 주고, 체크하면 줄 목록을 숨긴다.
+export default function SectionList({ section, items, onChange, errors, noItems = false, onNoItemsChange }) {
   return (
     <Card title={section.title} className={`input-section input-section--${section.key}`}>
       {section.description && <p className="input-section__description">{section.description}</p>}
+      {section.noItemsLabel && <Checkbox label={section.noItemsLabel} checked={noItems} onChange={onNoItemsChange} />}
       {section.fixedMonths ? (
         <FixedMonthRows section={section} items={items} onChange={onChange} errors={errors} />
-      ) : (
+      ) : noItems ? null : (
         <EditableList
           items={items}
           onChange={onChange}

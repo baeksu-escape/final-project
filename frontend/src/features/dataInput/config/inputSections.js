@@ -8,7 +8,7 @@ import {
   monthRule,
   numberRule,
 } from '../validation/inputRules.js'
-import { LOAN_SECTOR_OPTIONS, OTHER_EXPENSE_CATEGORY_OPTIONS } from './inputOptions.js'
+import { LOAN_RATE_TYPE_OPTIONS, LOAN_SECTOR_OPTIONS, OTHER_EXPENSE_CATEGORY_OPTIONS } from './inputOptions.js'
 import { VALIDATION_LIMITS } from './validationLimits.js'
 
 // FP-86 금액 칸 규칙 — 월 단위 금액과 쌓인 금액(잔액·자산)의 상한이 다르다. 상한값은 validationLimits.js에 있다.
@@ -32,6 +32,7 @@ const balanceAmountRule = amountRule(VALIDATION_LIMITS.BALANCE_AMOUNT_MAX)
 //     uniqueField·duplicateMessage: 이 칸 값이 앞줄과 같으면 오류   notice(rows): 입력 완료 현황의 같은 key 항목 옆에 보여 줄 안내 문구(없으면 null, 오류 아님)
 //   N-05-2 list 전용 — fixedMonths: 기준월로 끝나는 이 개월 수만큼 줄을 미리 채운다(줄 추가·삭제 없음). readOnly 칸은 입력 칸을 그리지 않는다.
 //   isComplete(saved): 입력 완료 현황에서 이 섹션의 완료 조건이 따로 있을 때 쓴다.
+//   N-05-8 list 전용 — noItemsLabel: 줄이 없어도 완료로 볼 수 있게 하는 체크 문구(대출이 없는 사용자용)
 
 // 이 화면의 모든 입력에 함께 보내는 기준월(YYYY-MM).
 export const BASE_MONTH_FIELD = Object.freeze({
@@ -100,7 +101,7 @@ function createPeriodSection(label) {
         max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX,
         step: 1,
         required: true,
-        validate: numberRule({ max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX, unit: '개월' }),
+        validate: numberRule({ max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX, integer: true, unit: '개월' }),
       },
     ],
   }
@@ -126,8 +127,9 @@ export const COMMON_SECTIONS = Object.freeze([
   {
     key: 'loans',
     title: '기존 부채(대출)',
-    description: '보유한 대출을 한 건에 한 줄씩 추가해 주세요. 대출이 없으면 비워 두세요.',
+    description: '보유한 대출을 한 건에 한 줄씩 추가해 주세요. 대출이 없으면 아래 항목을 체크해 주세요.',
     kind: 'list',
+    noItemsLabel: '보유한 대출이 없습니다.',
     addLabel: '대출 추가',
     emptyMessage: '추가한 대출이 없습니다.',
     itemFields: [
@@ -144,6 +146,7 @@ export const COMMON_SECTIONS = Object.freeze([
         required: true,
         validate: numberRule({ max: VALIDATION_LIMITS.ANNUAL_RATE_MAX_PERCENT, unit: '%' }),
       },
+      { key: 'rateType', label: '고정·변동', input: 'select', options: LOAN_RATE_TYPE_OPTIONS, required: true },
       { key: 'monthlyPaymentAmount', label: '월 상환액', input: 'money', required: true, validate: monthlyAmountRule },
       {
         key: 'remainingMonths',

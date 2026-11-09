@@ -1,3 +1,4 @@
+import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import { PATHS } from '../config/navigation.js'
 import { ROLES } from '../config/roles.js'
 
@@ -11,10 +12,12 @@ export function getAccessRedirect(user, { requiredRole, requireJobType = false }
   return null
 }
 
-// 로그인 직후나 '/'에 들어왔을 때 갈 첫 화면 (N-01 출력: 사용자는 신용 리포트, 관리자는 모형 성능 비교).
+// N-01-2 로그인 직후나 '/'에 들어왔을 때 갈 첫 화면 — 관리자는 모형 성능 비교, 직군이 없으면 직군 선택, 점수가 없으면 데이터 입력, 그 외는 신용 리포트.
+// hasScore는 서버가 주는 사용자 정보다. 서버가 아직 보내지 않으면(undefined) 신용 리포트로 보낸다.
 export function getHomePath(user) {
   if (!user) return PATHS.LOGIN
   if (user.role === ROLES.ADMIN) return PATHS.ADMIN_MODEL
   if (!user.jobType) return PATHS.SELECT_JOB
+  if (user.hasScore === false) return DATA_INPUT_PATHS.DATA_INPUT
   return PATHS.REPORT
 }

@@ -12,6 +12,7 @@ export default function AppHeader() {
   const admin = isAdmin(user)
   const badge = admin ? ROLE_LABELS[user.role] : (JOB_TYPE_LABELS[user?.jobType] ?? '직군 미선택')
 
+  // 로그인 상태를 지운 뒤 로그인 화면으로 보낸다.
   const handleLogout = async () => {
     await logout()
     navigate(PATHS.LOGIN, { replace: true })

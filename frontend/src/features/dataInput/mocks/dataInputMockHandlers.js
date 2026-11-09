@@ -12,7 +12,8 @@ import { INPUT_ERROR_CODE, toServerFieldErrors } from '../validation/serverError
 import { createAltDataRows } from './altDataMock.js'
 
 // 사용자별 저장값 — 메모리에만 있어 새로고침하면 사라진다.
-const savedInputs = new Map() // userId → 요청 본문(+savedAt)
+const savedInputs = new Map() // userId → 가장 최근에 저장한 요청 본문(+savedAt)
+const savedByMonth = new Map() // userId → { 기준월: 요청 본문(+savedAt) } (D-16 기준월별 저장)
 const importedAltData = new Map() // userId → { [대안 데이터 key]: { importedAt, rows } }
 
 // 사용자의 입력 완료 현황 — { sections: { 섹션 key: 입력 여부 }, altData: { 대안 데이터 key: 불러옴 여부 } }
@@ -23,6 +24,11 @@ function statusOf(user) {
     sections: getSectionStatus(input, getSectionsForJob(user.jobType)),
     altData: Object.fromEntries(ALT_DATA_SOURCES.map((source) => [source.key, Boolean(altData[source.key])])),
   }
+}
+
+// D-16 이 사용자가 저장한 적 있는 기준월 목록(오래된 달부터).
+function savedBaseMonthsOf(user) {
+  return Object.keys(savedByMonth.get(user.userId) ?? {}).sort()
 }
 
 // FP-86 입력값 오류 응답(400)을 만든다. 칸별 오류는 data.fieldErrors에 담는다(형식은 validation/serverErrors.js 참고).
@@ -70,10 +76,11 @@ registerMockHandlers({
       input: structuredClone(savedInputs.get(user.userId) ?? null),
       status: statusOf(user),
       altData: structuredClone(importedAltData.get(user.userId) ?? {}),
+      savedBaseMonths: savedBaseMonthsOf(user),
     }
   },
 
-  // N-05 입력 저장 — 기준월과 직군을 확인하고 덮어쓴다.
+  // N-05 입력 저장 — 기준월과 직군을 확인하고 기준월별로 저장한다. 같은 기준월이면 덮어쓴다(D-16).
   // FP-86: 서버처럼 화면과 같은 규칙으로 다시 검사하고, 오류가 있으면 400과 칸별 오류(fieldErrors)를 돌려준다.
   'PUT /api/members/me/financial-input': ({ body, token }) => {
     const user = requireUserWithJob(token)
@@ -86,14 +93,17 @@ registerMockHandlers({
     const errors = validateFinancialInput(values, sections)
     if (Object.keys(errors).length > 0) throw invalidInputError(toServerFieldErrors(errors, values))
     const savedAt = new Date().toISOString()
-    savedInputs.set(user.userId, { ...structuredClone(body), savedAt })
-    return { savedAt, status: statusOf(user) }
+    const saved = { ...structuredClone(body), savedAt }
+    savedInputs.set(user.userId, saved)
+    savedByMonth.set(user.userId, { ...savedByMonth.get(user.userId), [body.baseMonth]: saved })
+    return { savedAt, status: statusOf(user), savedBaseMonths: savedBaseMonthsOf(user) }
   },
 
-  // N-05-8 점수 산출 — 실제 계산 없이 성공만 돌려준다. 완료 현황 6개가 모두 차지 않았으면 막는다.
+  // N-05-8 점수 산출 — 실제 계산 없이 성공만 돌려준다. 완료 현황 6개가 모두 차지 않았으면 막고, 성공하면 '점수 있음'으로 바꾼다(N-01-2).
   'POST /api/members/me/score-calculation': ({ token }) => {
     const user = requireUserWithJob(token)
     if (!isInputComplete(statusOf(user))) throw new ApiError(409, '입력 완료 현황 6개 항목을 모두 채워 주세요.')
+    patchMockAccountUser(token, { hasScore: true })
     return { calculatedAt: new Date().toISOString() }
   },
 

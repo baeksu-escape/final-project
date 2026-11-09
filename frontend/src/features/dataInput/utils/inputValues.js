@@ -60,9 +60,12 @@ function createEmptyFields(section) {
 }
 
 // N-05 화면 입력값의 처음 상태 — { baseMonth, [섹션 key]: 칸 객체 | 줄 배열 }. 최소 줄 수가 있는 섹션은 빈 줄로 채워 둔다.
-// 달이 고정된 섹션(N-05-2)은 기준월로 끝나는 달을 미리 채운 줄로 시작한다.
+// 달이 고정된 섹션(N-05-2)은 기준월로 끝나는 달을 미리 채운 줄로 시작한다. noItems는 "대출 없음" 같은 체크 상태다(N-05-8).
 export function createEmptyValues(sections, baseMonth = defaultBaseMonth(sections)) {
-  const values = { baseMonth }
+  const values = {
+    baseMonth,
+    noItems: Object.fromEntries(sections.filter((section) => section.noItemsLabel).map((section) => [section.key, false])),
+  }
   for (const section of sections) {
     if (section.fixedMonths) {
       values[section.key] = createFixedMonthRows(section, baseMonth)
@@ -86,6 +89,7 @@ export function toValues(input, sections) {
       values[section.key] = restoreFixedMonthRows(section, values.baseMonth, saved.items ?? [])
     } else if (section.kind === 'list') {
       values[section.key] = withItemIds(saved.items ?? [])
+      if (section.noItemsLabel) values.noItems[section.key] = saved.noItems === true
     } else {
       for (const field of section.fields) values[section.key][field.key] = saved[field.key] ?? values[section.key][field.key]
     }
@@ -108,6 +112,7 @@ export function buildPayload(values, sections, jobType) {
     const body = { baseMonth: values.baseMonth, ...section.payloadExtra }
     if (section.kind === 'list') {
       body.items = value.map(withoutId)
+      if (section.noItemsLabel) body.noItems = values.noItems[section.key]
     } else {
       for (const field of section.fields) body[field.key] = value[field.key]
       Object.assign(body, section.derive?.(value))
@@ -117,7 +122,7 @@ export function buildPayload(values, sections, jobType) {
   return payload
 }
 
-// 저장된 요청 본문 기준으로 섹션별 입력 여부를 돌려준다 — 줄 섹션은 한 줄 이상, 칸 섹션은 한 칸 이상이면 입력함.
+// 저장된 요청 본문 기준으로 섹션별 입력 여부를 돌려준다 — 줄 섹션은 한 줄 이상이거나 "없음" 체크, 칸 섹션은 한 칸 이상이면 입력함.
 // 섹션 설정에 isComplete가 있으면 그 조건을 쓴다(N-05-8 월별 소득은 12개월을 모두 입력해야 완료).
 export function getSectionStatus(input, sections) {
   return Object.fromEntries(
@@ -126,7 +131,7 @@ export function getSectionStatus(input, sections) {
       if (section.isComplete) return [section.key, section.isComplete(saved)]
       const filled =
         section.kind === 'list'
-          ? (saved?.items?.length ?? 0) > 0
+          ? (saved?.items?.length ?? 0) > 0 || saved?.noItems === true
           : section.fields.some((field) => !isEmptyValue(saved?.[field.key]))
       return [section.key, filled]
     }),

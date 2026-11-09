@@ -43,7 +43,7 @@ export default function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route path={PATHS.HOME} element={<HomeRedirect />} />
           <Route path={PATHS.FORBIDDEN} element={<ForbiddenPage />} />
-          {/* 직군 선택 (FP-85 N-08) — 직군이 없는 사용자만 머문다 */}
+          {/* 직군 선택 (FP-85 N-05-1) — 직군이 없는 사용자만 머문다 */}
           <Route path={PATHS.SELECT_JOB} element={<JobSelectPage />} />
 
           {/* 일반 사용자 전용 + 직군 선택 완료 */}
