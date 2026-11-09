@@ -114,7 +114,7 @@ registerMockHandlers({
       email: body.email,
       phone: normalizePhone(body.phone),
       ageGroup: body.ageGroup,
-      user: { userId, name: body.name, role: ROLES.USER, jobType: null },
+      user: { userId, name: body.name, role: ROLES.USER, jobType: null, hasScore: false },
     })
     return { userId }
   },

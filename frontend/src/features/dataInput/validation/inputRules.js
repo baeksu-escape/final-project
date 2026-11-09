@@ -95,10 +95,8 @@ export function countEnteredMonths(rows) {
   return new Set(months).size
 }
 
-// 월별 소득 '정보 부족' 안내 — 입력한 달이 6개월 미만이면 안내 문구를, 아니면 null을 돌려준다. 오류가 아니므로 저장은 막지 않는다.
-export function incomeShortageNotice(rows) {
-  const count = countEnteredMonths(rows)
-  const shortage = VALIDATION_LIMITS.INCOME_MONTHS_SHORTAGE
-  if (count >= shortage) return null
-  return `입력한 달이 ${count}개월입니다. ${shortage}개월 미만이면 소득 변동성 진단에서 '정보 부족'으로 표시되며, 감점하지는 않습니다.`
+// N-05-7 월별 소득 남은 달 안내 — 12개월을 다 채우지 않았으면 남은 달 수를, 다 채웠으면 null을 돌려준다. 오류가 아니므로 저장은 막지 않는다.
+export function incomeRemainingNotice(rows) {
+  const remaining = VALIDATION_LIMITS.INCOME_MONTHS_MAX - countEnteredMonths(rows)
+  return remaining > 0 ? `${remaining}개월 더 입력해 주세요.` : null
 }

@@ -1,7 +1,14 @@
 import { JOB_TYPES } from '../../../common/config/jobTypes.js'
 import { formatWithComma } from '../../../common/utils/number.js'
-import { amountRule, incomeMonthRule, incomeShortageNotice, monthRule, numberRule } from '../validation/inputRules.js'
-import { LOAN_SECTOR_OPTIONS, OTHER_EXPENSE_CATEGORY_OPTIONS } from './inputOptions.js'
+import {
+  amountRule,
+  countEnteredMonths,
+  incomeMonthRule,
+  incomeRemainingNotice,
+  monthRule,
+  numberRule,
+} from '../validation/inputRules.js'
+import { LOAN_RATE_TYPE_OPTIONS, LOAN_SECTOR_OPTIONS, OTHER_EXPENSE_CATEGORY_OPTIONS } from './inputOptions.js'
 import { VALIDATION_LIMITS } from './validationLimits.js'
 
 // FP-86 금액 칸 규칙 — 월 단위 금액과 쌓인 금액(잔액·자산)의 상한이 다르다. 상한값은 validationLimits.js에 있다.
@@ -22,7 +29,10 @@ const balanceAmountRule = amountRule(VALIDATION_LIMITS.BALANCE_AMOUNT_MAX)
 //   payloadExtra: 요청 본문에 함께 보낼 고정값   minItems·minItemsMessage: list 최소 줄 수
 //   derive(value): 요청 본문에 덧붙일 계산값   summary(value): 화면에 보여 줄 요약 문구
 //   FP-86 list 전용 — maxItems·maxItemsMessage: 최대 줄 수(추가 버튼도 막힌다)
-//     uniqueField·duplicateMessage: 이 칸 값이 앞줄과 같으면 오류   notice(rows): 오류가 아닌 안내 문구(없으면 null)
+//     uniqueField·duplicateMessage: 이 칸 값이 앞줄과 같으면 오류   notice(rows): 입력 완료 현황의 같은 key 항목 옆에 보여 줄 안내 문구(없으면 null, 오류 아님)
+//   N-05-2 list 전용 — fixedMonths: 기준월로 끝나는 이 개월 수만큼 줄을 미리 채운다(줄 추가·삭제 없음). readOnly 칸은 입력 칸을 그리지 않는다.
+//   isComplete(saved): 입력 완료 현황에서 이 섹션의 완료 조건이 따로 있을 때 쓴다.
+//   N-05-8 list 전용 — noItemsLabel: 줄이 없어도 완료로 볼 수 있게 하는 체크 문구(대출이 없는 사용자용)
 
 // 이 화면의 모든 입력에 함께 보내는 기준월(YYYY-MM).
 export const BASE_MONTH_FIELD = Object.freeze({
@@ -44,24 +54,26 @@ const SALARY_SECTION = {
   fields: [{ key: 'monthlySalary', label: '월급(보너스 제외)', input: 'money', required: true, validate: monthlyAmountRule }],
 }
 
-// 자영업자·프리랜서 소득 — 한 달에 한 줄씩 받는다.
+// N-05-2 자영업자·프리랜서 소득 — 기준월로 끝나는 최근 12개월을 한 달에 한 줄씩 미리 채워 모두 받는다.
 const MONTHLY_INCOME_SECTION = {
   key: 'income',
   title: '월별 소득',
-  description: `기준월부터 거꾸로 최근 ${VALIDATION_LIMITS.INCOME_MONTHS_MAX}개월까지, 한 달에 한 줄씩 입력해 주세요.`,
+  description: `기준월까지 최근 ${VALIDATION_LIMITS.INCOME_MONTHS_MAX}개월의 소득을 모두 입력해 주세요. 소득이 없던 달은 0을 입력해 주세요.`,
   kind: 'list',
   payloadExtra: { incomeType: 'MONTHLY_INCOME' },
+  fixedMonths: VALIDATION_LIMITS.INCOME_MONTHS_MAX,
+  isComplete: (saved) => countEnteredMonths(saved?.items ?? []) >= VALIDATION_LIMITS.INCOME_MONTHS_MAX,
   minItems: 1,
   minItemsMessage: '소득을 한 달 이상 입력해 주세요.',
   maxItems: VALIDATION_LIMITS.INCOME_MONTHS_MAX,
   maxItemsMessage: `최근 ${VALIDATION_LIMITS.INCOME_MONTHS_MAX}개월까지만 입력할 수 있습니다.`,
   uniqueField: 'month',
   duplicateMessage: '같은 달이 이미 입력되어 있습니다.',
-  notice: incomeShortageNotice,
-  addLabel: '소득 월 추가',
+  notice: incomeRemainingNotice,
   itemFields: [
-    { key: 'month', label: '소득 월', input: 'month', required: true, validate: incomeMonthRule },
-    { key: 'amount', label: '소득 금액', input: 'money', required: true, validate: monthlyAmountRule },
+    { key: 'month', label: '소득 월', input: 'month', required: true, readOnly: true, validate: incomeMonthRule },
+    // N-05-7 빈칸은 미입력으로 저장하고, 12개월이 안 차면 입력 완료 현황에서 미완료로 둔다. 0원은 입력한 값이다.
+    { key: 'amount', label: '소득 금액', input: 'money', validate: monthlyAmountRule },
   ],
 }
 
@@ -70,6 +82,36 @@ export const INCOME_SECTION_BY_JOB = Object.freeze({
   [JOB_TYPES.EMPLOYEE]: SALARY_SECTION,
   [JOB_TYPES.SELF_EMPLOYED]: MONTHLY_INCOME_SECTION,
   [JOB_TYPES.FREELANCER]: MONTHLY_INCOME_SECTION,
+})
+
+// N-05-2 소득과 함께 받는 기간 섹션을 만든다. 직군마다 이름만 다르다.
+// TODO(D-24) 기간의 단위를 팀이 정하지 않아 개월 수로 받는다.
+function createPeriodSection(label) {
+  return {
+    key: 'workPeriod',
+    title: label,
+    kind: 'fields',
+    fields: [
+      {
+        key: 'periodMonths',
+        label,
+        input: 'number',
+        unit: '개월',
+        min: 0,
+        max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX,
+        step: 1,
+        required: true,
+        validate: numberRule({ max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX, integer: true, unit: '개월' }),
+      },
+    ],
+  }
+}
+
+// 직군별 기간 섹션(소득 섹션 바로 다음에 보여 준다).
+export const PERIOD_SECTION_BY_JOB = Object.freeze({
+  [JOB_TYPES.EMPLOYEE]: createPeriodSection('재직 기간'),
+  [JOB_TYPES.SELF_EMPLOYED]: createPeriodSection('운영 기간'),
+  [JOB_TYPES.FREELANCER]: createPeriodSection('활동 기간'),
 })
 
 // 자산 칸 금액을 모두 더한다(빈 칸은 0).
@@ -85,8 +127,9 @@ export const COMMON_SECTIONS = Object.freeze([
   {
     key: 'loans',
     title: '기존 부채(대출)',
-    description: '보유한 대출을 한 건에 한 줄씩 추가해 주세요. 대출이 없으면 비워 두세요.',
+    description: '보유한 대출을 한 건에 한 줄씩 추가해 주세요. 대출이 없으면 아래 항목을 체크해 주세요.',
     kind: 'list',
+    noItemsLabel: '보유한 대출이 없습니다.',
     addLabel: '대출 추가',
     emptyMessage: '추가한 대출이 없습니다.',
     itemFields: [
@@ -103,6 +146,7 @@ export const COMMON_SECTIONS = Object.freeze([
         required: true,
         validate: numberRule({ max: VALIDATION_LIMITS.ANNUAL_RATE_MAX_PERCENT, unit: '%' }),
       },
+      { key: 'rateType', label: '고정·변동', input: 'select', options: LOAN_RATE_TYPE_OPTIONS, required: true },
       { key: 'monthlyPaymentAmount', label: '월 상환액', input: 'money', required: true, validate: monthlyAmountRule },
       {
         key: 'remainingMonths',
@@ -132,18 +176,18 @@ export const COMMON_SECTIONS = Object.freeze([
   },
   {
     key: 'fixedExpense',
-    title: '월 고정지출',
-    description: '월세·관리비처럼 매달 정해진 금액이 나가는 지출의 합계를 입력해 주세요.',
+    title: '월 고정 지출',
+    description: '식비·교통·공과금 등 매달 나가는 지출의 합계를 입력해 주세요.',
     kind: 'fields',
-    fields: [{ key: 'monthlyAmount', label: '월 고정지출', input: 'money', validate: monthlyAmountRule }],
+    fields: [{ key: 'monthlyAmount', label: '월 고정 지출', input: 'money', validate: monthlyAmountRule }],
   },
   {
     key: 'otherExpenses',
-    title: '기타 지출',
-    description: '고정지출 외에 매달 나가는 지출을 항목별로 추가해 주세요.',
+    title: '할부·정기결제',
+    description: '할부금이나 구독료처럼 매달 나가는 결제를 항목별로 추가해 주세요.',
     kind: 'list',
-    addLabel: '기타 지출 추가',
-    emptyMessage: '추가한 기타 지출이 없습니다.',
+    addLabel: '할부·정기결제 추가',
+    emptyMessage: '추가한 할부·정기결제가 없습니다.',
     itemFields: [
       { key: 'category', label: '종류', input: 'select', options: OTHER_EXPENSE_CATEGORY_OPTIONS, required: true },
       { key: 'memo', label: '내용', input: 'text', maxLength: 50 },
@@ -152,8 +196,8 @@ export const COMMON_SECTIONS = Object.freeze([
   },
 ])
 
-// 직군에 맞는 섹션 목록(소득 + 공통)을 돌려준다. 알 수 없는 직군이면 빈 목록.
+// 직군에 맞는 섹션 목록(소득 + 기간 + 공통)을 돌려준다. 알 수 없는 직군이면 빈 목록.
 export function getSectionsForJob(jobType) {
   const incomeSection = INCOME_SECTION_BY_JOB[jobType]
-  return incomeSection ? [incomeSection, ...COMMON_SECTIONS] : []
+  return incomeSection ? [incomeSection, PERIOD_SECTION_BY_JOB[jobType], ...COMMON_SECTIONS] : []
 }

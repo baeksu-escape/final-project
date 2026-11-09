@@ -32,9 +32,11 @@ const ROW_BUILDERS = {
   telecom: (month, random) => [
     { month, billedAmount: pick(random, 40000, 110000, 10), paymentStatus: random() < 0.9 ? '정상 납부' : '연체' },
   ],
-  socialInsurance: (month, random) => [
-    { month, insuranceType: '국민연금', paidAmount: pick(random, 90000, 250000, 10), paymentStatus: random() < 0.95 ? '정상 납부' : '미납' },
-    { month, insuranceType: '건강보험', paidAmount: pick(random, 60000, 180000, 10), paymentStatus: random() < 0.95 ? '정상 납부' : '미납' },
+  nationalPension: (month, random) => [
+    { month, paidAmount: pick(random, 90000, 250000, 10), paymentStatus: random() < 0.95 ? '정상 납부' : '미납' },
+  ],
+  healthInsurance: (month, random) => [
+    { month, paidAmount: pick(random, 60000, 180000, 10), paymentStatus: random() < 0.95 ? '정상 납부' : '미납' },
   ],
 }
 
