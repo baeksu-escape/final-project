@@ -42,6 +42,12 @@ export default function AuthProvider({ children }) {
     return user
   }, [])
 
+  // N-01-6 소셜 로그인처럼 이미 받은 토큰과 사용자 정보로 로그인 상태를 만든다.
+  const loginWithToken = useCallback((accessToken, user) => {
+    tokenStorage.set(accessToken)
+    setAuth({ status: 'authenticated', user })
+  }, [])
+
   // 서버에 로그아웃을 알린 뒤 토큰을 지우고 로그아웃 상태로 바꾼다.
   const logout = useCallback(async () => {
     try {
@@ -58,7 +64,10 @@ export default function AuthProvider({ children }) {
     setAuth((prev) => (prev.user ? { ...prev, user: { ...prev.user, ...patch } } : prev))
   }, [])
 
-  const value = useMemo(() => ({ ...auth, login, logout, updateUser }), [auth, login, logout, updateUser])
+  const value = useMemo(
+    () => ({ ...auth, login, loginWithToken, logout, updateUser }),
+    [auth, login, loginWithToken, logout, updateUser],
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

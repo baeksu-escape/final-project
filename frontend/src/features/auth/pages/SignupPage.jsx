@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Checkbox, Select, TextInput } from '../../../common/components/index.js'
 import { requestSignup } from '../api/authFeatureApi.js'
 import { AGE_GROUP_OPTIONS, AUTH_ERROR_CODES, CREDIT_INFO_AGREEMENT_LABEL, EMAIL_PURPOSES } from '../authConstants.js'
@@ -23,7 +23,13 @@ const EMPTY_FORM = {
 
 // N-02 회원가입 화면 — 형식 검사·이메일 인증·필수 동의를 거쳐 계정을 만든다. 직군은 가입 후 직군 선택 화면(FP-85)에서 받는다.
 export default function SignupPage() {
-  const [form, setForm] = useState(EMPTY_FORM)
+  // N-01-6 소셜 계정으로 새로 가입하면 화면 이동 상태로 이름·이메일·임시 연결 키를 받는다. 칸은 사용자가 고칠 수 있고, 이메일 인증은 그대로 거친다.
+  const socialSignup = useLocation().state?.socialSignup
+  const [form, setForm] = useState(() => ({
+    ...EMPTY_FORM,
+    name: socialSignup?.name ?? '',
+    email: socialSignup?.email ?? '',
+  }))
   const [verification, setVerification] = useState(null)
   const [submitted, setSubmitted] = useState(false)
   const [serverErrors, setServerErrors] = useState({})
@@ -62,6 +68,7 @@ export default function SignupPage() {
         ageGroup: form.ageGroup,
         agreeCreditInfo: form.agreeCreditInfo,
         emailVerificationToken: verification.verificationToken,
+        ...(socialSignup?.linkKey ? { socialLinkKey: socialSignup.linkKey } : {}),
       })
       setCompleted(true)
     } catch (error) {

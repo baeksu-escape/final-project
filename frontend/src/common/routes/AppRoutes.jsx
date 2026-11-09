@@ -14,6 +14,9 @@ import FindIdPage from '../../features/auth/pages/FindIdPage.jsx'
 import FindPasswordPage from '../../features/auth/pages/FindPasswordPage.jsx'
 import LoginPage from '../../features/auth/pages/LoginPage.jsx'
 import SignupPage from '../../features/auth/pages/SignupPage.jsx'
+import SocialCallbackPage from '../../features/auth/pages/SocialCallbackPage.jsx'
+import SocialLinkPage from '../../features/auth/pages/SocialLinkPage.jsx'
+import { SOCIAL_PATHS } from '../../features/auth/socialLoginConfig.js'
 import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import DataInputPage from '../../features/dataInput/pages/DataInputPage.jsx'
 import JobSelectPage from '../../features/dataInput/pages/JobSelectPage.jsx'
@@ -36,6 +39,9 @@ export default function AppRoutes() {
         <Route path={AUTH_PATHS.SIGNUP} element={<SignupPage />} />
         <Route path={AUTH_PATHS.FIND_ID} element={<FindIdPage />} />
         <Route path={AUTH_PATHS.FIND_PASSWORD} element={<FindPasswordPage />} />
+        {/* 소셜 로그인 (FP-145 N-01-6) */}
+        <Route path={SOCIAL_PATHS.CALLBACK} element={<SocialCallbackPage />} />
+        <Route path={SOCIAL_PATHS.LINK} element={<SocialLinkPage />} />
       </Route>
 
       {/* 로그인 필요 */}
