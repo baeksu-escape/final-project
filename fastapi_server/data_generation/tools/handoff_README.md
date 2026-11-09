@@ -1,6 +1,8 @@
-# 학습용 합성 데이터 v3.5.10 — 이것부터 보세요
+# 학습용 합성 데이터 v3.5.12 — 이것부터 보세요
 
-모든 값은 합성 데이터다. 성능 수치는 실제 예측력의 근거가 아니다. 저장소의 생성 코드 v3.5.10(`fastapi_server/data_generation/`)을 기본 설정으로 생성했고 검증기를 모두 통과했다.
+모든 값은 합성 데이터다. 성능 수치는 실제 예측력의 근거가 아니다. 저장소의 생성 코드 v3.5.12(`fastapi_server/data_generation/`)를 기본 설정으로 생성했다.
+
+이 묶음은 v3.5.12 코드로 다시 생성했다. 데이터 파일(`1_model/`, `2_detail/`, `3_reference/`)의 값은 v3.5.10 묶음과 같고, 바뀐 것은 문서(이 README, `docs/`)다. `3_reference/legacy/validation.json`은 실행 환경 기록(numpy·pandas 버전)만 다르다. 본문의 서비스 정책(회원 월 입력 12개월, 등급 상태·점수 범위)은 v3.5.12 기준이다.
 
 이 폴더는 저장소의 `fastapi_server/data/training/`에 두는 것을 전제로 한다. 압축 푸는 위치와 폴더 구조는 저장소의 `fastapi_server/data/README.md`에 있다.
 
@@ -47,8 +49,8 @@
 ## 등급 이름
 
 - `CB`는 교육용 신용등급이고 **1이 우량, 10이 고위험**이다. 기존 집단에서 미래 연체 비율이 1등급 5.2%, 5등급 11.9%, 8등급 38.5%, 10등급 75%로 등급과 함께 커진다.
-- 서비스가 회원에게 보여 줄 등급은 `CB`가 아니라 **모델 점수**를 구간으로 나눈 3단계다: `GOOD` / `STANDARD` / `CAUTION`. 구간 기준은 모델 팀이 정한다.
-- 점수를 낼 수 없으면 등급 대신 상태로 표시한다: `NOT_SCORABLE`(산정 불가), `INSUFFICIENT_INPUT`(입력 부족, 12개월 월 입력 미완료). 이 두 상태는 서비스 회원에게만 생긴다. 학습 데이터에는 해당하는 사람이 없다.
+- 서비스가 회원에게 보여 줄 등급은 `CB`가 아니라 **모델 점수**를 구간으로 나눈 3단계다: `GOOD` / `STANDARD` / `CAUTION`. 서비스 점수는 0~1000, 경계는 665·780이다(시연용 임시값, 모형 학습 후 다시 정한다).
+- 점수를 낼 수 없으면 등급 대신 `NOT_SCORABLE`(산정 불가)로 표시한다. 이 상태는 서비스 회원에게만 생긴다. 12개월 월 입력이 덜 찬 회원은 점수를 산출하지 않는다(상태값 없음). 학습 데이터에는 해당하는 사람이 없다.
 
 ## 라벨 두 개
 
@@ -84,4 +86,5 @@
 
 - 직군 코드는 원본 값 `wage/selfemp/freelance`다(서비스 코드 `EMPLOYEE/SELF_EMPLOYED/FREELANCER`).
 - 대출 상환 일정(`loan_extension/`, 약 440MB)은 크기 때문에 뺐다. 필요하면 `data_generation/`에서 `python -m generate.build_loan_extension`으로 만든다.
-- 생성 환경은 `requirements.txt`의 고정 버전(numpy 2.3.5·pandas 2.2.3·scipy 1.17.0·scikit-learn 1.8.0)이다. 다른 버전으로 다시 만들면 소수점 마지막 자리가 다를 수 있다.
+- 권장 재현 환경은 `requirements.txt`의 고정 버전(numpy 2.3.5·pandas 2.2.3·scipy 1.17.0·scikit-learn 1.8.0)이다. 다른 버전으로 다시 만들면 소수점 마지막 자리가 다를 수 있다.
+- 이번 묶음(v3.5.12)의 실제 생성 환경은 Python 3.11.9·numpy 2.4.6·pandas 3.0.5·scipy 1.17.1·scikit-learn 1.9.1이다(`3_reference/legacy/validation.json`에 numpy·pandas 버전 기록). 데이터 파일 값은 v3.5.10 묶음(고정 버전 환경)과 같다.

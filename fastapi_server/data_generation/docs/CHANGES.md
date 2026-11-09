@@ -2,13 +2,17 @@
 
 데이터 생성과 해석에 영향을 주는 변경만 적는다. 최신 항목이 위에 있다. 문서 표현만 고친 버전은 한 줄로 줄였다.
 
+## v3.5.12 (2026-11-09) — 등급 상태 입력 부족 제거 (문서만)
+
+- 회원 월 입력 12개월이 필수가 되어 덜 차면 점수를 산출하지 않으므로, 등급 상태 `INSUFFICIENT_INPUT`(입력 부족)을 없앴다. 상태는 `SCORED`·`NOT_SCORABLE` 두 개다. 서비스 점수 0~1000, 등급 경계 665·780(임시, D-01)을 `SERVICE_DUMMY_DATA.md`·`tools/handoff_README.md`에 적었다. 생성 코드와 데이터는 바뀌지 않았다. DB 묶음은 v2.4(`MEMBER_CREDIT_GRADE` CHECK·코멘트).
+
 ## v3.5.11 (2026-11-05) — 회원 월 입력 12개월, 모델 집계 기간 키 분리
 
 - **배경(서비스 결정).** N-22 소득 변동성 진단의 비수기 판별에는 12개월 소득이 필요하다. v3.5.7에서 가입 장벽을 줄이려고 6개월로 줄였던 회원 월 입력(소득·생활지출·상환액)을 다시 최근 완결 12개월(2025-09~2026-08)로 늘린다. 12개월을 다 입력하지 않으면 입력 부족(`INSUFFICIENT_INPUT`)이다.
 - **설정 키 분리.** `reference/service_dummy_anchors.json`의 `members.input_months`는 원래 뜻(회원이 입력하는 달)대로 12개월로 바꾸고, 학습 모델 표의 입력 기반 집계 기간은 새 키 `members.model_feature_months`(6개월, 2026-03~2026-08)로 나눴다. `generate/build_input_features_6m.py`의 `input_months()`는 새 키를 읽는다. 함수 이름과 `*_6m` 열의 이름·의미는 그대로다.
 - **검증·테스트.** `verify/verify_input_features_6m.py`는 집계 기간이 회원 입력 기간의 마지막 연속 6개월인지 확인한다. 고정 예제 테스트: 회원 입력 12개월 기대값으로 수정, 입력 기간 밖 달이 빠지는지 1건 추가.
 - **바뀐 출력.** `service_dummy/members/member_monthly_inputs.csv` 하나(2,400 → 4,800행, 회원 400명 × 12개월). DB 묶음 v2.3의 `12_seed_member_monthly_input.sql`과 관련 코멘트·행 수 검사.
-- **바뀌지 않은 것.** 재생성 결과를 v3.5.10 학습 묶음(`2_detail/`)의 27개 파일(기존 집단 9, 씬파일 18; `input_features_6m.csv`, `monthly_history.csv`, `profiles.csv` 포함)과 값으로 비교해 모두 같았다. `member_monthly_inputs.csv`의 2026-03~2026-08 행 2,400건은 금액·입력일이 DB v2.2 시드와 모두 같다. 그 밖의 서비스 더미(외부 API 응답, 원장)는 이미 12개월이라 바뀌지 않는다.
+- **바뀌지 않은 것.** 재생성 결과를 v3.5.10 학습 묶음(`2_detail/`)의 26개 파일(기존 집단 9, 씬파일 17; `input_features_6m.csv`, `monthly_history.csv`, `profiles.csv` 포함)과 값으로 비교해 모두 같았다. `member_monthly_inputs.csv`의 2026-03~2026-08 행 2,400건은 금액·입력일이 DB v2.2 시드와 모두 같다. 그 밖의 서비스 더미(외부 API 응답, 원장)는 이미 12개월이라 바뀌지 않는다.
 - **재생성 환경.** 2026-11-05, Python 3.11.9, numpy 2.4.6, pandas 3.0.5, scipy 1.17.1, scikit-learn 1.9.1 (`provenance.json`의 기록 환경과 다르지만 위 비교에서 값이 같았다). Windows에서는 `PYTHONUTF8=1`로 실행했다.
 
 ## v3.5.10 (2026-11-03) — 학습용 6개월 입력 집계에 전처리 시연용 결측·이상치 추가

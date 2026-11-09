@@ -1,5 +1,5 @@
 {
- "package_version": "3.5.11-light",
+ "package_version": "3.5.12-light",
  "package_contents": "generation code, configuration, statistical sources and documentation; generated datasets are not included",
  "packaged_input": {
   "file": "data/base_207.csv",
@@ -28,7 +28,7 @@
  "official_thinfile_thresholds_used": false,
  "training_data_policy": "models are trained on synthetic data only; service_dummy/ (members) is never used for training",
  "execution_status": {
-  "release": "v3.5.11",
+  "release": "v3.5.12",
   "source_code_changed": "v3.5.11: reference/service_dummy_anchors.json (members.input_months 12 months, new members.model_feature_months 6 months), generate/build_input_features_6m.py (input_months() reads model_feature_months), generate/service_dummy_logic.py (docstrings), verify/verify_input_features_6m.py (window = last 6 consecutive input months), tests/test_input_features_6m.py, tests/test_service_dummy_logic.py (12-month inputs, +1 test). v3.5.7: new generate/build_input_features_6m.py, verify/verify_input_features_6m.py, tests/test_input_features_6m.py; changed generate/service_dummy_logic.py (6-month inputs, credit bureau and utility responses and checks), generate/build_members.py (credit bureau and utility ledgers), generate/build_external_api.py (two new responses), tools/build_handoff.py (6-month features, columns members cannot provide left out), reference/service_dummy_anchors.json (input_months, utility, credit_bureau), tests/test_service_dummy_logic.py (+4 tests). v3.5.6: tools/build_handoff.py (prepare_output refuses a symbolic-link --out before resolve(); the old check ran after resolve() and never fired), tests/test_build_handoff.py (+2 tests), tools/handoff_README.md (version, test count, symlink note). v3.5.5: generate/build_nonfinancial_sources.py (summary 'folder' is package-relative, no absolute path), tests/test_nonfinancial_sources.py (+1 test), tools/handoff_README.md (thin-file training restricted to eval_future_credit_exposure == 1). v3.5.0 changes: new: generate/nonfinancial_sources.py, generate/build_nonfinancial_sources.py, experiments/measure_nonfinancial_label_lift.py, verify/verify_nonfinancial_sources.py, tests/test_nonfinancial_sources.py, reference/nonfinancial_sources.json; changed: generate/nonfinancial_label.py, generate/build_nonfinancial_labels.py, generate/build_members.py, generate/build_external_api.py, generate/service_dummy_logic.py, reference/nonfinancial_label.json",
   "full_generation_and_validation": {
    "date": "2026-11-01",
@@ -147,11 +147,11 @@
     "verifiers": "verify, verify_thinfile_general, verify_thinfile, verify_nonfinancial_sources, verify_input_features_6m PASS; the other verifiers were not run",
     "fixed_fixture_tests": "70 run; 67 passed, 3 errors from the environment only (2 symbolic-link tests need Windows privilege, test_reproduction_comparison needs PyYAML in the system Python); same 3 errors before the change",
     "outputs_changed_vs_v3_5_10": ["service_dummy/members/member_monthly_inputs.csv (12 months 2025-09~2026-08, 4,800 rows; the 2,400 rows for 2026-03~2026-08 have the same amounts and input dates as DB v2.2 seed)"],
-    "outputs_unchanged_vs_v3_5_10": "27 files in the v3.5.10 training bundle 2_detail/ (legacy 9, thinfile 18, incl. input_features_6m.csv, monthly_history.csv, profiles.csv) compared by value: all equal",
+    "outputs_unchanged_vs_v3_5_10": "26 files in the v3.5.10 training bundle 2_detail/ (legacy 9, thinfile 17, incl. input_features_6m.csv, monthly_history.csv, profiles.csv) compared by value: all equal",
     "db": "DB bundle v2.3"
    }
   },
   "outputs_bundled": false,
-  "since_v3_5_0": "v3.5.1 documentation only; v3.5.2-v3.5.4 add tools/build_handoff.py and its safeguards (no generator or data change); v3.5.5 removes the absolute path from nonfinancial_sources_summary.json and documents the thin-file training filter; v3.5.6 fixes the symbolic-link check in tools/build_handoff.py (no generator or data change); v3.5.7 aligns model features with what service members provide (6-month inputs, credit bureau and utility APIs); v3.5.8-v3.5.10 change loan rate precision, repayment methods and add preprocessing anomalies (see docs/CHANGES.md); v3.5.11 restores 12-month member inputs and keeps 6-month model aggregates under members.model_feature_months"
+  "since_v3_5_0": "v3.5.1 documentation only; v3.5.2-v3.5.4 add tools/build_handoff.py and its safeguards (no generator or data change); v3.5.5 removes the absolute path from nonfinancial_sources_summary.json and documents the thin-file training filter; v3.5.6 fixes the symbolic-link check in tools/build_handoff.py (no generator or data change); v3.5.7 aligns model features with what service members provide (6-month inputs, credit bureau and utility APIs); v3.5.8-v3.5.10 change loan rate precision, repayment methods and add preprocessing anomalies (see docs/CHANGES.md); v3.5.11 restores 12-month member inputs and keeps 6-month model aggregates under members.model_feature_months; v3.5.12 documentation only (grade status INSUFFICIENT_INPUT removed, score range 0-1000 and provisional cutoffs 665/780 documented; DB bundle v2.4)"
  }
 }
