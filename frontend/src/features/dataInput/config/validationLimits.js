@@ -11,6 +11,9 @@ export const VALIDATION_LIMITS = Object.freeze({
   REMAINING_MONTHS_MAX: 600,
   // 확정 — 월별 소득은 기준월부터 거꾸로 최근 12개월까지만 받는다.
   INCOME_MONTHS_MAX: 12,
+  // N-05-2 '최근 12개월'의 끝 달이 이번 달에서 몇 달 전인지(1 = 지난달). 자영업자·프리랜서의 기준월 기본값이 된다.
+  // TODO(팀 결정) 끝 달을 이번 달로 할지 지난달로 할지 팀에서 확정하면 이 값만 바꾼다.
+  INCOME_END_MONTHS_AGO: 1,
   // 확정 — 입력한 달이 6개월 미만이면 '정보 부족'으로 안내한다(감점하지 않음, N-22).
   INCOME_MONTHS_SHORTAGE: 6,
 })

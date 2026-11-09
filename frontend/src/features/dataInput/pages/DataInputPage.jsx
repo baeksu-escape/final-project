@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { PATHS } from '../../../common/config/navigation.js'
-import { fetchFinancialInput, saveFinancialInput } from '../api/dataInputApi.js'
+import { fetchFinancialInput, requestScoreCalculation, saveFinancialInput } from '../api/dataInputApi.js'
 import AltDataImport from '../components/AltDataImport.jsx'
 import FieldControl from '../components/FieldControl.jsx'
 import InputStatus from '../components/InputStatus.jsx'
 import SectionFields from '../components/SectionFields.jsx'
 import SectionList from '../components/SectionList.jsx'
+import { isInputComplete } from '../config/completionItems.js'
 import { BASE_MONTH_FIELD, getSectionsForJob } from '../config/inputSections.js'
-import { buildPayload, createEmptyValues, toValues } from '../utils/inputValues.js'
+import { buildPayload, createEmptyValues, toValues, withFixedMonthRows } from '../utils/inputValues.js'
+import { monthRule } from '../validation/inputRules.js'
 import { errorKeyOf, getInputNotices, validateFinancialInput } from '../validation/inputValidation.js'
 import { fromServerFieldErrors } from '../validation/serverErrors.js'
 
@@ -19,6 +21,7 @@ import { fromServerFieldErrors } from '../validation/serverErrors.js'
 // FP-86: 잘못된 값은 입력 즉시, 빈 필수 칸은 첫 저장 시도 뒤부터 칸 옆에 오류를 보여 주고, 오류가 있으면 저장 버튼을 막는다.
 export default function DataInputPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const sections = useMemo(() => getSectionsForJob(user.jobType), [user.jobType])
 
   const [values, setValues] = useState(() => createEmptyValues(sections))
@@ -33,6 +36,8 @@ export default function DataInputPage() {
   const [justSaved, setJustSaved] = useState(false)
   const [serverErrors, setServerErrors] = useState({})
   const [savedBaseMonth, setSavedBaseMonth] = useState(null)
+  const [calculating, setCalculating] = useState(false)
+  const [calculateError, setCalculateError] = useState('')
 
   // 들어오면 저장된 입력과 완료 현황, 불러온 대안 데이터를 받아 화면을 채운다.
   useEffect(() => {
@@ -80,7 +85,14 @@ export default function DataInputPage() {
     clearServerErrors(errorKey)
   }
   // 기준월·칸 섹션·줄 섹션의 값이 바뀔 때 부르는 함수들 — 바뀐 부분만 새 값으로 바꾼다.
-  const handleBaseMonthChange = (baseMonth) => change((prev) => ({ ...prev, baseMonth }), BASE_MONTH_FIELD.key)
+  // N-05-2 기준월이 바뀌면(형식이 맞고 미래가 아닐 때) 월별 소득 12줄을 새 기준월에 맞춘다. 줄이 바뀌므로 서버 칸 오류는 모두 지운다.
+  const handleBaseMonthChange = (baseMonth) => {
+    change((prev) => {
+      const next = { ...prev, baseMonth }
+      return monthRule(baseMonth) ? next : withFixedMonthRows(next, sections)
+    }, BASE_MONTH_FIELD.key)
+    setServerErrors({})
+  }
   const handleFieldChange = (sectionKey) => (fieldKey, fieldValue) =>
     change(
       (prev) => ({ ...prev, [sectionKey]: { ...prev[sectionKey], [fieldKey]: fieldValue } }),
@@ -117,6 +129,19 @@ export default function DataInputPage() {
   const handleAltImported = (sourceKey, result) => {
     setAltData((prev) => ({ ...prev, [sourceKey]: result }))
     setStatus((prev) => (prev ? { ...prev, altData: { ...prev.altData, [sourceKey]: true } } : prev))
+  }
+
+  // N-05-8 [점수 산출하기] — 마지막으로 저장한 입력으로 산출을 요청하고, 성공하면 신용 리포트로 보낸다.
+  const handleCalculateScore = async () => {
+    setCalculating(true)
+    setCalculateError('')
+    try {
+      await requestScoreCalculation()
+      navigate(PATHS.REPORT)
+    } catch (error) {
+      setCalculateError(error.message)
+      setCalculating(false)
+    }
   }
 
   if (loading) return <p className="data-input-page__loading">저장된 입력을 불러오는 중입니다.</p>
@@ -183,8 +208,22 @@ export default function DataInputPage() {
         )}
       </form>
 
-      <InputStatus sections={sections} status={status} savedAt={savedAt} />
+      <InputStatus status={status} savedAt={savedAt} />
       <AltDataImport baseMonth={values.baseMonth} imported={altData} onImported={handleAltImported} />
+
+      <button
+        type="button"
+        className="data-input-page__calculate"
+        onClick={handleCalculateScore}
+        disabled={calculating || !isInputComplete(status)}
+      >
+        {calculating ? '산출 중…' : '점수 산출하기'}
+      </button>
+      {calculateError && (
+        <p className="data-input-page__calculate-error" role="alert">
+          {calculateError}
+        </p>
+      )}
 
       <Link to={PATHS.REPORT} className="data-input-page__next-link">
         신용 리포트로 이동

@@ -4,6 +4,7 @@ import { ROLES } from '../../../common/config/roles.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { patchMockAccountUser } from '../../auth/mocks/authMockHandlers.js'
 import { ALT_DATA_SOURCES } from '../config/altDataSources.js'
+import { isInputComplete } from '../config/completionItems.js'
 import { BASE_MONTH_FIELD, getSectionsForJob } from '../config/inputSections.js'
 import { getSectionStatus, toValues } from '../utils/inputValues.js'
 import { validateFinancialInput } from '../validation/inputValidation.js'
@@ -53,7 +54,7 @@ const altDataHandlers = Object.fromEntries(
 )
 
 registerMockHandlers({
-  // N-08 직군 저장 — 직군이 없는 일반 사용자만 저장할 수 있다. 직군 변경은 팀 결정 전이라 막는다.
+  // N-05-1 직군 저장 — 직군이 없는 일반 사용자만 저장할 수 있다. 직군 변경은 팀 결정 전이라 막는다.
   'PATCH /api/members/me/job-type': ({ body, token }) => {
     const user = patchMockAccountUser(token)
     if (user.role !== ROLES.USER) throw new ApiError(403, '일반 사용자만 직군을 선택할 수 있습니다.')
@@ -87,6 +88,13 @@ registerMockHandlers({
     const savedAt = new Date().toISOString()
     savedInputs.set(user.userId, { ...structuredClone(body), savedAt })
     return { savedAt, status: statusOf(user) }
+  },
+
+  // N-05-8 점수 산출 — 실제 계산 없이 성공만 돌려준다. 완료 현황 6개가 모두 차지 않았으면 막는다.
+  'POST /api/members/me/score-calculation': ({ token }) => {
+    const user = requireUserWithJob(token)
+    if (!isInputComplete(statusOf(user))) throw new ApiError(409, '입력 완료 현황 6개 항목을 모두 채워 주세요.')
+    return { calculatedAt: new Date().toISOString() }
   },
 
   ...altDataHandlers,
