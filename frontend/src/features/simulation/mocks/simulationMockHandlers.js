@@ -2,10 +2,10 @@
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { DUMMY_LOAN_PRODUCTS, getScoreBandOffer } from './simulationMockData.js'
 
-// N-18-7 같은 점수대 금리·한도·추천 대출 상품 조회 (3종 추천)
-function handleLoanRecommend({ body }) {
-  const score = Number(body?.score ?? 680)
-  const jobType = body?.jobType ?? 'FREELANCER'
+// N-18-7 같은 점수대 금리·한도·추천 대출 상품 조회 (3종 추천) — GET은 쿼리스트링, POST는 본문에서 값을 읽는다.
+function handleLoanRecommend({ body, query }) {
+  const score = Number(query?.score ?? body?.score ?? 680)
+  const jobType = query?.jobType ?? body?.jobType ?? 'FREELANCER'
   const band = getScoreBandOffer(score)
 
   // 해당 직군과 점수대에 맞는 상품을 우선 선별하고 3종을 맞춘다.

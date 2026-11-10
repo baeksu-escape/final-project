@@ -10,7 +10,7 @@ export function requireMockUser(token) {
   return structuredClone(found.user)
 }
 
-// 'METHOD 경로' → 처리 함수. 처리 함수는 { body, token }을 받아 응답 본문을 돌려준다.
+// 'METHOD 경로' → 처리 함수. 처리 함수는 { body, token, query }를 받아 응답 본문을 돌려준다. query는 쿼리스트링을 객체로 바꾼 값이다.
 // TODO(D-20) 응답은 감싸지 않은 본문 그대로다.
 // 아래 기본 인증 응답은 공통 틀 확인용이다. features/auth의 mock이 등록되면 로그인·내 정보 응답을 덮어쓴다.
 const handlers = {
@@ -35,8 +35,10 @@ export function registerMockHandlers(newHandlers) {
 // client.js가 VITE_USE_MOCK일 때 fetch 대신 호출한다. 실제 서버처럼 약간 늦게 응답한다.
 export async function handleMockRequest(method, path, body, token) {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS))
-  const pathname = path.split('?')[0]
+  const [pathname, search = ''] = path.split('?')
   const handler = handlers[`${method} ${pathname}`]
   if (!handler) throw new ApiError(404, `mock 응답이 없는 요청입니다: ${method} ${pathname}`)
-  return handler({ body, token })
+  // GET 요청의 ?score=700 같은 값을 handler가 읽을 수 있게 넘긴다.
+  const query = Object.fromEntries(new URLSearchParams(search))
+  return handler({ body, token, query })
 }
