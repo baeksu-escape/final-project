@@ -18,6 +18,7 @@
  * @property {string} name
  * @property {Role} role
  * @property {JobType | null} jobType
+ * @property {boolean} [hasScore] 점수 산출 여부(N-01-2 첫 화면 판단). false면 데이터 입력으로 보낸다. 관리자에게는 없을 수 있다.
  */
 
 /**
