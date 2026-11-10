@@ -19,6 +19,7 @@
 | `frontend/src/common/styles/{tokens,forms,components}.css` | 색·글꼴 토큰(화이트/블랙), 기존 컴포넌트용 스타일, 새 컴포넌트용 스타일 |
 | `frontend/src/main.jsx` | CSS import 3줄 추가 |
 | `fastapi_server/requirements.txt` | 직접 쓰는 패키지 10개를 버전 고정으로 작성 |
+| `frontend/src/common/README.md` | 새 컴포넌트·스타일 안내 추가, "스타일 미포함" 문구를 현재 상태로 수정 |
 
 ## DB·API 변경
 - DB: 없음
