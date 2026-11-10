@@ -9,3 +9,8 @@ export { default as NumberInput } from './NumberInput.jsx'
 export { default as Select } from './Select.jsx'
 export { default as Slider } from './Slider.jsx'
 export { default as TextInput } from './TextInput.jsx'
+// FP-156 공통 차트 컴포넌트 (FP-157 막대·추이, FP-158 히트맵)
+export { default as CompareBar } from './CompareBar.jsx'
+export { default as TrendLineChart } from './TrendLineChart.jsx'
+export { default as BarChart } from './BarChart.jsx'
+export { default as HeatmapGrid } from './HeatmapGrid.jsx'
