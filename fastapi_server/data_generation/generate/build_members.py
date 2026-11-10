@@ -15,6 +15,7 @@ from generate import build_thinfile
 from generate import nonfinancial_sources as ns
 from generate.build_nonfinancial_sources import generate_frames, load_cfg
 from generate.service_dummy_logic import make_members, make_monthly_inputs, remap_ledger, check_members
+from generate.service_dummy_logic import make_v02_asset_snapshots
 
 ROOT = Path(__file__).resolve().parents[1]
 TRAINING_SEEDS = {20261030, 20261029}   # build_thinfile default, extension_config seed
@@ -66,6 +67,9 @@ def run(out, per_cohort=None, seed=None):
     out = Path(out)/'members'; (out/'ledgers').mkdir(parents=True, exist_ok=True)
     members.to_csv(out/'members.csv', index=False, encoding='utf-8-sig')
     inputs.to_csv(out/'member_monthly_inputs.csv', index=False, encoding='utf-8-sig')
+    # N-05-4 v0.2 전용 보조 출력이다. 기존 파일의 행·값·순서는 유지한다.
+    make_v02_asset_snapshots(profiles, ids, cfg['input_months']['value'][-1]).to_csv(
+        out/'member_asset_snapshots_v02.csv', index=False, encoding='utf-8-sig')
     # Ledgers behind the dummy external APIs (same member IDs).
     remap_ledger(loans, ids).to_csv(out/'ledgers/loans.csv', index=False, encoding='utf-8-sig')
     remap_ledger(cards, ids).to_csv(out/'ledgers/cards.csv', index=False, encoding='utf-8-sig')

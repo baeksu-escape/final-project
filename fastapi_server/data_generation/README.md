@@ -1,4 +1,4 @@
-# Credit Extension 합성 데이터 v3.5.13
+# Credit Extension 합성 데이터 v3.6.0
 
 신용평가 교육·시연용 합성 데이터의 생성 코드, 설정, 통계 원자료, 문서다. 모든 데이터는 합성 데이터이며 실제 개인·금융기관 자료가 아니다. 결과는 시연용이고 실제 모집단의 통계나 예측력 근거로 쓰지 않는다.
 
@@ -12,7 +12,8 @@
 | 비금융 효과 라벨 | 기존 라벨 옆에 비금융 효과를 가정한 라벨 열을 추가한다 | `generate/build_nonfinancial_labels.py` | `docs/NONFINANCIAL_LABEL.md` |
 | 대출 원장·상환 일정 | 두 집단의 대출 계좌별 상환 일정(만기일시·원리금균등·원금균등)과 금리 시나리오 | `generate/build_loan_extension.py` | `docs/LOAN_EXTENSION.md` |
 | 6개월 입력 집계(보존·참고용) | 회원이 입력하는 소득·지출·상환액 중 최근 6개월(2026-03~2026-08) 집계. 기존 값 보존·참고용 compatibility_only, 기본 학습 제외 | `generate/build_input_features_6m.py` | `docs/DATA_SPEC.md` |
-| 12개월 입력 집계(기본 학습) | 최근 완결 12개월의 소득·지출·상환 집계. 모델 표 role=feature, 독립 전처리 시연 포함 | `generate/build_input_features_12m.py` | `docs/DATA_SPEC.md` |
+| 12개월 입력 집계(기본 학습) | 최근 완결 12개월의 소득·지출·상환 집계. 모델 표 role=feature, 독립 전처리 시연 포함. v3.6.0: 서비스 입력 규칙과 같은 정의의 9열(지출 = 평균 월 지출, 상환 = 기준월 상환액, 급여소득자 소득 = 기준월 × 12)을 같은 파일에 추가(평균 월 지출은 ROUND_HALF_UP). 기존 12개월 10열은 상세 파일에만 두고 모델 표에서 뺐다 | `generate/build_input_features_12m.py` | `docs/DATA_SPEC.md` |
+| 학습·검증·시험 분리(v3.6.0) | 고객 ID 단위 TRAIN/VALID/TEST 70/15/15, 직군 × 기존 라벨 층화, 집단마다 따로 | `generate/build_data_split.py` | `docs/DATA_SPEC.md` |
 | 서비스 개발용 더미 | 가상 대출상품, 가입 회원(12개월 입력, v3.5.11), 외부 금융·통신·간편결제·공공보험·신용평가사·공과금 API 응답. **학습에 쓰지 않는다** | `generate/build_loan_products.py`, `build_members.py`, `build_external_api.py` | `docs/SERVICE_DUMMY_DATA.md` |
 | 가정 민감도·비금융 실험 | 가정을 바꿨을 때의 변화, 라벨 신호 확인, 비금융 효과 라벨의 AUC 상승 측정 | `experiments/` 5개 스크립트 | `docs/ASSUMPTION_SENSITIVITY.md`, `docs/NONFINANCIAL_EXPERIMENT.md`, `docs/NONFINANCIAL_LABEL.md` |
 
@@ -42,7 +43,8 @@ python -m generate.build_thinfile
 python -m generate.build_nonfinancial_sources          # 위 두 단계 다음 (v3.5.0)
 python -m generate.build_nonfinancial_labels           # build_nonfinancial_sources 다음
 python -m generate.build_input_features_6m             # 보존·참고용 6개월, 기존 값 유지
-python -m generate.build_input_features_12m            # 기본 학습용 12개월 (v3.5.13)
+python -m generate.build_input_features_12m            # 기본 학습용 12개월 (v3.5.13, v3.6.0 서비스 정의 열 포함)
+python -m generate.build_data_split                     # 학습·검증·시험 분리 (v3.6.0, build_thinfile 다음이면 됨)
 python -m generate.build_loan_extension
 python -m generate.build_loan_products
 python -m generate.build_members
@@ -66,12 +68,13 @@ python -m verify.verify_assumption_sensitivity
 python -m verify.verify_nonfinancial_experiment
 python -m verify.verify_nonfinancial_sources           # v3.5.0
 python -m verify.verify_input_features_6m              # 보존·참고용 6개월
-python -m verify.verify_input_features_12m             # 기본 학습용 12개월
+python -m verify.verify_input_features_12m             # 기본 학습용 12개월 (서비스 정의 열 포함)
+python -m verify.verify_data_split                      # 학습·검증·시험 분리 (v3.6.0)
 ```
 
 고정 예제 테스트(생성 불필요): `python -m unittest discover -s tests -t .`
 
-모델 팀 전달 묶음(생성 후, v3.5.2): `python -m tools.build_handoff --out <새 폴더>`. 출력 폴더는 패키지 밖의 아직 없는 경로여야 한다. `--overwrite`는 이 도구가 만든 묶음을 다시 만들 때만 쓴다. `.handoff_bundle`에 기록된 파일 목록·SHA256과 폴더 내용이 정확히 같을 때만 그 파일들만 지우고, 하나라도 다르면 아무것도 지우지 않는다(v3.5.4). `--out`이 심볼릭 링크면 `--overwrite`여도 멈춘다(v3.5.6). 집단별 고객 한 줄 모델 표 2개(`1_model/`), 상세 원천(`2_detail/`), 설계값·점검(`3_reference/`), 문서로 나눈다. 모델 표에는 기존 라벨의 원천인 `결과값(연체회차)`를 넣지 않고, 씬파일의 미관측 값은 `model_inputs.csv`의 결측 표시를 따르고, 항상 0인 자리표시자 `PRE_LMT`·`PRE_RT`는 뺀다. **12개월이 기본 학습이며 6개월은 보존·참고용(`compatibility_only`)이다. 숫자 열 전체를 넣지 않고 역할표에서 `role == "feature"`만 선택한다.** 열은 데이터 사전에 전달용(`delivery`)으로 등록된 원천 열만 `feature`가 되고, 그 밖의 모르는 열이 있으면 멈춘다.
+모델 팀 전달 묶음(생성 후, v3.5.2): `python -m tools.build_handoff --out <새 폴더>`. 출력 폴더는 패키지 밖의 아직 없는 경로여야 한다. `--overwrite`는 이 도구가 만든 묶음을 다시 만들 때만 쓴다. `.handoff_bundle`에 기록된 파일 목록·SHA256과 폴더 내용이 정확히 같을 때만 그 파일들만 지우고, 하나라도 다르면 아무것도 지우지 않는다(v3.5.4). `--out`이 심볼릭 링크면 `--overwrite`여도 멈춘다(v3.5.6). 집단별 고객 한 줄 모델 표 2개(`1_model/`), 상세 원천(`2_detail/`), 설계값·점검(`3_reference/`), 문서로 나눈다. 모델 표에는 기존 라벨의 원천인 `결과값(연체회차)`를 넣지 않고, 씬파일의 미관측 값은 `model_inputs.csv`의 결측 표시를 따르고, 항상 0인 자리표시자 `PRE_LMT`·`PRE_RT`는 뺀다. **12개월이 기본 학습이며 6개월은 보존·참고용(`compatibility_only`)이다. 숫자 열 전체를 넣지 않고 역할표에서 `role == "feature"`만 선택한다.** v3.6.0부터 서비스 정의 12개월 열이 기본 학습이고 기존 12개월 10열은 모델 표에서 빠지며(상세 파일에는 그대로), `data_split`은 `dataset` 바로 뒤의 `split`(학습 제외) 열이다. 열은 데이터 사전에 전달용(`delivery`)으로 등록된 원천 열만 `feature`가 되고, 그 밖의 모르는 열이 있으면 멈춘다.
 
 일부만 시험 생성할 때(`--rows N`, `--per-cohort N`)는 `--out`을 `data/`가 아닌 다른 폴더로 준다. `data/`로 주면 `generate.extend`가 멈춘다. 집단당 수십 명 규모에서는 평가 집단에 한쪽 라벨만 남아 AUC를 계산할 수 없는 경우가 있으므로 성능 수치는 기본 규모에서 본다. 기본 환경은 `requirements.txt`를 따른다.
 

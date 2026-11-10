@@ -134,6 +134,21 @@ class Roles(unittest.TestCase):
             with self.assertRaises(ValueError):
                 bh.column_roles(tables, dictionary[dictionary.field != field], org)
 
+    def test_service_view_default_and_split_excluded(self):
+        """v3.6.0 서비스 정의 열은 학습, data_split은 학습 제외(split)다."""
+        cols = ['customer_id', 'data_split'] + bh.SVC_COLUMNS
+        tables = {'legacy': pd.DataFrame(columns=cols), 'thinfile': pd.DataFrame(columns=['customer_id'])}
+        org = {'legacy': {c: 'input_features_12m' for c in cols}, 'thinfile': {}}
+        org['legacy'].update(customer_id='profiles', data_split='data_split')
+        fields = bh.SVC_COLUMNS
+        dictionary = pd.DataFrame(dict(scope=['delivery'] * len(fields), table=['input_features_12m'] * len(fields),
+                                       field=fields, description=fields, unit=[''] * len(fields)))
+        roles = bh.column_roles(tables, dictionary, org).set_index('column').role
+        self.assertEqual(roles['data_split'], 'split')
+        self.assertEqual(set(roles[bh.SVC_COLUMNS]), {'feature'})
+        self.assertEqual(len(bh.MODEL_EXCLUDED_12M_COLUMNS), 10)
+        self.assertFalse(set(bh.MODEL_EXCLUDED_12M_COLUMNS) & set(bh.SVC_COLUMNS))
+
     def test_compatibility_requires_the_expected_source(self):
         """N-12 기존 열 이름만 같다고 출처·사전 검사를 우회하지 못하게 한다."""
         cols = ['customer_id', 'income_6m_krw', bh.LEAK]
@@ -151,21 +166,25 @@ class Roles(unittest.TestCase):
             'nonfinancial_source_features.csv': pd.DataFrame({'customer_id': ['C1'], 'dp_payment_amount_12m_krw': [100]}),
             'labels_nonfinancial.csv': pd.DataFrame({'customer_id': ['C1'], bh.LABELS[1]: [0]}),
             'input_features_6m.csv': pd.DataFrame({'customer_id': ['C1'], 'income_6m_krw': [600]}),
-            'input_features_12m.csv': pd.DataFrame({'customer_id': ['C1'], 'income_12m_krw': [1200], 'dp_payment_amount_12m_krw': [100]}),
+            'input_features_12m.csv': pd.DataFrame({'customer_id': ['C1'], 'income_12m_krw': [1200], 'dp_payment_amount_12m_krw': [100],
+                                                    'income_svc_12m_krw': [1300]}),
+            'data_split.csv': pd.DataFrame({'customer_id': ['C1'], 'data_split': ['TEST']}),
         }
         with patch.object(bh, 'read', side_effect=lambda folder, name: frames[name].copy()):
             got = bh.model_table('legacy')
-            self.assertEqual(got.columns.tolist(), ['customer_id', 'dataset', 'cohort', 'segment', 'age',
-                                                   'dp_payment_amount_12m_krw', 'income_6m_krw', 'income_12m_krw'] + bh.LABELS)
+            self.assertEqual(got.columns.tolist(), ['customer_id', 'dataset', 'data_split', 'cohort', 'segment', 'age',
+                                                   'dp_payment_amount_12m_krw', 'income_6m_krw', 'income_svc_12m_krw'] + bh.LABELS)
+            # v3.6.0: 기존 12개월 열(income_12m_krw 등 10열)은 상세 파일에만 두고 모델 표에서 뺀다.
+            self.assertNotIn('income_12m_krw', got.columns)
             self.assertEqual(got.dp_payment_amount_12m_krw.iloc[0], 100)
             # N-12 씬파일도 신규 집계 뒤에 라벨·평가용 tail을 기존 순서대로 둔다.
             frames['profiles.csv'] = frames['profiles.csv'].assign(cohort='no_credit', is_thinfile_scenario=1, label_origin='fixture')
             frames['model_inputs.csv'] = pd.DataFrame({'customer_id': ['C1'], 'credit_usage_available': [0]})
             frames['target_metadata.csv'] = pd.DataFrame({'customer_id': ['C1'], 'future_credit_exposure': [1]})
             thin = bh.model_table('thinfile')
-            self.assertEqual(thin.columns.tolist(), ['customer_id', 'dataset', 'cohort', 'segment', 'age',
+            self.assertEqual(thin.columns.tolist(), ['customer_id', 'dataset', 'data_split', 'cohort', 'segment', 'age',
                                                     'credit_usage_available', 'dp_payment_amount_12m_krw',
-                                                    'income_6m_krw', 'income_12m_krw'] + bh.LABELS + ['eval_future_credit_exposure'])
+                                                    'income_6m_krw', 'income_svc_12m_krw'] + bh.LABELS + ['eval_future_credit_exposure'])
             frames['input_features_12m.csv']['dp_payment_amount_12m_krw'] = 101
             with self.assertRaises(AssertionError):
                 bh.model_table('legacy')

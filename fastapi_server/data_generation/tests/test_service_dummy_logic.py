@@ -77,6 +77,7 @@ class Members(unittest.TestCase):
 
 class ExternalApi(unittest.TestCase):
     def test_responses_consistent_with_ledgers_and_consent(self):
+        """v3.6.0: 동의 표시와 무관하게 모든 회원이 OK 응답을 받고, OK가 아닌 응답은 짝 검사가 거부한다."""
         profiles, ages, monthly, loans, cards, usage = fixture()
         rng = np.random.default_rng(5)
         members, ids = s.make_members(profiles, ages, ANCHORS['members'], AS_OF, rng)
@@ -87,11 +88,31 @@ class ExternalApi(unittest.TestCase):
         self.assertEqual(s.check_external(fin, tel, members, L, monthly, ids, AS_OF), [])
         by = {r['member_id']: r for r in fin}
         self.assertEqual(sum(l['balance_krw'] for l in by[ids['THF2']]['loans']), 6_200_000)
-        self.assertEqual(by[ids['THF3']]['status'], 'CONSENT_REQUIRED')
+        # v3.6.0: 시연 시작 시 비동의 회원도 기관 응답은 OK + 데이터다(동의 확인은 목 서버가 요청 시점에 한다).
+        self.assertEqual([r['status'] for r in fin + tel], ['OK'] * 6)
+        self.assertEqual(len({r['member_id']: r for r in tel}[ids['THF3']]['bills']), monthly[monthly.customer_id == 'THF3'].shape[0])
+        broken = [dict(r) for r in fin]; broken[2]['status'] = 'CONSENT_REQUIRED'
+        self.assertTrue(s.check_external(broken, tel, members, L, monthly, ids, AS_OF))
         self.assertEqual(by[ids['THF1']]['card_usage'][0]['period_end'], AS_OF)
         bills = {b['bill_month']: b for b in {r['member_id']: r for r in tel}[ids['THF2']]['bills']}
         self.assertEqual(bills['2026-08']['payment_status'], 'late')
         self.assertEqual(bills['2026-07']['payment_status'], 'on_time')
+
+    def test_bill_values_of_initially_consenting_members_unchanged(self):
+        """v3.6.0: 비동의 회원 청구서를 추가해도 동의 회원의 청구서 값(난수 순서)은 바뀌지 않는다."""
+        profiles, ages, monthly, loans, cards, usage = fixture()
+        members, ids = s.make_members(profiles, ages, ANCHORS['members'], AS_OF, np.random.default_rng(5))
+        members['external_data_consent'] = [1, 0, 1]
+        mixed = s.make_telecom_responses(members, monthly, ids, ANCHORS['telecom'], AS_OF, np.random.default_rng(9))
+        # 비동의 회원의 월 원천을 빼면 그 회원은 난수를 쓰지 않는다 = v3.5.13까지의 난수 사용과 같다.
+        late_member = [c for c, m in ids.items() if m == members.member_id.iloc[1]][0]
+        first = s.make_telecom_responses(members, monthly[monthly.customer_id != late_member], ids, ANCHORS['telecom'], AS_OF,
+                                         np.random.default_rng(9))
+        first = [r for r in first if r['member_id'] != members.member_id.iloc[1]]
+        self.assertEqual([r['member_id'] for r in mixed], list(members.member_id))
+        by = {r['member_id']: r for r in mixed}
+        for r in first:
+            self.assertEqual(by[r['member_id']]['bills'], r['bills'])
 
     def test_checker_detects_tampered_status(self):
         profiles, ages, monthly, loans, cards, usage = fixture()
@@ -166,13 +187,15 @@ class BureauAndUtilityApi(unittest.TestCase):
         return members, bureau, monthly, ids, cb, util
 
     def test_responses_follow_ledger_and_consent(self):
+        """v3.6.0: 신용평가사·공과금 응답도 동의와 무관하게 모든 회원 OK다."""
         members, bureau, monthly, ids, cb, util = self.setup()
         excluded = ANCHORS['credit_bureau']['excluded_columns']['value']
         self.assertEqual(s.check_new_external(cb, util, members, bureau, monthly, ids, AS_OF, excluded), [])
-        self.assertEqual([r['status'] for r in cb], ['OK', 'OK', 'CONSENT_REQUIRED'])
+        self.assertEqual([r['status'] for r in cb], ['OK', 'OK', 'OK'])         # v3.6.0: 동의와 무관
         self.assertEqual(cb[0]['credit_info']['CB'], 3)
         self.assertIsNone(cb[1]['credit_info']['CB'])              # unobserved stays null, never the placeholder 5
-        self.assertEqual(cb[2]['credit_info'], {})
+        self.assertEqual(cb[2]['credit_info']['SP'], 1)
+        self.assertEqual([r['status'] for r in util], ['OK'] * 3)
         late = [b for b in util[0]['bills'] if b['bill_month'] == '2026-07'][0]
         self.assertEqual((late['payment_status'], util[0]['provider']), ('late', 'dummy_utility_api'))
 

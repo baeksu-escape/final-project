@@ -1,10 +1,10 @@
-"""N-05-2·N-12 기본 12개월 집계와 6개월 보존·독립 이상치 정책을 고정 예제로 검증한다."""
+"""N-05-2·N-12 기본 12개월 집계와 6개월 보존·독립 이상치 정책을 고정 예제로 검증한다. v3.6.0 서비스 정의 열 포함."""
 import json
 import unittest
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from generate.build_input_features_12m import input_features_12m, input_months, anomaly_spec, COLUMNS
+from generate.build_input_features_12m import input_features_12m, input_months, anomaly_spec, COLUMNS, SVC_COLUMNS, service_features_12m
 from generate.build_input_features_6m import input_features_6m, input_months as six_months
 from generate.synthesis_logic import inject_anomalies
 
@@ -98,6 +98,63 @@ class InputFeatures12m(unittest.TestCase):
         pd.testing.assert_frame_equal(restored.reset_index(), source, check_dtype=False)
         dirty_columns = set(log.column)
         pd.testing.assert_frame_equal(got.drop(columns=list(dirty_columns)), source.drop(columns=list(dirty_columns)))
+
+
+class ServiceViewFeatures(unittest.TestCase):
+    """v3.6.0 지출=평균 월 지출, 상환=기준월 상환액, 급여소득자 소득=기준월 x 12개월을 고정 예제로 확인한다."""
+    def frames(self):
+        incomes = {'2025-09': 0, '2025-10': 9_000_000, '2026-08': 2_000_000}
+        a = monthly(incomes, cid='S1')                                   # 자영업자: 소득 그대로
+        b = monthly(incomes, cid='W1')                                   # 급여소득자: 기준월 소득 2,000,000 x 12
+        for h in (a, b):
+            h['expense_total_krw'] = [400_000] * 11 + [1_000_001]       # 평균 450,000.08 -> 450,000
+            h['debt_service_krw'] = [100_000] * 11 + [300_000]          # 기준월 상환 300,000
+        prof = pd.DataFrame(dict(customer_id=['S1', 'W1'], segment=['selfemp', 'wage']))
+        return pd.concat([a, b], ignore_index=True), prof
+
+    def test_values(self):
+        h, prof = self.frames()
+        f = service_features_12m(h, prof, MONTHS).set_index('customer_id')
+        self.assertEqual(list(f.columns), SVC_COLUMNS)
+        s, w = f.loc['S1'], f.loc['W1']
+        self.assertEqual((s.expense_avg_month_krw, s.debt_service_current_krw), (450_000, 300_000))
+        self.assertEqual(s.income_svc_12m_krw, 20_000_000)
+        self.assertAlmostEqual(s.expense_ratio_svc_12m, 450_000 * 12 / 20_000_000)
+        self.assertAlmostEqual(s.dsr_svc_12m, 300_000 * 12 / 20_000_000)
+        # 월 소득(0, 9,000,000, 1,000,000 x 9, 2,000,000)에서 평균 지출 + 기준월 상환 750,000을 빼면 0원인 달만 적자다.
+        self.assertEqual((s.zero_income_months_svc_12m, s.deficit_months_svc_12m, s.worst_month_net_cash_svc_12m_krw), (1, 1, -750_000))
+        self.assertEqual(w.income_svc_12m_krw, 24_000_000)
+        self.assertEqual((w.income_cv_svc_12m, w.zero_income_months_svc_12m, w.deficit_months_svc_12m), (0, 0, 0))
+        self.assertEqual(w.worst_month_net_cash_svc_12m_krw, 2_000_000 - 750_000)
+
+    def test_average_expense_round_half_up_at_exact_half(self):
+        """v3.6.0: 평균이 정확히 .5이면 올린다(ROUND_HALF_UP). numpy 기본(짝수 쪽)과 다른 경계를 두 개 본다."""
+        h, prof = self.frames()
+        for total_extra, want in [(6, 400_001), (18, 400_002), (5, 400_000), (7, 400_001)]:
+            for cid in ('S1', 'W1'):
+                h.loc[h.customer_id == cid, 'expense_total_krw'] = [400_000] * 11 + [400_000 + total_extra]
+            f = service_features_12m(h, prof, MONTHS).set_index('customer_id')
+            self.assertEqual(f.loc['S1', 'expense_avg_month_krw'], want, total_extra)    # 400,000.5 -> 400,001 (rint는 400,000)
+            self.assertAlmostEqual(f.loc['S1', 'expense_ratio_svc_12m'], want * 12 / 20_000_000)
+
+    def test_zero_income_ratios_null_and_missing_segment_rejected(self):
+        h, prof = self.frames()
+        h.loc[h.customer_id == 'S1', 'income_krw'] = 0
+        f = service_features_12m(h, prof, MONTHS).set_index('customer_id')
+        for c in ['income_cv_svc_12m', 'expense_ratio_svc_12m', 'dsr_svc_12m']:
+            self.assertTrue(pd.isna(f.loc['S1', c]), c)
+        with self.assertRaises(ValueError):
+            service_features_12m(h, prof.iloc[:1], MONTHS)
+        with self.assertRaises(ValueError):
+            service_features_12m(h[h.month != '2026-01'], prof, MONTHS)
+
+    def test_svc_anomaly_spec_is_separate(self):
+        old, svc = anomaly_spec(), anomaly_spec('anomaly_injection_12m_svc.json')
+        self.assertNotEqual(old['seed']['value'], svc['seed']['value'])
+        self.assertNotEqual(old['log_file'], svc['log_file'])
+        targets = {c for r in svc['rules'] for c in r['columns']}
+        self.assertTrue(targets <= set(SVC_COLUMNS))
+        self.assertFalse(targets & set(COLUMNS))
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 {
- "package_version": "3.5.13-light",
+ "package_version": "3.6.0-light",
  "package_contents": "generation code, configuration, statistical sources and documentation; generated datasets are not included",
  "packaged_input": {
   "file": "data/base_207.csv",
@@ -28,8 +28,8 @@
  "official_thinfile_thresholds_used": false,
  "training_data_policy": "models are trained on synthetic data only; service_dummy/ (members) is never used for training",
  "execution_status": {
-  "release": "v3.5.13",
-  "source_code_changed": "v3.5.11: reference/service_dummy_anchors.json (members.input_months 12 months, new members.model_feature_months 6 months), generate/build_input_features_6m.py (input_months() reads model_feature_months), generate/service_dummy_logic.py (docstrings), verify/verify_input_features_6m.py (window = last 6 consecutive input months), tests/test_input_features_6m.py, tests/test_service_dummy_logic.py (12-month inputs, +1 test). v3.5.7: new generate/build_input_features_6m.py, verify/verify_input_features_6m.py, tests/test_input_features_6m.py; changed generate/service_dummy_logic.py (6-month inputs, credit bureau and utility responses and checks), generate/build_members.py (credit bureau and utility ledgers), generate/build_external_api.py (two new responses), tools/build_handoff.py (6-month features, columns members cannot provide left out), reference/service_dummy_anchors.json (input_months, utility, credit_bureau), tests/test_service_dummy_logic.py (+4 tests). v3.5.6: tools/build_handoff.py (prepare_output refuses a symbolic-link --out before resolve(); the old check ran after resolve() and never fired), tests/test_build_handoff.py (+2 tests), tools/handoff_README.md (version, test count, symlink note). v3.5.5: generate/build_nonfinancial_sources.py (summary 'folder' is package-relative, no absolute path), tests/test_nonfinancial_sources.py (+1 test), tools/handoff_README.md (thin-file training restricted to eval_future_credit_exposure == 1). v3.5.0 changes: new: generate/nonfinancial_sources.py, generate/build_nonfinancial_sources.py, experiments/measure_nonfinancial_label_lift.py, verify/verify_nonfinancial_sources.py, tests/test_nonfinancial_sources.py, reference/nonfinancial_sources.json; changed: generate/nonfinancial_label.py, generate/build_nonfinancial_labels.py, generate/build_members.py, generate/build_external_api.py, generate/service_dummy_logic.py, reference/nonfinancial_label.json",
+  "release": "v3.6.0",
+  "source_code_changed": "v3.6.0: generate/input_feature_logic.py (check_window extracted, new service_view_features with ROUND_HALF_UP average expense), generate/build_input_features_12m.py (SVC_COLUMNS appended after existing columns, separate svc anomaly injection), new generate/build_data_split.py, new reference/anomaly_injection_12m_svc.json and reference/data_split.json, tools/build_handoff.py (data_split after dataset with role split, 10 existing 12-month columns left out of the model tables), generate/service_dummy_logic.py (all institution responses OK with data regardless of consent, RNG order kept for initially consenting members, pair checks updated, new make_v02_asset_snapshots), generate/build_members.py (extra members/member_asset_snapshots_v02.csv), requirements.txt (cryptography==50.0.2 for the separate v0.2 DB seed generator), verify/verify_input_features_12m.py (svc recomputation), new verify/verify_data_split.py, tests/test_input_features_12m.py (+4), new tests/test_data_split.py (+5), tests/test_build_handoff.py (+1), tests/test_service_dummy_logic.py (+1). v3.5.11: reference/service_dummy_anchors.json (members.input_months 12 months, new members.model_feature_months 6 months), generate/build_input_features_6m.py (input_months() reads model_feature_months), generate/service_dummy_logic.py (docstrings), verify/verify_input_features_6m.py (window = last 6 consecutive input months), tests/test_input_features_6m.py, tests/test_service_dummy_logic.py (12-month inputs, +1 test). v3.5.7: new generate/build_input_features_6m.py, verify/verify_input_features_6m.py, tests/test_input_features_6m.py; changed generate/service_dummy_logic.py (6-month inputs, credit bureau and utility responses and checks), generate/build_members.py (credit bureau and utility ledgers), generate/build_external_api.py (two new responses), tools/build_handoff.py (6-month features, columns members cannot provide left out), reference/service_dummy_anchors.json (input_months, utility, credit_bureau), tests/test_service_dummy_logic.py (+4 tests). v3.5.6: tools/build_handoff.py (prepare_output refuses a symbolic-link --out before resolve(); the old check ran after resolve() and never fired), tests/test_build_handoff.py (+2 tests), tools/handoff_README.md (version, test count, symlink note). v3.5.5: generate/build_nonfinancial_sources.py (summary 'folder' is package-relative, no absolute path), tests/test_nonfinancial_sources.py (+1 test), tools/handoff_README.md (thin-file training restricted to eval_future_credit_exposure == 1). v3.5.0 changes: new: generate/nonfinancial_sources.py, generate/build_nonfinancial_sources.py, experiments/measure_nonfinancial_label_lift.py, verify/verify_nonfinancial_sources.py, tests/test_nonfinancial_sources.py, reference/nonfinancial_sources.json; changed: generate/nonfinancial_label.py, generate/build_nonfinancial_labels.py, generate/build_members.py, generate/build_external_api.py, generate/service_dummy_logic.py, reference/nonfinancial_label.json",
   "full_generation_and_validation": {
    "date": "2026-11-01",
    "settings": "defaults (legacy 12,000; thin 600/cohort; members 100/cohort), clean copy, README order",
@@ -127,8 +127,17 @@
     "settings": "defaults, clean copy, README order; same environment versions as above",
     "verifiers": "all 10 PASS (verify_input_features_6m added)",
     "fixed_fixture_tests": "74 passed",
-    "outputs_changed_vs_v3_5_6": ["service_dummy/members/member_monthly_inputs.csv (6 months, 2,400 rows; kept months identical)"],
-    "outputs_added": ["data/input_features_6m.csv", "thinfile/input_features_6m.csv", "service_dummy/external_api/credit_bureau_responses.jsonl", "service_dummy/external_api/utility_responses.jsonl", "service_dummy/members/ledgers/credit_bureau.csv", "service_dummy/members/ledgers/utility_monthly.csv"],
+    "outputs_changed_vs_v3_5_6": [
+     "service_dummy/members/member_monthly_inputs.csv (6 months, 2,400 rows; kept months identical)"
+    ],
+    "outputs_added": [
+     "data/input_features_6m.csv",
+     "thinfile/input_features_6m.csv",
+     "service_dummy/external_api/credit_bureau_responses.jsonl",
+     "service_dummy/external_api/utility_responses.jsonl",
+     "service_dummy/members/ledgers/credit_bureau.csv",
+     "service_dummy/members/ledgers/utility_monthly.csv"
+    ],
     "outputs_unchanged_vs_v3_5_6": "all other generated files are byte-identical",
     "handoff_model_tables": "legacy 12,000 x 242, thinfile 2,400 x 251; every feature has a member-side source",
     "db": "DB bundle v2.2"
@@ -146,390 +155,596 @@
     },
     "verifiers": "verify, verify_thinfile_general, verify_thinfile, verify_nonfinancial_sources, verify_input_features_6m PASS; the other verifiers were not run",
     "fixed_fixture_tests": "70 run; 67 passed, 3 errors from the environment only (2 symbolic-link tests need Windows privilege, test_reproduction_comparison needs PyYAML in the system Python); same 3 errors before the change",
-    "outputs_changed_vs_v3_5_10": ["service_dummy/members/member_monthly_inputs.csv (12 months 2025-09~2026-08, 4,800 rows; the 2,400 rows for 2026-03~2026-08 have the same amounts and input dates as DB v2.2 seed)"],
+    "outputs_changed_vs_v3_5_10": [
+     "service_dummy/members/member_monthly_inputs.csv (12 months 2025-09~2026-08, 4,800 rows; the 2,400 rows for 2026-03~2026-08 have the same amounts and input dates as DB v2.2 seed)"
+    ],
     "outputs_unchanged_vs_v3_5_10": "26 files in the v3.5.10 training bundle 2_detail/ (legacy 9, thinfile 17, incl. input_features_6m.csv, monthly_history.csv, profiles.csv) compared by value: all equal",
     "db": "DB bundle v2.3"
    }
   },
   "outputs_bundled": false,
-  "since_v3_5_0": "v3.5.13 switches default model aggregates to 12 months, preserves six-month files/columns/values as compatibility_only, adds independent anomalies and verification; v3.5.1 documentation only; v3.5.2-v3.5.4 add tools/build_handoff.py and its safeguards (no generator or data change); v3.5.5 removes the absolute path from nonfinancial_sources_summary.json and documents the thin-file training filter; v3.5.6 fixes the symbolic-link check in tools/build_handoff.py (no generator or data change); v3.5.7 aligns model features with what service members provide (6-month inputs, credit bureau and utility APIs); v3.5.8-v3.5.10 change loan rate precision, repayment methods and add preprocessing anomalies (see docs/CHANGES.md); v3.5.11 restores 12-month member inputs and keeps 6-month model aggregates under members.model_feature_months; v3.5.12 documentation only (grade status INSUFFICIENT_INPUT removed, score range 0-1000 and provisional cutoffs 665/780 documented; DB bundle v2.4)"
+  "since_v3_5_0": "v3.6.0 adds service-definition 12-month columns (average monthly expense, base-month debt service, wage income = base month x 12) as default features, demotes the 6 replaced 12-month columns to compatibility_only and adds a stratified TRAIN/VALID/TEST data_split; v3.5.13 switches default model aggregates to 12 months, preserves six-month files/columns/values as compatibility_only, adds independent anomalies and verification; v3.5.1 documentation only; v3.5.2-v3.5.4 add tools/build_handoff.py and its safeguards (no generator or data change); v3.5.5 removes the absolute path from nonfinancial_sources_summary.json and documents the thin-file training filter; v3.5.6 fixes the symbolic-link check in tools/build_handoff.py (no generator or data change); v3.5.7 aligns model features with what service members provide (6-month inputs, credit bureau and utility APIs); v3.5.8-v3.5.10 change loan rate precision, repayment methods and add preprocessing anomalies (see docs/CHANGES.md); v3.5.11 restores 12-month member inputs and keeps 6-month model aggregates under members.model_feature_months; v3.5.12 documentation only (grade status INSUFFICIENT_INPUT removed, score range 0-1000 and provisional cutoffs 665/780 documented; DB bundle v2.4)"
  },
  "v3_5_13_regeneration": {
-   "date": "2026-11-10",
-   "release": "v3.5.13",
-   "default_model_window": "12 complete months 2025-09~2026-08; role=feature",
-   "compatibility_window": "6 complete months 2026-03~2026-08; existing files/columns/values preserved, role=compatibility_only; excluded from default training",
-   "config": "members.model_feature_months=12 months; members.model_feature_months_6m added; members.input_months unchanged",
-   "new_files": [
-     "data/input_features_12m.csv",
-     "thinfile/input_features_12m.csv",
-     "data/anomaly_log_12m.csv",
-     "thinfile/anomaly_log_12m.csv"
+  "date": "2026-11-10",
+  "release": "v3.5.13",
+  "default_model_window": "12 complete months 2025-09~2026-08; role=feature",
+  "compatibility_window": "6 complete months 2026-03~2026-08; existing files/columns/values preserved, role=compatibility_only; excluded from default training",
+  "config": "members.model_feature_months=12 months; members.model_feature_months_6m added; members.input_months unchanged",
+  "new_files": [
+   "data/input_features_12m.csv",
+   "thinfile/input_features_12m.csv",
+   "data/anomaly_log_12m.csv",
+   "thinfile/anomaly_log_12m.csv"
+  ],
+  "model_columns": {
+   "legacy": {
+    "rows": 12000,
+    "columns_before": 242,
+    "columns_after": 252
+   },
+   "thinfile": {
+    "rows": 2400,
+    "columns_before": 251,
+    "columns_after": 261
+   },
+   "new_columns": 10,
+   "note": "dp_payment_amount_12m_krw already existed; values checked against new aggregate, position and source preserved. Both cohorts retain all 11 six-month columns as compatibility_only; all 11 twelve-month aggregate columns are feature."
+  },
+  "anomaly_seed": 20261113,
+  "seed_collision_check": "No occurrence of seed 20261113 in extension_config.json or existing reference/*.json before addition. Existing anomaly seed 20261110 unchanged.",
+  "injected_cells": {
+   "legacy": 516,
+   "thinfile": 103
+  },
+  "environment": {
+   "python": "3.11.9",
+   "numpy": "2.4.6",
+   "pandas": "3.0.5",
+   "scipy": "1.17.1",
+   "scikit-learn": "1.9.1",
+   "PyYAML": "6.0.3",
+   "openpyxl": "3.1.5",
+   "note": "Existing virtual environment, no dependency installation or requirements changes. Temporary copies normalize text LF; binary source files and original field_dictionary.csv bytes preserved."
+  },
+  "full_generation": "Baseline 14 generation/experiment commands PASS; updated 15 commands PASS (adds build_input_features_12m). Defaults legacy 12000, thinfile 2400, service members 400.",
+  "unit_tests": {
+   "command": "python -B -m unittest discover -s tests -t .",
+   "run": 86,
+   "passed": 84,
+   "errors": 2,
+   "error_reason": "Existing Windows symlink privileges WinError 1314, before prepare_output invocation; no new test failure."
+  },
+  "verifiers": [
+   [
+    "verify.verify",
+    0,
+    2.21
    ],
-   "model_columns": {
-     "legacy": {
-       "rows": 12000,
-       "columns_before": 242,
-       "columns_after": 252
-     },
-     "thinfile": {
-       "rows": 2400,
-       "columns_before": 251,
-       "columns_after": 261
-     },
-     "new_columns": 10,
-     "note": "dp_payment_amount_12m_krw already existed; values checked against new aggregate, position and source preserved. Both cohorts retain all 11 six-month columns as compatibility_only; all 11 twelve-month aggregate columns are feature."
-   },
-   "anomaly_seed": 20261113,
-   "seed_collision_check": "No occurrence of seed 20261113 in extension_config.json or existing reference/*.json before addition. Existing anomaly seed 20261110 unchanged.",
-   "injected_cells": {
-     "legacy": 516,
-     "thinfile": 103
-   },
-   "environment": {
-     "python": "3.11.9",
-     "numpy": "2.4.6",
-     "pandas": "3.0.5",
-     "scipy": "1.17.1",
-     "scikit-learn": "1.9.1",
-     "PyYAML": "6.0.3",
-     "openpyxl": "3.1.5",
-     "note": "Existing virtual environment, no dependency installation or requirements changes. Temporary copies normalize text LF; binary source files and original field_dictionary.csv bytes preserved."
-   },
-   "full_generation": "Baseline 14 generation/experiment commands PASS; updated 15 commands PASS (adds build_input_features_12m). Defaults legacy 12000, thinfile 2400, service members 400.",
-   "unit_tests": {
-     "command": "python -B -m unittest discover -s tests -t .",
-     "run": 86,
-     "passed": 84,
-     "errors": 2,
-     "error_reason": "Existing Windows symlink privileges WinError 1314, before prepare_output invocation; no new test failure."
-   },
-   "verifiers": [
-     [
-       "verify.verify",
-       0,
-       2.21
-     ],
-     [
-       "verify.verify_statistics",
-       0,
-       0.52
-     ],
-     [
-       "verify.verify_thinfile_general",
-       0,
-       1.85
-     ],
-     [
-       "verify.verify_thinfile",
-       0,
-       3.19
-     ],
-     [
-       "verify.verify_card_accounts",
-       0,
-       0.69
-     ],
-     [
-       "verify.verify_loan_extension",
-       0,
-       162.94
-     ],
-     [
-       "verify.verify_assumption_sensitivity",
-       0,
-       4.33
-     ],
-     [
-       "verify.verify_nonfinancial_experiment",
-       0,
-       5.42
-     ],
-     [
-       "verify.verify_nonfinancial_sources",
-       0,
-       36.16
-     ],
-     [
-       "verify.verify_input_features_6m",
-       0,
-       1.0
-     ],
-     [
-       "verify.verify_input_features_12m",
-       0,
-       1.01
-     ]
+   [
+    "verify.verify_statistics",
+    0,
+    0.52
    ],
-   "preservation": {
-     "data": {
-       "old_files": 17,
-       "new_files": 19,
-       "changed_existing": [],
-       "added": [
-         "anomaly_log_12m.csv",
-         "input_features_12m.csv"
-       ]
-     },
-     "thinfile": {
-       "old_files": 25,
-       "new_files": 27,
-       "changed_existing": [],
-       "added": [
-         "anomaly_log_12m.csv",
-         "input_features_12m.csv"
-       ]
-     },
-     "loan_extension": {
-       "old_files": 6,
-       "new_files": 6,
-       "changed_existing": [],
-       "added": []
-     },
-     "service_dummy": {
-       "old_files": 17,
-       "new_files": 17,
-       "changed_existing": [],
-       "added": []
-     },
-     "nonfinancial_label_lift": {
-       "old_files": 3,
-       "new_files": 3,
-       "changed_existing": [],
-       "added": []
-     },
-     "assumption_sensitivity": {
-       "old_files": 6,
-       "new_files": 6,
-       "changed_existing": [],
-       "added": []
-     },
-     "nonfinancial_experiment": {
-       "old_files": 7,
-       "new_files": 7,
-       "changed_existing": [],
-       "added": []
-     },
-     "baseline_db": {
-       "sql_files": 18,
-       "repository_differences": []
-     },
-     "updated_db": {
-       "sql_files": 18,
-       "repository_differences": []
-     }
-   },
-   "model_and_member_checks": {
-     "legacy": {
-       "rows": 12000,
-       "old_columns": 242,
-       "columns": 252,
-       "new_columns": [
-         "income_12m_krw",
-         "expense_12m_krw",
-         "debt_service_12m_krw",
-         "expense_ratio_12m",
-         "dsr_12m",
-         "income_cv_12m",
-         "zero_income_months_12m",
-         "deficit_months_12m",
-         "worst_month_net_cash_12m_krw",
-         "dp_amount_to_income_12m"
-       ],
-       "role_counts": {
-         "feature": 236,
-         "compatibility_only": 11,
-         "group": 2,
-         "label": 2,
-         "id": 1
-       }
-     },
-     "thinfile": {
-       "rows": 2400,
-       "old_columns": 251,
-       "columns": 261,
-       "new_columns": [
-         "income_12m_krw",
-         "expense_12m_krw",
-         "debt_service_12m_krw",
-         "expense_ratio_12m",
-         "dsr_12m",
-         "income_cv_12m",
-         "zero_income_months_12m",
-         "deficit_months_12m",
-         "worst_month_net_cash_12m_krw",
-         "dp_amount_to_income_12m"
-       ],
-       "role_counts": {
-         "feature": 244,
-         "compatibility_only": 11,
-         "group": 2,
-         "label": 2,
-         "id": 1,
-         "eval_only": 1
-       }
-     },
-     "member_aggregation": {
-       "members": 400,
-       "monthly_rows": 4800,
-       "status": "PASS (payment excluded in this member-input sum comparison)"
-     }
-   },
-   "handoff": "Preview build PASS, source-by-source values and dictionary roles validated; final archive file counts and hashes recorded in the work log.",
-   "not_run": [
-     "Oracle 21c actual loading",
-     "training/evaluation of a new model using the new default feature set",
-     "Spring/FastAPI inference integration"
+   [
+    "verify.verify_thinfile_general",
+    0,
+    1.85
    ],
-   "git": "No commit/push/stash/reset/merge. origin/develop fetched for overlap check only; no incoming changes in approved generation paths.",
-   "source_code_changed": [
-     "generate/input_feature_logic.py",
-     "generate/build_input_features_12m.py",
-     "generate/build_input_features_6m.py",
-     "generate/build_members.py (header only)",
-     "reference/service_dummy_anchors.json",
-     "reference/anomaly_injection_12m.json",
-     "tools/build_handoff.py",
-     "verify/verify_input_features_12m.py",
-     "verify/verify_input_features_6m.py",
-     "tests/test_input_features_12m.py",
-     "tests/test_input_features_6m.py",
-     "tests/test_build_handoff.py"
+   [
+    "verify.verify_thinfile",
+    0,
+    3.19
+   ],
+   [
+    "verify.verify_card_accounts",
+    0,
+    0.69
+   ],
+   [
+    "verify.verify_loan_extension",
+    0,
+    162.94
+   ],
+   [
+    "verify.verify_assumption_sensitivity",
+    0,
+    4.33
+   ],
+   [
+    "verify.verify_nonfinancial_experiment",
+    0,
+    5.42
+   ],
+   [
+    "verify.verify_nonfinancial_sources",
+    0,
+    36.16
+   ],
+   [
+    "verify.verify_input_features_6m",
+    0,
+    1.0
+   ],
+   [
+    "verify.verify_input_features_12m",
+    0,
+    1.01
    ]
+  ],
+  "preservation": {
+   "data": {
+    "old_files": 17,
+    "new_files": 19,
+    "changed_existing": [],
+    "added": [
+     "anomaly_log_12m.csv",
+     "input_features_12m.csv"
+    ]
+   },
+   "thinfile": {
+    "old_files": 25,
+    "new_files": 27,
+    "changed_existing": [],
+    "added": [
+     "anomaly_log_12m.csv",
+     "input_features_12m.csv"
+    ]
+   },
+   "loan_extension": {
+    "old_files": 6,
+    "new_files": 6,
+    "changed_existing": [],
+    "added": []
+   },
+   "service_dummy": {
+    "old_files": 17,
+    "new_files": 17,
+    "changed_existing": [],
+    "added": []
+   },
+   "nonfinancial_label_lift": {
+    "old_files": 3,
+    "new_files": 3,
+    "changed_existing": [],
+    "added": []
+   },
+   "assumption_sensitivity": {
+    "old_files": 6,
+    "new_files": 6,
+    "changed_existing": [],
+    "added": []
+   },
+   "nonfinancial_experiment": {
+    "old_files": 7,
+    "new_files": 7,
+    "changed_existing": [],
+    "added": []
+   },
+   "baseline_db": {
+    "sql_files": 18,
+    "repository_differences": []
+   },
+   "updated_db": {
+    "sql_files": 18,
+    "repository_differences": []
+   }
+  },
+  "model_and_member_checks": {
+   "legacy": {
+    "rows": 12000,
+    "old_columns": 242,
+    "columns": 252,
+    "new_columns": [
+     "income_12m_krw",
+     "expense_12m_krw",
+     "debt_service_12m_krw",
+     "expense_ratio_12m",
+     "dsr_12m",
+     "income_cv_12m",
+     "zero_income_months_12m",
+     "deficit_months_12m",
+     "worst_month_net_cash_12m_krw",
+     "dp_amount_to_income_12m"
+    ],
+    "role_counts": {
+     "feature": 236,
+     "compatibility_only": 11,
+     "group": 2,
+     "label": 2,
+     "id": 1
+    }
+   },
+   "thinfile": {
+    "rows": 2400,
+    "old_columns": 251,
+    "columns": 261,
+    "new_columns": [
+     "income_12m_krw",
+     "expense_12m_krw",
+     "debt_service_12m_krw",
+     "expense_ratio_12m",
+     "dsr_12m",
+     "income_cv_12m",
+     "zero_income_months_12m",
+     "deficit_months_12m",
+     "worst_month_net_cash_12m_krw",
+     "dp_amount_to_income_12m"
+    ],
+    "role_counts": {
+     "feature": 244,
+     "compatibility_only": 11,
+     "group": 2,
+     "label": 2,
+     "id": 1,
+     "eval_only": 1
+    }
+   },
+   "member_aggregation": {
+    "members": 400,
+    "monthly_rows": 4800,
+    "status": "PASS (payment excluded in this member-input sum comparison)"
+   }
+  },
+  "handoff": "Preview build PASS, source-by-source values and dictionary roles validated; final archive file counts and hashes recorded in the work log.",
+  "not_run": [
+   "Oracle 21c actual loading",
+   "training/evaluation of a new model using the new default feature set",
+   "Spring/FastAPI inference integration"
+  ],
+  "git": "No commit/push/stash/reset/merge. origin/develop fetched for overlap check only; no incoming changes in approved generation paths.",
+  "source_code_changed": [
+   "generate/input_feature_logic.py",
+   "generate/build_input_features_12m.py",
+   "generate/build_input_features_6m.py",
+   "generate/build_members.py (header only)",
+   "reference/service_dummy_anchors.json",
+   "reference/anomaly_injection_12m.json",
+   "tools/build_handoff.py",
+   "verify/verify_input_features_12m.py",
+   "verify/verify_input_features_6m.py",
+   "tests/test_input_features_12m.py",
+   "tests/test_input_features_6m.py",
+   "tests/test_build_handoff.py"
+  ]
  },
  "v3_5_13_review": {
-   "date": "2026-11-10",
-   "reason": "User-approved Claude review before distribution; v3.5.13 archives replaced, older versions preserved",
-   "dictionary_fix": "Only income/expense/debt_service_12m notes now point to anomaly_log_12m.csv",
-   "column_order": "Existing predictors in original relative order, 10 new 12-month columns, then original tail. Legacy tail: label_any_delinquency_12m, label_nonfin_effect_12m. Thinfile tail: the same labels, then eval_future_credit_exposure.",
-   "model_values_and_order": {
-     "legacy": {
-       "rows": 12000,
-       "columns": 252,
-       "added_columns": [
-         "income_12m_krw",
-         "expense_12m_krw",
-         "debt_service_12m_krw",
-         "expense_ratio_12m",
-         "dsr_12m",
-         "income_cv_12m",
-         "zero_income_months_12m",
-         "deficit_months_12m",
-         "worst_month_net_cash_12m_krw",
-         "dp_amount_to_income_12m"
-       ],
-       "tail": [
-         "label_any_delinquency_12m",
-         "label_nonfin_effect_12m"
-       ],
-       "existing_values_and_relative_order": "PASS"
-     },
-     "thinfile": {
-       "rows": 2400,
-       "columns": 261,
-       "added_columns": [
-         "income_12m_krw",
-         "expense_12m_krw",
-         "debt_service_12m_krw",
-         "expense_ratio_12m",
-         "dsr_12m",
-         "income_cv_12m",
-         "zero_income_months_12m",
-         "deficit_months_12m",
-         "worst_month_net_cash_12m_krw",
-         "dp_amount_to_income_12m"
-       ],
-       "tail": [
-         "label_any_delinquency_12m",
-         "label_nonfin_effect_12m",
-         "eval_future_credit_exposure"
-       ],
-       "existing_values_and_relative_order": "PASS"
-     }
+  "date": "2026-11-10",
+  "reason": "User-approved Claude review before distribution; v3.5.13 archives replaced, older versions preserved",
+  "dictionary_fix": "Only income/expense/debt_service_12m notes now point to anomaly_log_12m.csv",
+  "column_order": "Existing predictors in original relative order, 10 new 12-month columns, then original tail. Legacy tail: label_any_delinquency_12m, label_nonfin_effect_12m. Thinfile tail: the same labels, then eval_future_credit_exposure.",
+  "model_values_and_order": {
+   "legacy": {
+    "rows": 12000,
+    "columns": 252,
+    "added_columns": [
+     "income_12m_krw",
+     "expense_12m_krw",
+     "debt_service_12m_krw",
+     "expense_ratio_12m",
+     "dsr_12m",
+     "income_cv_12m",
+     "zero_income_months_12m",
+     "deficit_months_12m",
+     "worst_month_net_cash_12m_krw",
+     "dp_amount_to_income_12m"
+    ],
+    "tail": [
+     "label_any_delinquency_12m",
+     "label_nonfin_effect_12m"
+    ],
+    "existing_values_and_relative_order": "PASS"
    },
-   "settings": "Only basis text changed: model_feature_months starts with assumption:; model_feature_months_6m explicitly says compatibility_only/reference. Month arrays unchanged.",
-   "work_log": "docs/logs/2026-11-10_kgh_모델입력-12개월.md; author kgh / Codex; local working materials identified as absent from repository",
-   "unit_tests": {
-     "run": 86,
-     "passed": 84,
-     "errors": 2,
-     "reason": "Existing Windows symlink creation WinError 1314, no new test failures. Both legacy and thinfile tail order checked by fixed fixture."
-   },
-   "verifiers": [
-     [
-       "verify.verify",
-       0,
-       2.08
-     ],
-     [
-       "verify.verify_statistics",
-       0,
-       0.48
-     ],
-     [
-       "verify.verify_thinfile_general",
-       0,
-       1.54
-     ],
-     [
-       "verify.verify_thinfile",
-       0,
-       2.78
-     ],
-     [
-       "verify.verify_card_accounts",
-       0,
-       0.63
-     ],
-     [
-       "verify.verify_loan_extension",
-       0,
-       106.54
-     ],
-     [
-       "verify.verify_assumption_sensitivity",
-       0,
-       4.22
-     ],
-     [
-       "verify.verify_nonfinancial_experiment",
-       0,
-       5.32
-     ],
-     [
-       "verify.verify_nonfinancial_sources",
-       0,
-       34.44
-     ],
-     [
-       "verify.verify_input_features_6m",
-       0,
-       0.99
-     ],
-     [
-       "verify.verify_input_features_12m",
-       0,
-       1.01
-     ]
+   "thinfile": {
+    "rows": 2400,
+    "columns": 261,
+    "added_columns": [
+     "income_12m_krw",
+     "expense_12m_krw",
+     "debt_service_12m_krw",
+     "expense_ratio_12m",
+     "dsr_12m",
+     "income_cv_12m",
+     "zero_income_months_12m",
+     "deficit_months_12m",
+     "worst_month_net_cash_12m_krw",
+     "dp_amount_to_income_12m"
+    ],
+    "tail": [
+     "label_any_delinquency_12m",
+     "label_nonfin_effect_12m",
+     "eval_future_credit_exposure"
+    ],
+    "existing_values_and_relative_order": "PASS"
+   }
+  },
+  "settings": "Only basis text changed: model_feature_months starts with assumption:; model_feature_months_6m explicitly says compatibility_only/reference. Month arrays unchanged.",
+  "work_log": "docs/logs/2026-11-10_kgh_모델입력-12개월.md; author kgh / Codex; local working materials identified as absent from repository",
+  "unit_tests": {
+   "run": 86,
+   "passed": 84,
+   "errors": 2,
+   "reason": "Existing Windows symlink creation WinError 1314, no new test failures. Both legacy and thinfile tail order checked by fixed fixture."
+  },
+  "verifiers": [
+   [
+    "verify.verify",
+    0,
+    2.08
    ],
-   "preservation": {
-     "files": {
-       "data": 17,
-       "thinfile": 25,
-       "loan_extension": 6,
-       "service_dummy": 17,
-       "nonfinancial_label_lift": 3,
-       "assumption_sensitivity": 6,
-       "nonfinancial_experiment": 7
-     },
-     "total": 81,
-     "older_archives": 5,
-     "old_log_unchanged": true
-   },
-   "not_run": [
-     "Full regeneration of unchanged monthly data during this layout/documentation review (previous full generation retained and hash-checked)",
-     "Oracle actual loading",
-     "New model training/evaluation and Spring/FastAPI integration"
+   [
+    "verify.verify_statistics",
+    0,
+    0.48
+   ],
+   [
+    "verify.verify_thinfile_general",
+    0,
+    1.54
+   ],
+   [
+    "verify.verify_thinfile",
+    0,
+    2.78
+   ],
+   [
+    "verify.verify_card_accounts",
+    0,
+    0.63
+   ],
+   [
+    "verify.verify_loan_extension",
+    0,
+    106.54
+   ],
+   [
+    "verify.verify_assumption_sensitivity",
+    0,
+    4.22
+   ],
+   [
+    "verify.verify_nonfinancial_experiment",
+    0,
+    5.32
+   ],
+   [
+    "verify.verify_nonfinancial_sources",
+    0,
+    34.44
+   ],
+   [
+    "verify.verify_input_features_6m",
+    0,
+    0.99
+   ],
+   [
+    "verify.verify_input_features_12m",
+    0,
+    1.01
    ]
+  ],
+  "preservation": {
+   "files": {
+    "data": 17,
+    "thinfile": 25,
+    "loan_extension": 6,
+    "service_dummy": 17,
+    "nonfinancial_label_lift": 3,
+    "assumption_sensitivity": 6,
+    "nonfinancial_experiment": 7
+   },
+   "total": 81,
+   "older_archives": 5,
+   "old_log_unchanged": true
+  },
+  "not_run": [
+   "Full regeneration of unchanged monthly data during this layout/documentation review (previous full generation retained and hash-checked)",
+   "Oracle actual loading",
+   "New model training/evaluation and Spring/FastAPI integration"
+  ]
+ },
+ "v3_6_0_regeneration": {
+  "date": "2026-11-10",
+  "release": "v3.6.0",
+  "decisions": "user-approved plan_v360.md (local work file, not in repo) and step-3 decisions after cross review: wage flattening at feature stage; separate svc anomaly config; data_split after dataset; TEST rows EVAL_ELIGIBLE_YN=Y (split marker only, thinfile comparison also filters eval_future_credit_exposure=1); base month = last source month 2026-08 (wage base month TODO pending team confirmation); 10 existing 12-month columns left out of the model tables (v3.5.13 bundle was not distributed); average monthly expense ROUND_HALF_UP; institution responses OK for every member, consent checked by the mock server at request time",
+  "service_definition_columns": [
+   "income_svc_12m_krw",
+   "income_cv_svc_12m",
+   "zero_income_months_svc_12m",
+   "expense_avg_month_krw",
+   "debt_service_current_krw",
+   "expense_ratio_svc_12m",
+   "dsr_svc_12m",
+   "deficit_months_svc_12m",
+   "worst_month_net_cash_svc_12m_krw"
+  ],
+  "model_excluded_12m_columns": [
+   "income_12m_krw",
+   "income_cv_12m",
+   "zero_income_months_12m",
+   "dp_amount_to_income_12m",
+   "expense_12m_krw",
+   "debt_service_12m_krw",
+   "expense_ratio_12m",
+   "dsr_12m",
+   "deficit_months_12m",
+   "worst_month_net_cash_12m_krw"
+  ],
+  "svc_anomaly_seed": 20261115,
+  "data_split_seed": 20261114,
+  "seed_collision_check": "20261114 and 20261115 do not occur in extension_config.json or existing reference/*.json (existing 20261101, 20261104, 20261105, 20261110, 20261113)",
+  "injected_cells": {
+   "legacy": {
+    "existing_12m": 516,
+    "svc": 516
+   },
+   "thinfile": {
+    "existing_12m": 103,
+    "svc": 103
+   }
+  },
+  "data_split_counts": {
+   "legacy": {
+    "TRAIN": 8400,
+    "VALID": 1800,
+    "TEST": 1800
+   },
+   "thinfile": {
+    "TRAIN": 1680,
+    "VALID": 361,
+    "TEST": 359,
+    "TEST_with_eval_future_credit_exposure_1": 246
+   }
+  },
+  "rounding": "expense_avg_month_krw ROUND_HALF_UP (integer arithmetic in the generator, Decimal in the verifier); compared with numpy half-to-even, 457 legacy and 91 thinfile clean values differ by 1 won (injected cells excluded)",
+  "measured": {
+   "wage_monthly_income_cv_mean": {
+    "legacy": 0.0562,
+    "thinfile": 0.0564
+   },
+   "mean_deficit_months": {
+    "legacy": [
+     3.848,
+     3.849
+    ],
+    "thinfile": [
+     2.734,
+     2.776
+    ],
+    "note": "existing 12m vs svc"
+   },
+   "mean_dsr": {
+    "legacy": [
+     0.3357,
+     0.3363
+    ],
+    "thinfile": [
+     0.062,
+     0.0663
+    ],
+    "note": "existing 12m vs svc (derived ratios are clean, pre-injection values)"
+   },
+   "thinfile_debt_current_x12_vs_snapshot_annual": "1738/2400 equal; 618 differ by <= 12 won (monthly allocation remainder); 44 differ because loans start or end within the window"
+  },
+  "model_columns": {
+   "legacy": {
+    "rows": 12000,
+    "columns_v3_5_13": 252,
+    "columns": 252,
+    "features": 235
+   },
+   "thinfile": {
+    "rows": 2400,
+    "columns_v3_5_13": 261,
+    "columns": 261,
+    "features": 243
+   },
+   "note": "Dropping data_split and the 9 svc columns gives exactly the v3.5.13 delivered model tables minus the 10 excluded columns (values and order). compatibility_only = the 11 six-month columns."
+  },
+  "service_dummy_responses": "All 6 institution response files: every member status OK with data. Initially consenting members' responses and member order are byte-identical to v3.5.13; only the 82 initially non-consenting members changed (were CONSENT_REQUIRED with empty lists). members.csv external_data_consent unchanged (consent state at demo start).",
+  "dictionary_fix": "telecom_late_months and utility_late_months descriptions corrected to '0~12, 실제 생성 분포 0~5' (DATA_DICTIONARY.csv, field_dictionary.csv keeps CRLF bytes). Generated values unchanged",
+  "environment": {
+   "python": "3.11.9",
+   "numpy": "2.4.6",
+   "pandas": "3.0.5",
+   "scipy": "1.17.1",
+   "scikit-learn": "1.9.1",
+   "PyYAML": "6.0.3",
+   "openpyxl": "3.1.5",
+   "cryptography": "50.0.2",
+   "note": "Existing virtual environment (cryptography installed by the DB task). Temporary copy of the working tree with text normalized to LF."
+  },
+  "full_generation": "16 generation/experiment commands PASS in README order (adds build_data_split). Defaults legacy 12000, thinfile 2400, service members 400.",
+  "unit_tests": {
+   "command": "python -B -m unittest discover -s tests -t .",
+   "run": 97,
+   "passed": 95,
+   "errors": 2,
+   "error_reason": "Existing Windows symlink privileges WinError 1314 (same 2 tests as v3.5.13)",
+   "db_seed_tests": "python -B -m unittest discover -s docs/spec/sql/dummy_db/tools/tests (repository root, AVENUE_TEST_SERVICE_DUMMY set to the regenerated service_dummy): 17 run, all PASS"
+  },
+  "verifiers": [
+   [
+    "verify.verify",
+    0,
+    2.03
+   ],
+   [
+    "verify.verify_statistics",
+    0,
+    0.49
+   ],
+   [
+    "verify.verify_thinfile_general",
+    0,
+    1.55
+   ],
+   [
+    "verify.verify_thinfile",
+    0,
+    2.83
+   ],
+   [
+    "verify.verify_card_accounts",
+    0,
+    0.65
+   ],
+   [
+    "verify.verify_loan_extension",
+    0,
+    141.02
+   ],
+   [
+    "verify.verify_assumption_sensitivity",
+    0,
+    4.28
+   ],
+   [
+    "verify.verify_nonfinancial_experiment",
+    0,
+    5.52
+   ],
+   [
+    "verify.verify_nonfinancial_sources",
+    0,
+    35.3
+   ],
+   [
+    "verify.verify_input_features_6m",
+    0,
+    1.01
+   ],
+   [
+    "verify.verify_input_features_12m",
+    0,
+    1.16
+   ],
+   [
+    "verify.verify_data_split",
+    0,
+    0.65
+   ]
+  ],
+  "preservation": "Against the v3.5.13 full generation (byte-equal to the delivered v3.5.13 2_detail files): 77 of 85 generated files byte-identical; changed data/ and thinfile/input_features_12m.csv (existing columns exactly equal, 9 appended) and the 6 institution response files (see service_dummy_responses); added data_split.csv and anomaly_log_12m_svc.csv in both folders and service_dummy/members/member_asset_snapshots_v02.csv",
+  "handoff": {
+   "zip": "avenue_training_data_v3_6_0.zip",
+   "entries": 64,
+   "bytes": 20998627,
+   "sha256": "48cca97a4e779c094751a7223798b47b3ef5cee8dd493cb49b907793168c4f99",
+   "marker_hashes": "all match after reopening",
+   "replaced_undistributed_sha256": "50dbed008ecb2fa644cccecd0020f7730771108eaa74a602802010939a1e380f",
+   "files_added": [
+    "2_detail/*/data_split.csv",
+    "3_reference/*/anomaly_log_12m_svc.csv"
+   ],
+   "files_removed": []
+  },
+  "source_package": "credit_extension_light_v3_6_0.zip: manifest.json lists every package file except itself (text LF, xlsx and field_dictionary.csv original bytes); its size and SHA256 are in the work log because they depend on this file",
+  "not_run": [
+   "Oracle actual loading",
+   "New model training/evaluation and Spring/FastAPI integration"
+  ],
+  "git": "branch KGH_Work; no commit, push, stash, reset or merge by the tool",
+  "final_review_note": "2026-11-10 최종 검수 반영: handoff 피처 안내와 모델 역할 일치, 기관 응답 전원 OK·시작 동의 분리 문서 통일, DB 99_check USER_LOAN 203 및 생성본 동등성 테스트 보완. 데이터 값 재생성 없이 문서·마커·manifest·v3.6.0 ZIP만 갱신."
  }
 }

@@ -19,34 +19,46 @@ source table and the data dictionary lists it as a delivery field of that table;
 is `unclassified` and stops the build.
 N-12 v3.5.13: 기본 학습은 input_features_12m.csv의 12개월 집계다. 기존 6개월 열·값은
 compatibility_only(보존·참고용)로 남긴다. profiles의 기존 연간·자산·설계 열 제외 정책은 유지한다.
+N-12·N-25 v3.6.0: 서비스 입력 규칙과 같은 정의의 12개월 열(SVC_COLUMNS)이 기본 학습이다. 기존 12개월 집계 중
+소득·지출·상환 관련 10열(MODEL_EXCLUDED_12M_COLUMNS)은 모델 표에 넣지 않는다(상세 input_features_12m.csv에는 그대로,
+v3.5.13 묶음은 배포되지 않음). data_split(TRAIN/VALID/TEST)은 dataset 바로 뒤에 두며 학습에 쓰지 않는다(role=split).
 """
 from pathlib import Path
 import argparse, hashlib, json, shutil
 import numpy as np
 import pandas as pd
 from generate.build_input_features_6m import COLUMNS as SIX_MONTH_COLUMNS
+from generate.build_data_split import SPLITS
+from generate.build_input_features_12m import SVC_COLUMNS
 
 ROOT = Path(__file__).resolve().parents[1]
 LEAK = '결과값(연체회차)'                      # future delinquency months: source of the original label
 THIN_PLACEHOLDERS = ['PRE_LMT', 'PRE_RT']      # thin-file placeholders (DATA_SPEC.md): always 0, dropped from the thin table
-FRONT_COLS = ['customer_id', 'dataset', 'cohort', 'segment']   # column order only
+FRONT_COLS = ['customer_id', 'dataset', 'data_split', 'cohort', 'segment']   # column order only (v3.6.0: data_split after dataset)
 ID_COLS = ['customer_id']
 GROUP_COLS = ['dataset', 'cohort']                              # evaluation grouping, never features
+SPLIT_COLS = ['data_split']                                     # v3.6.0 TRAIN/VALID/TEST, never a feature
+# v3.6.0: 서비스 정의 열과 겹치거나(급여소득자 소득 정의가 다름) 대체되어 모델 표에서 빼는 기존 12개월 열.
+# 상세 2_detail/*/input_features_12m.csv에는 그대로 남는다. dp_payment_amount_12m_krw 등 다른 열은 그대로 모델 표에 있다.
+MODEL_EXCLUDED_12M_COLUMNS = ['income_12m_krw', 'income_cv_12m', 'zero_income_months_12m', 'dp_amount_to_income_12m',
+                              'expense_12m_krw', 'debt_service_12m_krw', 'expense_ratio_12m', 'dsr_12m',
+                              'deficit_months_12m', 'worst_month_net_cash_12m_krw']
 LABELS = ['label_any_delinquency_12m', 'label_nonfin_effect_12m']
 
 DETAIL = {
     'data': ['base_207.csv', 'profiles.csv', 'monthly_history.csv', 'scenarios.csv', 'digital_payment_monthly.csv',
-             'social_insurance_monthly.csv', 'nonfinancial_source_features.csv', 'labels_nonfinancial.csv', 'input_features_6m.csv', 'input_features_12m.csv'],
+             'social_insurance_monthly.csv', 'nonfinancial_source_features.csv', 'labels_nonfinancial.csv', 'input_features_6m.csv', 'input_features_12m.csv', 'data_split.csv'],
     'thinfile': ['base_207.csv', 'model_inputs.csv', 'profiles.csv', 'monthly_history.csv', 'scenarios.csv',
                  'digital_payment_monthly.csv', 'social_insurance_monthly.csv', 'nonfinancial_source_features.csv',
                  'labels_nonfinancial.csv', 'loans.csv', 'cards.csv', 'delinquencies.csv', 'card_monthly.csv',
-                 'card_account_monthly.csv', 'loan_monthly_budget.csv', 'ui_credit_summary.csv', 'input_features_6m.csv', 'input_features_12m.csv'],
+                 'card_account_monthly.csv', 'loan_monthly_budget.csv', 'ui_credit_summary.csv', 'input_features_6m.csv', 'input_features_12m.csv',
+                 'data_split.csv'],
 }
 REFERENCE = {
     'data': ['labels_nonfinancial_metadata.csv', 'effective_config.json', 'segment_summary.csv', 'validation.json',
-             'nonfinancial_sources_summary.json', 'rho_sensitivity.csv', 'expense_sensitivity.csv', 'anomaly_log.csv', 'anomaly_log_12m.csv'],
+             'nonfinancial_sources_summary.json', 'rho_sensitivity.csv', 'expense_sensitivity.csv', 'anomaly_log.csv', 'anomaly_log_12m.csv', 'anomaly_log_12m_svc.csv'],
     'thinfile': ['labels_nonfinancial_metadata.csv', 'target_metadata.csv', 'plan.csv', 'availability.csv',
-                 'cohort_summary.csv', 'generation_summary.json', 'column_dictionary_207.csv', 'anomaly_log.csv', 'anomaly_log_12m.csv'],
+                 'cohort_summary.csv', 'generation_summary.json', 'column_dictionary_207.csv', 'anomaly_log.csv', 'anomaly_log_12m.csv', 'anomaly_log_12m_svc.csv'],
 }
 DOCS = ['DATA_DICTIONARY.csv', 'DATA_SPEC.md', 'THINFILE.md', 'NONFINANCIAL_LABEL.md', 'NONFINANCIAL_SOURCES.md',
         'CHANGES.md']   # v3.5.12: version history goes with the bundle so the modelling team can see what changed
@@ -78,6 +90,7 @@ def model_table(group):
     lab = read(folder, 'labels_nonfinancial.csv')
     six = read(folder, 'input_features_6m.csv')
     twelve = read(folder, 'input_features_12m.csv')
+    split = read(folder, 'data_split.csv')
     prof = prof.drop(columns=[c for c in NOT_SERVICE_AVAILABLE if c in prof.columns])
     feat = feat.drop(columns=[c for c in NOT_SERVICE_AVAILABLE if c in feat.columns])
     if group == 'thinfile':
@@ -99,11 +112,12 @@ def model_table(group):
     else:
         t = t.drop(columns=OFFER_COLS).assign(cohort='legacy')
     t = t.assign(dataset=group).copy()
+    t = t.merge(split[['customer_id'] + SPLIT_COLS], on='customer_id', validate='one_to_one')   # v3.6.0
     # N-12 이미 제공 중인 간편결제 12개월 합계는 값이 같은지 확인하고 기존 위치·출처를 유지한다.
     overlap = [c for c in twelve.columns if c in t.columns and c != 'customer_id']
     pd.testing.assert_frame_equal(t.set_index('customer_id').loc[twelve.customer_id, overlap].reset_index(drop=True),
                                   twelve[overlap].reset_index(drop=True), check_dtype=False, check_names=False)
-    new_columns = [c for c in twelve.columns if c not in t.columns]
+    new_columns = [c for c in twelve.columns if c not in t.columns and c not in MODEL_EXCLUDED_12M_COLUMNS]   # v3.6.0
     t = t.merge(twelve[['customer_id'] + new_columns], on='customer_id', validate='one_to_one')
     front = FRONT_COLS
     tail = LABELS + (['eval_future_credit_exposure'] if group == 'thinfile' else [])
@@ -142,6 +156,8 @@ def column_roles(tables, dictionary, org=None):
             role = 'id'
         elif c in GROUP_COLS:
             role = 'group'
+        elif c in SPLIT_COLS:
+            role = 'split'
         elif c in LABELS:
             role = 'label'
         elif c in EVAL_COLS:
@@ -159,11 +175,13 @@ def column_roles(tables, dictionary, org=None):
                          source_table=(src['table'] if src is not None else '')))
     r = pd.DataFrame(rows)
     note = {'customer_id': '고객 ID. 피처로 쓰지 않는다', 'dataset': 'legacy 또는 thinfile', 'cohort': '씬파일 집단 구분(기존 집단은 legacy). 집단별 평가에 쓰고 피처로 쓰지 않는다',
-            'segment': '직군 wage/selfemp/freelance. 피처로 써도 된다', 'eval_future_credit_exposure': '씬파일 평가 대상 표시(1이면 양성이 될 수 있음). 피처로 쓰지 않는다',
+            'segment': '직군 wage/selfemp/freelance. 피처로 써도 된다', 'data_split': '학습·검증·시험 구분(TRAIN/VALID/TEST, v3.6.0). 피처로 쓰지 않는다. 성능 비교는 TEST만',
+            'eval_future_credit_exposure': '씬파일 평가 대상 표시(1이면 양성이 될 수 있음). 피처로 쓰지 않는다',
             }
     r['note'] = r.column.map(note).fillna('')
     r.loc[r.role == 'compatibility_only', 'note'] = '12개월이 기본 학습. 6개월은 기존 값 보존·참고용이며 기본 학습에서 제외'
     r.loc[r.source_table == 'input_features_12m', 'note'] = '기본 학습용 12개월 집계. 학습 전 결측·이상치 처리 필요'
+    r.loc[r.column.isin(SVC_COLUMNS), 'note'] = 'v3.6.0 서비스 입력 규칙과 같은 정의(지출=평균 월 지출, 상환=기준월 상환, 급여소득자 소득=기준월 x 12). 학습 전 결측·이상치 처리 필요'
     bad = r[r.role == 'unclassified'].column.tolist()
     if bad:
         raise ValueError(f'unclassified columns (add them to DATA_DICTIONARY.csv as delivery fields or to an explicit role list): {bad}')
@@ -179,7 +197,9 @@ def check(tables):
         assert LEAK not in t.columns, 'label source column must not be in the model table'
         assert not any(c.endswith('_207') for c in t.columns), 'duplicate columns between profiles and base_207'
         assert not set(NOT_SERVICE_AVAILABLE + OFFER_COLS) & set(t.columns), 'a column members cannot provide is in the model table'
-        for name in ['profiles.csv', 'nonfinancial_source_features.csv', 'input_features_6m.csv', 'input_features_12m.csv', 'labels_nonfinancial.csv'] + (['model_inputs.csv'] if group == 'thinfile' else ['base_207.csv']):
+        assert t.data_split.isin(SPLITS).all(), (group, 'data_split values')   # v3.6.0
+        assert not set(MODEL_EXCLUDED_12M_COLUMNS) & set(t.columns), (group, 'excluded 12-month columns in the model table')
+        for name in ['profiles.csv', 'nonfinancial_source_features.csv', 'input_features_6m.csv', 'input_features_12m.csv', 'labels_nonfinancial.csv', 'data_split.csv'] + (['model_inputs.csv'] if group == 'thinfile' else ['base_207.csv']):
             src = read(folder, name).rename(columns={'식별구분': 'customer_id'})
             cols = [c for c in src.columns if c in t.columns and c != 'customer_id']
             a = t.set_index('customer_id').loc[src.customer_id, cols].reset_index(drop=True)

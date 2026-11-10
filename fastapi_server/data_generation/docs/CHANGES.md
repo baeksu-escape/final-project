@@ -2,6 +2,17 @@
 
 데이터 생성과 해석에 영향을 주는 변경만 적는다. 최신 항목이 위에 있다. 문서 표현만 고친 버전은 한 줄로 줄였다.
 
+## v3.6.0 (2026-11-10) — 서비스 정의 12개월 열, 학습·검증·시험 분리
+
+- **서비스 정의 열(R1, DDL v0.2 제안).** 서비스는 소득만 12개월, 지출은 평균 월 지출 하나, 상환은 현재 월 원리금 하나를 받는다. 같은 정의로 `input_features_12m.csv` 뒤쪽에 9열을 붙였다: `income_svc_12m_krw`, `income_cv_svc_12m`, `zero_income_months_svc_12m`, `expense_avg_month_krw`(12개월 평균, `ROUND_HALF_UP`: 정확히 .5이면 올림. v3.5.8 규칙·DB 시드·Java·Oracle과 같음), `debt_service_current_krw`(기준월 2026-08 상환액), `expense_ratio_svc_12m`, `dsr_svc_12m`, `deficit_months_svc_12m`, `worst_month_net_cash_svc_12m_krw`(월 소득 − 평균 지출 − 현재 상환). 기존 12개월 열의 이름·값·이상치 기록은 그대로다.
+- **급여소득자 소득.** 원천의 급여소득자 월 소득은 출렁인다(고객별 CV 평균 0.056). 서비스는 1개월 입력을 12개월로 펼치므로(`REQUIRED_INCOME_MONTHS = 1`) 서비스 정의 열에서만 기준월 소득 × 12로 계산한다. 원천·라벨·6개월·기존 12개월 열은 바꾸지 않았다. 급여소득자 기준월은 팀 확인 전 임시로 2026-08(`TODO`).
+- **모델 표.** 서비스 정의 9열은 `feature`. 기존 12개월 집계 중 10열(`income_12m_krw`, `income_cv_12m`, `zero_income_months_12m`, `dp_amount_to_income_12m`, `expense_12m_krw`, `debt_service_12m_krw`, `expense_ratio_12m`, `dsr_12m`, `deficit_months_12m`, `worst_month_net_cash_12m_krw`)은 모델 표에서 뺐다(사용자 승인. v3.5.13 묶음은 배포되지 않았다). 상세 `input_features_12m.csv`에는 값 그대로 남는다. `dp_payment_amount_12m_krw`는 그대로 `feature`다. 모델 표 legacy 252열(피처 236→235), thinfile 261열(피처 244→243).
+- **전처리 시연.** 새 설정 `reference/anomaly_injection_12m_svc.json`(seed 20261115)과 로그 `anomaly_log_12m_svc.csv`. 기존과 같은 결측 1%·단위 착오 0.5%·음수 상환 0.3% 교육용 가정이며, 기존 12개월 설정·로그는 바꾸지 않았다.
+- **학습·검증·시험 분리.** 새 `generate/build_data_split.py`·`reference/data_split.json`(seed 20261114)이 각 폴더에 `data_split.csv`를 만든다. 고객 ID 단위 TRAIN/VALID/TEST 70/15/15, 직군 × `label_any_delinquency_12m` 층화, 집단마다 따로. 모델 표에서 `dataset` 바로 뒤, `role = split`. DB 적재 규칙(`LABEL_TYPE_CODE` 늘 `SYNTHETIC`, TEST면 `EVAL_ELIGIBLE_YN = Y`)은 `DATA_SPEC.md`에 적었다. 이 `Y`는 시험 분할 표시이며, 씬파일 성능 비교에는 `eval_future_credit_exposure = 1` 필터도 함께 적용한다.
+- **서비스 더미 기관 응답(동의 무관).** 가상 기관 응답 6종을 동의와 무관하게 모든 회원 `status = OK` + 데이터로 바꿨다(`generate/service_dummy_logic.py`의 응답 함수와 짝 검사 3곳). 동의 확인은 목 서버가 요청 시점에 한다. `members.csv`의 `external_data_consent`는 그대로이며 뜻은 '시연 시작 시 동의 상태'다. 기존 동의 회원의 응답 값은 바뀌지 않도록 청구서 난수는 그 회원들 것을 먼저 뽑는다. 바뀐 출력은 비동의 회원의 응답 6개 파일 내용이다.
+- **사전 정정.** `telecom_late_months`·`utility_late_months` 설명의 "현 버전 0 또는 1"이 틀려 "0~12, 실제 생성 분포 0~5"로 고쳤다(`DATA_DICTIONARY.csv`, `field_dictionary.csv`). 미납이 시작되면 매달 30% 확률로 이어지는 규칙(v3.2.0)이라 여러 달이 나온다. 생성 값은 바뀌지 않았다.
+- **검증·바뀌지 않은 것.** 12개월 검증기를 서비스 정의 열까지 넓히고 `verify/verify_data_split.py`를 추가했다. 고정 예제 테스트를 11건 추가했다(정확히 .5 경계, 동의 회원 청구서 값 보존 포함). 재생성 결과 v3.5.13 생성 파일 85개 중 77개는 바이트가 같다. 바뀐 것은 두 집단의 `input_features_12m.csv`(기존 열 값 동일, 9열 추가)와 기관 응답 6개(동의 회원 응답은 그대로, 비동의 회원 82명만 OK + 데이터)다. 새 파일은 `data_split.csv`·`anomaly_log_12m_svc.csv` 각 2개와 DB 작업의 `member_asset_snapshots_v02.csv`다. DB 시드(DDL v0.2 구조)는 별도 작업이다. 최종 재생성 수치는 provenance.json에 기록한다.
+
 ## v3.5.13 (2026-11-10) — 기본 모델 입력 12개월, 6개월 보존·참고용
 
 - **기본 기준.** 12개월이 기본 학습(role=feature)이다. 6개월 파일·열·값은 보존·참고용(compatibility_only)이며 기본 학습에서 제외한다. 모델 표의 기존 열 값·상대 순서를 유지하고 새 12개월 10열을 라벨 앞에 추가했다(간편결제 금액 12개월 열은 이미 있어 값 대조 후 기존 위치 유지). 라벨은 맨 끝쪽에 두며 씬파일 평가용 tail은 기존처럼 라벨 뒤 마지막 열이다.
