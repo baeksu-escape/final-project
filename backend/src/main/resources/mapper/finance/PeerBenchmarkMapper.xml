@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- N-15-2 동년배 기준값 조회 매퍼 XML -->
+<mapper namespace="com.baeksuescape.finance.mapper.PeerBenchmarkMapper">
+
+    <!-- 연령대별 가계금융복지조사 통계 조회 -->
+    <select id="findByAgeGroup" resultType="com.baeksuescape.finance.dto.PeerBenchmarkResponse">
+        SELECT
+            STAT_YEAR           AS statYear,
+            AGE_GROUP           AS ageGroup,
+            AVG_ANNUAL_INCOME   AS avgAnnualIncome,
+            AVG_TOTAL_ASSET     AS avgTotalAsset,
+            AVG_TOTAL_DEBT      AS avgTotalDebt,
+            SAMPLE_SIZE         AS sampleSize
+        FROM FACT_HFS_STAT
+        WHERE STAT_YEAR = #{statYear}
+          AND AGE_GROUP = #{ageGroup}
+    </select>
+
+    <!-- 기준 연도 전체 연령대 통계 목록 조회 -->
+    <select id="findAllByYear" resultType="com.baeksuescape.finance.dto.PeerBenchmarkResponse">
+        SELECT
+            STAT_YEAR           AS statYear,
+            AGE_GROUP           AS ageGroup,
+            AVG_ANNUAL_INCOME   AS avgAnnualIncome,
+            AVG_TOTAL_ASSET     AS avgTotalAsset,
+            AVG_TOTAL_DEBT      AS avgTotalDebt,
+            SAMPLE_SIZE         AS sampleSize
+        FROM FACT_HFS_STAT
+        WHERE STAT_YEAR = #{statYear}
+        ORDER BY STAT_ID ASC
+    </select>
+
+    <!-- 직군 및 연령대별 평균 통계 조회 -->
+    <select id="findByJobTypeAndAgeGroup" resultType="com.baeksuescape.finance.dto.PeerBenchmarkResponse">
+        SELECT
+            STAT_YEAR           AS statYear,
+            AGE_GROUP           AS ageGroup,
+            AVG_ANNUAL_INCOME   AS avgAnnualIncome,
+            AVG_TOTAL_ASSET     AS avgTotalAsset,
+            AVG_TOTAL_DEBT      AS avgTotalDebt,
+            NULL                AS sampleSize
+        FROM FACT_INDUSTRY_AGE_INCOME
+        WHERE STAT_YEAR = #{statYear}
+          AND JOB_TYPE = #{jobType}
+          AND AGE_GROUP = #{ageGroup}
+    </select>
+
+</mapper>
+
