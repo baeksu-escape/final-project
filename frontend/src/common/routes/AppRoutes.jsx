@@ -13,6 +13,7 @@ import GuestOnlyRoute from '../../features/auth/components/GuestOnlyRoute.jsx'
 import FindIdPage from '../../features/auth/pages/FindIdPage.jsx'
 import FindPasswordPage from '../../features/auth/pages/FindPasswordPage.jsx'
 import LoginPage from '../../features/auth/pages/LoginPage.jsx'
+import MyPage from '../../features/auth/pages/MyPage.jsx'
 import SignupPage from '../../features/auth/pages/SignupPage.jsx'
 import SocialCallbackPage from '../../features/auth/pages/SocialCallbackPage.jsx'
 import SocialLinkPage from '../../features/auth/pages/SocialLinkPage.jsx'
@@ -57,7 +58,7 @@ export default function AppRoutes() {
             <Route path={PATHS.REPORT} element={<PlaceholderPage title="신용 리포트" nId="N-12" />} />
             <Route path={`${PATHS.DIAGNOSIS}/:subTab?`} element={<DiagnosisPage contents={DIAGNOSIS_CONTENTS} />} />
             <Route path={PATHS.SIMULATOR} element={<PlaceholderPage title="점수·금리 시뮬레이터" nId="N-18" />} />
-            <Route path={PATHS.MY_PAGE} element={<PlaceholderPage title="마이 페이지" nId="N-04" />} />
+            <Route path={PATHS.MY_PAGE} element={<MyPage />} />
             <Route path={DATA_INPUT_PATHS.DATA_INPUT} element={<DataInputPage />} />
           </Route>
 

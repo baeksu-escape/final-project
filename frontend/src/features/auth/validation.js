@@ -1,9 +1,9 @@
-// N-02 비밀번호 규칙 — 입력하는 동안 PasswordRuleList가 이 목록으로 충족 여부를 보여 준다.
+// N-02 비밀번호 규칙 — 영문과 숫자를 섞어 8자 이상, 기호는 요구하지 않는다(decisions.md 1-2). 가입·비밀번호 찾기·마이페이지가 함께 쓴다.
+// 입력하는 동안 PasswordRuleList가 이 목록으로 충족 여부를 보여 준다.
 export const PASSWORD_RULES = Object.freeze([
   { key: 'length', label: '8자 이상', test: (value) => value.length >= 8 },
   { key: 'letter', label: '영문 포함', test: (value) => /[A-Za-z]/.test(value) },
   { key: 'number', label: '숫자 포함', test: (value) => /\d/.test(value) },
-  { key: 'symbol', label: '기호 포함', test: (value) => /[^A-Za-z0-9\s]/.test(value) },
 ])
 
 // 비밀번호가 모든 규칙을 지키는지 돌려준다.

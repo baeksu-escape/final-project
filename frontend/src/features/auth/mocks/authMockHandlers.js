@@ -24,8 +24,8 @@ let sequence = 0
 // 아이디·비밀번호 찾기에서 계정이 없을 때 쓰는 문구. 어느 항목이 틀렸는지는 알려 주지 않는다.
 const NO_MATCH_MESSAGE = '입력한 정보와 일치하는 계정이 없습니다.'
 
-// 토큰으로 계정을 찾는다. 없으면 401.
-function requireAccountByToken(token) {
+// 토큰으로 계정을 찾는다. 없으면 401. N-04 마이페이지 mock도 이 계정 목록을 함께 쓴다.
+export function requireAccountByToken(token) {
   const account = accounts.find((item) => toMockToken(item.user.userId) === token)
   if (!account) throw new ApiError(401, '로그인이 필요합니다.')
   return account
@@ -34,6 +34,11 @@ function requireAccountByToken(token) {
 // N-01-6 소셜 로그인 mock이 아이디로 계정을 찾을 때 쓴다. 없으면 undefined.
 export function findMockAccount(loginId) {
   return accounts.find((item) => item.loginId === loginId)
+}
+
+// N-04-3 이메일 변경 mock이 다른 계정이 이미 쓰는 이메일인지 볼 때 쓴다.
+export function isMockEmailInUse(email) {
+  return accounts.some((item) => item.email === email)
 }
 
 // FP-85 등 다른 기능의 mock이 토큰 주인의 사용자 정보를 바꿀 때 쓴다(예: 직군 저장). patch를 비우면 조회만 한다.
@@ -51,7 +56,8 @@ function maskLoginId(loginId) {
 }
 
 // 이메일 인증 토큰이 목적·이메일(재설정이면 아이디까지)과 맞는지 확인하고 맞으면 꺼내서 지운다(한 번만 사용).
-function consumeVerification(token, { purpose, email, loginId }) {
+// N-04-3 이메일 변경 mock도 이 함수로 인증 토큰을 확인한다.
+export function consumeVerification(token, { purpose, email, loginId }) {
   const saved = verifications.get(token)
   const matches = saved && saved.purpose === purpose && saved.email === email && (loginId === undefined || saved.loginId === loginId)
   if (!matches) throw new ApiError(400, '이메일 인증을 다시 진행해 주세요.')
@@ -73,10 +79,11 @@ registerMockHandlers({
   // 저장된 토큰으로 내 정보 조회(새로 가입한 계정 포함).
   'GET /api/auth/me': ({ token }) => ({ user: structuredClone(requireAccountByToken(token).user) }),
 
-  // N-02·N-03 인증코드 발송 — 가입 목적이면 이미 가입된 이메일을 막는다. 재설정 목적은 계정이 있는지 알려 주지 않는다.
+  // N-02·N-03 인증코드 발송 — 가입·이메일 변경(N-04-3) 목적이면 이미 가입된 이메일을 막는다. 재설정 목적은 계정이 있는지 알려 주지 않는다.
   'POST /api/auth/email/send': ({ body }) => {
     if (!isValidEmail(body?.email)) throw new ApiError(400, '이메일 형식이 올바르지 않습니다.')
-    if (body.purpose === EMAIL_PURPOSES.SIGNUP && accounts.some((item) => item.email === body.email)) {
+    const blocksUsedEmail = body.purpose === EMAIL_PURPOSES.SIGNUP || body.purpose === EMAIL_PURPOSES.CHANGE_EMAIL
+    if (blocksUsedEmail && accounts.some((item) => item.email === body.email)) {
       throw new ApiError(409, '이미 가입된 이메일입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_EMAIL })
     }
     sentCodes.set(`${body.purpose}:${body.email}`, Date.now() + MOCK_EMAIL_CODE_TTL_SECONDS * 1000)
