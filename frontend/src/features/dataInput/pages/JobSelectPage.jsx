@@ -8,7 +8,7 @@ import { isAdmin } from '../../../common/config/roles.js'
 import { saveJobType } from '../api/dataInputApi.js'
 import { DATA_INPUT_PATHS } from '../dataInputPaths.js'
 
-// N-08 직군 선택 화면 — 직군이 없는 일반 사용자가 세 직군 중 하나를 골라 저장하면 데이터 입력 화면으로 보낸다.
+// N-05-1 직군 선택 화면 — 직군이 없는 일반 사용자가 세 직군 중 하나를 골라 저장하면 데이터 입력 화면으로 보낸다.
 // 이미 직군이 있거나 관리자면 첫 화면으로 보낸다(직군 변경은 팀 결정 전이라 만들지 않는다).
 export default function JobSelectPage() {
   const { user, updateUser } = useAuth()

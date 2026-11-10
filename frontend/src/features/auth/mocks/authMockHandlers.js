@@ -10,6 +10,7 @@ import {
   MOCK_EMAIL_CODE,
   MOCK_EMAIL_CODE_TTL_SECONDS,
 } from './authMockData.js'
+import { mockLinkKeys } from './socialLoginMockData.js'
 
 // N-01~N-03 mock 계정 목록 — 메모리에만 있어 새로고침하면 가입자는 사라진다. password가 null이면 비밀번호를 비교하지 않는다(데모 계정).
 const accounts = [
@@ -28,6 +29,11 @@ function requireAccountByToken(token) {
   const account = accounts.find((item) => toMockToken(item.user.userId) === token)
   if (!account) throw new ApiError(401, '로그인이 필요합니다.')
   return account
+}
+
+// N-01-6 소셜 로그인 mock이 아이디로 계정을 찾을 때 쓴다. 없으면 undefined.
+export function findMockAccount(loginId) {
+  return accounts.find((item) => item.loginId === loginId)
 }
 
 // FP-85 등 다른 기능의 mock이 토큰 주인의 사용자 정보를 바꿀 때 쓴다(예: 직군 저장). patch를 비우면 조회만 한다.
@@ -105,7 +111,12 @@ registerMockHandlers({
     if (accounts.some((item) => item.email === body.email)) {
       throw new ApiError(409, '이미 가입된 이메일입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_EMAIL })
     }
+    // N-01-6 소셜 계정으로 가입하면 임시 연결 키가 함께 온다. 이메일 인증을 통과한 뒤에 키를 지운다.
+    if (body.socialLinkKey !== undefined && !mockLinkKeys.has(body.socialLinkKey)) {
+      throw new ApiError(400, '소셜 로그인을 처음부터 다시 진행해 주세요.')
+    }
     consumeVerification(body.emailVerificationToken, { purpose: EMAIL_PURPOSES.SIGNUP, email: body.email })
+    mockLinkKeys.delete(body.socialLinkKey)
     const userId = `u-${body.loginId}`
     accounts.push({
       loginId: body.loginId,
@@ -114,7 +125,7 @@ registerMockHandlers({
       email: body.email,
       phone: normalizePhone(body.phone),
       ageGroup: body.ageGroup,
-      user: { userId, name: body.name, role: ROLES.USER, jobType: null },
+      user: { userId, name: body.name, role: ROLES.USER, jobType: null, hasScore: false },
     })
     return { userId }
   },
