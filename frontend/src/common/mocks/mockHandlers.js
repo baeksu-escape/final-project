@@ -12,6 +12,7 @@ export function requireMockUser(token) {
 
 // 'METHOD 경로' → 처리 함수. 처리 함수는 { body, token }을 받아 응답 본문을 돌려준다.
 // TODO(D-20) 응답은 감싸지 않은 본문 그대로다.
+// 아래 기본 인증 응답은 공통 틀 확인용이다. features/auth의 mock이 등록되면 로그인·내 정보 응답을 덮어쓴다.
 const handlers = {
   'POST /api/auth/login': ({ body }) => {
     if (!body?.loginId || !body?.password) {

@@ -28,6 +28,7 @@ export default function EditableList({
 }) {
   const canAdd = maxItems === undefined || items.length < maxItems
 
+  // 항목 추가·삭제·수정 — 항상 바뀐 새 목록을 만들어 부모에 넘긴다.
   const handleAdd = () => onChange([...items, { ...createItem(), id: createItemId() }])
   const handleRemove = (id) => onChange(items.filter((item) => item.id !== id))
   const handleUpdate = (id, patch) => onChange(items.map((item) => (item.id === id ? { ...item, ...patch } : item)))

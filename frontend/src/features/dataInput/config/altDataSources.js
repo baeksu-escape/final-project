@@ -1,4 +1,4 @@
-// N-05 대안 데이터 모의 연동 설정 — 실제 외부 기관은 호출하지 않고 [불러오기]로 더미 데이터를 가져온다.
+// N-05-6 대안 데이터 모의 연동 설정(4종) — 실제 외부 기관은 호출하지 않고 [불러오기]로 더미 데이터를 가져온다.
 //   apiSegment: 요청 경로의 일부(/api/members/me/alt-data/{apiSegment}/import)
 //   columns: 결과 표의 열. format은 'money'(원) | 'count'(건) | 없음(그대로)
 export const ALT_DATA_SOURCES = Object.freeze([
@@ -23,12 +23,21 @@ export const ALT_DATA_SOURCES = Object.freeze([
     ],
   },
   {
-    key: 'socialInsurance',
-    label: '국민연금·건강보험료 납부 내역',
-    apiSegment: 'social-insurance',
+    key: 'nationalPension',
+    label: '국민연금 납부 내역',
+    apiSegment: 'national-pension',
     columns: [
       { key: 'month', label: '월' },
-      { key: 'insuranceType', label: '구분' },
+      { key: 'paidAmount', label: '납부 금액', format: 'money' },
+      { key: 'paymentStatus', label: '납부 상태' },
+    ],
+  },
+  {
+    key: 'healthInsurance',
+    label: '건강보험료 납부 내역',
+    apiSegment: 'health-insurance',
+    columns: [
+      { key: 'month', label: '월' },
       { key: 'paidAmount', label: '납부 금액', format: 'money' },
       { key: 'paymentStatus', label: '납부 상태' },
     ],
