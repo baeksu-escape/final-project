@@ -1,0 +1,85 @@
+/* 공통 디자인 토큰 — 색·글꼴 변수. 기본은 화이트 테마이고, html에 data-theme="dark"를 달면 블랙 테마가 된다.
+   값은 'Avenue 기능 데모 v2' UI 기준이다. 테마를 바꾸는 코드는 여기에 없다. */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: light;
+  --bg: #f0eee9;
+  --panel: #ebe8de;
+  --panel2: #e4e1d8;
+  --inp: #faf9f6;
+  --line: #c1bdb3;
+  --line2: #aaa69c;
+  --sel: #dbeee6;
+  --fg: #24221e;
+  --fg2: #38352f;
+  --mut: #5c5951;
+  --mut2: #726f67;
+  --mint: #277b68;
+  --vio: #7954d4;
+  --vio2: #6a46c4;
+  --pri: #bde9dc;
+  --pri2: #a9dfcf;
+  --pri-fg: #1b4e43;
+  --warn: #8a6828;
+  --bad: #974646;
+  --info: #2a6a9a;
+  --link: #2a5a8f;
+  --acc: #277b68;
+
+  /* 안내 박스·오버레이 */
+  --note-bg: #f0ecfb;
+  --note-line: #cfc4ef;
+  --note-fg: #4a36a0;
+  --warn-bg: #fbf3dc;
+  --warn-line: #e6cf93;
+  --warn-fg: #6b4b00;
+  --ok-bg: #e1f3ea;
+  --ok-line: #a9d9c3;
+  --ok-fg: #145a43;
+  --overlay: #2b28204d;
+  --float-bg: #fbfaf6;
+  --shadow: 0 12px 32px rgba(60, 50, 30, 0.2);
+
+  --f-d: 'DM Sans', 'Noto Sans KR', sans-serif;
+  --f-b: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --panel: #131f37;
+  --panel2: #0f1a30;
+  --inp: #0c1527;
+  --line: #22314b;
+  --line2: #2d3e5c;
+  --sel: #1b2944;
+  --fg: #eaf1fa;
+  --fg2: #cfd8e6;
+  --mut: #a7b4c6;
+  --mut2: #8a9bb4;
+  --mint: #00e6a5;
+  --vio: #a78bfa;
+  --vio2: #c4b5fd;
+  --pri: #6d3ee8;
+  --pri2: #7b50f0;
+  --pri-fg: #ffffff;
+  --warn: #fbbf24;
+  --bad: #ff8d7d;
+  --info: #38bdf8;
+  --link: #9db8ff;
+  --acc: #00e6a5;
+
+  --note-bg: #17123a;
+  --note-line: #3b2f7a;
+  --note-fg: #c4b5fd;
+  --warn-bg: #2a2210;
+  --warn-line: #6b5420;
+  --warn-fg: #fde6a8;
+  --ok-bg: #0d2a26;
+  --ok-line: #145a48;
+  --ok-fg: #a7f3d8;
+  --overlay: #050a16b3;
+  --float-bg: #1f2d4d;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
