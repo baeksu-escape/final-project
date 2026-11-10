@@ -87,7 +87,7 @@ export function validateFinancialInput(values, sections, { checkRequired = true,
 }
 
 // FP-86 N-05 입력 안내 — 섹션 설정에 notice(값)가 있으면 그 안내 문구를 { 섹션 key: 문구 }로 모은다.
-// 오류가 아니므로 저장을 막지 않는다(예: 월별 소득 6개월 미만 '정보 부족').
+// 오류가 아니므로 저장을 막지 않는다(예: N-05-7 월별 소득의 남은 달 수).
 export function getInputNotices(values, sections) {
   const notices = {}
   for (const section of sections) {

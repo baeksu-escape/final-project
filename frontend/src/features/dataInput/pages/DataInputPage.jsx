@@ -1,24 +1,27 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { PATHS } from '../../../common/config/navigation.js'
-import { fetchFinancialInput, saveFinancialInput } from '../api/dataInputApi.js'
+import { fetchFinancialInput, requestScoreCalculation, saveFinancialInput } from '../api/dataInputApi.js'
 import AltDataImport from '../components/AltDataImport.jsx'
 import FieldControl from '../components/FieldControl.jsx'
 import InputStatus from '../components/InputStatus.jsx'
 import SectionFields from '../components/SectionFields.jsx'
 import SectionList from '../components/SectionList.jsx'
+import { isInputComplete } from '../config/completionItems.js'
 import { BASE_MONTH_FIELD, getSectionsForJob } from '../config/inputSections.js'
-import { buildPayload, createEmptyValues, toValues } from '../utils/inputValues.js'
+import { buildPayload, createEmptyValues, toValues, withFixedMonthRows } from '../utils/inputValues.js'
+import { monthRule } from '../validation/inputRules.js'
 import { errorKeyOf, getInputNotices, validateFinancialInput } from '../validation/inputValidation.js'
 import { fromServerFieldErrors } from '../validation/serverErrors.js'
 
-// N-05 데이터 입력 화면 — 내 직군의 소득 섹션과 공통 섹션(부채·자산·고정지출·기타 지출)을 설정대로 그리고,
+// N-05 데이터 입력 화면 — 내 직군의 소득 섹션과 공통 섹션(부채·자산·월 고정 지출·할부·정기결제)을 설정대로 그리고,
 // 기준월과 함께 저장한 뒤 입력 완료 현황을 보여 준다. 대안 데이터는 모의 연동으로 따로 불러온다.
 // FP-86: 잘못된 값은 입력 즉시, 빈 필수 칸은 첫 저장 시도 뒤부터 칸 옆에 오류를 보여 주고, 오류가 있으면 저장 버튼을 막는다.
 export default function DataInputPage() {
-  const { user } = useAuth()
+  const { user, updateUser } = useAuth()
+  const navigate = useNavigate()
   const sections = useMemo(() => getSectionsForJob(user.jobType), [user.jobType])
 
   const [values, setValues] = useState(() => createEmptyValues(sections))
@@ -32,7 +35,9 @@ export default function DataInputPage() {
   const [formError, setFormError] = useState('')
   const [justSaved, setJustSaved] = useState(false)
   const [serverErrors, setServerErrors] = useState({})
-  const [savedBaseMonth, setSavedBaseMonth] = useState(null)
+  const [savedBaseMonths, setSavedBaseMonths] = useState([])
+  const [calculating, setCalculating] = useState(false)
+  const [calculateError, setCalculateError] = useState('')
 
   // 들어오면 저장된 입력과 완료 현황, 불러온 대안 데이터를 받아 화면을 채운다.
   useEffect(() => {
@@ -43,8 +48,8 @@ export default function DataInputPage() {
         if (result.input) {
           setValues(toValues(result.input, sections))
           setSavedAt(result.input.savedAt)
-          setSavedBaseMonth(result.input.baseMonth)
         }
+        setSavedBaseMonths(result.savedBaseMonths ?? [])
         setStatus(result.status)
         setAltData(result.altData ?? {})
       })
@@ -62,10 +67,10 @@ export default function DataInputPage() {
   // 입력할 때마다 다시 검사한다. 빈 필수 칸 오류는 처음 저장을 시도한 뒤부터 넣고, 서버가 돌려준 칸 오류도 함께 보여 준다.
   const errors = { ...validateFinancialInput(values, sections, { checkRequired: submitted }), ...serverErrors }
   const errorCount = Object.keys(errors).length
-  // 오류가 아닌 안내(월별 소득 6개월 미만 '정보 부족' 등). 저장은 막지 않는다.
+  // N-05-7 오류가 아닌 안내(월별 소득의 남은 달 수). 지금 입력 중인 값으로 세고, 저장은 막지 않는다.
   const notices = getInputNotices(values, sections)
-  // 이미 저장한 기준월로 다시 저장하려 하면 덮어쓴다고 알려 준다.
-  const willOverwrite = savedBaseMonth !== null && savedBaseMonth === values.baseMonth && !justSaved
+  // 이미 저장한 기준월로 다시 저장하려 하면 덮어쓴다고 알려 준다. 입력은 기준월별로 저장된다(D-16).
+  const willOverwrite = savedBaseMonths.includes(values.baseMonth) && !justSaved
 
   // 고친 칸의 서버 오류만 지운다 — key가 errorKey와 같거나 'errorKey.'로 시작하는 오류(줄 섹션이면 그 섹션 전체)를 뺀다.
   const clearServerErrors = (errorKey) =>
@@ -80,16 +85,31 @@ export default function DataInputPage() {
     clearServerErrors(errorKey)
   }
   // 기준월·칸 섹션·줄 섹션의 값이 바뀔 때 부르는 함수들 — 바뀐 부분만 새 값으로 바꾼다.
-  const handleBaseMonthChange = (baseMonth) => change((prev) => ({ ...prev, baseMonth }), BASE_MONTH_FIELD.key)
+  // N-05-2 기준월이 바뀌면(형식이 맞고 미래가 아닐 때) 월별 소득 12줄을 새 기준월에 맞춘다. 줄이 바뀌므로 서버 칸 오류는 모두 지운다.
+  const handleBaseMonthChange = (baseMonth) => {
+    change((prev) => {
+      const next = { ...prev, baseMonth }
+      return monthRule(baseMonth) ? next : withFixedMonthRows(next, sections)
+    }, BASE_MONTH_FIELD.key)
+    setServerErrors({})
+  }
+  // 칸 섹션은 칸 하나만, 줄 섹션은 목록 전체를 새 값으로 바꾼다.
   const handleFieldChange = (sectionKey) => (fieldKey, fieldValue) =>
     change(
       (prev) => ({ ...prev, [sectionKey]: { ...prev[sectionKey], [fieldKey]: fieldValue } }),
       errorKeyOf(sectionKey, fieldKey),
     )
   const handleListChange = (sectionKey) => (items) => change((prev) => ({ ...prev, [sectionKey]: items }), sectionKey)
+  // N-05-8 "대출 없음" 체크 — 체크하면 입력해 둔 줄을 비운다.
+  const handleNoItemsChange = (sectionKey) => (checked) =>
+    change(
+      (prev) => ({ ...prev, noItems: { ...prev.noItems, [sectionKey]: checked }, [sectionKey]: checked ? [] : prev[sectionKey] }),
+      sectionKey,
+    )
 
   // 저장 — 검사를 통과하면 요청 본문(모든 섹션에 기준월)을 보내고, 응답의 완료 현황으로 화면을 바꾼다.
   // 서버가 400과 칸별 오류(fieldErrors)를 주면 해당 칸 옆에 보여 주고, 칸을 찾지 못한 오류는 폼 아래 문구에 붙인다.
+  // TODO(D-20) { code, message, fieldErrors }는 팀 공통 형식이 정해지지 않은 임시 형식이다.
   const handleSubmit = async (event) => {
     event.preventDefault()
     setSubmitted(true)
@@ -101,7 +121,7 @@ export default function DataInputPage() {
       const result = await saveFinancialInput(buildPayload(values, sections, user.jobType))
       setStatus(result.status)
       setSavedAt(result.savedAt)
-      setSavedBaseMonth(values.baseMonth)
+      setSavedBaseMonths(result.savedBaseMonths ?? [])
       setServerErrors({})
       setJustSaved(true)
     } catch (error) {
@@ -117,6 +137,20 @@ export default function DataInputPage() {
   const handleAltImported = (sourceKey, result) => {
     setAltData((prev) => ({ ...prev, [sourceKey]: result }))
     setStatus((prev) => (prev ? { ...prev, altData: { ...prev.altData, [sourceKey]: true } } : prev))
+  }
+
+  // N-05-8 [점수 산출하기] — 마지막으로 저장한 입력으로 산출을 요청하고, 성공하면 신용 리포트로 보낸다.
+  const handleCalculateScore = async () => {
+    setCalculating(true)
+    setCalculateError('')
+    try {
+      await requestScoreCalculation()
+      updateUser({ hasScore: true })
+      navigate(PATHS.REPORT)
+    } catch (error) {
+      setCalculateError(error.message)
+      setCalculating(false)
+    }
   }
 
   if (loading) return <p className="data-input-page__loading">저장된 입력을 불러오는 중입니다.</p>
@@ -145,8 +179,9 @@ export default function DataInputPage() {
               section={section}
               items={values[section.key]}
               onChange={handleListChange(section.key)}
+              noItems={values.noItems[section.key]}
+              onNoItemsChange={handleNoItemsChange(section.key)}
               errors={errors}
-              notice={notices[section.key]}
             />
           ) : (
             <SectionFields
@@ -183,8 +218,22 @@ export default function DataInputPage() {
         )}
       </form>
 
-      <InputStatus sections={sections} status={status} savedAt={savedAt} />
+      <InputStatus status={status} savedAt={savedAt} notices={notices} />
       <AltDataImport baseMonth={values.baseMonth} imported={altData} onImported={handleAltImported} />
+
+      <button
+        type="button"
+        className="data-input-page__calculate"
+        onClick={handleCalculateScore}
+        disabled={calculating || !isInputComplete(status)}
+      >
+        {calculating ? '산출 중…' : '점수 산출하기'}
+      </button>
+      {calculateError && (
+        <p className="data-input-page__calculate-error" role="alert">
+          {calculateError}
+        </p>
+      )}
 
       <Link to={PATHS.REPORT} className="data-input-page__next-link">
         신용 리포트로 이동

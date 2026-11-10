@@ -35,6 +35,7 @@ function toErrorKey(path, values) {
 }
 
 // 서버 fieldErrors를 화면 오류로 바꾼다 → { errors: { 화면 오류 key: 문구 }, unmatched: [화면에서 칸을 찾지 못한 문구] }
+// TODO(D-20) fieldErrors는 팀 공통 형식이 정해지지 않은 임시 형식이다.
 export function fromServerFieldErrors(fieldErrors, values) {
   const errors = {}
   const unmatched = []

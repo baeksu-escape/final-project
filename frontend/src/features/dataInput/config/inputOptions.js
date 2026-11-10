@@ -9,7 +9,13 @@ export const LOAN_SECTOR_OPTIONS = Object.freeze([
   { value: '6', label: '보험' },
 ])
 
-// 기타 지출 종류 선택지. TODO(D-20) 백엔드 코드값이 정해지면 value를 맞춘다.
+// N-05-3 대출 금리 방식 선택지. TODO(D-20) 백엔드 코드값이 정해지면 value를 맞춘다.
+export const LOAN_RATE_TYPE_OPTIONS = Object.freeze([
+  { value: 'FIXED', label: '고정' },
+  { value: 'VARIABLE', label: '변동' },
+])
+
+// 할부·정기결제 종류 선택지. TODO(D-20) 백엔드 코드값이 정해지면 value를 맞춘다.
 export const OTHER_EXPENSE_CATEGORY_OPTIONS = Object.freeze([
   { value: 'INSURANCE', label: '보험료' },
   { value: 'EDUCATION', label: '교육비' },
