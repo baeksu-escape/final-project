@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Card } from '../../../common/components/index.js'
 import { fetchMyProfile, requestUnmaskProfile } from '../api/myPageApi.js'
 import AccountManageCard from '../components/AccountManageCard.jsx'
+import DiagnosisHistoryTable from '../components/DiagnosisHistoryTable.jsx'
 import MyProfileCard from '../components/MyProfileCard.jsx'
 
 // N-04 마이페이지 — 내 정보(N-04-1·N-04-2), 계정 관리(N-04-3) 카드와 진단 내역(FP-92) 자리를 보여 준다.
@@ -56,8 +57,10 @@ export default function MyPage() {
       )}
       <MyProfileCard profile={profile} unmasked={unmasked} onUnmask={handleUnmask} />
       <AccountManageCard onSaved={() => setReloadKey((key) => key + 1)} />
-      {/* N-04-6 진단 내역 자리 — FP-92에서 이 카드 안에 진단 내역 표를 넣는다. */}
-      <Card title="진단 내역" className="my-page-history-card" />
+      {/* N-04-6 진단 내역 — 지난 평가를 최신순 표로 보여 준다(FP-92). */}
+      <Card title="진단 내역" className="my-page-history-card">
+        <DiagnosisHistoryTable />
+      </Card>
     </section>
   )
 }
