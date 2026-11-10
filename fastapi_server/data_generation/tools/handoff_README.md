@@ -1,8 +1,8 @@
-# 학습용 합성 데이터 v3.5.12 — 이것부터 보세요
+# 학습용 합성 데이터 v3.5.13 — 이것부터 보세요
 
-모든 값은 합성 데이터다. 성능 수치는 실제 예측력의 근거가 아니다. 저장소의 생성 코드 v3.5.12(`fastapi_server/data_generation/`)를 기본 설정으로 생성했다.
+모든 값은 합성 데이터다. 성능 수치는 실제 예측력의 근거가 아니다. 저장소의 생성 코드 v3.5.13(`fastapi_server/data_generation/`)를 기본 설정으로 생성했다.
 
-이 묶음은 v3.5.12 코드로 다시 생성했다. 데이터 파일(`1_model/`, `2_detail/`, `3_reference/`)의 값은 v3.5.10 묶음과 같고, 바뀐 것은 문서(이 README, `docs/`)다. `3_reference/legacy/validation.json`은 실행 환경 기록(numpy·pandas 버전)만 다르다. 본문의 서비스 정책(회원 월 입력 12개월, 등급 상태·점수 범위)은 v3.5.12 기준이다.
+이 묶음은 v3.5.13 코드로 생성한다. **기본 학습은 12개월(role=feature), 6개월은 보존·참고용(compatibility_only)**이다. 기존 원천·6개월 파일·열·값은 유지하고 12개월 집계와 독립 이상치 기록을 추가했다. 새 12개월 10열은 라벨 앞에 추가하며 라벨은 맨 끝쪽에 둔다. 씬파일의 `eval_future_credit_exposure`는 기존처럼 두 라벨 뒤 마지막 열이다. 기존 열 값·상대 순서는 유지한다.
 
 이 폴더는 저장소의 `fastapi_server/data/training/`에 두는 것을 전제로 한다. 압축 푸는 위치와 폴더 구조는 저장소의 `fastapi_server/data/README.md`에 있다.
 
@@ -10,10 +10,10 @@
 
 | 파일 | 행 | 열 | 내용 |
 |---|---:|---:|---|
-| `1_model/legacy_model_table.csv` | 12,000 | 242 | 기존 집단. 고객 한 줄 = 207열 + 6개월 소득·지출 집계 + 간편결제·사회보험·통신·공과금 집계 + 라벨 2개 |
-| `1_model/thinfile_model_table.csv` | 2,400 | 251 | 금융이력 부족 집단(4개 cohort × 600명). 같은 형식 + 씬파일 전용 열 |
+| `1_model/legacy_model_table.csv` | 12,000 | 252 | 기존 집단. 고객 한 줄 = 207열 + 기본 12개월 소득·지출 집계 + 보존·참고용 6개월 집계 + 간편결제·사회보험·통신·공과금 집계 + 라벨 2개 |
+| `1_model/thinfile_model_table.csv` | 2,400 | 261 | 금융이력 부족 집단(4개 cohort × 600명). 같은 형식 + 씬파일 전용 열 |
 
-열마다 역할이 `1_model/model_table_columns.csv`에 있다(`id`, `group`, `feature`, `label`, `eval_only`). **`feature`인 열만 모델에 넣는다.**
+열마다 역할이 `1_model/model_table_columns.csv`에 있다(`id`, `group`, `feature`, `label`, `eval_only`, `compatibility_only`). **`feature`인 열만 모델에 넣는다.**
 
 ## 서비스 회원에게도 있는 피처만 들어 있다
 
@@ -22,19 +22,19 @@
 | 모델 표의 피처 | 회원 쪽 원천 |
 |---|---|
 | 207열(`CB`, `SP`, 연체·대출·카드 집계 등) | 신용평가사 API (`credit_bureau_responses`) |
-| `*_6m` 소득·지출·상환 집계 | 회원 월 입력 12개월 중 최근 완결 6개월(2026-03~2026-08) |
-| 간편결제·국민연금·건강보험 집계(12개월), `dp_amount_to_income_6m` | 간편결제·공공보험 API (+ 회원 소득 입력) |
+| `*_12m` 소득·지출·상환 집계 | 회원 월 입력 최근 완결 12개월(2025-09~2026-08), 기본 학습 |
+| 간편결제·국민연금·건강보험 집계(12개월), `dp_amount_to_income_12m` | 간편결제·공공보험 API (+ 회원 소득 입력) |
 | 통신·공과금 미납(12개월) | 통신·공과금 API |
 | 대출·카드 수, 현재 상환예정액 | 금융 API |
 | 직군, 나이 | 회원 정보 |
 
-회원은 소득을 12개월 입력하지만(v3.5.11, 이전 6개월), 회원 입력으로 만드는 모델 표 집계는 최근 6개월로 계산했다(`*_6m`, `2_detail/*/input_features_6m.csv`). 집계 값은 v3.5.10과 같다. API로 받는 정보는 회원 부담이 없어 12개월 그대로다.
+회원 입력과 기본 모델 집계는 모두 12개월이다. `2_detail/*/input_features_12m.csv`를 기본 학습에 쓰며, `input_features_6m.csv`와 기존 6개월 열 11개는 값 그대로 보존·참고용으로만 남긴다. 숫자 열 전체를 학습하지 말고 역할표에서 `role == "feature"`만 고른다.
 
 **모델 표에서 뺀 열.** 원천 파일(`2_detail/`)에는 그대로 있다. 서비스용 모델에는 쓰지 않는다.
 
 | 뺀 열 | 이유 |
 |---|---|
-| `annual_income_krw`, `annual_debt_service_krw`, `dsr`, `expense_ratio`, `income_cv`, `income_decile`, `deficit_months`, `zero_income_months`, `worst_month_net_cash_krw`, `snapshot_dsr`, `dp_amount_to_income` | 12개월 소득 기준. 같은 뜻의 6개월 열로 바꿨다 |
+| `annual_income_krw`, `annual_debt_service_krw`, `dsr`, `expense_ratio`, `income_cv`, `income_decile`, `deficit_months`, `zero_income_months`, `worst_month_net_cash_krw`, `snapshot_dsr`, `dp_amount_to_income` | 기존 연간·스냅샷·설계 열은 그대로 제외한다. 서비스에서 같은 수식으로 만드는 명시적 12개월 열 11개만 새로 추가했다 |
 | `asset_total_krw`, `liquid_assets_krw`, `net_assets_krw`, `annual_shortfall_krw`, `ending_liquid_balance_krw`, `min_liquid_balance_krw`, `months_liquid_negative`, `shortfall_to_liquid_ratio`, `exceeds_drawdown_limit`, `liquid_assets_insufficient` | 회원이 자산을 입력하지 않는다 |
 | `PRE_LMT`, `PRE_RT` | 대출 신청 때 금융사가 제시한 한도·금리. 회원에게 없다(씬파일은 원래 항상 0인 자리표시자라 이전부터 뺐다) |
 
@@ -66,7 +66,7 @@
 - 씬파일에서 신용이력이 없어 관측되지 않은 값(`CB`, `SP`, `DQ1200001`, `KC5000016`, `CL0631905`)은 빈 값이다. 0으로 채우지 않는다. 원본의 자리표시자 중 등급 미산출 `CB=5`는 빈 값으로 바꿨고, 항상 0인 `PRE_LMT`·`PRE_RT`는 씬파일 표에서 뺐다.
 - 정시납부율(`np_on_time_rate`, `hi_on_time_rate`)은 납부 의무가 없으면 빈 값이다(정보 없음 ≠ 나쁜 기록).
 - 대출 0건·잔액 0·소득 0원인 달은 실제 0이다.
-- **6개월 입력 열(`income_6m_krw`, `expense_6m_krw`, `debt_service_6m_krw`)의 결측·이상치는 일부러 넣은 것이다.** 결측(빈 값), 단위 착오(원래 값 × 1,000), 음수 상환액이 조금씩 섞여 있고, 이 세 열은 `feature`이므로 **학습 전에 결측 처리와 이상치 처리를 해야 한다.** 넣은 칸과 원래 값은 `3_reference/*/anomaly_log.csv`에 있다. 이 기록은 전처리가 제대로 잡아냈는지 확인하는 정답지이며 모델 입력에 쓰지 않는다. 파생 비율 열(`dsr_6m` 등)은 깨끗한 값 그대로라 입력 열과 맞지 않는 칸이 있다.
+- **기본 12개월 입력 열(`income_12m_krw`, `expense_12m_krw`, `debt_service_12m_krw`)의 결측·이상치는 일부러 넣은 것이다.** 결측(빈 값), 단위 착오(원래 값 × 1,000), 음수 상환액이 조금씩 섞여 있고, 이 세 열은 `feature`이므로 **학습 전에 결측 처리와 이상치 처리를 해야 한다.** 넣은 칸과 원래 값은 `3_reference/*/anomaly_log_12m.csv`에 있다. 이 기록은 전처리가 제대로 잡아냈는지 확인하는 정답지이며 모델 입력에 쓰지 않는다. 파생 비율 열(`dsr_12m` 등)은 깨끗한 값 그대로라 입력 열과 맞지 않는 칸이 있다. 6개월의 기존 주입 값과 `anomaly_log.csv`도 보존하지만 기본 학습에서는 6개월 열을 제외한다.
 
 ## 나머지 폴더
 
@@ -74,7 +74,7 @@
 |---|---|
 | `2_detail/legacy`, `2_detail/thinfile` | 피처를 새로 만들 때. 월별 소득·지출, 간편결제 월자료, 사회보험 월자료, 대출·카드·연체 원장, 그리고 모델 표를 만든 원본 표 |
 | `3_reference/` | 생성 설계값·요약·점검 결과, AUC 상승 측정(`nonfinancial_label_lift/`). **모델 입력 금지** |
-| `docs/` | `DATA_DICTIONARY.csv`(모든 필드), 생성 규칙 문서 |
+| `docs/` | `DATA_DICTIONARY.csv`(모든 필드), 생성 규칙 문서, `CHANGES.md`(버전별 변경 이력) |
 
 ## 다시 만들기
 
@@ -87,4 +87,4 @@
 - 직군 코드는 원본 값 `wage/selfemp/freelance`다(서비스 코드 `EMPLOYEE/SELF_EMPLOYED/FREELANCER`).
 - 대출 상환 일정(`loan_extension/`, 약 440MB)은 크기 때문에 뺐다. 필요하면 `data_generation/`에서 `python -m generate.build_loan_extension`으로 만든다.
 - 권장 재현 환경은 `requirements.txt`의 고정 버전(numpy 2.3.5·pandas 2.2.3·scipy 1.17.0·scikit-learn 1.8.0)이다. 다른 버전으로 다시 만들면 소수점 마지막 자리가 다를 수 있다.
-- 이번 묶음(v3.5.12)의 실제 생성 환경은 Python 3.11.9·numpy 2.4.6·pandas 3.0.5·scipy 1.17.1·scikit-learn 1.9.1이다(`3_reference/legacy/validation.json`에 numpy·pandas 버전 기록). 데이터 파일 값은 v3.5.10 묶음(고정 버전 환경)과 같다.
+- 이번 묶음(v3.5.13)의 실제 생성 환경은 Python 3.11.9·numpy 2.4.6·pandas 3.0.5·scipy 1.17.1·scikit-learn 1.9.1이다(`3_reference/legacy/validation.json`에 numpy·pandas 버전 기록). 기존 원천·6개월 값 보존 결과와 실행 검증은 provenance.json 및 작업 로그에 기록한다.

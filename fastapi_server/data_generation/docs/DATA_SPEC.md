@@ -48,9 +48,9 @@
 
 기존 집단 12,000명은 모두 등급이 있다. 180일 기준 등은 이 프로젝트의 설계 가정이며 공식 신용평가 조건이 아니다. CB는 교육용 등급이고 공식 신용점수가 아니다.
 
-## 6개월 입력 집계 (v3.5.7)
+## 6개월 입력 집계 (v3.5.7, 현재 보존·참고용)
 
-서비스 회원은 최근 완결 12개월(2025-09~2026-08)의 소득·생활지출·상환액을 입력한다(v3.5.11, v3.5.7~v3.5.10은 6개월). 모델 표의 입력 기반 집계는 그중 **최근 6개월(2026-03~2026-08)**로 계산한다. 기간은 `reference/service_dummy_anchors.json`의 `members.model_feature_months`가 정하며, 회원 입력 기간(`members.input_months`)의 마지막 6개월이어야 한다. 학습한 모델을 회원에게 그대로 쓰려면 같은 기간의 값으로 학습해야 하므로, 두 집단 모두 `input_features_6m.csv`를 만든다(`generate/build_input_features_6m.py`, 검증 `verify/verify_input_features_6m.py`). v3.5.11에서 회원 입력 기간이 늘었어도 이 파일의 기간·값은 바뀌지 않았다.
+서비스 회원은 최근 완결 12개월(2025-09~2026-08)의 소득·생활지출·상환액을 입력한다(v3.5.11, v3.5.7~v3.5.10은 6개월). v3.5.13부터 기본 학습은 아래 12개월 집계다. 기존 **최근 6개월(2026-03~2026-08)** 집계는 값·열·파일을 보존하고 참고용(`compatibility_only`)으로만 남긴다. 기간은 `reference/service_dummy_anchors.json`의 `members.model_feature_months_6m`가 정하며, 회원 입력 기간(`members.input_months`)의 마지막 6개월이어야 한다. 기존 결과와 비교할 수 있도록 두 집단 모두 `input_features_6m.csv`를 만든다(`generate/build_input_features_6m.py`, 검증 `verify/verify_input_features_6m.py`). v3.5.11에서 회원 입력 기간이 늘었어도 이 파일의 기간·값은 바뀌지 않았다.
 
 | 열 | 정의 |
 |---|---|
@@ -70,9 +70,28 @@
   | `negative` | `debt_service_6m_krw` | 0.3% | 원래 값 × −1 (원래 값이 0이 아닌 칸만) |
 
   한 칸에는 하나만 넣고, 라벨·위험도와 무관한 별도 seed의 난수로 뽑는다. 단위 착오도 원래 값이 0인 칸은 바뀌지 않으므로 뽑지 않는다. 파생 비율 열(`expense_ratio_6m`, `dsr_6m` 등)은 깨끗한 값으로 계산된 그대로라서 입력 열과 맞지 않는 칸이 있다(실제 데이터에서도 흔한 모습). `age`와 다른 파일은 바꾸지 않았다.
-- 원천 월자료(`monthly_history.csv`)와 `profiles.csv`의 12개월 집계는 바꾸지 않는다. 다만 전달 묶음의 **모델 표에는 12개월 소득 집계 대신 6개월 집계가 들어간다.** 모델 표에서 뺀 열과 이유는 학습 묶음 README(`tools/handoff_README.md`)에 있다.
+- 원천 월자료(`monthly_history.csv`)와 `profiles.csv`의 12개월 집계는 바꾸지 않는다. 전달 묶음의 **모델 표에는 두 기간이 모두 있지만 기본 학습은 12개월(`feature`), 6개월은 보존·참고용(`compatibility_only`)이다.** 모델 표에서 뺀 열과 이유는 학습 묶음 README(`tools/handoff_README.md`)에 있다.
 - 간편결제·사회보험·통신·공과금처럼 외부 API로 받는 정보는 회원 부담이 없으므로 12개월 집계를 그대로 쓴다.
 - 라벨(향후 12개월 연체)은 예측 기간이며 입력 기간과 별개라 그대로다. 비금융 효과 라벨은 12개월 원천으로 만든 "실제로 일어난 일" 역할이고 바꾸지 않았다.
+
+## 12개월 입력 집계 (v3.5.13, 기본 학습)
+
+**12개월이 기본 학습이며 6개월은 보존·참고용(compatibility_only)이다.** 각 집단의 `input_features_12m.csv`를 `generate/build_input_features_12m.py`로 만들고 `verify/verify_input_features_12m.py`로 독립 재계산한다. 기간은 `members.model_feature_months` = `members.input_months`의 연속 12개월(2025-09~2026-08)이다. 6개월 값을 두 배로 늘리지 않고 원천 월별 값을 합산한다. 누락·중복 월과 미관측 소득·지출·상환액은 거부한다.
+
+| 열 | 정의 |
+|---|---|
+| `income_12m_krw`, `expense_12m_krw`, `debt_service_12m_krw` | 12개월 실제 합계 |
+| `expense_ratio_12m`, `dsr_12m` | 12개월 지출·상환 합계 / 같은 기간 소득 합계. 소득 합이 0이면 null |
+| `income_cv_12m` | 월소득 모집단 표준편차(ddof=0) / 평균. 평균 0이면 null |
+| `zero_income_months_12m`, `deficit_months_12m` | 소득 0인 달 수, 소득 − 생활지출 − 상환액이 음수인 달 수 |
+| `worst_month_net_cash_12m_krw` | 위 월 현금흐름의 최솟값 |
+| `dp_payment_amount_12m_krw`, `dp_amount_to_income_12m` | 같은 12개월 간편결제 금액 합계, 해당 금액 / 소득 합계(소득 0이면 null) |
+
+간편결제는 기존 6개월 집계와 같은 이용 금액 정책으로 집계하고 거래 행이 없는 고객은 0으로 둔다. 서비스에서는 관측 여부를 확인한 원천을 전달해야 하며 미수집을 이용 0으로 바꾸는 정책을 추가하지 않는다.
+
+`reference/anomaly_injection_12m.json`의 별도 seed 20261113으로 전처리 시연용 결측·이상치를 넣는다. 소득·지출·상환 합계에 결측 각각 1%, 소득·지출 합계에 단위 착오(×1,000) 각각 0.5%, 상환 합계에 음수(×−1) 0.3%다. 기존과 같은 교육용 가정이며 한 칸에는 하나만, 라벨과 독립적으로 주입한다. 로그는 각 폴더 `anomaly_log_12m.csv`, 전달 위치는 `3_reference/*/anomaly_log_12m.csv`다. 비율·CV 등 파생 열은 주입 전 깨끗한 값이므로 오염된 합계와 불일치할 수 있다. 로그의 원래 값은 전처리 검증 정답지이며 학습에 넣지 않는다. 기존 6개월 주입 설정·로그·값은 유지한다.
+
+모델 표의 기존 열 값·상대 순서는 유지하고 12개월 집계 11열 중 새 10열을 라벨 앞에 추가한다(간편결제 금액 12개월 열은 기존 위치·값 유지). 라벨은 맨 끝쪽에 두고, 씬파일의 `eval_future_credit_exposure`는 기존처럼 두 라벨 뒤 마지막 열로 유지한다. `model_table_columns.csv`에서 기존 6개월 11열은 `compatibility_only`, 12개월 집계 11열(기존 간편결제 금액 열 포함)은 모두 `feature`다. 기본 학습에는 `role == "feature"`인 열만 쓰고, 서비스 추론에도 같은 열 순서·수식·단위·전처리를 적용한다. 기존 profiles의 연간 열과 자산·설계·스냅샷 열을 이번 변경으로 일괄 학습 허용하지 않는다.
 
 ## 반올림 규칙 (v3.5.8)
 
@@ -94,6 +113,7 @@
 | 간편결제·사회보험 원천(v3.5.0) | `digital_payment_monthly.csv`, `social_insurance_monthly.csv`, `nonfinancial_source_features.csv`(두 폴더 각각, `NONFINANCIAL_SOURCES.md`) |
 | 비금융 효과 라벨 | `data/labels_nonfinancial.csv`, `thinfile/labels_nonfinancial.csv` |
 | 6개월 입력 집계(v3.5.7) | `data/input_features_6m.csv`, `thinfile/input_features_6m.csv` (v3.5.10부터 결측·이상치 포함, 기록은 각 폴더 `anomaly_log.csv`) |
+| 12개월 입력 집계(기본 학습, v3.5.13) | `data/input_features_12m.csv`, `thinfile/input_features_12m.csv`, 각 `anomaly_log_12m.csv` |
 | 서비스 개발용 더미 | `service_dummy/` (학습에 쓰지 않는다, `SERVICE_DUMMY_DATA.md`) |
 | 생성 설계·참고 | `thinfile/plan.csv`, `availability.csv`, `target_metadata.csv`, `cohort_summary.csv`, `*_metadata.csv` |
 

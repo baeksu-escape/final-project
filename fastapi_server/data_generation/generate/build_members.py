@@ -2,8 +2,8 @@
 
 Source rows come from the thin-file generator run with a separate member seed in a
 temporary directory; labels and cohort design fields are dropped. Outputs go to
-service_dummy/members/, separate from data/ and thinfile/. v3.5.7: members enter only the latest
-6 complete months, and the credit fields a credit bureau would return (207 columns without the
+service_dummy/members/, separate from data/ and thinfile/. v3.5.11부터 회원 입력은 최근 완결
+12개월이며 학습용 집계 기간과 독립적이다. The credit fields a credit bureau would return (207 columns without the
 label source and offer placeholders, unobserved values null) are kept as a ledger for the
 dummy credit bureau API, with a utility (공과금) ledger for the dummy utility API.
 """
