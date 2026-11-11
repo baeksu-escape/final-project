@@ -46,12 +46,16 @@ export default function AppRoutes() {
 
           {/* 일반 사용자 전용 + 직군 선택 완료 — N-08-1 주 메뉴 9개와 헤더의 마이 페이지 */}
           <Route element={<RouteGuard requiredRole={ROLES.USER} requireJobType />}>
-            <Route path={PATHS.REPORT} element={<PlaceholderPage title="신용 리포트" nId="N-12" />} />
-            <Route path={PATHS.ASSET_DEBT} element={<PlaceholderPage title="자산·부채 건전성" nId="N-16" />} />
-            <Route path={PATHS.SCENARIO} element={<PlaceholderPage title="시나리오 테스트" nId="N-17" />} />
-            <Route path={PATHS.CASH_FLOW} element={<PlaceholderPage title="현금흐름·소득 변동성" nId="N-21·N-22" />} />
-            <Route path={PATHS.MARKET} element={<PlaceholderPage title="상권 분석" nId="N-24" />} />
-            <Route path={PATHS.SIMULATOR} element={<PlaceholderPage title="신용케어 시뮬레이터" nId="N-18" />} />
+            {/* 점수가 있어야 보는 화면 — 점수가 없으면 데이터 입력으로 보낸다(11/06 확정 UI) */}
+            <Route element={<RouteGuard requireScore />}>
+              <Route path={PATHS.REPORT} element={<PlaceholderPage title="신용 리포트" nId="N-12" />} />
+              <Route path={PATHS.ASSET_DEBT} element={<PlaceholderPage title="자산·부채 건전성" nId="N-16" />} />
+              <Route path={PATHS.SCENARIO} element={<PlaceholderPage title="시나리오 테스트" nId="N-17" />} />
+              <Route path={PATHS.CASH_FLOW} element={<PlaceholderPage title="현금흐름·소득 변동성" nId="N-21·N-22" />} />
+              <Route path={PATHS.MARKET} element={<PlaceholderPage title="상권 분석" nId="N-24" />} />
+              <Route path={PATHS.SIMULATOR} element={<PlaceholderPage title="신용케어 시뮬레이터" nId="N-18" />} />
+            </Route>
+            {/* 점수 없이도 여는 화면 */}
             <Route path={PATHS.LOANS} element={<PlaceholderPage title="대출 상품" nId="N-37" />} />
             <Route path={PATHS.COMPARISON} element={<PlaceholderPage title="비교 분석" nId="N-13·N-26" />} />
             <Route path={PATHS.LOUNGE} element={<PlaceholderPage title="신용 라운지" nId="N-06" />} />
