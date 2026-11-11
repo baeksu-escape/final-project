@@ -1,5 +1,14 @@
 -- ====================================================================
--- DDL 초안 (경환) · Oracle 21c, UTF-8 · 2026-11-09
+-- Avenue 서비스 DB DDL v0.3.1 (배포용 확정본) · Oracle 21c, UTF-8
+-- 상태: 확정 · 2026-11-11 · DB·데이터 관리자 범영 결정. 아래 결정은 팀 공유 후 저장소 문서에도 반영한다.
+--  - 서비스 DB 기준 DDL = 이 파일 (표 47개). 옛 dummy_db/ 14개 표(APP_MEMBER 계열)와 경환 v0.2(46개 표)를 대신한다 (D-05, 점검 결과 결정 5).
+--  - A-1 점수 범위 = 0~1000. 점수 CHECK와 등급 구간(CUT-0.1)이 이 범위를 쓴다. decisions.md의 "300~900"은 문서 담당자가 고쳐야 한다.
+--  - U2·U3·E2 = 아래 v0.3.1 내용으로 확정. E2(키 버전 접두어)는 우선 이대로 운영하고, 키 운영 방식이 정해지면 다시 확인한다.
+-- 실행: 빈 스키마에서 SQL Developer "스크립트 실행"(F5)으로 한 번에 실행한다. 마지막에 COMMIT이 있다.
+-- 적용 전에 바꿔야 하는 코드: 경환님 시드 생성기(표 47개, UNPAID 변환, "v1:" 접두어), A팀 Spring(UNPAID 변환, "v1:" 복호화).
+--   생성기를 고치기 전의 옛 시드는 CK_UTP_PAID_DATE에서 거절된다.
+-- ====================================================================
+-- (이력) DDL 초안 (경환) · Oracle 21c, UTF-8 · 2026-11-09
 -- 기준: 기능 명세서 v3 시트(사용 테이블 열의 이름을 따름)
 -- 참고: docs/spec/sql/dummy_db/01_create_tables.sql, 03_b_team_tables.sql(B팀)
 --
@@ -17,8 +26,29 @@
 --  B3 평가 요청 고유번호 ASSESSMENT.REQUEST_ID      B4 산출 불가 사유 DIM_NOT_SCORABLE_REASON
 --  B5 학습·검증·시험 구분 DATA_SPLIT_CODE 등        P1 데이터셋 버전 DATASET_VERSION, DATASET_CLEANING_LOG
 --  P2 모델 등록부 MODEL_REGISTRY, MODEL_ARTIFACT
---  미정(팀 확인 중, 이 DDL에서 바꾸지 않음): R1 지출·상환 월별 입력 여부, R2 신용평가사 응답 207개 원문 보관 여부.
+--  R1 (팀원 확인 반영) 소득만 달마다 12개월, 지출·대출·자산은 기준월 시점의 현재 값 한 세트. 지출은 평균 월 지출 금액(회원이 적는 평소 월 금액), 대출은 현재 월 원리금 한 값.
+--     모델 피처도 이 입력에 맞춘다 (피처 정의서·학습 데이터 정의에서 반영, DDL의 열 구조는 그대로).
+--  R2 (팀원 확인 반영) 신용평가사 응답 207개 항목용 테이블과 원문 저장은 만들지 않는다. 모델에 넘긴 값은 ASSESSMENT.FEATURE_SNAPSHOT(JSON)에만 보관.
 --  R4 단위(원·개월)는 컬럼 이름에 이미 반영돼 있어 DDL 변경 없음 (화면 문구만 수정).
+--  U1 (A팀 공과금 API 반영) USER_UTILITY_PAYMENT 신설. A팀 v3.5.7 공과금 응답이 통신 응답과 같은 형식(청구월, 청구액, 기한, 납부일, 상태)이라 통신비 표와 같은 구조로 만듦.
+--     모델 피처 utility_late_months(공과금 미납 개월 수)의 원천이다.
+--
+-- [v0.3 제안 · 범영 · 2026-11-11] 팀 공유·합의 전 초안. 경환님 브랜치(KGH_Work)의 더미 DB v0.2 DDL(46개 표)과 대조하고,
+--   서비스 입력·학습 데이터 v3.6.0 변경(커밋 설명)을 반영했다. 바꾼 곳에는 "v0.3 (항목번호)" 주석을 붙였다.
+--   구조 비교: 범영 v0.2(47개 표) 대비 표·열·인덱스 구조는 같다. 경환 v0.2(46개 표) 대비로는 USER_UTILITY_PAYMENT(U1) 1개가 늘었다.
+--   v0.3.1에서 CHECK 제약 2개(CK_UTP_PAID_DATE, CK_UUP_PAID_DATE)를 추가했다 (U3).
+--  E1 이름·휴대폰·이메일 암호문과 검색 HMAC의 저장 형식을 열 주석에 기록 (경환님 생성기 build_db_v02.py·README 기준)
+--  S1 더미 시드 규칙을 SOURCE_CODE 주석에 기록: 동의 회원 대출 = IMPORTED, 미동의 회원 대출 = MANUAL
+--
+-- [v0.3.1 확정 · 범영 · 2026-11-11] E2·U2·U3를 아래 내용으로 정했다. 바꾼 곳에는 "v0.3.1 (항목번호)" 주석을 붙였다.
+--  E2 (확정, 우선 운영) 암호문 앞에 키 버전 접두어를 붙인다: "v1:" + Base64(IV 12바이트 + 암호문 + 태그 16바이트).
+--     복호화할 때는 첫 ':' 앞의 버전으로 키를 고르고, 모르는 버전이면 오류로 멈춘다. 열 길이(500자)는 그대로 둔다.
+--     HMAC 열에는 접두어를 붙이지 않는다 (검색 값이라 키를 바꾸면 어차피 모두 다시 계산한다).
+--     바꿀 곳: 경환님 생성기 encrypt_text, Spring 암·복호화 코드.
+--  U2 (확정) utility_late_months는 LATE와 UNPAID를 모두 센다 (= 기한까지 내지 않은 달). 학습 데이터의 utility_late 정의와 같다.
+--  U3 (확정) 상태 뜻을 고정하고 통신비·공과금 두 표에 같은 CHECK를 넣는다.
+--     ON_TIME = 기한 안에 납부(납부일 <= 기한), LATE = 기한 뒤에 납부(납부일 > 기한), UNPAID = 기준일 현재 미납(납부일 NULL).
+--     바꿀 곳: 기관 응답의 "late + 납부일 없음"을 UNPAID로 바꿔 저장한다 (경환님 생성기 map_bill_rows, A팀 Spring 불러오기 코드).
 -- ====================================================================
 
 
@@ -137,11 +167,11 @@ COMMENT ON TABLE  APP_USER IS '회원·관리자 계정 (N-01~N-05, N-27)';
 COMMENT ON COLUMN APP_USER.LOGIN_ID IS '로그인 아이디';
 COMMENT ON COLUMN APP_USER.PASSWORD_HASH IS 'BCrypt 해시 (소셜 로그인 전용 계정만 NULL. 시연 계정도 해시를 저장하고 일반 로그인)';
 COMMENT ON COLUMN APP_USER.NICKNAME IS '닉네임 (2~12자, 중복 불가, 신용 라운지 작성자 표시)';
-COMMENT ON COLUMN APP_USER.NAME_ENC IS '이름 (AES 암호문)';
-COMMENT ON COLUMN APP_USER.PHONE_ENC IS '휴대폰 (AES 암호문)';
-COMMENT ON COLUMN APP_USER.PHONE_HMAC IS '휴대폰 검색용 HMAC (아이디 찾기)';
-COMMENT ON COLUMN APP_USER.EMAIL_ENC IS '이메일 (AES 암호문, 관리자는 업무 이메일)';
-COMMENT ON COLUMN APP_USER.EMAIL_HMAC IS '이메일 검색용 HMAC';
+COMMENT ON COLUMN APP_USER.NAME_ENC IS 'v0.3.1 (E1·E2) 이름 (AES-256-GCM 암호문. "v1:" + 표준 Base64로 저장한다. Base64 = 앞 12바이트 IV + 암호문 + 16바이트 인증 태그. v1은 키 버전이고, 값마다 새 난수 IV를 쓰며, 키는 DB에 두지 않는다)';
+COMMENT ON COLUMN APP_USER.PHONE_ENC IS 'v0.3.1 (E1·E2) 휴대폰 (AES-256-GCM 암호문. "v1:" + 표준 Base64로 저장한다. Base64 = 앞 12바이트 IV + 암호문 + 16바이트 인증 태그. v1은 키 버전이고, 값마다 새 난수 IV를 쓰며, 키는 DB에 두지 않는다)';
+COMMENT ON COLUMN APP_USER.PHONE_HMAC IS 'v0.3 (E1) 휴대폰 검색용 HMAC (아이디 찾기). HMAC-SHA256, 암호화와 다른 별도 키, 소문자 16진수 64자. 숫자만 남긴 값으로 계산한다';
+COMMENT ON COLUMN APP_USER.EMAIL_ENC IS 'v0.3.1 (E1·E2) 이메일 (관리자는 업무 이메일. AES-256-GCM 암호문. "v1:" + 표준 Base64로 저장한다. Base64 = 앞 12바이트 IV + 암호문 + 16바이트 인증 태그. v1은 키 버전이고, 값마다 새 난수 IV를 쓰며, 키는 DB에 두지 않는다)';
+COMMENT ON COLUMN APP_USER.EMAIL_HMAC IS 'v0.3 (E1) 이메일 검색용 HMAC. HMAC-SHA256, 암호화와 다른 별도 키, 소문자 16진수 64자. 앞뒤 공백을 지우고 소문자로 바꾼 값으로 계산한다';
 COMMENT ON COLUMN APP_USER.BIRTH_YEAR IS '출생연도 (1930~2006, 2026년 기준 20세 이상만 가입). 연령대는 이 값으로 계산. 관리자는 NULL 가능. TODO 상한 연도는 해마다 바뀌므로 최종 검사는 Spring에서';
 COMMENT ON COLUMN APP_USER.WORKER_TYPE_CODE IS '직군 (로그인 후 선택, 선택 전 NULL. N-05-1·N-04-8)';
 COMMENT ON COLUMN APP_USER.WORK_PERIOD_MONTHS IS '재직·운영·활동 기간 (개월, 소득 입력에서 받음)';
@@ -192,8 +222,8 @@ CREATE TABLE USER_CONSENT (
 );
 COMMENT ON TABLE  USER_CONSENT IS '동의 이력 (가입 필수 2·선택 1, 대안 데이터 항목별 정보 제공 동의). 철회해도 행을 지우지 않는다';
 COMMENT ON COLUMN USER_CONSENT.CONSENT_TYPE_CODE IS 'TERMS_OF_SERVICE·PRIVACY_COLLECTION=가입 필수, NOTIFICATION_MARKETING=가입 선택, ALT_DATA_PROVISION=대안 데이터 제공';
-COMMENT ON COLUMN USER_CONSENT.PROVIDER_CODE IS '제공 기관 (대안 데이터 동의만: telecom, payment, public-insurance 등)';
-COMMENT ON COLUMN USER_CONSENT.ITEM_CODE IS '제공 항목 (대안 데이터 동의만: TELECOM_BILL, EASYPAY, NATIONAL_PENSION, HEALTH_INSURANCE 등)';
+COMMENT ON COLUMN USER_CONSENT.PROVIDER_CODE IS '제공 기관 (대안 데이터 동의만: telecom, utility, payment, public-insurance 등)';
+COMMENT ON COLUMN USER_CONSENT.ITEM_CODE IS '제공 항목 (대안 데이터 동의만: TELECOM_BILL, UTILITY_BILL, EASYPAY, NATIONAL_PENSION, HEALTH_INSURANCE 등)';
 COMMENT ON COLUMN USER_CONSENT.EXTERNAL_CONSENT_ID IS '가상 기관(목 서버)이 발급한 동의 ID';
 COMMENT ON COLUMN USER_CONSENT.EXPIRES_AT IS '동의 만료 시각 (법적 최대 1년)';
 COMMENT ON COLUMN USER_CONSENT.WITHDRAWN_AT IS '동의 철회 시각 ([연결 해제])';
@@ -216,7 +246,7 @@ CREATE TABLE VERIFICATION_CODE (
     CONSTRAINT CK_VCD_CHANNEL CHECK (CHANNEL_CODE IN ('EMAIL', 'PHONE'))
 );
 COMMENT ON TABLE  VERIFICATION_CODE IS '인증코드 발송·확인 이력 (N-02-3, N-03-2, N-04-3, 관리자 2단계 인증)';
-COMMENT ON COLUMN VERIFICATION_CODE.TARGET_HMAC IS '받는 이메일·휴대폰의 HMAC (원문 저장 안 함)';
+COMMENT ON COLUMN VERIFICATION_CODE.TARGET_HMAC IS '받는 이메일·휴대폰의 HMAC (원문 저장 안 함). v0.3 (E1) 소문자 16진수 64자. APP_USER의 HMAC과 같은 방식으로 만들어야 대조가 맞는다 (권장)';
 COMMENT ON COLUMN VERIFICATION_CODE.USER_ID IS '대상 계정 (가입 전이면 NULL)';
 COMMENT ON COLUMN VERIFICATION_CODE.CODE_HASH IS '인증코드 해시 (원문 저장 안 함)';
 
@@ -225,6 +255,12 @@ COMMENT ON COLUMN VERIFICATION_CODE.CODE_HASH IS '인증코드 해시 (원문 �
 -- 3. 데이터 입력 (N-05) — 모든 입력은 기준월과 함께 저장 (D-16)
 -- 기준월 = 입력 범위의 가장 최근 달(기본값: 입력 시점의 지난달). 범위는 기준월 −11 ~ 기준월 12개월.
 -- 기준월은 따로 저장하지 않고 USER_INCOME_MONTH의 가장 늦은 BASE_MONTH로 정한다(11/10 결정).
+-- v0.2 (R1) 소득만 달마다 한 행씩 12개월(월별) 받는다. 지출·대출·자산은 달마다 12벌을 받지 않고, 기준월 시점의 현재 값 한 세트만 받는다.
+--   지출은 평균 월 지출 금액(USER_EXPENSE_ITEM.MONTHLY_AMT, 회원이 적는 평소 월 금액), 대출은 현재 월 원리금(USER_LOAN.MONTHLY_PAYMENT_AMT) 한 값이다.
+--   "한 세트" 규칙: 자산은 UNIQUE (USER_ID, BASE_MONTH)로 DB가 지킨다(회원당 한 행으로 막으면 D-16의 기준월별 저장과 충돌하므로 USER_ID만으로는 걸지 않는다).
+--   지출·대출은 항목이 여러 개라 DB 제약으로 못 막으므로, Spring이 같은 회원·같은 기준월의 기존 항목을 지우고 다시 넣는다(한 트랜잭션).
+-- v0.2 (R2) 신용평가사 응답 207개 항목용 테이블은 만들지 않고, 응답 원문도 저장하지 않는다. 모델에 넘긴 값만 ASSESSMENT.FEATURE_SNAPSHOT(JSON)에 둔다.
+--   피처 정의서의 원천 칸에는 "신용평가사 응답 항목 이름"을 적는다. 원문 보관이 필요해지면 "응답 원문 JSON + 보관 기한" 테이블 1개를 추가한다.
 -- ====================================================================
 
 -- N-05-2 소득. 자영업자·프리랜서는 최근 12개월 월별 소득, 급여소득자는 월급(보너스 제외).
@@ -278,8 +314,8 @@ COMMENT ON TABLE  USER_LOAN IS '보유 대출 (N-05-3, N-16-4 보유 대출 표,
 COMMENT ON COLUMN USER_LOAN.ANNUAL_RATE_PCT IS '연 금리 (%, 8.9 = 8.9%, 법정 최고금리 20% 이하). 가상 기관 응답(비율 0.089)은 저장할 때 ×100';
 COMMENT ON COLUMN USER_LOAN.RATE_TYPE_CODE IS '금리 방식 (FIXED=고정, VARIABLE=변동, UNKNOWN=불러온 자료에 없음)';
 COMMENT ON COLUMN USER_LOAN.LOAN_TYPE_CODE IS '대출 종류 (불러온 대출은 가상 기관 응답의 loanTypeCode)';
-COMMENT ON COLUMN USER_LOAN.MONTHLY_PAYMENT_AMT IS '월 원리금 (원, 연 원리금 = ×12로 DSR 계산)';
-COMMENT ON COLUMN USER_LOAN.SOURCE_CODE IS 'MANUAL=직접 입력, IMPORTED=가상 금융기관에서 불러옴';
+COMMENT ON COLUMN USER_LOAN.MONTHLY_PAYMENT_AMT IS '월 원리금 (원, 연 원리금 = ×12로 DSR 계산). v0.2 (R1): 현재 월 원리금 한 값만 받는다 (달마다 따로 받지 않는다)';
+COMMENT ON COLUMN USER_LOAN.SOURCE_CODE IS 'MANUAL=직접 입력, IMPORTED=가상 금융기관에서 불러옴. v0.3 (S1) 더미 시드: 동의 회원 대출=IMPORTED, 미동의 회원 대출=MANUAL';
 
 -- N-05-4 자산.
 CREATE TABLE USER_ASSET_SNAPSHOT (
@@ -318,6 +354,7 @@ COMMENT ON TABLE  USER_EXPENSE_ITEM IS '지출 항목 (N-05-5 월 고정 지출�
 COMMENT ON COLUMN USER_EXPENSE_ITEM.EXPENSE_GROUP_CODE IS 'FIXED=월 고정 지출, INSTALLMENT=할부, SUBSCRIPTION=정기결제, OTHER=기타 지출(N-21-3)';
 COMMENT ON COLUMN USER_EXPENSE_ITEM.EXPENSE_CATEGORY IS '종류 (식비, 교통, 공과금 등). 할부·정기결제처럼 화면에 종류 칸이 없으면 NULL';
 COMMENT ON COLUMN USER_EXPENSE_ITEM.DESCRIPTION IS '항목 이름 (예: 휴대폰 할부금)';
+COMMENT ON COLUMN USER_EXPENSE_ITEM.MONTHLY_AMT IS 'v0.2 (R1) 평균 월 지출 금액 (원, 평소 한 달에 쓰는 대표 금액을 회원이 적는다. 달마다 달라지는 항목도 평소 수준의 월 금액 하나만 받고, 12개월 값을 따로 받지 않는다)';
 
 -- N-05-6 대안 데이터: 통신비 납부.
 CREATE TABLE USER_TELECOM_PAYMENT (
@@ -339,12 +376,50 @@ CREATE TABLE USER_TELECOM_PAYMENT (
     CONSTRAINT CK_UTP_BILL_MONTH CHECK (REGEXP_LIKE(BILL_MONTH, '^\d{4}-(0[1-9]|1[0-2])$')),
     CONSTRAINT CK_UTP_AMT CHECK (BILLED_AMT >= 0),
     CONSTRAINT CK_UTP_STATUS CHECK (PAYMENT_STATUS_CODE IN ('ON_TIME', 'LATE', 'UNPAID')),
-    CONSTRAINT CK_UTP_SOURCE CHECK (SOURCE_CODE IN ('MANUAL', 'IMPORTED'))
+    CONSTRAINT CK_UTP_SOURCE CHECK (SOURCE_CODE IN ('MANUAL', 'IMPORTED')),
+    -- v0.3.1 (U3) 상태와 납부일이 서로 맞아야 한다. 공과금 표의 CK_UUP_PAID_DATE와 같은 규칙.
+    CONSTRAINT CK_UTP_PAID_DATE CHECK ((PAYMENT_STATUS_CODE = 'UNPAID' AND PAID_DATE IS NULL)
+                                       OR (PAYMENT_STATUS_CODE = 'ON_TIME' AND PAID_DATE IS NOT NULL AND PAID_DATE <= DUE_DATE)
+                                       OR (PAYMENT_STATUS_CODE = 'LATE' AND PAID_DATE IS NOT NULL AND PAID_DATE > DUE_DATE))
 );
 COMMENT ON TABLE  USER_TELECOM_PAYMENT IS '통신비 청구·납부 (대안 데이터, N-05-6, N-18-1 통신비 정시 납부 기간)';
+COMMENT ON COLUMN USER_TELECOM_PAYMENT.PAYMENT_STATUS_CODE IS 'v0.3.1 (U3) ON_TIME=기한 안에 납부, LATE=기한 뒤에 납부, UNPAID=기준일 현재 미납(납부일 NULL). 기관 응답의 "late + 납부일 없음"은 UNPAID로 저장한다';
 COMMENT ON COLUMN USER_TELECOM_PAYMENT.PAID_DATE IS '납부일 (미납이면 NULL)';
 COMMENT ON COLUMN USER_TELECOM_PAYMENT.CONSENT_ID IS '불러올 때 쓴 동의 (직접 입력이면 NULL)';
 COMMENT ON COLUMN USER_TELECOM_PAYMENT.BASE_DATE IS '기관 데이터 기준일';
+
+-- v0.2 (U1) N-05-6 대안 데이터: 공과금 납부. A팀 공과금 API 응답(통신과 같은 bills[] 형식)을 담는다. 통신비 표와 같은 구조.
+CREATE TABLE USER_UTILITY_PAYMENT (
+    UTILITY_PAYMENT_ID     NUMBER(19)           GENERATED BY DEFAULT ON NULL AS IDENTITY,
+    USER_ID                NUMBER(19)           NOT NULL,
+    BILL_MONTH             VARCHAR2(7 CHAR)     NOT NULL,
+    BILLED_AMT             NUMBER(15)           NOT NULL,
+    DUE_DATE               DATE                 NOT NULL,
+    PAID_DATE              DATE,
+    PAYMENT_STATUS_CODE    VARCHAR2(10 CHAR)    NOT NULL,
+    SOURCE_CODE            VARCHAR2(10 CHAR)    DEFAULT 'IMPORTED' NOT NULL,
+    CONSENT_ID             NUMBER(19),
+    BASE_DATE              DATE                 NOT NULL,
+    CREATED_AT             TIMESTAMP            DEFAULT SYSTIMESTAMP NOT NULL,
+    CONSTRAINT PK_USER_UTILITY_PAYMENT PRIMARY KEY (UTILITY_PAYMENT_ID),
+    CONSTRAINT UK_UUP_USER_MONTH UNIQUE (USER_ID, BILL_MONTH),
+    CONSTRAINT FK_UUP_USER FOREIGN KEY (USER_ID) REFERENCES APP_USER (USER_ID) ON DELETE CASCADE,
+    CONSTRAINT FK_UUP_CONSENT FOREIGN KEY (CONSENT_ID) REFERENCES USER_CONSENT (CONSENT_ID) ON DELETE SET NULL,
+    CONSTRAINT CK_UUP_BILL_MONTH CHECK (REGEXP_LIKE(BILL_MONTH, '^\d{4}-(0[1-9]|1[0-2])$')),
+    CONSTRAINT CK_UUP_AMT CHECK (BILLED_AMT >= 0),
+    CONSTRAINT CK_UUP_STATUS CHECK (PAYMENT_STATUS_CODE IN ('ON_TIME', 'LATE', 'UNPAID')),
+    CONSTRAINT CK_UUP_SOURCE CHECK (SOURCE_CODE IN ('MANUAL', 'IMPORTED')),
+    -- v0.3.1 (U3) 상태와 납부일이 서로 맞아야 한다. 통신비 표의 CK_UTP_PAID_DATE와 같은 규칙.
+    CONSTRAINT CK_UUP_PAID_DATE CHECK ((PAYMENT_STATUS_CODE = 'UNPAID' AND PAID_DATE IS NULL)
+                                       OR (PAYMENT_STATUS_CODE = 'ON_TIME' AND PAID_DATE IS NOT NULL AND PAID_DATE <= DUE_DATE)
+                                       OR (PAYMENT_STATUS_CODE = 'LATE' AND PAID_DATE IS NOT NULL AND PAID_DATE > DUE_DATE))
+);
+COMMENT ON TABLE  USER_UTILITY_PAYMENT IS 'v0.2 (U1) 공과금 청구·납부 (대안 데이터, N-05-6). 전기·가스·수도 합산 청구를 월 1행으로 받는다. 미납 개월 수 피처(utility_late_months)의 원천. v0.3.1 (U2) 이 피처는 12개월 안에서 LATE 또는 UNPAID인 달의 수(0~12, 학습 데이터 실제 분포 0~5)다. 학습 데이터의 utility_late(기한까지 내지 않은 달)와 같은 정의';
+COMMENT ON COLUMN USER_UTILITY_PAYMENT.BILLED_AMT IS 'v0.3 청구액 (원, 전기·가스·수도를 합친 한 달 금액)';
+COMMENT ON COLUMN USER_UTILITY_PAYMENT.PAYMENT_STATUS_CODE IS 'v0.3.1 (U3) ON_TIME=기한 안에 납부, LATE=기한 뒤에 납부, UNPAID=기준일 현재 미납(납부일 NULL). 통신비 표와 같은 값·규칙. 기관 응답의 "late + 납부일 없음"은 UNPAID로 저장한다';
+COMMENT ON COLUMN USER_UTILITY_PAYMENT.PAID_DATE IS '납부일 (미납이면 NULL)';
+COMMENT ON COLUMN USER_UTILITY_PAYMENT.CONSENT_ID IS '불러올 때 쓴 동의 (직접 입력이면 NULL)';
+COMMENT ON COLUMN USER_UTILITY_PAYMENT.BASE_DATE IS '기관 데이터 기준일';
 
 -- N-05-6 대안 데이터: 간편결제 이용.
 CREATE TABLE USER_EASYPAY_USAGE (
@@ -449,7 +524,7 @@ CREATE TABLE USER_CREDIT_PROFILE (
     CONSTRAINT CK_UCP_RECENT_DELINQ CHECK (RECENT_DELINQ_YN IN ('Y', 'N')),
     CONSTRAINT CK_UCP_SOURCE CHECK (SOURCE_CODE IN ('MANUAL', 'IMPORTED'))
 );
-COMMENT ON TABLE  USER_CREDIT_PROFILE IS 'CB 프로필 (N-12-2 입력, N-18-1 연체 횟수·신규 대출·카드 한도·카드 사용액·현금서비스 기간)';
+COMMENT ON TABLE  USER_CREDIT_PROFILE IS 'CB 프로필 (N-12-2 입력, N-18-1 연체 횟수·신규 대출·카드 한도·카드 사용액·현금서비스 기간). v0.2 (R2): 신용평가사 응답 원문(207개 항목)은 저장하지 않고 요약 열만 둔다. 모델에 넘긴 값은 ASSESSMENT.FEATURE_SNAPSHOT에 있다';
 COMMENT ON COLUMN USER_CREDIT_PROFILE.CB_GRADE IS '교육용 CB 등급 1~10 (공식 점수 아님, 서비스 3등급과 별개. 산출 불가면 NULL)';
 COMMENT ON COLUMN USER_CREDIT_PROFILE.DELINQ_COUNT_12M IS '최근 1년 30일 이상 연체 건수 (신용이력 없으면 NULL, 0과 구분)';
 COMMENT ON COLUMN USER_CREDIT_PROFILE.LOAN_BALANCE_AMT IS '신용평가사 기준 미상환 대출 총액 (원, USER_LOAN 합계와 출처·기준일이 다를 수 있음)';
@@ -716,7 +791,7 @@ COMMENT ON COLUMN ASSESSMENT.TRAD_SCORABLE_YN IS '기존 모델 산정 여부 (�
 COMMENT ON COLUMN ASSESSMENT.TRAD_DEFAULT_PROB IS '기존 모델 예상 부도 확률 (0~1)';
 COMMENT ON COLUMN ASSESSMENT.ALT_DEFAULT_PROB IS '대안 모델 예상 부도 확률 (0~1, 시뮬레이터 표시)';
 COMMENT ON COLUMN ASSESSMENT.SHAP_BASE_SCORE IS 'SHAP 기준점 (639는 시연용 예시)';
-COMMENT ON COLUMN ASSESSMENT.FEATURE_SNAPSHOT IS '산출 때 모델에 넘긴 피처 값 JSON (SHAP·시뮬레이터가 같은 값을 쓰도록 저장, SCORED면 필수). 시뮬레이터 입력 9개의 원래 값도 담는다. 빈 객체·필수 키 누락은 저장하는 쪽(Spring)에서 검사';
+COMMENT ON COLUMN ASSESSMENT.FEATURE_SNAPSHOT IS '산출 때 모델에 넘긴 피처 값 JSON (SHAP·시뮬레이터가 같은 값을 쓰도록 저장, SCORED면 필수). 시뮬레이터 입력 9개의 원래 값도 담는다. 빈 객체·필수 키 누락은 저장하는 쪽(Spring)에서 검사. v0.2 (R2): 신용평가사 응답 원문은 따로 저장하지 않으므로 이 JSON이 산출 근거의 유일한 기록이다. 개인 금융정보라 열람은 ACCESS_AUDIT_LOG에 남기고 접근 권한·마스킹을 적용한다';
 COMMENT ON COLUMN ASSESSMENT.ACTUAL_DEFAULT_YN IS '정답(부도 여부) 라벨 (합성 고객, N-25 성능 비교. 서비스 회원은 NULL). 라벨의 종류는 LABEL_TYPE_CODE로 구분한다';
 COMMENT ON COLUMN ASSESSMENT.LABEL_TYPE_CODE IS 'v0.2 (B5) 정답 라벨의 종류 (OBSERVED=실제 관측, SYNTHETIC=합성 규칙으로 만든 값). 합성 고객만, 서비스 회원은 NULL. 화면에 실제 연체로 보여 주기 전에 확인한다';
 COMMENT ON COLUMN ASSESSMENT.DATA_SPLIT_CODE IS 'v0.2 (B5) 합성 고객의 학습·검증·시험 구분 (TRAIN/VALID/TEST). 서비스 회원은 NULL. 분리 기준은 데이터 담당(범영)이 정하고 적재 스크립트가 채운다';
