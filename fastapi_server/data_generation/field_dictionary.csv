@@ -22,8 +22,8 @@ profiles,liquid_assets_insufficient,부족액이 유동자산 전부를 초과�
 profiles,ending_liquid_balance_krw,관측 12개월 말 유동자산 잔액 = 시작 유동자산 + 12개월 순현금; 음수면 자금 소진,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
 profiles,min_liquid_balance_krw,12개월 중 월말 유동자산 잔액의 최저값,원,provenance.json + reference/column_dictionary_207.csv + extension_config.json
 profiles,months_liquid_negative,월말 유동자산 잔액이 음수인 개월 수,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
-profiles,telecom_late_months,12개월 내 통신 미납월 수; 현 버전 0 또는 1,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
-profiles,utility_late_months,12개월 내 공과금 미납월 수; 현 버전 0 또는 1,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,telecom_late_months,"12개월 내 통신 미납월 수 (0~12, 실제 생성 분포 0~5)",정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
+profiles,utility_late_months,"12개월 내 공과금 미납월 수 (0~12, 실제 생성 분포 0~5)",정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
 profiles,telecom_on_time_streak,관측된 최근 12개월 창 내 연속 정시납부 개월 수,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
 profiles,label_any_delinquency_12m,기존 미래 연체월 수 > 0; 모델 입력 제외,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
 monthly_history,customer_id,기존 식별구분과 같은 가상 고객 ID,정의 참조,provenance.json + reference/column_dictionary_207.csv + extension_config.json
