@@ -50,7 +50,7 @@
 | `diagnosisId` | 진단 식별값 |
 | `calculatedAt` | 산출 일시(초까지, 화면은 분까지 표시) |
 | `jobType` | 진단 당시 직군 코드(화면은 급여소득자·자영업자·프리랜서) |
-| `existingScore`·`alternativeScore` | 기존·대안 모델 점수(300~900) |
+| `existingScore`·`alternativeScore` | 기존·대안 모델 점수(0~1000, 임시 D-01) |
 | `grade` | 대안 점수 등급 `GOOD`·`STANDARD`·`CAUTION`(화면은 Good·Standard·Caution) |
 | `alternativeScoreChange` | 바로 이전 진단 대비 대안 점수 차이(정수). 가장 오래된 진단은 `null`(화면은 "—") |
 | `modelVersion` | 모델 버전(화면에 보이지 않음) |
