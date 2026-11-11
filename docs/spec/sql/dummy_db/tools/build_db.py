@@ -3,6 +3,8 @@
 사용: python3 -I tools/build_db.py <service_dummy 폴더> <출력 db 폴더>  (데이터 패키지와 별도로 이 DB 묶음에 들어 있다)
 테이블 정의(TABLES) 한 곳에서 DDL, 시드, 검사를 모두 만든다.
 v2.2: 신용평가사·공과금 응답 정리 테이블, 서비스 등급 결과 틀(MEMBER_CREDIT_GRADE, 시드 없음), 월 입력 6개월.
+v2.3: 회원 월 입력 12개월(데이터 패키지 v3.5.11, N-22 비수기 판별). 테이블 구조는 그대로다.
+v2.4: 등급 상태 INSUFFICIENT_INPUT 제거(12개월 입력 필수, 덜 차면 산출하지 않음), 점수 범위·등급 경계 상수, SCORE 범위 CHECK.
 """
 import csv
 import json
@@ -20,6 +22,11 @@ JOB_COMMENT = "직군 코드 (EMPLOYEE=급여소득자, SELF_EMPLOYED=자영업�
 SECTOR_COMMENT = "업권 코드 (0 은행, 1 카드, 2 저축은행, 3 캐피탈, 4 대부, 5 상호금융, 6 보험)"
 YN = ["Y", "N"]
 MONTH_RE = r"^\d{4}-(0[1-9]|1[0-2])$"
+# v2.4: 서비스 점수 범위와 등급 경계(CAUTION < 665 ≤ STANDARD < 780 ≤ GOOD). 시연용 임시값이며 모형 학습 후 다시 정한다. TODO(D-01)
+SCORE_MIN, SCORE_MAX = 0, 1000
+GRADE_STANDARD_MIN, GRADE_GOOD_MIN = 665, 780
+GRADE_BAND_COMMENT = (f"서비스 등급 (GOOD {GRADE_GOOD_MIN}~{SCORE_MAX}, STANDARD {GRADE_STANDARD_MIN}~{GRADE_GOOD_MIN - 1}, "
+                      f"CAUTION {SCORE_MIN}~{GRADE_STANDARD_MIN - 1}점, 경계는 임시값. SCORED일 때만 값이 있음. 교육용 CB 등급과 별개)")
 
 
 def col(name, typ, comment, null=False, default=None, values=None, regex=None, rng=None, identity=False):
@@ -48,7 +55,7 @@ TABLES = [
         col("DUMMY_YN", "CHAR(1)", "더미 데이터 여부 (Y/N)", default="'N'", values=YN),
     ] + AUDIT, pk=["MEMBER_ID"], uks=[["MEMBER_CODE"], ["EMAIL"]], fks=[]),
 
-    dict(name="MEMBER_MONTHLY_INPUT", comment="회원이 입력한 월별 소득·지출·상환액 (최근 완결 6개월, v2.2)", cols=[
+    dict(name="MEMBER_MONTHLY_INPUT", comment="회원이 입력한 월별 소득·지출·상환액 (최근 완결 12개월, v2.3)", cols=[
         col("INPUT_ID", "NUMBER(19)", "월별 입력 ID (PK, 자동 증가)", identity=True),
         col("MEMBER_ID", "NUMBER(19)", "회원 ID (FK → APP_MEMBER)"),
         col("BASE_MONTH", "VARCHAR2(7 CHAR)", "입력 대상 월 (YYYY-MM)", regex=MONTH_RE),
@@ -228,14 +235,16 @@ TABLES = [
         fks=[("MEMBER_ID", "APP_MEMBER", "MEMBER_ID"), ("SOURCE_RESPONSE_ID", "EXTERNAL_API_RESPONSE", "RESPONSE_ID")]),
 
     dict(name="MEMBER_CREDIT_GRADE", seed=False,
-         comment="서비스 신용 등급 산정 결과 (v2.2 틀만 생성, 시드 없음. 점수 산식과 등급 구간은 모델 팀이 정한다. 산정할 때마다 한 행)", cols=[
+         comment="서비스 신용 등급 산정 결과 (v2.2 틀만 생성, 시드 없음. 점수 산식은 모델 팀이 정하고 등급 경계는 설정 상수(임시)다. 산정할 때마다 한 행)", cols=[
         col("GRADE_ID", "NUMBER(19)", "등급 산정 ID (PK, 자동 증가)", identity=True),
         col("MEMBER_ID", "NUMBER(19)", "회원 ID (FK → APP_MEMBER)"),
-        col("GRADE_STATUS_CODE", "VARCHAR2(20 CHAR)", "산정 상태 (SCORED=산정됨, NOT_SCORABLE=산정 불가: 점수 계산에 필요한 정보 없음, INSUFFICIENT_INPUT=입력 부족: 6개월 월 입력 미완료. 입력 부족을 먼저 판정)",
-            values=["SCORED", "NOT_SCORABLE", "INSUFFICIENT_INPUT"]),
-        col("GRADE_BAND_CODE", "VARCHAR2(10 CHAR)", "서비스 등급 (GOOD, STANDARD, CAUTION. SCORED일 때만 값이 있음. 교육용 CB 등급과 별개)", null=True,
+        # v2.4: 12개월 입력이 덜 차면 산출 요청을 막으므로 입력 부족 상태는 두지 않는다
+        col("GRADE_STATUS_CODE", "VARCHAR2(20 CHAR)", "산정 상태 (SCORED=산정됨, NOT_SCORABLE=산정 불가: 점수 계산에 필요한 정보 없음)",
+            values=["SCORED", "NOT_SCORABLE"]),
+        col("GRADE_BAND_CODE", "VARCHAR2(10 CHAR)", GRADE_BAND_COMMENT, null=True,
             values=["GOOD", "STANDARD", "CAUTION"]),
-        col("SCORE", "NUMBER(12,6)", "모델 점수 (산식·범위는 모델 팀이 정함, SCORED일 때만 값이 있음)", null=True),
+        col("SCORE", "NUMBER(12,6)", f"서비스 점수 ({SCORE_MIN}~{SCORE_MAX}, 산식은 모델 팀이 정함, SCORED일 때만 값이 있음)", null=True,
+            rng=(SCORE_MIN, SCORE_MAX)),
         col("MODEL_VERSION", "VARCHAR2(30 CHAR)", "점수를 낸 모델 버전 (SCORED일 때만)", null=True),
         col("SCORED_AT", "TIMESTAMP", "산정 일시", default="SYSTIMESTAMP"),
     ] + AUDIT, pk=["GRADE_ID"], uks=[],
@@ -479,12 +488,13 @@ N_API = 6
 resp_members = {(r["MEMBER_ID"], r["PROVIDER_TYPE_CODE"]) for r in rows["EXTERNAL_API_RESPONSE"]}
 if len(resp_members) != N_API * len(members) or len(rows["EXTERNAL_API_RESPONSE"]) != N_API * len(members):
     errors.append("회원별 금융·통신·간편결제·공공보험·신용평가사·공과금 응답이 1건씩이 아님")
-# v2.2: 회원 월 입력은 회원마다 같은 6개월
+# v2.3: 회원 월 입력은 회원마다 같은 12개월(v2.2는 6개월)
+INPUT_MONTH_COUNT = 12
 months_by = {}
 for r in rows["MEMBER_MONTHLY_INPUT"]:
     months_by.setdefault(r["MEMBER_ID"], set()).add(r["BASE_MONTH"])
-if len(months_by) != len(members) or any(len(v) != 6 or v != next(iter(months_by.values())) for v in months_by.values()):
-    errors.append("MEMBER_MONTHLY_INPUT이 회원마다 같은 6개월이 아님")
+if len(months_by) != len(members) or any(len(v) != INPUT_MONTH_COUNT or v != next(iter(months_by.values())) for v in months_by.values()):
+    errors.append(f"MEMBER_MONTHLY_INPUT이 회원마다 같은 {INPUT_MONTH_COUNT}개월이 아님")
 for tbl, fn, src_col, dst_col in (("MEMBER_PAYMENT_MONTHLY", "digital_payment_monthly.csv", "payment_amount_krw", "PAYMENT_AMT"),
                                   ("MEMBER_SOCIAL_INSURANCE", "social_insurance_monthly.csv", "paid_amount_krw", "PAID_AMT")):
     want, got2, cnt_w, cnt_g = {}, {}, {}, {}

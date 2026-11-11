@@ -1,8 +1,8 @@
 """Independent check of input_features_6m.csv (v3.5.7) in data/ and thinfile/. Read-only.
 
 Recomputes every column from monthly_history.csv and digital_payment_monthly.csv with a wide
-(customer x month) layout instead of the generator's group-by, and checks that the window equals
-the member input months in reference/service_dummy_anchors.json.
+(customer x month) layout instead of the generator's group-by. 집계 기간은 anchors의
+members.model_feature_months_6m(6개월)이고, 회원 입력 기간 members.input_months(v3.5.11부터 12개월) 안에 있어야 한다.
 """
 from pathlib import Path
 import json
@@ -13,8 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    months = json.loads((ROOT/'reference/service_dummy_anchors.json').read_text(encoding='utf-8'))['members']['input_months']['value']
+    members_cfg = json.loads((ROOT/'reference/service_dummy_anchors.json').read_text(encoding='utf-8'))['members']
+    months = members_cfg['model_feature_months_6m']['value']
+    member_months = sorted(members_cfg['input_months']['value'])
+    # 모델 집계 달은 회원 입력 달의 마지막 연속 6개월이어야 회원 데이터로 같은 집계를 만들 수 있다.
     assert len(months) == 6 and months == sorted(months) and months[-1] == '2026-08', months
+    assert months == member_months[-6:], ('model_feature_months_6m must be the last 6 input_months', months, member_months)
+    assert list(pd.period_range(months[0], months[-1], freq='M').strftime('%Y-%m')) == months, ('months must be consecutive', months)
     report = {'window': f'{months[0]}~{months[-1]}'}
     for folder in ('data', 'thinfile'):
         d = ROOT/folder
