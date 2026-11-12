@@ -1,4 +1,4 @@
-"""N-05·N-37 서비스 더미를 v0.2 DDL에 맞춰 검증한 뒤 별도 SQL 묶음으로 만든다.
+"""N-05·N-37 서비스 더미를 DDL v0.3.1 확정본(47개 표, 폴더 이름은 v0_2)에 맞춰 검증한 뒤 별도 SQL 묶음으로 만든다.
 
 환경변수 키가 없거나 DDL·원천 대조가 실패하면 출력 파일을 쓰지 않는다. 옛 생성기는 실행·수정하지 않는다.
 """
@@ -21,6 +21,12 @@ JOB_MAP = {'wage': 'EMPLOYEE', 'selfemp': 'SELF_EMPLOYED', 'freelance': 'FREELAN
 # N-37 시연용 최소점수 가정이다. 실제 금융기관의 심사 조건이 아니다.
 PRODUCT_MIN_SCORES = {'0': 780, '5': 665, '1': 0, '2': 0, '3': 0}
 LEGACY_TABLE_MARKERS = ('APP_MEMBER', 'MEMBER_MONTHLY_INPUT', 'MEMBER_LOAN', 'EXTERNAL_API_RESPONSE')
+DDL_TABLE_COUNT = 47  # v0.3.1 확정본
+KEY_VERSION = 'v1'  # v0.3.1 (E2) 암호문 키 버전 접두어
+# 시연 계정: 직군별로 회원 ID 정렬 후 첫 회원. 비밀번호 원문은 AVENUE_DEMO_PASSWORD에서만 받는다.
+DEMO_LOGIN_IDS = {'wage': 'demo_employee', 'selfemp': 'demo_self', 'freelance': 'demo_free'}
+DEMO_ADMIN_LOGIN_ID = 'demo_admin'  # N-01-5 관리자 시연 계정(새 행, 같은 시연 비밀번호)
+BCRYPT_ROUNDS = 10  # Spring BCryptPasswordEncoder 기본 cost, $2a$
 
 
 def sql_tokens(text):
@@ -363,12 +369,67 @@ def load_keys(environ=None):
     return tuple(keys)
 
 
+def repo_root():
+    """이 스크립트에서 위로 올라가며 .git이 있는 저장소 루트를 찾는다."""
+    here = Path(__file__).resolve()
+    for folder in here.parents:
+        if (folder/'.git').exists(): return folder
+    raise ValueError('저장소 루트(.git)를 찾지 못했습니다')
+
+
+def read_env_file(path):
+    """KEY=VALUE 형식 env 파일을 읽는다. 저장소 안 파일은 거부하고, 오류에 값은 넣지 않는다."""
+    target = Path(path).resolve(); root = repo_root()
+    if target == root or root in target.parents: raise ValueError('env 파일은 저장소 밖에 두어야 합니다')
+    values = {}
+    for line in target.read_text(encoding='utf-8-sig').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'): continue
+        name, sep, value = line.partition('=')
+        if not sep: raise ValueError('env 파일 형식은 KEY=VALUE여야 합니다')
+        values[name.strip()] = value.strip()
+    return values
+
+
+def load_demo_password(environ=None):
+    """N-01 시연 계정 비밀번호 원문을 AVENUE_DEMO_PASSWORD에서만 읽는다. 값은 오류에 넣지 않는다."""
+    environ = os.environ if environ is None else environ
+    value = environ.get('AVENUE_DEMO_PASSWORD')
+    if not value: raise ValueError('AVENUE_DEMO_PASSWORD(시연 계정 비밀번호)가 필요합니다')
+    if len(value.encode('utf-8')) > 72: raise ValueError('AVENUE_DEMO_PASSWORD는 BCrypt 한도 72바이트 이하여야 합니다')
+    return value
+
+
+def bcrypt_hash(password):
+    """Spring BCryptPasswordEncoder와 호환되는 $2a$ cost 10 해시를 만든다."""
+    import bcrypt
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(BCRYPT_ROUNDS, b'2a')).decode('ascii')
+
+
+def demo_members(members):
+    """직군별로 회원 ID 정렬 후 첫 회원을 시연 계정으로 고른다."""
+    chosen = {}
+    for m in sorted(members, key=lambda r: r['member_id']):
+        chosen.setdefault(m['segment'], m['member_id'])
+    if set(chosen) != set(DEMO_LOGIN_IDS): raise ValueError('직군마다 시연 회원이 1명씩 있어야 함')
+    return {code: DEMO_LOGIN_IDS[seg] for seg, code in chosen.items()}
+
+
 def encrypt_text(text, aes_key):
-    """N-02-4 UTF-8 값을 12바이트 난수 IV의 AES-256-GCM으로 암호화하고 Base64(IV+암호문+16바이트 태그)를 반환한다."""
+    """N-02-4 UTF-8 값을 12바이트 난수 IV의 AES-256-GCM으로 암호화하고 "v1:" + Base64(IV+암호문+16바이트 태그)를 반환한다(v0.3.1 E2)."""
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     if len(aes_key)!=32: raise ValueError('AES-256-GCM에는 32바이트 키가 필요합니다')
     iv = os.urandom(12)
-    return base64.b64encode(iv + AESGCM(aes_key).encrypt(iv, text.encode('utf-8'), None)).decode('ascii')
+    return KEY_VERSION + ':' + base64.b64encode(iv + AESGCM(aes_key).encrypt(iv, text.encode('utf-8'), None)).decode('ascii')
+
+
+def decrypt_text(value, keys_by_version):
+    """v0.3.1 (E2) 첫 ':' 앞 키 버전으로 키를 골라 복호화한다. 모르는 버전·접두어 없음은 오류로 멈춘다(Spring 참고용·테스트용)."""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    version, sep, body = value.partition(':')
+    if not sep or version not in keys_by_version: raise ValueError('알 수 없는 암호문 키 버전')
+    raw = base64.b64decode(body, validate=True)
+    return AESGCM(keys_by_version[version]).decrypt(raw[:12], raw[12:], None).decode('utf-8')
 
 
 def search_hmac(text, kind, hmac_key):
@@ -385,7 +446,7 @@ def read_csv(path):
 
 
 def read_responses(source, filename):
-    """허용된 종류의 더미 응답만 읽으며 공과금 파일은 읽지 않는다."""
+    """서비스 더미의 기관 응답 JSONL 한 종류를 읽는다."""
     with (source/'external_api'/filename).open(encoding='utf-8-sig') as handle:
         return [json.loads(line) for line in handle if line.strip()]
 
@@ -410,8 +471,14 @@ def allocate_current_payment(total, loans):
     return values
 
 
+def bill_status(row):
+    """v0.3.1 (U3) 기관 응답의 "late + 납부일 없음"을 UNPAID로 바꾼다. 상태와 납부일이 맞는지는 DDL CHECK로 검사한다."""
+    status = row['payment_status'].upper()
+    return 'UNPAID' if status == 'LATE' and not row['paid_date'] else status
+
+
 def map_bill_rows(responses, ids, consent_ids, item_code, as_of):
-    """N-05-6 공통 청구·납부 모양을 변환한다. 공과금은 DDL 개정 뒤 같은 함수에 연결할 수 있다."""
+    """N-05-6 통신비·공과금 공통 청구·납부 모양을 변환한다. 동의 회원만 IMPORTED 행으로 만든다."""
     result = []
     for js in responses:
         code=js['member_id']
@@ -420,12 +487,12 @@ def map_bill_rows(responses, ids, consent_ids, item_code, as_of):
         for row in js['bills']:
             result.append(dict(USER_ID=ids[code], BILL_MONTH=row['bill_month'], BILLED_AMT=int(row['billed_amount_krw']),
                 DUE_DATE=dt.date.fromisoformat(row['due_date']), PAID_DATE=dt.date.fromisoformat(row['paid_date']) if row['paid_date'] else None,
-                PAYMENT_STATUS_CODE=row['payment_status'].upper(), SOURCE_CODE='IMPORTED', CONSENT_ID=consent_ids[code,item_code], BASE_DATE=as_of))
+                PAYMENT_STATUS_CODE=bill_status(row), SOURCE_CODE='IMPORTED', CONSENT_ID=consent_ids[code,item_code], BASE_DATE=as_of))
     return result
 
 
-def build_seed_rows(source, tables, base_rows, keys):
-    """N-05·N-37 기존 서비스 원천을 v0.2 행으로 매핑한다. 개인정보는 메모리에서 바로 암호화한다."""
+def build_seed_rows(source, tables, base_rows, keys, demo_password=None):
+    """N-05·N-37 기존 서비스 원천을 v0.3.1 행으로 매핑한다. 개인정보는 메모리에서 바로 암호화하고, 시연 계정 3명만 BCrypt 해시를 넣는다."""
     source = Path(source); aes_key, hmac_key = keys
     members = read_csv(source/'members/members.csv')
     inputs = read_csv(source/'members/member_monthly_inputs.csv')
@@ -439,6 +506,8 @@ def build_seed_rows(source, tables, base_rows, keys):
     if len(ids)!=len(members) or len(set(ids.values()))!=len(ids): raise ValueError('회원 ID 원천 중복')
     if any(m['external_data_consent'] not in ('0','1') for m in members): raise ValueError('회원 시작 동의 상태는 0 또는 1이어야 함')
     consenting = {m['member_id'] for m in members if m['external_data_consent']=='1'}
+    demo = demo_members(members) if demo_password is not None else {}
+    if set(demo.values()) & {m['member_id'].lower() for m in members}: raise ValueError('시연 아이디가 다른 회원과 겹침')
     loans_by = {}
     for loan in read_csv(source/'members/ledgers/loans.csv'):
         if loan['member_id'] not in ids: raise ValueError('대출 원장의 회원 범위 불일치')
@@ -456,7 +525,7 @@ def build_seed_rows(source, tables, base_rows, keys):
         generated[table].append(row)
         return row.get(id_col)
 
-    items = [('financial','LOANS'),('telecom','TELECOM_BILL'),('payment','EASYPAY'),
+    items = [('financial','LOANS'),('telecom','TELECOM_BILL'),('utility','UTILITY_BILL'),('payment','EASYPAY'),
              ('public-insurance','NATIONAL_PENSION'),('public-insurance','HEALTH_INSURANCE'),('credit-bureau','CREDIT_PROFILE')]
     for member in members:
         code = member['member_id']; uid = ids[code]; signup = dt.datetime.fromisoformat(member['signup_date'])
@@ -475,7 +544,8 @@ def build_seed_rows(source, tables, base_rows, keys):
         current = ordered[-1]
         # 이름·휴대폰은 회원 ID에서 만든 합성값이다. 원문을 SQL·오류·로그에 남기지 않는다.
         name = f'합성회원{uid:06d}'; phone = f'010{uid:08d}'
-        add('APP_USER', dict(USER_ID=uid, LOGIN_ID=code.lower(), PASSWORD_HASH=None, NICKNAME=member['nickname'],
+        add('APP_USER', dict(USER_ID=uid, LOGIN_ID=demo.get(code, code.lower()),
+            PASSWORD_HASH=bcrypt_hash(demo_password) if code in demo else None, NICKNAME=member['nickname'],
             NAME_ENC=encrypt_text(name,aes_key), PHONE_ENC=encrypt_text(phone,aes_key), PHONE_HMAC=search_hmac(phone,'phone',hmac_key),
             EMAIL_ENC=encrypt_text(member['email'],aes_key), EMAIL_HMAC=search_hmac(member['email'],'email',hmac_key),
             BIRTH_YEAR=int(member['birth_year']), WORKER_TYPE_CODE=JOB_MAP[member['segment']], WORK_PERIOD_MONTHS=None,
@@ -522,6 +592,8 @@ def build_seed_rows(source, tables, base_rows, keys):
             add('USER_LOAN',row,'LOAN_ID')
     for row in map_bill_rows(read_responses(source,'telecom_responses.jsonl'),ids,consent_ids,'TELECOM_BILL',as_of):
         add('USER_TELECOM_PAYMENT',row,'TELECOM_PAYMENT_ID')
+    for row in map_bill_rows(read_responses(source,'utility_responses.jsonl'),ids,consent_ids,'UTILITY_BILL',as_of):
+        add('USER_UTILITY_PAYMENT',row,'UTILITY_PAYMENT_ID')
     for js in read_responses(source,'payment_responses.jsonl'):
         code=js['member_id']
         if code not in consenting: continue
@@ -595,6 +667,14 @@ def build_seed_rows(source, tables, base_rows, keys):
             offer['RATE_AVG_PCT']=((minimum+maximum)/2).quantize(Decimal('.001'),rounding=ROUND_HALF_UP)
         else: missing.append('SCORE_BAND_OFFER.RATE_AVG_PCT')
         add('SCORE_BAND_OFFER',offer)
+    if demo_password is not None:
+        # N-01-5 관리자 시연 계정: 더미 회원을 바꾸지 않고 새 행으로 추가한다. 회원 데이터 행(동의·소득 등)은 만들지 않는다.
+        admin_name, admin_email = '시연 관리자', 'demo-admin@avenue.example'
+        add('APP_USER', dict(USER_ID=max(ids.values())+1, LOGIN_ID=DEMO_ADMIN_LOGIN_ID, PASSWORD_HASH=bcrypt_hash(demo_password),
+            NICKNAME='시연관리자', NAME_ENC=encrypt_text(admin_name,aes_key), PHONE_ENC=None, PHONE_HMAC=None,
+            EMAIL_ENC=encrypt_text(admin_email,aes_key), EMAIL_HMAC=search_hmac(admin_email,'email',hmac_key),
+            BIRTH_YEAR=None, WORKER_TYPE_CODE=None, WORK_PERIOD_MONTHS=None, ROLE_CODE='ROLE_ADMIN',
+            ACCOUNT_STATUS_CODE='ACTIVE', DUMMY_YN='Y', CREATED_AT=dt.datetime.combine(as_of, dt.time())))
     for name in rows: rows[name].extend(generated[name])
     source_checks(source,members,inputs,generated,ids)
     return rows, generated, sorted(set(missing))
@@ -603,7 +683,12 @@ def build_seed_rows(source, tables, base_rows, keys):
 def source_checks(source, members, inputs, generated, ids):
     """N-05 회원 ID·소득·평균 지출·대출 잔액·대안 원장 값을 독립적으로 대조한다."""
     by_uid={v:k for k,v in ids.items()}; consenting={m['member_id'] for m in members if m['external_data_consent']=='1'}
-    if {r['USER_ID'] for r in generated['APP_USER']}!=set(ids.values()): raise ValueError('회원 ID 원천 대조 실패')
+    users=[r for r in generated['APP_USER'] if r['ROLE_CODE']=='ROLE_USER'];admins=[r for r in generated['APP_USER'] if r['ROLE_CODE']!='ROLE_USER']
+    if {r['USER_ID'] for r in users}!=set(ids.values()) or len(users)!=len(ids): raise ValueError('회원 ID 원천 대조 실패')
+    if len(admins)>1 or any(r['USER_ID'] in ids.values() or r['LOGIN_ID']!=DEMO_ADMIN_LOGIN_ID or r['ROLE_CODE']!='ROLE_ADMIN' for r in admins): raise ValueError('관리자 시연 계정 대조 실패')
+    admin_ids={r['USER_ID'] for r in admins}
+    for table,table_rows in generated.items():
+        if table!='APP_USER' and any(r.get('USER_ID') in admin_ids for r in table_rows): raise ValueError('관리자 시연 계정에 회원 데이터 행이 있음')
     for m in members:
         code=m['member_id']; uid=ids[code]; original=[r for r in inputs if r['member_id']==code]
         expected=[r for r in original if m['segment']!='wage' or r['month']==BASE_MONTH]
@@ -624,9 +709,12 @@ def source_checks(source, members, inputs, generated, ids):
     for r in generated['USER_LOAN']:
         code=by_uid[r['USER_ID']];actual[code]=actual.get(code,0)+r['BALANCE_AMT']
     if expected!=actual: raise ValueError('대출 잔액 원장 대조 실패')
-    telecom={(r['member_id'],r['month']):r['telecom_late']=='1' for r in read_csv(source/'members/ledgers/telecom_monthly.csv') if r['member_id'] in consenting}
-    got={(by_uid[r['USER_ID']],r['BILL_MONTH']):r['PAYMENT_STATUS_CODE']=='LATE' for r in generated['USER_TELECOM_PAYMENT']}
-    if got!=telecom: raise ValueError('통신 연체 원장 대조 실패')
+    # v0.3.1 (U2) 미납 = LATE + UNPAID. 달마다, 그리고 합계로 원장과 맞춘다.
+    for filename,col,table in [('telecom_monthly.csv','telecom_late','USER_TELECOM_PAYMENT'),('utility_monthly.csv','utility_late','USER_UTILITY_PAYMENT')]:
+        ledger={(r['member_id'],r['month']):r[col]=='1' for r in read_csv(source/'members/ledgers'/filename) if r['member_id'] in consenting}
+        got={(by_uid[r['USER_ID']],r['BILL_MONTH']):r['PAYMENT_STATUS_CODE'] in ('LATE','UNPAID') for r in generated[table]}
+        if len(got)!=len(generated[table]) or got!=ledger or sum(got.values())!=sum(ledger.values()):
+            raise ValueError(table+': 미납 원장 대조 실패')
     for filename,table,src_col,dst_col,extra in [
         ('digital_payment_monthly.csv','USER_EASYPAY_USAGE','payment_amount_krw','PAYMENT_AMT',None),
         ('social_insurance_monthly.csv','USER_SOCIAL_INSURANCE_PAYMENT','paid_amount_krw','PAID_AMT','insurance_type')]:
@@ -657,7 +745,7 @@ def sql_value(value):
 
 def bundle_files(ddl_bytes, tables, all_rows, generated, missing):
     """검사 완료된 행에서 실행·정리·시드·행 수 점검 SQL을 준비한다. 이 함수는 파일을 쓰지 않는다."""
-    header='-- N-05·N-37 v0.2 합성 시드. 별도 개발 스키마 권장, 팀 합의 전 초안.\nSET DEFINE OFF\n'
+    header='-- N-05·N-37 DDL v0.3.1 합성 시드. 별도 개발 스키마 권장.\nSET DEFINE OFF\n'
     files={'01_create_tables.sql':ddl_bytes}
     # N-05 옛 DB와 이름이 겹치는 테이블을 지우기 전에 중단한다. 단독 실행에도 SQL 오류 즉시 종료를 적용한다.
     markers=', '.join("'"+name+"'" for name in LEGACY_TABLE_MARKERS)
@@ -689,8 +777,10 @@ def bundle_files(ddl_bytes, tables, all_rows, generated, missing):
     files['run_all.sql']=run.encode('utf-8')
     report=dict(ddl_sha256=hashlib.sha256(ddl_bytes).hexdigest(),table_count=len(tables),
                 rows={name:len(all_rows[name]) for name in tables},omitted_missing_ddl=missing,base_month=BASE_MONTH,
-                privacy='AES-256-GCM random IV per value, Base64(IV+ciphertext+16-byte tag), HMAC-SHA256; no keys in output',
-                note='ASSESSMENT empty; utility source preserved but no v0.2 utility table. Commit-key policy not selected by generator.')
+                privacy='AES-256-GCM random IV per value, "v1:" + Base64(IV+ciphertext+16-byte tag), HMAC-SHA256 without prefix; no keys in output',
+                unpaid={t:sum(r['PAYMENT_STATUS_CODE']=='UNPAID' for r in all_rows[t]) for t in ('USER_TELECOM_PAYMENT','USER_UTILITY_PAYMENT') if t in all_rows},
+                demo_login_ids=sorted(r['LOGIN_ID'] for r in all_rows['APP_USER'] if r.get('PASSWORD_HASH')),
+                note='ASSESSMENT empty. Demo accounts use BCrypt $2a$ cost 10; password not stored in output.')
     files['seed_report.json']=(json.dumps(report,ensure_ascii=False,indent=2)+'\n').encode('utf-8')
     files['README.md']=(Path(__file__).resolve().parents[1]/'v0_2/README.md').read_bytes()
     for name,body in files.items():
@@ -700,11 +790,12 @@ def bundle_files(ddl_bytes, tables, all_rows, generated, missing):
 
 
 def generate(source, output, ddl_path, environ=None):
-    """N-05·N-37 키·DDL·원천·행 제약을 모두 통과한 뒤에만 새 SQL 파일을 원자적으로 저장한다."""
-    keys=load_keys(environ)
+    """N-05·N-37 키·시연 비밀번호·DDL·원천·행 제약을 모두 통과한 뒤에만 새 SQL 파일을 저장한다.
+    출력이 저장소 v0_2이면 커밋용 시드이며, 시드 없이 실행을 막던 안내용 run_all.sql도 시드까지 적재하는 run_all.sql로 바뀐다."""
+    keys=load_keys(environ);demo_password=load_demo_password(environ)
     ddl_bytes=Path(ddl_path).read_bytes();tables,base_rows=parse_ddl(ddl_bytes.decode('utf-8-sig'))
-    if len(tables)!=46: raise ValueError('받은 v0.2 DDL은 46테이블이어야 합니다. 개정본은 범위를 먼저 확인하세요')
-    rows,generated,missing=build_seed_rows(Path(source),tables,base_rows,keys)
+    if len(tables)!=DDL_TABLE_COUNT: raise ValueError(f'DDL v0.3.1은 {DDL_TABLE_COUNT}테이블이어야 합니다. 개정본은 범위를 먼저 확인하세요')
+    rows,generated,missing=build_seed_rows(Path(source),tables,base_rows,keys,demo_password)
     complete=validate_rows(tables,rows)
     if complete['ASSESSMENT'] or complete['ASSESSMENT_FACTOR']: raise ValueError('평가 시드는 비워야 함')
     files,report=bundle_files(ddl_bytes,tables,complete,generated,missing)
@@ -718,12 +809,33 @@ def generate(source, output, ddl_path, environ=None):
     for name,body in files.items():
         target=out/name
         if target.is_symlink(): raise ValueError('출력 파일 심볼릭 링크는 허용하지 않습니다')
-    for name,body in files.items():
-        target=out/name
-        with tempfile.NamedTemporaryFile(dir=out,prefix=name+'.',suffix='.tmp',delete=False) as handle:
-            handle.write(body);temp=Path(handle.name)
-        temp.replace(target)
+    write_all_or_nothing(out,files)
     return report
+
+
+def write_all_or_nothing(out, files):
+    """모든 파일을 임시 파일로 먼저 쓰고, 전부 성공했을 때만 한꺼번에 교체한다. 실패하면 임시 파일을 지우고 기존 파일을 되돌린다."""
+    temps={}
+    try:
+        for name,body in files.items():
+            with tempfile.NamedTemporaryFile(dir=out,prefix=name+'.',suffix='.tmp',delete=False) as handle:
+                temps[name]=Path(handle.name);handle.write(body)
+    except BaseException:
+        for temp in temps.values(): temp.unlink(missing_ok=True)
+        raise
+    backups,replaced={},[]
+    try:
+        for name in files:
+            target=out/name
+            if target.exists():
+                backup=target.with_name(target.name+'.bak.tmp');target.replace(backup);backups[name]=backup
+            temps[name].replace(target);replaced.append(name)
+    except BaseException:
+        for name in replaced: (out/name).unlink(missing_ok=True)
+        for name,backup in backups.items(): backup.replace(out/name)
+        for temp in temps.values(): temp.unlink(missing_ok=True)
+        raise
+    for backup in backups.values(): backup.unlink(missing_ok=True)
 
 
 def main():
@@ -732,13 +844,15 @@ def main():
     parser.add_argument('source',help='service_dummy 폴더')
     parser.add_argument('output',help='별도 v0_2 출력 폴더')
     parser.add_argument('--ddl',default=str(Path(__file__).resolve().parents[1]/'v0_2/01_create_tables.sql'))
+    parser.add_argument('--env-file',help='키·시연 비밀번호를 읽을 저장소 밖 env 파일 (없으면 환경변수)')
     args=parser.parse_args()
     try:
-        report=generate(args.source,args.output,args.ddl)
+        environ=read_env_file(args.env_file) if args.env_file else None
+        report=generate(args.source,args.output,args.ddl,environ)
     except (ValueError,KeyError,OSError,ArithmeticError) as error:
         print('v0.2 시드 생성 중단: '+str(error),file=sys.stderr);return 1
     except ModuleNotFoundError:
-        print('데이터 생성 requirements.txt의 cryptography 설치가 필요합니다',file=sys.stderr);return 1
+        print('데이터 생성 requirements.txt의 cryptography·bcrypt 설치가 필요합니다',file=sys.stderr);return 1
     print(json.dumps({'table_count':report['table_count'],'rows':report['rows'],'omitted_missing_ddl':report['omitted_missing_ddl']},ensure_ascii=False,indent=2))
     return 0
 

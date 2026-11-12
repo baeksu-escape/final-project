@@ -47,7 +47,7 @@
 
 ## 서비스 등급과 상태 코드 (v3.5.7, v3.5.12 수정)
 
-회원 등급은 학습 데이터의 `CB`가 아니라 **모델 점수**를 구간으로 나눠 정한다. 점수 산식은 모델 팀이 정하고, 이 패키지는 이름과 코드만 정한다. 결과는 DB의 `MEMBER_CREDIT_GRADE`(틀만 있음, 시드 없음)에 넣는다.
+회원 등급은 학습 데이터의 `CB`가 아니라 **모델 점수**를 구간으로 나눠 정한다. 점수 산식은 모델 팀이 정하고, 이 패키지는 이름과 코드만 정한다. 결과는 서비스 DB(v0.3.1)에서는 `ASSESSMENT`(틀만 있음, 시드 없음)에 넣는다. 옛 더미 DB(`dummy_db/`, v2.x)에서는 같은 역할의 표가 `MEMBER_CREDIT_GRADE`였다.
 
 | 상태 `GRADE_STATUS_CODE` | 뜻 | 화면 예시 | 등급 `GRADE_BAND_CODE` |
 |---|---|---|---|
@@ -94,20 +94,21 @@ python -m generate.build_external_api   # build_members 출력 필요
 
 모두 2차 보도로 확인한 값이다. 최종 생성 전에 한국은행·여신금융협회 원 공시로 수치를 대조하는 것이 좋다.
 
-## v0.2 DB 시드와 백엔드 개인정보 규격 (N-02-4, N-05)
+## 서비스 DB 시드(v0.3.1, 폴더 v0_2)와 백엔드 개인정보 규격 (N-02-4, N-05)
 
-새 DB 생성기는 `docs/spec/sql/dummy_db/tools/build_db_v02.py`, 합의 전 초안 DDL·안내는 `docs/spec/sql/dummy_db/v0_2/`다. 옛 DB 생성기·SQL·README는 보존한다. 겹치는 테이블 이름이 있어 별도 Oracle 개발 스키마 적재를 권장한다. 받은 v0.2 DDL은 수정 없이 복사했다.
+새 DB 생성기는 `docs/spec/sql/dummy_db/tools/build_db_v02.py`, DDL·안내는 `docs/spec/sql/dummy_db/v0_2/`다. DDL은 범영 v0.3.1 배포용 확정본(47개 표)을 수정 없이 복사했다(폴더 이름만 `v0_2`). 옛 DB 생성기·SQL·README는 팀 공지 전까지 보존한다. 겹치는 테이블 이름이 있어 별도 Oracle 개발 스키마 적재를 권장한다. 시연 계정은 직군별 사용자 3명(`demo_employee`·`demo_self`·`demo_free`)과 새 행으로 추가한 관리자 `demo_admin`(N-01-5)이다.
 
 - `generate.build_members`는 기존 회원·12개월 입력·원장 값을 유지하고 **`members/member_asset_snapshots_v02.csv`**만 추가한다(`member_id`, `base_month`, `total_asset_amt`). 기존 합성 프로필의 자산 원 단위 값을 그대로 옮기며 새 난수를 소비하지 않는다.
 - v0.2 소득 시드는 급여소득자 `SALARY` 1행, 자영업·프리랜서 `MONTHLY_INCOME` 12행이다. 기준월은 임시 **2026-08(TODO(D-16))**이며 지출·대출·자산은 한 세트다. 지출은 회원당 `FIXED` 1행 = 원천 12개월 평균 월 지출(원 단위 ROUND_HALF_UP). 평가 시드는 비운다.
 - 미확정 대출 종류·금리 방식은 사용자 승인으로 `OTHER`·`UNKNOWN`을 사용한다(TODO(D-27)). 상세 매핑·없는 원천 필드·동의 처리와 원장 대조는 `v0_2/README.md`에 적었다.
 - 기관 데이터는 동의와 무관하게 전 회원 몫을 생성하고 응답은 전원 `status=OK`다. 동의는 목 서버가 요청 시 확인하며 `members.csv.external_data_consent`는 시연 시작 동의 상태다. v0.2 시드의 USER_CONSENT와 대안 데이터 IMPORTED 행은 이 시작 상태로 제한한다. DB 생성기는 종전 동의 제한 응답도 호환 입력으로 지원하며 응답 status를 동의로 해석하지 않는다.
 - 전 회원의 대출 원장은 보존한다. 시작 동의 회원은 `USER_LOAN.SOURCE_CODE=IMPORTED`, 미동의 회원은 `MANUAL`이며 회원별 월 상환 합계가 원천 기준월 상환액과 같아야 한다. 받은 USER_LOAN DDL에는 CONSENT_ID 열이 없어 추가하지 않았다(개정으로 생기면 MANUAL은 NULL). 상품별 최소점수·점수대 참고 범위의 시연 가정은 `v0_2/README.md`를 따른다.
-- **공과금 테이블은 DDL 개정 후 추가 예정.** 기존 서비스 더미의 공과금 원장·응답과 학습 피처는 유지하며, 현재 v0.2 SQL 시드에서만 제외한다. 청구·납부 변환은 새 생성기의 `map_bill_rows()`로 분리했다.
+- **공과금 표(DDL v0.3.1, 2026-11-11):** 생성기 기준 DDL이 범영 v0.3.1 확정본(47개 표, 폴더 이름은 `v0_2` 그대로)으로 바뀌었다. 공과금 응답은 통신비와 같은 `map_bill_rows()`로 `USER_UTILITY_PAYMENT`에 넣고, 동의는 `PROVIDER_CODE=utility`, `ITEM_CODE=UTILITY_BILL`이다. 시작 동의 회원만 IMPORTED 행이다.
+- **납부 상태(v0.3.1 U3):** DB에는 `ON_TIME`(납부일 ≤ 기한), `LATE`(납부일 > 기한), `UNPAID`(납부일 NULL)로 저장한다. 기관 응답의 `late` + `paid_date=null`은 `UNPAID`로 바꾼다. 응답 파일 자체는 바꾸지 않는다. 미납 개월 수(`telecom_late`·`utility_late`)는 LATE + UNPAID와 같다(U2).
 
-**백엔드와 맞출 암호화 규격:** 이름·휴대폰·이메일은 UTF-8 → **AES-256-GCM**으로 암호화한다. 값마다 독립적인 **12바이트 난수 IV**, AAD 없음. DB 문자열은 표준 **Base64(IV 12바이트 + 암호문 + 인증 태그 16바이트)**다. 복호화 시 앞 12바이트를 IV로 분리하고 나머지 암호문+태그를 인증 복호화한다. 실제 암호문 길이를 DDL 열 길이와 대조한다.
+**백엔드와 맞출 암호화 규격:** 이름·휴대폰·이메일은 UTF-8 → **AES-256-GCM**으로 암호화한다. 값마다 독립적인 **12바이트 난수 IV**, AAD 없음. DB 문자열은 키 버전 접두어 **`v1:` + 표준 Base64(IV 12바이트 + 암호문 + 인증 태그 16바이트)**다(DDL v0.3.1 E2). 복호화 시 첫 `:` 앞 버전으로 키를 고르고(모르는 버전이면 오류), Base64를 푼 뒤 앞 12바이트를 IV로 분리하고 나머지 암호문+태그를 인증 복호화한다. 실제 암호문 길이를 DDL 열 길이와 대조한다.
 
-검색용 값은 **별도 키의 HMAC-SHA256**, UTF-8, **64자 소문자 16진수**다. 이메일은 trim+소문자, 휴대폰은 ASCII 숫자만 남긴 뒤 HMAC을 계산한다. 저장 암호문의 원문 자체는 이 검색 정규화와 구분한다.
+검색용 값은 **별도 키의 HMAC-SHA256**, UTF-8, **64자 소문자 16진수**다. 이메일은 trim+소문자, 휴대폰은 ASCII 숫자만 남긴 뒤 HMAC을 계산한다. HMAC 열에는 접두어를 붙이지 않는다. 저장 암호문의 원문 자체는 이 검색 정규화와 구분한다.
 
-키는 **`AVENUE_DEV_AES_KEY`**, **`AVENUE_DEV_HMAC_KEY`** 환경변수의 Base64 값으로만 받는다. AES는 디코딩 후 정확히 32바이트, HMAC은 최소 32바이트의 별도 키이며 두 키가 같으면 거부한다. 키가 없으면 파일 쓰기 전에 오류로 중단한다. 키·키 지문·원문을 저장소·생성 SQL·로그에 남기지 않는다. `.env`·application 설정 파일은 읽지 않는다. 테스트의 공개 고정 키는 실제 키가 아니며, 어떤 키로 커밋용 시드를 만들지는 사용자 결정 전이다. 기본 의존성은 이 패키지의 `requirements.txt`에만 추가한 `cryptography==50.0.2`다.
+키는 **`AVENUE_DEV_AES_KEY`**, **`AVENUE_DEV_HMAC_KEY`**의 Base64 값으로 받는다. 환경변수 또는 `--env-file`로 지정한 저장소 밖 env 파일에서 읽고, 시연 계정 비밀번호 `AVENUE_DEMO_PASSWORD`도 같은 곳에서 읽는다. AES는 디코딩 후 정확히 32바이트, HMAC은 최소 32바이트의 별도 키이며 두 키가 같으면 거부한다. 키가 없으면 파일 쓰기 전에 오류로 중단한다. 키·키 지문·원문을 저장소·생성 SQL·로그에 남기지 않는다. 저장소의 `.env`·application 설정 파일은 읽지 않는다. 커밋용 시드는 팀 개발 키 한 쌍(디스코드 비공개 채널로 공유)으로 만들어 커밋한다(절차는 `v0_2/README.md`). 테스트의 공개 고정 키·비밀번호는 실제 값이 아니다. 의존성은 이 패키지의 `requirements.txt`에 있는 `cryptography==50.0.2`, `bcrypt==5.0.0`이다.
 
