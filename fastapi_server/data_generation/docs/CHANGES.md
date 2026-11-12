@@ -2,6 +2,10 @@
 
 데이터 생성과 해석에 영향을 주는 변경만 적는다. 최신 항목이 위에 있다. 문서 표현만 고친 버전은 한 줄로 줄였다.
 
+## v3.6.1 (2026-11-12) — 서비스 더미 대출 종류·금리 방식
+
+- N-05-3 서비스 더미 대출 원장과 금융 응답에 대출 종류·금리 방식을 추가했다. 학습 데이터 값은 바꾸지 않는다.
+
 ## v3.6.0 (2026-11-10) — 서비스 정의 12개월 열, 학습·검증·시험 분리
 
 - **서비스 정의 열(R1, DDL v0.2 제안).** 서비스는 소득만 12개월, 지출은 평균 월 지출 하나, 상환은 현재 월 원리금 하나를 받는다. 같은 정의로 `input_features_12m.csv` 뒤쪽에 9열을 붙였다: `income_svc_12m_krw`, `income_cv_svc_12m`, `zero_income_months_svc_12m`, `expense_avg_month_krw`(12개월 평균, `ROUND_HALF_UP`: 정확히 .5이면 올림. v3.5.8 규칙·DB 시드·Java·Oracle과 같음), `debt_service_current_krw`(기준월 2026-08 상환액), `expense_ratio_svc_12m`, `dsr_svc_12m`, `deficit_months_svc_12m`, `worst_month_net_cash_svc_12m_krw`(월 소득 − 평균 지출 − 현재 상환). 기존 12개월 열의 이름·값·이상치 기록은 그대로다.

@@ -11,6 +11,7 @@ from pathlib import Path
 import argparse, json, tempfile
 import numpy as np
 import pandas as pd
+from generate.loan_classification import loan_type_code, rate_type, check_loan_classification
 from generate import build_thinfile
 from generate import nonfinancial_sources as ns
 from generate.build_nonfinancial_sources import generate_frames, load_cfg
@@ -71,7 +72,14 @@ def run(out, per_cohort=None, seed=None):
     make_v02_asset_snapshots(profiles, ids, cfg['input_months']['value'][-1]).to_csv(
         out/'member_asset_snapshots_v02.csv', index=False, encoding='utf-8-sig')
     # Ledgers behind the dummy external APIs (same member IDs).
-    remap_ledger(loans, ids).to_csv(out/'ledgers/loans.csv', index=False, encoding='utf-8-sig')
+    # N-05-3 회원 계좌 ID를 기준으로 대출 종류와 금리 방식을 결정한다.
+    loan_ledger = remap_ledger(loans, ids)
+    loan_ledger['loan_type_code'] = [loan_type_code(k, s) for k, s in zip(loan_ledger.kind, loan_ledger.sector)]
+    loan_ledger['rate_type'] = [rate_type(a).upper() for a in loan_ledger.account_id]
+    errors = check_loan_classification(loan_ledger)
+    if errors:
+        raise ValueError('; '.join(errors))
+    loan_ledger.to_csv(out/'ledgers/loans.csv', index=False, encoding='utf-8-sig')
     remap_ledger(cards, ids).to_csv(out/'ledgers/cards.csv', index=False, encoding='utf-8-sig')
     remap_ledger(card_monthly, ids, account_prefix_col='none').to_csv(out/'ledgers/card_monthly.csv', index=False, encoding='utf-8-sig')
     remap_ledger(monthly[['customer_id', 'month', 'telecom_late']], ids, account_prefix_col='none').to_csv(out/'ledgers/telecom_monthly.csv', index=False, encoding='utf-8-sig')

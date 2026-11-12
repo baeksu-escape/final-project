@@ -1,0 +1,17 @@
+{
+  "basis": "assumption",
+  "note": "JEONSE와 BUSINESS_OPERATING에 대응하는 원천 코드가 없어 생성되지 않는다.",
+  "kind": {
+    "0": "CREDIT",
+    "1": "MORTGAGE",
+    "2": "OTHER",
+    "3": "OTHER",
+    "4": "OTHER",
+    "5": "OTHER",
+    "6": "OTHER",
+    "7": "MORTGAGE",
+    "8": "OTHER"
+  },
+  "card_sector": 1,
+  "card_unsecured_code": "CARD_LOAN"
+}

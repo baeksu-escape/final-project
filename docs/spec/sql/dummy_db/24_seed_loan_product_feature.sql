@@ -1,4 +1,4 @@
--- N-05·N-37 DDL v0.3.1 합성 시드. 별도 개발 스키마 권장.
+-- N-05·N-37 서비스 DB 합성 시드 (DDL: docs/spec/sql/avenue_ddl.sql). 별도 개발 스키마 권장.
 SET DEFINE OFF
 -- LOAN_PRODUCT_FEATURE: 17행
 INSERT INTO LOAN_PRODUCT_FEATURE (PRODUCT_ID, DISPLAY_ORDER, FEATURE_TEXT) VALUES (1, 1, '교육용 합성 참고 상품, 실제 상품 아님');

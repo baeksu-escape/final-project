@@ -50,7 +50,7 @@ def main():
     except (ValueError, OSError) as error:
         print('키 생성 중단: ' + str(error), file=sys.stderr); return 1
     print(f'저장함: {saved}')
-    print('다음: 파일을 디스코드 비공개 채널로 공유하고, AVENUE_DEMO_PASSWORD 값을 채운 뒤 build_db_v02.py --env-file 로 시드를 만드세요.')
+    print('다음: 파일을 디스코드 비공개 채널로 공유하고, AVENUE_DEMO_PASSWORD 값을 채운 뒤 build_db.py --env-file 로 시드를 만드세요.')
     return 0
 
 

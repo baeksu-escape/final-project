@@ -1,4 +1,4 @@
--- N-05·N-37 DDL v0.3.1 합성 시드. 별도 개발 스키마 권장.
+-- N-05·N-37 서비스 DB 합성 시드 (DDL: docs/spec/sql/avenue_ddl.sql). 별도 개발 스키마 권장.
 SET DEFINE OFF
 -- USER_ASSET_SNAPSHOT: 400행
 INSERT INTO USER_ASSET_SNAPSHOT (ASSET_ID, USER_ID, BASE_MONTH, TOTAL_ASSET_AMT) VALUES (1, 1, '2026-08', 155396930);

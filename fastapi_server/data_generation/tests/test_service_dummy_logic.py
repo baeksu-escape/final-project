@@ -25,6 +25,25 @@ def fixture():
     return profiles, ages, monthly, loans, cards, usage
 
 
+class LoanClassification(unittest.TestCase):
+    """N-05-3 대출 종류와 학습 공통 금리 규칙을 고정 예제로 확인한다."""
+    def test_all_kinds_and_card(self):
+        expected = ['CREDIT', 'MORTGAGE', 'OTHER', 'OTHER', 'OTHER', 'OTHER', 'OTHER', 'MORTGAGE', 'OTHER']
+        self.assertEqual([s.loan_type_code(k, 0) for k in range(9)], expected)
+        self.assertEqual(s.loan_type_code(0, 1), 'CARD_LOAN')
+        self.assertEqual(s.loan_type_code(1, 1), 'MORTGAGE')
+
+    def test_hash_and_checker(self):
+        import hashlib
+        for account in ['MEM000001_L0', 'THF2_L1', 'abc']:
+            expected = 'variable' if int(hashlib.sha256(account.encode()).hexdigest()[:8], 16) % 2 else 'fixed'
+            self.assertEqual(s.rate_type(account), expected)
+        rows = pd.DataFrame([dict(account_id='abc', kind=0, sector=1, loan_type_code='CARD_LOAN', rate_type=s.rate_type('abc').upper())])
+        self.assertEqual(s.check_loan_classification(rows), [])
+        rows.loc[0, 'rate_type'] = 'BAD'
+        self.assertTrue(s.check_loan_classification(rows))
+
+
 class LoanProducts(unittest.TestCase):
     def test_ranges_contain_anchor_and_respect_cap(self):
         for seed in range(20):

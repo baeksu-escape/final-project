@@ -31,7 +31,7 @@ fastapi_server/data/
    └─ .handoff_bundle       파일 목록 (지우지 않는다)
 ```
 
-- 생성 코드: `fastapi_server/data_generation/` (같은 v3.6.0 패키지)
-- 서비스 DB 더미(학습에 쓰지 않음): `docs/spec/sql/dummy_db/`
+- 생성 코드: `fastapi_server/data_generation/` (v3.6.1 패키지. v3.6.1은 서비스 더미 대출 종류·금리 방식만 추가해 학습 데이터는 v3.6.0과 같다)
+- 서비스 DB 더미(학습에 쓰지 않음): `docs/spec/sql/dummy_db/` (DDL·시드·생성기를 한 폴더에 보관)
 - 폴더 이름에는 버전을 넣지 않는다. 새 버전을 받으면 `training/`을 통째로 교체하고 위 표의 버전만 고친다
 - 공유 드라이브 경로: 팀 디스코드 #파일공유 채널 참고
