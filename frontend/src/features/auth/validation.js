@@ -33,7 +33,8 @@ export function isValidLoginId(value) {
 // 화면 안내·오류 문구에 쓰는 아이디 규칙 설명.
 export const LOGIN_ID_RULE_TEXT ='영문 소문자로 시작하는 4~20자 영문 소문자·숫자'
 
-// N-02-1 가입 출생연도 — 팀 결정(A안) — 출생연도만 받으므로 생일 경과는 따지지 않고 '올해 20세가 되는 해까지'로 판단한다.
+// N-02-1 가입 출생연도 검사 규칙.
+// 팀 결정(A안) — 출생연도만 받으므로 생일 경과는 따지지 않고 '올해 20세가 되는 해까지'로 판단한다
 // 하한 1930은 DDL v0.3.2 APP_USER.BIRTH_YEAR CHECK(1930~2006)와 같다.
 // TODO DDL CHECK의 상한은 2006으로 고정돼 있어, 2027년부터는 화면 상한(올해 − 20)과 달라진다. DB 담당과 CHECK 상한을 맞춰야 한다.
 export const BIRTH_YEAR_MIN = 1930
