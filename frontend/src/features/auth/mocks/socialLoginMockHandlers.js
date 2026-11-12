@@ -10,8 +10,8 @@ import {
   SOCIAL_EXCHANGE_RESULTS,
   SOCIAL_PATHS,
 } from '../socialLoginConfig.js'
-import { findMockAccount } from './authMockHandlers.js'
-import { MOCK_LINKED_LOGIN_ID, MOCK_SOCIAL_PROFILE, mockLinkKeys, mockSocialSettings } from './socialLoginMockData.js'
+import { findMockAccount, findMockAccountByUserId } from './authMockHandlers.js'
+import { MOCK_SOCIAL_PROFILE, mockLinkKeys, mockSocialLinks, mockSocialSettings } from './socialLoginMockData.js'
 
 // 내준 일회용 코드 → 제공자 key. 교환하면 지운다.
 const issuedCodes = new Map()
@@ -24,6 +24,14 @@ const lockedError = () => new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH
 // 계정으로 로그인 응답을 만든다.
 function toLoginResponse(account) {
   return { accessToken: toMockToken(account.user.userId), user: structuredClone(account.user) }
+}
+
+// N-01-6 b '처음 연결' 응답 — 임시 연결 키를 내주고 기존 계정 연결 또는 새 가입으로 보낸다.
+function linkRequiredResponse(provider) {
+  sequence += 1
+  const linkKey = `mock-link-${sequence}`
+  mockLinkKeys.add(linkKey)
+  return { result: SOCIAL_EXCHANGE_RESULTS.LINK_REQUIRED, linkKey, provider, profile: { ...MOCK_SOCIAL_PROFILE } }
 }
 
 // N-01-6 백엔드 대신 콜백 주소를 만든다 — 취소·오류 시나리오는 error를, 나머지는 일회용 코드를 싣는다.
@@ -43,18 +51,18 @@ registerMockHandlers({
     issuedCodes.delete(body.code)
 
     switch (mockSocialSettings.scenario) {
-      case 'NEW_ACCOUNT': {
-        sequence += 1
-        const linkKey = `mock-link-${sequence}`
-        mockLinkKeys.add(linkKey)
-        return { result: SOCIAL_EXCHANGE_RESULTS.LINK_REQUIRED, linkKey, provider, profile: { ...MOCK_SOCIAL_PROFILE } }
-      }
+      case 'NEW_ACCOUNT':
+        return linkRequiredResponse(provider)
       case 'ADMIN':
         throw adminBlockedError()
       case 'LOCKED':
         throw lockedError()
-      default:
-        return { result: SOCIAL_EXCHANGE_RESULTS.LINKED, ...toLoginResponse(findMockAccount(MOCK_LINKED_LOGIN_ID)) }
+      default: {
+        // a 연결된 계정 — 이 제공자의 연결 기록으로 계정을 찾는다. 탈퇴로 기록이 지워졌거나 계정이 없으면 '처음 연결' 흐름으로 보낸다(N-04-7).
+        const account = findMockAccountByUserId(mockSocialLinks.get(provider))
+        if (!account) return linkRequiredResponse(provider)
+        return { result: SOCIAL_EXCHANGE_RESULTS.LINKED, ...toLoginResponse(account) }
+      }
     }
   },
 
