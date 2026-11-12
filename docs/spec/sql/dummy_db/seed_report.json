@@ -1,6 +1,6 @@
 {
-  "ddl_sha256": "a733cba56d779733728a8b65fdbb91c292e5cc7ac182c188ad33f97fced47568",
-  "table_count": 47,
+  "ddl_sha256": "d2462b731edeaa577b0fc82c9bb0667235f929fd5205b1ee495c9dfd29399e1c",
+  "table_count": 51,
   "rows": {
     "DIM_WORKER_TYPE": 3,
     "DIM_ROLE": 2,
@@ -39,16 +39,20 @@
     "FACT_POLICY_RATE": 0,
     "FACT_HFS_STAT": 0,
     "FACT_INDUSTRY_AGE_INCOME": 0,
+    "FACT_HFS_WORKER_STAT": 0,
     "FACT_DONG_SALES": 0,
     "FACT_DONG_STORE": 0,
+    "FACT_DONG_LIVING_POP": 0,
     "BOARD_POST": 0,
     "BOARD_COMMENT": 0,
     "CONTENT_REPORT": 0,
+    "BOARD_POST_LOG": 0,
     "APP_SETTING": 4,
     "GLOSSARY_TERM": 0,
     "CHATBOT_PRESET_QUESTION": 0,
     "CHATBOT_QUESTION_LOG": 0,
-    "ACCESS_AUDIT_LOG": 0
+    "ACCESS_AUDIT_LOG": 0,
+    "SYSTEM_LOG": 0
   },
   "omitted_missing_ddl": [],
   "base_month": "2026-08",
@@ -57,6 +61,7 @@
     "USER_TELECOM_PAYMENT": 0,
     "USER_UTILITY_PAYMENT": 2
   },
+  "card_spend_over_limit": 0,
   "demo_login_ids": [
     "demo_admin",
     "demo_employee",

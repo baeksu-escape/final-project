@@ -5,6 +5,7 @@ logic can be checked with small fixtures without running the synthetic generator
 """
 import numpy as np
 import pandas as pd
+from generate.loan_classification import loan_type_code, rate_type, check_loan_classification
 
 SEGMENTS = ('wage', 'selfemp', 'freelance')
 SECTOR_NAMES = {0: '은행', 1: '카드', 2: '저축은행', 3: '캐피탈', 4: '대부', 5: '상호금융', 6: '보험'}
@@ -172,7 +173,8 @@ def make_financial_responses(members, loans, cards, card_monthly, as_of):
             loans=[dict(account_id=r.account_id, sector=int(r.sector), kind=int(r.kind), institution_id=int(r.institution_id),
                         balance_krw=int(r.balance_thousand) * 1000, annual_rate=float(r.annual_rate),
                         remaining_months=int(r.remaining_months), opened_date=_date(as_of, r.age_days),
-                        annual_service_krw=int(r.annual_service_thousand) * 1000) for r in lg.itertuples(index=False)],
+                        annual_service_krw=int(r.annual_service_thousand) * 1000,
+                        loan_type_code=loan_type_code(r.kind, r.sector), rate_type=rate_type(r.account_id).upper()) for r in lg.itertuples(index=False)],
             cards=[dict(account_id=r.account_id, institution_id=int(r.institution_id), opened_date=_date(as_of, r.age_days),
                         active=int(r.active)) for r in cg.itertuples(index=False)],
             card_usage=[dict(period_offset=int(r.month_offset),
@@ -245,10 +247,14 @@ def check_external(fin, tel, members, loans, monthly, ids, as_of):
         return errors
     for r in fin + tel:                                 # v3.6.0: 동의와 무관하게 모든 회원 OK
         if r['status'] != 'OK': errors.append(f"every member needs an OK response {r['member_id']}"); break
+    if {'loan_type_code', 'rate_type'} <= set(loans.columns):
+        errors += check_loan_classification(loans)
     debt = loans.groupby('member_id').balance_thousand.sum() * 1000
     for r in fin:
         if r['status'] == 'OK' and sum(l['balance_krw'] for l in r['loans']) != int(debt.get(r['member_id'], 0)):
             errors.append(f"loan balance mismatch {r['member_id']}"); break
+        if any(l.get('loan_type_code') != loan_type_code(l['kind'], l['sector']) or l.get('rate_type') != rate_type(l['account_id']).upper() for l in r['loans']):
+            errors.append('loan classification mismatch'); break
         if any(l['opened_date'] > str(pd.Timestamp(as_of).date()) for l in r['loans'] + r['cards']):
             errors.append('account opened after as_of'); break
     return errors + check_bills(tel, monthly, ids, as_of, 'telecom_late', 'telecom')

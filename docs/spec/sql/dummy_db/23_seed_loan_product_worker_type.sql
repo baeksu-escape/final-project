@@ -1,4 +1,4 @@
--- N-05·N-37 DDL v0.3.1 합성 시드. 별도 개발 스키마 권장.
+-- N-05·N-37 서비스 DB 합성 시드 (DDL: docs/spec/sql/avenue_ddl.sql). 별도 개발 스키마 권장.
 SET DEFINE OFF
 -- LOAN_PRODUCT_WORKER_TYPE: 43행
 INSERT INTO LOAN_PRODUCT_WORKER_TYPE (PRODUCT_ID, WORKER_TYPE_CODE) VALUES (1, 'EMPLOYEE');

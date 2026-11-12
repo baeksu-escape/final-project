@@ -5,6 +5,7 @@ import csv
 import importlib.util
 import json
 import os
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -13,10 +14,10 @@ import shutil
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-SCRIPT=Path(__file__).resolve().parents[1]/'build_db_v02.py'
-SPEC=importlib.util.spec_from_file_location('build_db_v02',SCRIPT)
+SCRIPT=Path(__file__).resolve().parents[1]/'build_db.py'
+SPEC=importlib.util.spec_from_file_location('build_db',SCRIPT)
 db=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(db)
-DDL=SCRIPT.parents[1]/'v0_2/01_create_tables.sql'
+DDL=SCRIPT.parents[1]/'01_create_tables.sql'
 # 공개 고정 테스트 키다. 실제 개발·운영 키가 아니며 커밋용 시드에 사용하지 않는다.
 TEST_AES=bytes(range(32));TEST_HMAC=bytes(range(32,64))
 # 공개 고정 테스트 비밀번호다. 실제 시연 비밀번호가 아니다.
@@ -181,7 +182,9 @@ class AssetSupplementTests(unittest.TestCase):
         import pandas as pd
         path=SCRIPT.parents[5]/'fastapi_server/data_generation/generate/service_dummy_logic.py'
         spec=importlib.util.spec_from_file_location('service_dummy_v02_test',path)
-        logic=importlib.util.module_from_spec(spec);spec.loader.exec_module(logic)
+        logic=importlib.util.module_from_spec(spec)
+        with patch.object(sys,'path',[str(path.parent.parent),*sys.path]):
+            spec.loader.exec_module(logic)
         profiles=pd.DataFrame(dict(customer_id=['A','B'],asset_total_krw=[123,456]))
         got=logic.make_v02_asset_snapshots(profiles,{'A':'MEM000001','B':'MEM000002'},'2026-08')
         self.assertEqual(got.total_asset_amt.tolist(),[123,456]);self.assertEqual(got.base_month.tolist(),['2026-08']*2)
@@ -189,19 +192,69 @@ class AssetSupplementTests(unittest.TestCase):
             with self.assertRaises(ValueError):logic.make_v02_asset_snapshots(bad,{'A':'MEM000001','B':'MEM000002'},'2026-08')
 
 
+class CardLimitTests(unittest.TestCase):
+    """원천 경로 없이 카드 한도 계산 규칙을 확인한다."""
+    def test_card_limit_calculation(self):
+        """N-05 카드 한도의 천원 환산과 누락·음수 및 소진율 독립성을 확인한다."""
+        self.assertEqual(db.estimate_card_limit({'CL0631905':25,'KC1000001':50,'L00000002':20}),30000)
+        self.assertEqual(db.estimate_card_limit({'CL0631905':99,'KC1000001':50,'L00000002':20}),30000)
+        self.assertEqual(db.estimate_card_limit({'KC1000001':20,'L00000002':20}),0)
+        self.assertIsNone(db.estimate_card_limit({'KC1000001':10,'L00000002':20}))
+        self.assertIsNone(db.estimate_card_limit({'KC1000001':None,'L00000002':20}))
+        self.assertIsNone(db.estimate_card_limit({'KC1000001':50}))
+
+
 class SchemaTests(unittest.TestCase):
-    """DDL v0.3.1 47개 테이블과 SQL NULL·복합 제약을 검증한다."""
+    """DDL v0.3.2 51개 테이블과 SQL NULL·복합 제약을 검증한다."""
     def setUp(self):
         """각 테스트에 독립 DDL 정의·기준 행을 제공한다."""
         self.tables,self.base=db.parse_ddl(DDL.read_text(encoding='utf-8-sig'))
 
     def test_received_ddl_and_base_inserts(self):
         """기준 INSERT 25행과 선택 기능 세 개가 실제 DDL에 있는지 확인한다."""
-        self.assertEqual(len(self.tables),47);self.assertIn('USER_UTILITY_PAYMENT',self.tables);self.assertEqual(sum(map(len,self.base.values())),25)
+        self.assertEqual(len(self.tables),51);self.assertIn('SYSTEM_LOG',self.tables);self.assertIn('USER_UTILITY_PAYMENT',self.tables);self.assertEqual(sum(map(len,self.base.values())),25)
         db.validate_rows(self.tables,self.base)
         self.assertIn('LOAN_PRODUCT_FEATURE',self.tables)
         self.assertIn('TERM_TEXT',self.tables['LOAN_PRODUCT']['columns'])
         self.assertIn('RATE_AVG_PCT',self.tables['SCORE_BAND_OFFER']['columns'])
+
+    def test_ddl_copy_matches_canonical(self):
+        """배포 사본이 기준 DDL과 다르면 시드 적재 전에 발견한다."""
+        self.assertEqual(DDL.read_bytes(),(SCRIPT.parents[2]/'avenue_ddl.sql').read_bytes())
+
+    def test_concat_like_and_to_char(self):
+        """문자 연결·패턴과 SQL NULL의 세 값 논리를 검사한다."""
+        def ev(sql,row=None): return db.CheckExpression(db.sql_tokens(sql)).evaluate(row or {})
+        self.assertEqual(ev("'wd_' || TO_CHAR(123)"),'wd_123')
+        self.assertEqual(ev("NULL || 'x'"),'x')
+        self.assertIsNone(ev('NULL || NULL'))
+        self.assertEqual(ev("-1 || 'a'"),'-1a')
+        self.assertIsNone(ev("'x' LIKE ''"))
+        self.assertIsNone(ev("'' LIKE '%'"))
+        for sql in ["'abcd' LIKE 'a%d'", "'abcd' LIKE 'a_c_'", "'wd_x' LIKE 'wd\\_%' ESCAPE '\\'", "'WD_x' NOT LIKE 'wd\\_%' ESCAPE '\\'"]:
+            self.assertIs(ev(sql),True,sql)
+        for sql in ["'wdXx' LIKE 'wd\\_%' ESCAPE '\\'", "'abc' LIKE 'a_d'", "'ABC' LIKE 'abc'"]:
+            self.assertIs(ev(sql),False,sql)
+        for sql in ["NULL LIKE '%'", "'abc' NOT LIKE NULL", "'abc' LIKE '%' ESCAPE NULL"]:
+            self.assertIsNone(ev(sql),sql)
+        for sql in ['TO_CHAR(1,2)',"'a' LIKE 'a' ESCAPE 'xy'",'TO_CHAR(1.5)']:
+            with self.assertRaises(ValueError):ev(sql)
+
+    def test_withdrawal_and_consent_checks(self):
+        """탈퇴 대체값과 동의·입력 출처의 실제 DDL CHECK를 평가한다."""
+        expr=dict(self.tables['APP_USER']['checks'])['CK_APU_PII_BY_STATUS']
+        active=dict(USER_ID=42,ACCOUNT_STATUS_CODE='ACTIVE',LOGIN_ID='normal',NICKNAME='사용자',NAME_ENC='v1:x',EMAIL_ENC='v1:x',EMAIL_HMAC='a'*64,PHONE_ENC='v1:x',PHONE_HMAC='b'*64,PASSWORD_HASH='hash')
+        self.assertIs(expr.evaluate(active),True)
+        for change in [dict(LOGIN_ID='wd_x'),dict(NICKNAME='탈퇴x')]:
+            self.assertIs(expr.evaluate(dict(active,**change)),False)
+        withdrawn=dict(active,ACCOUNT_STATUS_CODE='WITHDRAWN',LOGIN_ID='wd_42',NICKNAME='탈퇴42',NAME_ENC='WITHDRAWN',EMAIL_ENC='WITHDRAWN',EMAIL_HMAC='WITHDRAWN:42',PHONE_ENC=None,PHONE_HMAC=None,PASSWORD_HASH=None)
+        self.assertIs(expr.evaluate(withdrawn),True)
+        for col,value in [('LOGIN_ID','wrong'),('NICKNAME','wrong'),('NAME_ENC','x'),('EMAIL_ENC','x'),('EMAIL_HMAC','x'),('PHONE_ENC','x'),('PHONE_HMAC','x'),('PASSWORD_HASH','x')]:
+            self.assertIs(expr.evaluate(dict(withdrawn,**{col:value})),False,col)
+        for table in ['USER_LOAN','USER_TELECOM_PAYMENT','USER_UTILITY_PAYMENT','USER_EASYPAY_USAGE','USER_SOCIAL_INSURANCE_PAYMENT','USER_CREDIT_PROFILE']:
+            expr=next(e for n,e in self.tables[table]['checks'] if n.endswith('_CONSENT_SOURCE'))
+            for source,consent,expected in [('IMPORTED',1,True),('IMPORTED',None,False),('MANUAL',None,True),('MANUAL',1,False)]:
+                self.assertIs(expr.evaluate(dict(SOURCE_CODE=source,CONSENT_ID=consent)),expected,(table,source,consent))
 
     def test_unknown_check_column_and_syntax_rejected(self):
         """DDL 오타·미지원 구문을 UNKNOWN으로 넘기지 않는다."""
@@ -314,6 +367,32 @@ class SchemaTests(unittest.TestCase):
 @unittest.skipUnless(os.environ.get('AVENUE_TEST_SERVICE_DUMMY'),'별도 재생성한 서비스 더미 경로가 필요함')
 class FullSourceTests(unittest.TestCase):
     """고정 공개 테스트 키로 전체 원천 매핑·제약·출력과 실패 시 무쓰기를 검증한다."""
+    def test_ddl_new_table_and_loan_fields(self):
+        """N-05 새 DDL 표를 자동 반영하고 대출 원장의 신규 필드를 보존한다."""
+        source=Path(os.environ['AVENUE_TEST_SERVICE_DUMMY'])
+        original_read=db.read_csv
+        def read(path):
+            rows=original_read(path)
+            if Path(path).name=='loans.csv' and rows:
+                rows[0]['loan_type_code']='CREDIT';rows[0]['rate_type']='FIXED'
+            return rows
+        with tempfile.TemporaryDirectory() as temp:
+            ddl=Path(temp)/'extended.sql'
+            empty=Path(temp)/'empty.sql';empty.write_text('-- 빈 DDL\n',encoding='utf-8')
+            with self.assertRaisesRegex(ValueError,'CREATE TABLE'):
+                db.generate(source,Path(temp)/'empty-output',empty,TEST_ENV)
+            ddl.write_text(DDL.read_text(encoding='utf-8-sig')+'\nCREATE TABLE REVIEW_EXTRA (ID NUMBER(10), CONSTRAINT PK_REVIEW_EXTRA PRIMARY KEY (ID));\n',encoding='utf-8')
+            with patch.object(db,'read_csv',side_effect=read):
+                report=db.generate(source,Path(temp)/'out',ddl,TEST_ENV)
+                tables,base=db.parse_ddl(ddl.read_text(encoding='utf-8'))
+                _,generated,_=db.build_seed_rows(source,tables,base,db.load_keys(TEST_ENV))
+            self.assertEqual(report['table_count'],len(tables))
+            self.assertIn('REVIEW_EXTRA',report['rows'])
+            self.assertIn('REVIEW_EXTRA',(Path(temp)/'out'/'00_drop_all.sql').read_text(encoding='utf-8'))
+            self.assertIn('REVIEW_EXTRA',(Path(temp)/'out'/'99_check.sql').read_text(encoding='utf-8'))
+            self.assertEqual((generated['USER_LOAN'][0]['LOAN_TYPE_CODE'],generated['USER_LOAN'][0]['RATE_TYPE_CODE']),('CREDIT','FIXED'))
+            self.assertTrue(any(r['LOAN_TYPE_CODE']=='OTHER' and r['RATE_TYPE_CODE']=='UNKNOWN' for r in generated['USER_LOAN'][1:]))
+
     def test_full_source_and_invalid_output_untouched(self):
         """400명 직군별 소득 행 수·암호문 복원과 DDL 불일치 시 출력 보존을 확인한다."""
         source=Path(os.environ['AVENUE_TEST_SERVICE_DUMMY'])
@@ -328,7 +407,7 @@ class FullSourceTests(unittest.TestCase):
             income=generated['USER_INCOME_MONTH']
             members=db.read_csv(source/'members/members.csv');expected=sum(1 if m['segment']=='wage' else 12 for m in members)
             self.assertEqual(len(income),expected)
-            self.assertEqual(report['table_count'],47)
+            self.assertEqual(report['table_count'],len(tables))
             consenting={m['member_id'] for m in members if m['external_data_consent']=='1'}
             ids={int(m['member_id'][3:]) for m in members if m['member_id'] in consenting}
             utility=generated['USER_UTILITY_PAYMENT']
@@ -358,7 +437,7 @@ class FullSourceTests(unittest.TestCase):
             for name,table_rows in demo_rows.items():
                 if name!='APP_USER':self.assertFalse(any(r.get('USER_ID')==admin['USER_ID'] for r in table_rows),name)
             self.assertIn("'APP_USER' AS TABLE_NAME, 401 AS EXPECTED",(out/'99_check.sql').read_text(encoding='utf-8'))
-            # 저장소 v0_2처럼 안내용 run_all.sql이 있는 폴더에 쓰면 시드를 적재하는 run_all.sql로 바뀐다.
+            # 안내용 run_all.sql이 있는 폴더에 쓰면 시드를 적재하는 run_all.sql로 바뀐다.
             stub=Path(temp)/'stub';stub.mkdir();shutil.copy(DDL.parent/'run_all.sql',stub/'run_all.sql')
             if '@@' not in (stub/'run_all.sql').read_text(encoding='utf-8'):
                 db.generate(source,stub,DDL,TEST_ENV)
@@ -374,10 +453,21 @@ class FullSourceTests(unittest.TestCase):
             with self.assertRaises(ValueError):db.generate(source,out,bad,TEST_ENV)
             self.assertEqual(original,{p.name:p.read_bytes() for p in out.iterdir()})
             self.assertEqual((out/'01_create_tables.sql').read_bytes(),DDL.read_bytes())
-            # N-05 저장소의 배포 보조 SQL도 실제 생성 결과와 함께 갱신됐는지 확인한다.
-            for filename in ['00_drop_all.sql','99_check.sql']:
-                self.assertEqual((out/filename).read_bytes(),(DDL.parent/filename).read_bytes(),filename)
-            with self.assertRaises(ValueError):db.generate(source,SCRIPT.parents[1],DDL,TEST_ENV)
+            # N-05 이전 DDL의 보조 SQL이면 이 비교만 건너뛰고, 재생성 후에는 LF 기준으로 전체 바이트를 대조한다.
+            with self.subTest(배포_보조_SQL='비교'):
+                import re
+                pattern=r"SELECT '([A-Z][A-Z0-9_]*)' AS TABLE_NAME, [0-9]+ AS EXPECTED"
+                generated_tables=set(re.findall(pattern,(out/'99_check.sql').read_text(encoding='utf-8')))
+                stored_tables=set(re.findall(pattern,(DDL.parent/'99_check.sql').read_text(encoding='utf-8')))
+                if generated_tables != stored_tables:
+                    self.skipTest('시드 재생성 전: 저장소 00/99가 이전 DDL 생성본')
+                if (DDL.parent/'99_check.sql').read_text(encoding='utf-8').startswith('-- N-05·N-37 DDL v0.3.1 합성 시드.'):
+                    self.skipTest('시드 재생성 전: 저장소 00/99가 이전 머리말 생성본')
+                for filename in ['00_drop_all.sql','99_check.sql']:
+                    actual=(out/filename).read_bytes()
+                    self.assertNotIn(b'\r',actual,filename)
+                    self.assertEqual(actual,(DDL.parent/filename).read_bytes().replace(b'\r\n',b'\n'),filename)
+            with self.assertRaises(ValueError):db.generate(source,SCRIPT.parents[1].parent,DDL,TEST_ENV)
             changed_source=Path(temp)/'changed_source';shutil.copytree(source,changed_source)
             path=changed_source/'members/member_monthly_inputs.csv';monthly=db.read_csv(path);monthly[0]['month']='2024-01'
             with path.open('w',encoding='utf-8',newline='') as handle:

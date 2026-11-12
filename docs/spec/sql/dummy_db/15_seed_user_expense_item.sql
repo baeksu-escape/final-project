@@ -1,4 +1,4 @@
--- N-05·N-37 DDL v0.3.1 합성 시드. 별도 개발 스키마 권장.
+-- N-05·N-37 서비스 DB 합성 시드 (DDL: docs/spec/sql/avenue_ddl.sql). 별도 개발 스키마 권장.
 SET DEFINE OFF
 -- USER_EXPENSE_ITEM: 400행
 INSERT INTO USER_EXPENSE_ITEM (EXPENSE_ID, USER_ID, BASE_MONTH, EXPENSE_GROUP_CODE, EXPENSE_CATEGORY, DESCRIPTION, MONTHLY_AMT) VALUES (1, 1, '2026-08', 'FIXED', NULL, '12개월 평균 월 지출(합성)', 1461547);
