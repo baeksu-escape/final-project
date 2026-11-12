@@ -1,5 +1,15 @@
 // N-15-3 나와 동년배·같은 직군 평균 수평 비교 막대 컴포넌트
 // 내 수치와 평균값을 수평 트랙 막대로 나란히 비교하여 보여 줍니다.
+// props
+//   label       : 비교 항목 이름 (예: '연소득'). 없으면 제목 줄을 그리지 않는다
+//   myValue     : 내 수치 (숫자)
+//   avgValue    : 비교 대상 평균 수치 (숫자)
+//   unit        : 숫자 뒤에 붙는 단위 (기본 '만원')
+//   maxValue    : 막대 100% 기준값. 없으면 myValue·avgValue 중 큰 값
+//   myLabel     : 내 막대 이름 (기본 '나')
+//   avgLabel    : 평균 막대 이름 (기본 '평균'. 예: '동년배 평균', '같은 직군 평균')
+//   formatValue : 숫자 표시 함수 (기본 천 단위 쉼표)
+// 사용 예: <CompareBar label="연소득" myValue={4200} avgValue={3800} avgLabel="동년배 평균" />
 
 export default function CompareBar({
   label,
