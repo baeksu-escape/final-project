@@ -1,0 +1,27 @@
+/* N-12-6 신용 리포트 전용 배치와 게이지. 공통 색상 토큰으로 테마를 따른다. */
+.credit-report { display: grid; gap: 20px; color: var(--fg); }
+.credit-report h1 { margin: 0; }
+.credit-report header p, .credit-hint { color: var(--mut); font-size: 0.875rem; }
+.credit-models { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+.credit-model { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.credit-model__header { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.credit-model__header h3 { margin: 0; font-size: 1rem; }
+.credit-model__header p { margin: 4px 0; color: var(--mut); font-size: 0.875rem; }
+.credit-grade { border-radius: 999px; padding: 4px 10px; font-size: 0.75rem; font-weight: 700; }
+.credit-grade--good { color: var(--ok-fg); background: var(--ok-bg); }
+.credit-grade--standard { color: var(--note-fg); background: var(--note-bg); }
+.credit-grade--caution { color: var(--warn-fg); background: var(--warn-bg); }
+.credit-diff { color: var(--mint); font-weight: 700; font-size: 0.875rem; }
+.credit-diff--negative { color: var(--bad); }
+.credit-gauge { display: block; width: 100%; max-width: 300px; margin: 0 auto; color: var(--mut); }
+.credit-gauge--alternative { color: var(--mint); }
+.credit-gauge__track, .credit-gauge__value { fill: none; stroke-width: 22; stroke-linecap: round; }
+.credit-gauge__track { stroke: var(--line); }
+.credit-gauge__value { stroke: currentColor; }
+.credit-gauge__tick { fill: var(--fg); }
+.credit-gauge__label { fill: var(--mut); font-size: 12px; }
+.credit-gauge__score { fill: currentColor; font-size: 50px; font-weight: 700; }
+.credit-unavailable { min-height: 150px; display: grid; place-items: center; color: var(--mut); }
+.credit-feature-title { color: var(--mut); font-size: 0.875rem; }
+.credit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.credit-chip--alternative .chip { color: var(--vio); border-color: var(--vio); background: var(--note-bg); }
