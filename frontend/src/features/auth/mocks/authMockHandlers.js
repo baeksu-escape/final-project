@@ -3,7 +3,7 @@ import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { MOCK_USERS, toMockToken } from '../../../common/mocks/mockUsers.js'
 import { ROLES } from '../../../common/config/roles.js'
 import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, EMAIL_PURPOSES, LOGIN_FAILED_MESSAGE } from '../authConstants.js'
-import { isValidEmail, isValidPassword, normalizePhone } from '../validation.js'
+import { isValidEmail, isValidPassword, normalizePhone, validateBirthYear } from '../validation.js'
 import {
   DEMO_ACCOUNT_CONTACTS,
   LOCKED_DEMO_ACCOUNT,
@@ -112,6 +112,9 @@ registerMockHandlers({
   'POST /api/auth/signup': ({ body }) => {
     if (body?.agreeCreditInfo !== true) throw new ApiError(400, '필수 동의 항목에 동의해 주세요.')
     if (!isValidPassword(body.password)) throw new ApiError(400, '비밀번호 규칙을 지켜 주세요.')
+    // N-02-1 출생연도 — 화면과 같은 규칙(validateBirthYear)으로 다시 검사하고, 어기면 칸별 오류로 돌려준다.
+    const birthYearError = validateBirthYear(body.birthYear)
+    if (birthYearError) throw new ApiError(400, birthYearError, { fieldErrors: [{ field: 'birthYear', message: birthYearError }] })
     if (accounts.some((item) => item.loginId === body.loginId)) {
       throw new ApiError(409, '이미 사용 중인 아이디입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_LOGIN_ID })
     }
@@ -132,6 +135,7 @@ registerMockHandlers({
       email: body.email,
       phone: normalizePhone(body.phone),
       ageGroup: body.ageGroup,
+      birthYear: Number(body.birthYear),
       user: { userId, name: body.name, role: ROLES.USER, jobType: null, hasScore: false },
     })
     return { userId }

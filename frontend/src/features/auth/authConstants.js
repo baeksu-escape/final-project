@@ -7,6 +7,16 @@ export const AGE_GROUP_OPTIONS = Object.freeze([
   { value: 'AGE_60_PLUS', label: '60대 이상' },
 ])
 
+// N-02 출생연도로 연령대 값(AGE_GROUP_OPTIONS의 value)을 계산한다. 나이 = 올해 − 출생연도(생일은 따지지 않는다).
+// 가입 요청의 ageGroup을 지우지 않고 함께 보내려고 둔다. TODO(D-20) 백엔드 가입 API가 확정되면 ageGroup과 이 함수를 제거한다.
+// 숫자가 아닌 값이면 null을 돌려준다(가입 화면은 출생연도 검사를 통과한 값만 넘긴다).
+export function toAgeGroup(birthYear, thisYear = new Date().getFullYear()) {
+  const decade = Math.floor((thisYear - Number(birthYear)) / 10)
+  if (!Number.isFinite(decade)) return null
+  const index = Math.min(Math.max(decade - 2, 0), AGE_GROUP_OPTIONS.length - 1)
+  return AGE_GROUP_OPTIONS[index].value
+}
+
 // 이메일 인증을 어디에 쓰는지 서버에 알려 주는 값. CHANGE_EMAIL은 마이페이지(FP-93)에서 쓴다.
 export const EMAIL_PURPOSES = Object.freeze({
   SIGNUP: 'SIGNUP',

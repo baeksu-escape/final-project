@@ -12,7 +12,9 @@ export const AUTH_FEATURE_API = Object.freeze({
   PASSWORD_RESET: '/api/auth/password/reset',
 })
 
-// N-02 회원가입 — { loginId, name, phone, email, password, ageGroup, agreeCreditInfo, emailVerificationToken } → { userId }
+// N-02 회원가입 — { loginId, name, phone, email, password, birthYear, ageGroup, agreeCreditInfo, emailVerificationToken } → { userId }
+//   birthYear: 출생연도(숫자). ageGroup은 birthYear로 계산해 함께 보낸다(authConstants.js toAgeGroup). TODO(D-20) 백엔드 확정 시 ageGroup 제거.
+//   400: 칸별 오류는 data.fieldErrors [{ field, message }]로 온다(예: field 'birthYear').
 export function requestSignup(payload) {
   return apiPost(AUTH_FEATURE_API.SIGNUP, payload)
 }

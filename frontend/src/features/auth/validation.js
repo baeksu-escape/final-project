@@ -33,6 +33,30 @@ export function isValidLoginId(value) {
 // 화면 안내·오류 문구에 쓰는 아이디 규칙 설명.
 export const LOGIN_ID_RULE_TEXT ='영문 소문자로 시작하는 4~20자 영문 소문자·숫자'
 
+// N-02-1 가입 출생연도 — 팀 결정(A안) — 출생연도만 받으므로 생일 경과는 따지지 않고 '올해 20세가 되는 해까지'로 판단한다.
+// 하한 1930은 DDL v0.3.2 APP_USER.BIRTH_YEAR CHECK(1930~2006)와 같다.
+// TODO DDL CHECK의 상한은 2006으로 고정돼 있어, 2027년부터는 화면 상한(올해 − 20)과 달라진다. DB 담당과 CHECK 상한을 맞춰야 한다.
+export const BIRTH_YEAR_MIN = 1930
+export const MIN_SIGNUP_AGE = 20
+
+// 가입할 수 있는 가장 늦은 출생연도(올해 − 20). 연도를 코드에 박지 않고 실행 시점의 올해로 계산한다.
+export function getMaxBirthYear() {
+  return new Date().getFullYear() - MIN_SIGNUP_AGE
+}
+
+// 출생연도를 검사해 오류 문구를 돌려준다. 문제가 없으면 ''. 가입 화면과 가입 mock이 같은 규칙을 쓴다.
+// 4자리 정수이고 1930 ≤ 출생연도 ≤ (올해 − 20)이어야 한다.
+export function validateBirthYear(value) {
+  const text = String(value ?? '').trim()
+  if (!text) return '출생연도를 넣어 주세요.'
+  const maxYear = getMaxBirthYear()
+  const year = Number(text)
+  if (!/^\d{4}$/.test(text) || year < BIRTH_YEAR_MIN || year > maxYear) {
+    return `올해 기준 ${MIN_SIGNUP_AGE}세 이상(${maxYear}년생까지)만 가입할 수 있습니다. 출생연도를 확인해 주세요.`
+  }
+  return ''
+}
+
 // 새 비밀번호와 확인 값을 검사해 { password?, passwordConfirm? } 오류 객체를 돌려준다(재설정 화면과 가입 화면이 함께 쓴다).
 export function validateNewPassword(password, passwordConfirm) {
   const errors = {}
@@ -60,7 +84,8 @@ export function validateSignup(form, { emailVerified }) {
 
   Object.assign(errors, validateNewPassword(form.password, form.passwordConfirm))
 
-  if (!form.ageGroup) errors.ageGroup = '연령대를 선택해 주세요.'
+  const birthYearError = validateBirthYear(form.birthYear)
+  if (birthYearError) errors.birthYear = birthYearError
   if (!form.agreeCreditInfo) errors.agreeCreditInfo = '필수 동의 항목입니다.'
   return errors
 }

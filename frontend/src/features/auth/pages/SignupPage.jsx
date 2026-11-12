@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Checkbox, Select, TextInput } from '../../../common/components/index.js'
+import { Checkbox, TextInput } from '../../../common/components/index.js'
 import { requestSignup } from '../api/authFeatureApi.js'
-import { AGE_GROUP_OPTIONS, AUTH_ERROR_CODES, CREDIT_INFO_AGREEMENT_LABEL, EMAIL_PURPOSES } from '../authConstants.js'
+import { AUTH_ERROR_CODES, CREDIT_INFO_AGREEMENT_LABEL, EMAIL_PURPOSES, toAgeGroup } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
 import EmailVerification from '../components/EmailVerification.jsx'
 import PasswordRuleList from '../components/PasswordRuleList.jsx'
-import { LOGIN_ID_RULE_TEXT, normalizePhone, validateSignup } from '../validation.js'
+import { LOGIN_ID_RULE_TEXT, MIN_SIGNUP_AGE, getMaxBirthYear, normalizePhone, validateSignup } from '../validation.js'
 
-// 가입 화면 입력값의 처음 상태.
+// 가입 화면 입력값의 처음 상태. N-02-1 연령대 선택 대신 출생연도(4자리 숫자 글자)를 받는다.
 const EMPTY_FORM = {
   loginId: '',
   name: '',
@@ -17,7 +17,7 @@ const EMPTY_FORM = {
   email: '',
   password: '',
   passwordConfirm: '',
-  ageGroup: null,
+  birthYear: '',
   agreeCreditInfo: false,
 }
 
@@ -65,7 +65,8 @@ export default function SignupPage() {
         phone: normalizePhone(form.phone),
         email: form.email,
         password: form.password,
-        ageGroup: form.ageGroup,
+        birthYear: Number(form.birthYear),
+        ageGroup: toAgeGroup(form.birthYear),
         agreeCreditInfo: form.agreeCreditInfo,
         emailVerificationToken: verification.verificationToken,
         ...(socialSignup?.linkKey ? { socialLinkKey: socialSignup.linkKey } : {}),
@@ -73,9 +74,13 @@ export default function SignupPage() {
       setCompleted(true)
     } catch (error) {
       const code = error?.data?.code
+      const fieldErrors = error?.data?.fieldErrors
       if (code === AUTH_ERROR_CODES.DUPLICATE_LOGIN_ID) setServerErrors({ loginId: error.message })
       else if (code === AUTH_ERROR_CODES.DUPLICATE_EMAIL) setServerErrors({ email: error.message })
-      else setFormError(error.message)
+      // 서버가 칸별 오류(fieldErrors [{ field, message }])를 주면 그 칸 옆에 보여 준다(예: 출생연도).
+      else if (Array.isArray(fieldErrors) && fieldErrors.length > 0) {
+        setServerErrors(Object.fromEntries(fieldErrors.map(({ field, message }) => [field, message])))
+      } else setFormError(error.message)
     } finally {
       setPending(false)
     }
@@ -143,13 +148,15 @@ export default function SignupPage() {
           error={errors.passwordConfirm}
           autoComplete="new-password"
         />
-        <Select
-          label="연령대"
-          options={AGE_GROUP_OPTIONS}
-          value={form.ageGroup}
-          onChange={update('ageGroup')}
-          placeholder="선택하세요"
-          error={errors.ageGroup}
+        <TextInput
+          label="출생연도"
+          value={form.birthYear}
+          onChange={update('birthYear')}
+          error={errors.birthYear}
+          hint={`연령대별 기준을 고르는 데 씁니다. 올해 기준 ${MIN_SIGNUP_AGE}세 이상(${getMaxBirthYear()}년생까지) 가입할 수 있습니다.`}
+          autoComplete="bday-year"
+          inputMode="numeric"
+          maxLength={4}
         />
         <Checkbox
           label={CREDIT_INFO_AGREEMENT_LABEL}
