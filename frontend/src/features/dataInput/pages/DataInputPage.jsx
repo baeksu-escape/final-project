@@ -139,6 +139,12 @@ export default function DataInputPage() {
     setStatus((prev) => (prev ? { ...prev, altData: { ...prev.altData, [sourceKey]: true } } : prev))
   }
 
+  // N-05-9 [연결 해제]하면 서버가 그 동의로 불러온 데이터를 지우므로, 화면에서도 표 데이터를 지우고 완료 현황을 미완료로 바꾼다.
+  const handleAltDisconnected = (sourceKey) => {
+    setAltData((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => key !== sourceKey)))
+    setStatus((prev) => (prev ? { ...prev, altData: { ...prev.altData, [sourceKey]: false } } : prev))
+  }
+
   // N-05-8 [점수 산출하기] — 마지막으로 저장한 입력으로 산출을 요청하고, 성공하면 신용 리포트로 보낸다.
   const handleCalculateScore = async () => {
     setCalculating(true)
@@ -219,7 +225,12 @@ export default function DataInputPage() {
       </form>
 
       <InputStatus status={status} savedAt={savedAt} notices={notices} />
-      <AltDataImport baseMonth={values.baseMonth} imported={altData} onImported={handleAltImported} />
+      <AltDataImport
+        baseMonth={values.baseMonth}
+        imported={altData}
+        onImported={handleAltImported}
+        onDisconnected={handleAltDisconnected}
+      />
 
       <button
         type="button"
