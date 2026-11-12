@@ -14,7 +14,7 @@ export const GRADE_LABELS = Object.freeze({
   [GRADES.CAUTION]: 'Caution',
 })
 
-// 기존·대안 모델 점수 범위 — DDL v0.2 CHECK와 같은 0~1000. TODO(D-01) 모형 학습 후 환산식이 정해지면 다시 맞춘다.
+// 기존·대안 모델 점수 범위 — DDL v0.3.2 CHECK와 같은 0~1000. TODO(D-01) 모형 학습 후 환산식이 정해지면 다시 맞춘다.
 export const SCORE_RANGE = Object.freeze({ MIN: 0, MAX: 1000 })
 
 // 등급 경계 점수 — Good 780 이상, Standard 665 이상, 그 아래는 Caution. TODO(D-01) 모형 학습 후 다시 정한다.
