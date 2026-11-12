@@ -52,8 +52,11 @@ export function withdrawConsent(consentId) {
   return apiDelete(DATA_INPUT_API.consent(consentId))
 }
 
-// N-05-8 [점수 산출하기] — 저장된 입력으로 점수 산출을 요청한다 → { calculatedAt }
-// TODO(D-20) B팀 점수 산출 API 명세가 나오면 이 함수의 경로와 응답을 맞춘다.
-export function requestScoreCalculation() {
-  return apiPost(DATA_INPUT_API.SCORE_CALCULATION)
+// N-05-8 [점수 산출하기] — 저장된 입력으로 점수 산출을 요청한다(Avenue API 명세서 B팀 v0.2 3-1 RPT-01).
+//   요청: { requestId } — 소문자 UUID. 네트워크 오류로 다시 보낼 때는 같은 값을 보내 서버가 한 번만 계산하게 한다.
+//   응답: { calculatedAt, requestId, gradeStatusCode, notScorableReasonCode,
+//           alternative: { score, gradeBandCode }, traditional: { scorableYn, score, gradeBandCode } }
+//   409: { code: 'INPUT_INCOMPLETE' | 'JOB_TYPE_REQUIRED' | 'REQUEST_ID_CONFLICT' } (validation/serverErrors.js SCORE_ERROR_CODES)
+export function requestScoreCalculation(requestId) {
+  return apiPost(DATA_INPUT_API.SCORE_CALCULATION, { requestId })
 }
