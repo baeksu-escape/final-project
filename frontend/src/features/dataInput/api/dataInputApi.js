@@ -10,7 +10,7 @@ export const DATA_INPUT_API = Object.freeze({
   SCORE_CALCULATION: '/api/members/me/score-calculation',
   altDataImport: (apiSegment) => `/api/members/me/alt-data/${apiSegment}/import`,
   // N-05-9 정보 제공 동의 — 목록 조회(GET)·동의(POST)·[연결 해제](DELETE /{consentId}).
-  // 🟡 API 정의서 v0.1 제안 경로 — 확정되면 이 줄만 바꾼다.
+  // 🟡 API 정의서 v0.1 제안 경로 — 확정되면 이 줄만 바꾼다
   CONSENTS: '/api/members/me/consents',
   consent: (consentId) => `/api/members/me/consents/${consentId}`,
 })
