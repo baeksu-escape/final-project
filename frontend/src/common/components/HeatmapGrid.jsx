@@ -1,5 +1,20 @@
 // N-26-3, N-26-6 직군 × 연령 격자형 히트맵 컴포넌트
 // 2차원 매트릭스 형태로 집단별 수치를 명도 램프로 표시하고, 내 위치 및 셀 선택 인터랙션을 제공합니다.
+// props
+//   rows    : 행 이름 목록 (기본 직군 3개)
+//   columns : 열 이름 목록 (기본 연령대 4개)
+//   data    : 2차원 배열. data[행 번호][열 번호] = 칸 값
+//     칸 값은 숫자 또는 { value: 수치, count: 인원 수(없으면 생략) }
+//     예: [[612, 640, ...], [{ value: 590, count: 1200 }, ...], ...]
+//   myCell       : 내 위치 칸 [행 번호, 열 번호]. '나' 표시를 붙인다. 없으면 null
+//   selectedCell : 선택된 칸 [행 번호, 열 번호]. 테두리를 강조한다
+//   onSelectCell : 칸을 눌렀을 때 호출 (rowIndex, colIndex, { value, count })
+//   unit         : 숫자 뒤 단위 (기본 '점')
+//   rowSummary   : 행마다 오른쪽 끝에 붙일 요약값 배열 (제목 '직군 평균'). 비우면 열을 그리지 않는다
+//   colSummary   : 열마다 맨 아래에 붙일 요약값 배열 (제목 '연령 평균')
+//   totalSummary : 맨 아래 오른쪽 끝 전체 평균 (colSummary가 있을 때만 보인다)
+// 칸 색은 data 안의 최솟값~최댓값 기준으로 진하기가 정해진다.
+// 사용 예: <HeatmapGrid data={scores} myCell={[1, 2]} onSelectCell={(r, c, cell) => setPicked([r, c])} />
 import React from 'react';
 
 export default function HeatmapGrid({
