@@ -8,7 +8,7 @@
 | 가입 회원 더미 | `build_members.py` | `service_dummy/members/` |
 | 외부 금융·통신·간편결제·공공보험·신용평가사·공과금 API 더미 응답 | `build_external_api.py` | `service_dummy/external_api/` |
 
-기준점과 가정 값은 모두 `reference/service_dummy_anchors.json` 한 곳에 둔다. 각 값에 `basis`(statistic/assumption/statute)와 출처를 적는다. 판단 로직은 `service_dummy_logic.py`의 순수 함수에 있고 `test_service_dummy_logic.py`가 고정 예제로 검사한다.
+기준점과 가정 값은 `reference/service_dummy_anchors.json`에, 대출 종류 매핑은 `reference/loan_type_mapping.json`에 둔다. 각 값에 근거를 적고 고정 예제로 검사한다.
 
 ## 학습 데이터와의 분리
 
@@ -31,6 +31,11 @@
 - `ledgers/`: 외부 API 응답의 근거 원장(대출·카드·카드 이용·통신 미납 월, v3.5.0부터 `digital_payment_monthly.csv`·`social_insurance_monthly.csv`). 서비스 전달 대상이 아니라 API 더미의 정합성 확인용이다.
 - 간편결제·사회보험 원장은 학습 데이터와 같은 규칙(`NONFINANCIAL_SOURCES.md`)을 회원 시드(20261101, 오프셋 2)로 실행해 만든다. 위험 기울기 같은 설계값은 저장하지 않는다.
 
+## 대출 종류·금리 방식 (N-05-3)
+
+- 회원 원장과 금융 응답의 대출 목록에 `loan_type_code`와 `rate_type`을 추가한다. 종류 매핑은 시연 가정이다(`basis=assumption`). kind 0은 CREDIT, 그중 카드 업권(sector 1)은 CARD_LOAN, 1·7은 MORTGAGE, 2·3·4·5·6·8은 OTHER다. JEONSE와 BUSINESS_OPERATING은 대응 원천 코드가 없어 생성되지 않는다.
+- 금리 방식은 회원 계좌 ID의 SHA-256 앞 8자리 정수의 홀짝으로 정한다. 짝수 FIXED, 홀수 VARIABLE이며 학습 데이터와 같은 함수를 사용한다(학습 출력은 소문자). 난수는 사용하지 않는다.
+
 ## 외부 금융·통신 API 더미 응답
 
 - 회원당 금융 1건, 통신 1건의 JSON 응답을 JSON Lines로 저장한다. 기관 데이터는 시작 동의 상태와 무관하게 전 회원 몫을 생성하며 응답은 전원 `status=OK`다.
@@ -47,7 +52,7 @@
 
 ## 서비스 등급과 상태 코드 (v3.5.7, v3.5.12 수정)
 
-회원 등급은 학습 데이터의 `CB`가 아니라 **모델 점수**를 구간으로 나눠 정한다. 점수 산식은 모델 팀이 정하고, 이 패키지는 이름과 코드만 정한다. 결과는 DB의 `MEMBER_CREDIT_GRADE`(틀만 있음, 시드 없음)에 넣는다.
+회원 등급은 학습 데이터의 `CB`가 아니라 **모델 점수**를 구간으로 나눠 정한다. 점수 산식은 모델 팀이 정하고, 이 패키지는 이름과 코드만 정한다. 결과는 서비스 DB(v0.3.2)에서는 `ASSESSMENT`(틀만 있음, 시드 없음)에 넣는다. 옛 더미 DB(`dummy_db/`, v2.x)에서는 같은 역할의 표가 `MEMBER_CREDIT_GRADE`였다.
 
 | 상태 `GRADE_STATUS_CODE` | 뜻 | 화면 예시 | 등급 `GRADE_BAND_CODE` |
 |---|---|---|---|
@@ -94,20 +99,23 @@ python -m generate.build_external_api   # build_members 출력 필요
 
 모두 2차 보도로 확인한 값이다. 최종 생성 전에 한국은행·여신금융협회 원 공시로 수치를 대조하는 것이 좋다.
 
-## v0.2 DB 시드와 백엔드 개인정보 규격 (N-02-4, N-05)
+## 서비스 DB 시드(v0.3.2)와 백엔드 개인정보 규격 (N-02-4, N-05)
 
-새 DB 생성기는 `docs/spec/sql/dummy_db/tools/build_db_v02.py`, 합의 전 초안 DDL·안내는 `docs/spec/sql/dummy_db/v0_2/`다. 옛 DB 생성기·SQL·README는 보존한다. 겹치는 테이블 이름이 있어 별도 Oracle 개발 스키마 적재를 권장한다. 받은 v0.2 DDL은 수정 없이 복사했다.
+DB 생성기는 `docs/spec/sql/dummy_db/tools/build_db.py`, 기준 DDL은 `docs/spec/sql/avenue_ddl.sql`의 v0.3.2(51개 표)다. 별도 Oracle 개발 스키마 적재를 권장한다. 시연 계정은 직군별 사용자 3명(`demo_employee`·`demo_self`·`demo_free`)과 관리자 `demo_admin`(N-01-5)이다.
+
+- v0.3.2의 `USER_LOAN.CONSENT_ID`는 불러온 대출이면 필수, 직접 입력이면 NULL이다. 통신비·공과금·간편결제·사회보험·신용 프로필에도 같은 출처·동의 ID 규칙이 있다. 동의는 최대 1년이며 만료·철회·탈퇴 시 해당 동의로 불러온 행을 삭제한다. 기존 시드는 새 DDL에 맞춰 사용자가 다시 생성한다. 이 변경은 학습 데이터 자체를 바꾸지 않는다.
 
 - `generate.build_members`는 기존 회원·12개월 입력·원장 값을 유지하고 **`members/member_asset_snapshots_v02.csv`**만 추가한다(`member_id`, `base_month`, `total_asset_amt`). 기존 합성 프로필의 자산 원 단위 값을 그대로 옮기며 새 난수를 소비하지 않는다.
 - v0.2 소득 시드는 급여소득자 `SALARY` 1행, 자영업·프리랜서 `MONTHLY_INCOME` 12행이다. 기준월은 임시 **2026-08(TODO(D-16))**이며 지출·대출·자산은 한 세트다. 지출은 회원당 `FIXED` 1행 = 원천 12개월 평균 월 지출(원 단위 ROUND_HALF_UP). 평가 시드는 비운다.
-- 미확정 대출 종류·금리 방식은 사용자 승인으로 `OTHER`·`UNKNOWN`을 사용한다(TODO(D-27)). 상세 매핑·없는 원천 필드·동의 처리와 원장 대조는 `v0_2/README.md`에 적었다.
+- 대출 종류·금리 방식은 원장 `members/ledgers/loans.csv`의 `loan_type_code`·`rate_type`에서 읽는다(기관 응답 `loanTypeCode`와 같은 원천 값). 두 필드가 없는 옛 원천은 `OTHER`·`UNKNOWN`으로 처리한다. 종류 매핑은 가정이며 대출 입력 항목은 미확정이다(TODO(D-27)).
 - 기관 데이터는 동의와 무관하게 전 회원 몫을 생성하고 응답은 전원 `status=OK`다. 동의는 목 서버가 요청 시 확인하며 `members.csv.external_data_consent`는 시연 시작 동의 상태다. v0.2 시드의 USER_CONSENT와 대안 데이터 IMPORTED 행은 이 시작 상태로 제한한다. DB 생성기는 종전 동의 제한 응답도 호환 입력으로 지원하며 응답 status를 동의로 해석하지 않는다.
-- 전 회원의 대출 원장은 보존한다. 시작 동의 회원은 `USER_LOAN.SOURCE_CODE=IMPORTED`, 미동의 회원은 `MANUAL`이며 회원별 월 상환 합계가 원천 기준월 상환액과 같아야 한다. 받은 USER_LOAN DDL에는 CONSENT_ID 열이 없어 추가하지 않았다(개정으로 생기면 MANUAL은 NULL). 상품별 최소점수·점수대 참고 범위의 시연 가정은 `v0_2/README.md`를 따른다.
-- **공과금 테이블은 DDL 개정 후 추가 예정.** 기존 서비스 더미의 공과금 원장·응답과 학습 피처는 유지하며, 현재 v0.2 SQL 시드에서만 제외한다. 청구·납부 변환은 새 생성기의 `map_bill_rows()`로 분리했다.
+- 전 회원의 대출 원장은 보존한다. 시작 동의 회원은 `USER_LOAN.SOURCE_CODE=IMPORTED`, 미동의 회원은 `MANUAL`이며 회원별 월 상환 합계가 원천 기준월 상환액과 같아야 한다. v0.3.2에서는 불러온 대출에 동의 ID를 연결한다. 상품별 최소점수·점수대 참고 범위의 시연 가정은 `docs/spec/sql/dummy_db/README.md`를 따른다.
+- **공과금 표:** 공과금 응답은 통신비와 같은 `map_bill_rows()`로 `USER_UTILITY_PAYMENT`에 넣고, 동의는 `PROVIDER_CODE=utility`, `ITEM_CODE=UTILITY_BILL`이다. 시작 동의 회원만 IMPORTED 행이다.
+- **납부 상태(v0.3.1 U3):** DB에는 `ON_TIME`(납부일 ≤ 기한), `LATE`(납부일 > 기한), `UNPAID`(납부일 NULL)로 저장한다. 기관 응답의 `late` + `paid_date=null`은 `UNPAID`로 바꾼다. 응답 파일 자체는 바꾸지 않는다. 미납 개월 수(`telecom_late`·`utility_late`)는 LATE + UNPAID와 같다(U2).
 
-**백엔드와 맞출 암호화 규격:** 이름·휴대폰·이메일은 UTF-8 → **AES-256-GCM**으로 암호화한다. 값마다 독립적인 **12바이트 난수 IV**, AAD 없음. DB 문자열은 표준 **Base64(IV 12바이트 + 암호문 + 인증 태그 16바이트)**다. 복호화 시 앞 12바이트를 IV로 분리하고 나머지 암호문+태그를 인증 복호화한다. 실제 암호문 길이를 DDL 열 길이와 대조한다.
+**백엔드와 맞출 암호화 규격:** 이름·휴대폰·이메일은 UTF-8 → **AES-256-GCM**으로 암호화한다. 값마다 독립적인 **12바이트 난수 IV**, AAD 없음. DB 문자열은 키 버전 접두어 **`v1:` + 표준 Base64(IV 12바이트 + 암호문 + 인증 태그 16바이트)**다(DDL v0.3.1 E2). 복호화 시 첫 `:` 앞 버전으로 키를 고르고(모르는 버전이면 오류), Base64를 푼 뒤 앞 12바이트를 IV로 분리하고 나머지 암호문+태그를 인증 복호화한다. 실제 암호문 길이를 DDL 열 길이와 대조한다.
 
-검색용 값은 **별도 키의 HMAC-SHA256**, UTF-8, **64자 소문자 16진수**다. 이메일은 trim+소문자, 휴대폰은 ASCII 숫자만 남긴 뒤 HMAC을 계산한다. 저장 암호문의 원문 자체는 이 검색 정규화와 구분한다.
+검색용 값은 **별도 키의 HMAC-SHA256**, UTF-8, **64자 소문자 16진수**다. 이메일은 trim+소문자, 휴대폰은 ASCII 숫자만 남긴 뒤 HMAC을 계산한다. HMAC 열에는 접두어를 붙이지 않는다. 저장 암호문의 원문 자체는 이 검색 정규화와 구분한다.
 
-키는 **`AVENUE_DEV_AES_KEY`**, **`AVENUE_DEV_HMAC_KEY`** 환경변수의 Base64 값으로만 받는다. AES는 디코딩 후 정확히 32바이트, HMAC은 최소 32바이트의 별도 키이며 두 키가 같으면 거부한다. 키가 없으면 파일 쓰기 전에 오류로 중단한다. 키·키 지문·원문을 저장소·생성 SQL·로그에 남기지 않는다. `.env`·application 설정 파일은 읽지 않는다. 테스트의 공개 고정 키는 실제 키가 아니며, 어떤 키로 커밋용 시드를 만들지는 사용자 결정 전이다. 기본 의존성은 이 패키지의 `requirements.txt`에만 추가한 `cryptography==50.0.2`다.
+키는 **`AVENUE_DEV_AES_KEY`**, **`AVENUE_DEV_HMAC_KEY`**의 Base64 값으로 받는다. 환경변수 또는 `--env-file`로 지정한 저장소 밖 env 파일에서 읽고, 시연 계정 비밀번호 `AVENUE_DEMO_PASSWORD`도 같은 곳에서 읽는다. AES는 디코딩 후 정확히 32바이트, HMAC은 최소 32바이트의 별도 키이며 두 키가 같으면 거부한다. 키가 없으면 파일 쓰기 전에 오류로 중단한다. 키·키 지문·원문을 저장소·생성 SQL·로그에 남기지 않는다. 저장소의 `.env`·application 설정 파일은 읽지 않는다. 커밋용 시드는 팀 개발 키 한 쌍(디스코드 비공개 채널로 공유)으로 만들어 커밋한다(절차는 `docs/spec/sql/dummy_db/README.md`). 테스트의 공개 고정 키·비밀번호는 실제 값이 아니다. 의존성은 이 패키지의 `requirements.txt`에 있는 `cryptography==50.0.2`, `bcrypt==5.0.0`이다.
 

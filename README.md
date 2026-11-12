@@ -12,7 +12,7 @@
 ## 데이터 위치
 | 위치 | 누가 읽나 | 내용 |
 |------|-----------|------|
-| `docs/spec/sql/dummy_db/` | 사람·AI | 서비스 개발용 더미 Oracle 21c DB (테이블 14개 + 시드). `run_all.sql` 실행 후 `99_check.sql`로 확인, 개발 DB에서만 |
+| `docs/spec/sql/dummy_db/` | 사람·AI | 서비스 개발용 더미 Oracle 21c DB (테이블 47개 + 시드). `run_all.sql` 실행 후 `99_check.sql`로 확인, 개발 DB에서만 |
 | `fastapi_server/data_generation/` | B조·AI | 합성 데이터 생성 코드(현재 버전은 `fastapi_server/data/README.md`). 필드 정의 기준은 `data_generation/docs/DATA_DICTIONARY.csv` |
 | `fastapi_server/data/` | B조 | 학습용 데이터. **Git 제외**, 공유 드라이브에서 받아 `fastapi_server/data/training/` 안에 압축 해제. 버전·폴더 구조는 `fastapi_server/data/README.md` |
 

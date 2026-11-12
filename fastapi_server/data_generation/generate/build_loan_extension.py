@@ -4,6 +4,7 @@ import ast,copy,json,hashlib,csv
 from decimal import Decimal,ROUND_HALF_UP
 import numpy as np,pandas as pd
 from generate.synthesis_logic import quantize_rate,amortization_rows
+from generate.loan_classification import rate_type
 R=Path(__file__).resolve().parents[1]
 
 def money(x):return int(Decimal(str(x)).quantize(Decimal('1'),rounding=ROUND_HALF_UP))
@@ -58,7 +59,7 @@ def run():
  repayment_config=json.loads((R/'reference/repayment_method_assumptions.json').read_text(encoding='utf-8'))
  loans['repayment_method']=assign_repayment_methods(loans.account_id,loans.kind,repayment_config)
  loans['repayment_method_basis']=repayment_config['assignment_basis']
- loans['rate_type']=['variable' if int(hashlib.sha256(x.encode()).hexdigest()[:8],16)%2 else 'fixed' for x in loans.account_id]
+ loans['rate_type']=[rate_type(x) for x in loans.account_id]
  loans['rate_type_basis']='deterministic_demo_assumption'
  loans['as_of_date']='2026-09-18';loans['schedule_start']='2026-10'
  loans.to_csv(out/'loans.csv',index=False)
