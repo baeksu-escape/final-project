@@ -1,8 +1,8 @@
 """6-month aggregates of the figures a service member enters (income, living expense, debt service), for both cohorts.
 
-v3.5.7. Members enter only the latest 6 complete months (reference/service_dummy_anchors.json
-members.input_months), so the model table uses these aggregates instead of the 12-month ones in
-profiles.csv. Reads monthly_history.csv and digital_payment_monthly.csv; writes input_features_6m.csv
+v3.5.7. 기존 최근 완결 6개월 집계를 호환용으로 보존한다(v3.5.13). v3.5.11부터 회원 입력은
+12개월(members.input_months)이고, 보존·참고용 집계 기간은 members.model_feature_months_6m(6개월)가 정한다.
+Reads monthly_history.csv and digital_payment_monthly.csv; writes input_features_6m.csv
 next to them. Does not change any other file. Run after build_nonfinancial_sources.
 """
 from pathlib import Path
@@ -10,6 +10,7 @@ import argparse, json
 import numpy as np
 import pandas as pd
 from generate.synthesis_logic import inject_anomalies
+from generate.input_feature_logic import aggregate_input_features
 
 ROOT = Path(__file__).resolve().parents[1]
 COLUMNS = ['customer_id', 'income_6m_krw', 'expense_6m_krw', 'debt_service_6m_krw', 'expense_ratio_6m', 'dsr_6m',
@@ -18,32 +19,14 @@ COLUMNS = ['customer_id', 'income_6m_krw', 'expense_6m_krw', 'debt_service_6m_kr
 
 
 def input_months():
+    """N-05-2 호환용 6개월 집계 기간을 읽는다. 기본 학습 기간 12개월과 분리해 기존 값을 보존한다."""
     a = json.loads((ROOT/'reference/service_dummy_anchors.json').read_text(encoding='utf-8'))
-    return a['members']['input_months']['value']
+    return a['members']['model_feature_months_6m']['value']
 
 
 def input_features_6m(monthly, payment, months):
-    """Aggregates over `months` from the three entered fields only. Net cash is recomputed as
-    income - expense - debt service (what a member's inputs allow). Ratios are null when income is 0."""
-    h = monthly[monthly.month.isin(months)]
-    if (h.groupby('customer_id').month.nunique() != len(months)).any() or h.customer_id.nunique() != monthly.customer_id.nunique():
-        raise ValueError('every customer needs exactly the input months in monthly_history')
-    net = h.income_krw - h.expense_total_krw - h.debt_service_krw
-    g = h.assign(net=net).groupby('customer_id')
-    inc, exp, debt = g.income_krw.sum(), g.expense_total_krw.sum(), g.debt_service_krw.sum()
-    mean = g.income_krw.mean()
-    safe = lambda s: s.where(s > 0)
-    dp = payment[payment.month.isin(months)].groupby('customer_id').payment_amount_krw.sum().reindex(inc.index, fill_value=0)
-    f = pd.DataFrame(dict(
-        income_6m_krw=inc, expense_6m_krw=exp, debt_service_6m_krw=debt,
-        expense_ratio_6m=exp / safe(inc), dsr_6m=debt / safe(inc),
-        income_cv_6m=g.income_krw.std(ddof=0) / safe(mean),
-        zero_income_months_6m=g.income_krw.apply(lambda x: int((x == 0).sum())),
-        deficit_months_6m=g.net.apply(lambda x: int((x < 0).sum())),
-        worst_month_net_cash_6m_krw=g.net.min(),
-        dp_payment_amount_6m_krw=dp.astype('int64'),
-        dp_amount_to_income_6m=dp / safe(inc)))
-    return f.reset_index()[COLUMNS]
+    """N-05-2 기존 6개월 입력 집계를 공통 수식으로 계산한다. 0소득의 비율은 NULL로 남긴다."""
+    return aggregate_input_features(monthly, payment, months, 6)[COLUMNS]
 
 
 def anomaly_spec():

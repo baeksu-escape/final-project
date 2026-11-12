@@ -1,0 +1,60 @@
+{
+  "description": "v3.6.0 서비스 정의 열(input_features_12m.csv의 *_svc_*·expense_avg_month_krw·debt_service_current_krw)에 넣는 전처리 시연용 결측·이상치. 기존 12개월 설정(anomaly_injection_12m.json)·로그와 따로 둔다. 비율은 기존과 같은 교육용 가정이며 통계 근거가 없다. 파생 비율은 주입 전 값으로 유지하고 원천·서비스 더미·라벨은 변경하지 않는다.",
+  "seed": {
+    "value": 20261115,
+    "basis": "assumption",
+    "note": "기존 설정 seed(20261101·04·05·10·13)와 data_split seed 20261114와 중복 없음. 폴더마다 [seed, 폴더 순번]으로 독립 난수를 만든다"
+  },
+  "target_file": "input_features_12m.csv",
+  "log_file": "anomaly_log_12m_svc.csv",
+  "rate_unit": "각 파일에서 열마다 행 수 x 비율(반올림)칸",
+  "rules": [
+    {
+      "type": "missing",
+      "columns": [
+        "income_svc_12m_krw",
+        "expense_avg_month_krw",
+        "debt_service_current_krw"
+      ],
+      "rate": {
+        "value": 0.01,
+        "basis": "assumption",
+        "note": "교육용 가정, 통계 근거 없음"
+      },
+      "injected_value": "빈 값(null)"
+    },
+    {
+      "type": "unit_error",
+      "columns": [
+        "income_svc_12m_krw",
+        "expense_avg_month_krw"
+      ],
+      "rate": {
+        "value": 0.005,
+        "basis": "assumption",
+        "note": "교육용 가정, 통계 근거 없음"
+      },
+      "factor": {
+        "value": 1000,
+        "basis": "assumption",
+        "note": "원·천원 혼동을 가정해 원래 값 x 1,000. 원래 값이 0이면 바뀌지 않으므로 0이 아닌 칸만 뽑는다. 교육용 가정, 통계 근거 없음"
+      }
+    },
+    {
+      "type": "negative",
+      "columns": [
+        "debt_service_current_krw"
+      ],
+      "rate": {
+        "value": 0.003,
+        "basis": "assumption",
+        "note": "교육용 가정, 통계 근거 없음"
+      },
+      "factor": {
+        "value": -1,
+        "basis": "assumption",
+        "note": "원래 값 x -1. 원래 값이 0이 아닌 칸만 뽑는다. 교육용 가정, 통계 근거 없음"
+      }
+    }
+  ]
+}

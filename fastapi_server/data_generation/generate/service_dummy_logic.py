@@ -91,8 +91,8 @@ def make_members(profiles, ages, cfg, as_of, rng):
 
 def make_monthly_inputs(monthly, members, ids, cfg, as_of, rng):
     """Member-entered monthly figures with the date each month was entered.
-    v3.5.7: only the months in cfg['input_months'] (the latest 6 complete months) are kept. Dates are drawn
-    for every source month first so the kept months have the same input dates as the 12-month version."""
+    cfg['input_months']의 달만 남긴다. v3.5.11부터 최근 완결 12개월이다(v3.5.7~v3.5.10은 6개월).
+    입력일은 원천의 모든 달에 대해 먼저 뽑으므로 기간을 바꿔도 남는 달의 입력일은 같다."""
     as_of = pd.Timestamp(as_of)
     mm = monthly[monthly.customer_id.isin(ids)].copy()
     mm['member_id'] = mm.customer_id.map(ids)
@@ -117,9 +117,21 @@ def remap_ledger(frame, ids, account_prefix_col='account_id'):
     return f.rename(columns={'customer_id': 'member_id'}).reset_index(drop=True)
 
 
+def make_v02_asset_snapshots(profiles, ids, base_month):
+    """N-05-4 v0.2용 회원 자산 스냅샷만 추가한다. 기존 회원·원장 출력과 난수 소비는 바꾸지 않는다."""
+    source = profiles[profiles.customer_id.isin(ids)]
+    if source.customer_id.duplicated().any() or len(source) != len(ids):
+        raise ValueError('v0.2 asset source must cover each member exactly once')
+    values = source.asset_total_krw
+    if values.isna().any() or (values < 0).any() or (values % 1 != 0).any():
+        raise ValueError('v0.2 asset source requires nonnegative integer KRW')
+    return pd.DataFrame(dict(member_id=source.customer_id.map(ids).to_numpy(), base_month=base_month,
+                             total_asset_amt=values.astype('int64').to_numpy()))
+
+
 def check_members(members, monthly_inputs, as_of, training_seed, member_seed, input_months=None):
     errors = []
-    if input_months is not None:                       # v3.5.7: every member enters exactly these months
+    if input_months is not None:                       # 회원마다 입력 기간의 달을 정확히 입력해야 한다(v3.5.11부터 12개월)
         got = monthly_inputs.groupby('member_id').month.apply(lambda m: sorted(m) == sorted(input_months))
         if len(got) != len(members) or not got.all(): errors.append('every member must enter exactly the input months')
     as_of = pd.Timestamp(as_of)
@@ -146,15 +158,13 @@ def _date(as_of, days_ago):
 
 
 def make_financial_responses(members, loans, cards, card_monthly, as_of):
-    """One dummy financial-API response per member. Non-consenting members get CONSENT_REQUIRED."""
+    """One dummy financial-API response per member, status OK with data for every member.
+    v3.6.0: 동의와 무관하게 기관 응답을 만든다. 동의 확인은 목 서버가 요청 시점에 한다(external_data_consent는 시연 시작 시 동의 상태)."""
     by = lambda f: {k: g for k, g in f.groupby('member_id')} if len(f) else {}
     L, C, U = by(loans), by(cards), by(card_monthly)
     out = []
     for m in members.itertuples(index=False):
         base = dict(member_id=m.member_id, provider='dummy_financial_api', as_of_date=str(pd.Timestamp(as_of).date()), is_dummy=True)
-        if not m.external_data_consent:
-            out.append(dict(base, status='CONSENT_REQUIRED', loans=[], cards=[], card_usage=[]))
-            continue
         lg = L.get(m.member_id, pd.DataFrame(columns=loans.columns))
         cg = C.get(m.member_id, pd.DataFrame(columns=cards.columns))
         ug = U.get(m.member_id, pd.DataFrame(columns=card_monthly.columns))
@@ -189,13 +199,13 @@ def make_bill_responses(members, monthly, ids, tcfg, as_of, rng, provider, late_
     base = {m: float(np.clip(tcfg['bill_median_krw']['value'] * np.exp(tcfg['bill_sigma']['value'] * rng.standard_normal()), lo, hi))
             for m in members.member_id}
     delay = tcfg['late_payment_delay_days']
-    out = []
+    out = {}
     groups = {k: g.sort_values('month') for k, g in mm.groupby('member_id')}
-    for m in members.itertuples(index=False):
+    # v3.6.0: 모든 회원에게 OK 응답을 만든다. 기존 동의 회원의 값이 바뀌지 않도록 그 회원들의 난수를 먼저 뽑고,
+    # 시연 시작 시 비동의 회원의 청구서는 그 뒤에 이어서 뽑는다. 응답 순서는 회원 순서 그대로다.
+    ordered = sorted(members.itertuples(index=False), key=lambda m: not m.external_data_consent)
+    for m in ordered:
         head = dict(member_id=m.member_id, provider=provider, is_dummy=True)
-        if not m.external_data_consent:
-            out.append(dict(head, status='CONSENT_REQUIRED', bills=[]))
-            continue
         bills = []
         for r in groups.get(m.member_id, mm.iloc[0:0]).itertuples(index=False):
             amount = int(round(np.clip(base[m.member_id] * np.exp(tcfg['bill_month_noise_sigma']['value'] * rng.standard_normal()), lo, hi), -1))
@@ -206,8 +216,8 @@ def make_bill_responses(members, monthly, ids, tcfg, as_of, rng, provider, late_
             paid_text = paid.strftime('%Y-%m-%d') if paid <= pd.Timestamp(as_of) else None
             bills.append(dict(bill_month=r.month, billed_amount_krw=amount, due_date=due.strftime('%Y-%m-%d'),
                               paid_date=paid_text, payment_status='late' if late else 'on_time'))
-        out.append(dict(head, status='OK', bills=bills))
-    return out
+        out[m.member_id] = dict(head, status='OK', bills=bills)
+    return [out[m] for m in members.member_id]
 
 
 def check_bills(rows, monthly, ids, as_of, late_col, name):
@@ -226,7 +236,6 @@ def check_bills(rows, monthly, ids, as_of, late_col, name):
 
 def check_external(fin, tel, members, loans, monthly, ids, as_of):
     errors = []
-    consent = members.set_index('member_id').external_data_consent
     expected = pd.Series(1, index=sorted(members.member_id))
     for name, rows in [('financial', fin), ('telecom', tel)]:
         counts = pd.Series([r['member_id'] for r in rows]).value_counts().sort_index()
@@ -234,9 +243,8 @@ def check_external(fin, tel, members, loans, monthly, ids, as_of):
             errors.append(f'{name}: every member needs exactly one response (missing, duplicate or unknown member)')
     if errors:
         return errors
-    for r in fin + tel:
-        ok = bool(consent[r['member_id']])
-        if (r['status'] == 'OK') != ok: errors.append(f"status/consent mismatch {r['member_id']}"); break
+    for r in fin + tel:                                 # v3.6.0: 동의와 무관하게 모든 회원 OK
+        if r['status'] != 'OK': errors.append(f"every member needs an OK response {r['member_id']}"); break
     debt = loans.groupby('member_id').balance_thousand.sum() * 1000
     for r in fin:
         if r['status'] == 'OK' and sum(l['balance_krw'] for l in r['loans']) != int(debt.get(r['member_id'], 0)):
@@ -248,15 +256,12 @@ def check_external(fin, tel, members, loans, monthly, ids, as_of):
 
 # ------------------------------------------------- v3.5.0 nonfinancial source APIs
 def make_payment_responses(members, payment, as_of):
-    """One dummy 간편결제 API response per member (12 complete months). Non-consenting members get CONSENT_REQUIRED."""
+    """One dummy 간편결제 API response per member (12 complete months), status OK for every member (v3.6.0)."""
     groups = {k: g.sort_values('month') for k, g in payment.groupby('member_id')}
     out = []
     for m in members.itertuples(index=False):
         head = dict(member_id=m.member_id, provider='dummy_payment_api', provider_scope='npay_synthetic',
                     as_of_date=str(pd.Timestamp(as_of).date()), is_dummy=True)
-        if not m.external_data_consent:
-            out.append(dict(head, status='CONSENT_REQUIRED', months=[]))
-            continue
         g = groups.get(m.member_id, payment.iloc[0:0])
         out.append(dict(head, status='OK', months=[dict(month=r.month, observation_status=r.observation_status,
                                                        payment_count=int(r.payment_count), payment_amount_krw=int(r.payment_amount_krw),
@@ -265,14 +270,11 @@ def make_payment_responses(members, payment, as_of):
 
 
 def make_insurance_responses(members, insurance, as_of):
-    """One dummy 공공(국민연금·건강보험) 납부 API response per member. Paid date is null when nothing was paid."""
+    """One dummy 공공(국민연금·건강보험) 납부 API response per member, status OK for every member (v3.6.0). Paid date is null when nothing was paid."""
     groups = {k: g.sort_values(['insurance_type', 'month']) for k, g in insurance.groupby('member_id')}
     out = []
     for m in members.itertuples(index=False):
         head = dict(member_id=m.member_id, provider='dummy_public_insurance_api', as_of_date=str(pd.Timestamp(as_of).date()), is_dummy=True)
-        if not m.external_data_consent:
-            out.append(dict(head, status='CONSENT_REQUIRED', records=[]))
-            continue
         g = groups.get(m.member_id, insurance.iloc[0:0])
         txt = lambda v: v if isinstance(v, str) and v else None
         out.append(dict(head, status='OK', records=[dict(
@@ -285,7 +287,6 @@ def make_insurance_responses(members, insurance, as_of):
 
 def check_nonfinancial_external(pay_resp, ins_resp, members, payment, insurance):
     errors = []
-    consent = members.set_index('member_id').external_data_consent
     expected = pd.Series(1, index=sorted(members.member_id))
     for name, rows in [('payment', pay_resp), ('public_insurance', ins_resp)]:
         counts = pd.Series([r['member_id'] for r in rows]).value_counts().sort_index()
@@ -293,9 +294,9 @@ def check_nonfinancial_external(pay_resp, ins_resp, members, payment, insurance)
             errors.append(f'{name}: every member needs exactly one response (missing, duplicate or unknown member)')
     if errors:
         return errors
-    for r in pay_resp + ins_resp:
-        if (r['status'] == 'OK') != bool(consent[r['member_id']]):
-            errors.append(f"status/consent mismatch {r['member_id']}"); break
+    for r in pay_resp + ins_resp:                       # v3.6.0: 동의와 무관하게 모든 회원 OK
+        if r['status'] != 'OK':
+            errors.append(f"every member needs an OK response {r['member_id']}"); break
     n_months = payment.groupby('member_id').month.nunique()
     amount = payment.groupby('member_id').payment_amount_krw.sum()
     paid = insurance.groupby('member_id').paid_amount_krw.sum()
@@ -327,14 +328,11 @@ def _json_value(v):
 def make_credit_bureau_responses(members, bureau, as_of):
     """One dummy 신용평가사 API response per member: the member's 207 credit fields (label source and
     offer placeholders removed) plus credit-history fields. Unobserved values are null. CB is the
-    educational 1 (best) ~ 10 (highest risk) grade, not the service grade."""
+    educational 1 (best) ~ 10 (highest risk) grade, not the service grade. v3.6.0: status OK for every member."""
     rows = bureau.set_index('member_id')
     out = []
     for m in members.itertuples(index=False):
         head = dict(member_id=m.member_id, provider='dummy_credit_bureau_api', as_of_date=str(pd.Timestamp(as_of).date()), is_dummy=True)
-        if not m.external_data_consent:
-            out.append(dict(head, status='CONSENT_REQUIRED', credit_info={}))
-            continue
         r = rows.loc[m.member_id]
         out.append(dict(head, status='OK', credit_info={c: _json_value(r[c]) for c in rows.columns}))
     return out
@@ -342,7 +340,6 @@ def make_credit_bureau_responses(members, bureau, as_of):
 
 def check_new_external(cb_resp, util_resp, members, bureau, monthly, ids, as_of, excluded):
     errors = []
-    consent = members.set_index('member_id').external_data_consent
     expected = pd.Series(1, index=sorted(members.member_id))
     for name, rows in [('credit_bureau', cb_resp), ('utility', util_resp)]:
         counts = pd.Series([r['member_id'] for r in rows]).value_counts().sort_index()
@@ -350,9 +347,9 @@ def check_new_external(cb_resp, util_resp, members, bureau, monthly, ids, as_of,
             errors.append(f'{name}: every member needs exactly one response (missing, duplicate or unknown member)')
     if errors:
         return errors
-    for r in cb_resp + util_resp:
-        if (r['status'] == 'OK') != bool(consent[r['member_id']]):
-            return [f"status/consent mismatch {r['member_id']}"]
+    for r in cb_resp + util_resp:                       # v3.6.0: 동의와 무관하게 모든 회원 OK
+        if r['status'] != 'OK':
+            return [f"every member needs an OK response {r['member_id']}"]
     if set(excluded) & set(bureau.columns):
         return ['credit bureau ledger contains an excluded column (label source or offer placeholder)']
     b = bureau.set_index('member_id')

@@ -1,5 +1,20 @@
 // N-24-3, N-10-2 시계열 추이 선 그래프 컴포넌트
 // 최근 분기별 또는 월별 수치 변화 추이와 기준선을 SVG로 부드럽게 렌더링합니다.
+// props
+//   data : 시간 순서대로 그릴 점 목록
+//     [{ label: 'X축에 표시할 이름 (예: 1분기)', value: 수치 }, ...]
+//     숫자 배열 [100, 120, ...]도 받는다(라벨은 1, 2, 3…)
+//   width, height : 차트 가로·세로 크기(px). 화면이 좁으면 가로는 줄어든다
+//   strokeColor   : 선·점·면적 색 (기본 민트)
+//   areaOpacity   : 선 아래 면적 투명도 0~1 (0이면 면적 없음)
+//   baseline      : 가로 점선으로 그릴 기준값 (예: 평균). 없으면 그리지 않는다
+//   baselineLabel : 기준선 오른쪽 위 글자 (예: '서울 평균')
+//   baselineColor : 기준선 색
+//   unit          : 숫자 뒤 단위 (예: '%')
+//   minY, maxY    : Y축 범위를 직접 정할 때. 없으면 data·baseline으로 자동
+//   ariaLabel     : 화면 낭독기용 설명
+// 마지막 점에만 값을 표시한다.
+// 사용 예: <TrendLineChart data={[{ label: '1분기', value: 3.1 }, { label: '2분기', value: 3.4 }]} baseline={3.0} baselineLabel="서울 평균" unit="%" />
 import React from 'react';
 
 export default function TrendLineChart({

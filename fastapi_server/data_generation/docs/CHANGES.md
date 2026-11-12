@@ -2,6 +2,39 @@
 
 데이터 생성과 해석에 영향을 주는 변경만 적는다. 최신 항목이 위에 있다. 문서 표현만 고친 버전은 한 줄로 줄였다.
 
+## v3.6.0 (2026-11-10) — 서비스 정의 12개월 열, 학습·검증·시험 분리
+
+- **서비스 정의 열(R1, DDL v0.2 제안).** 서비스는 소득만 12개월, 지출은 평균 월 지출 하나, 상환은 현재 월 원리금 하나를 받는다. 같은 정의로 `input_features_12m.csv` 뒤쪽에 9열을 붙였다: `income_svc_12m_krw`, `income_cv_svc_12m`, `zero_income_months_svc_12m`, `expense_avg_month_krw`(12개월 평균, `ROUND_HALF_UP`: 정확히 .5이면 올림. v3.5.8 규칙·DB 시드·Java·Oracle과 같음), `debt_service_current_krw`(기준월 2026-08 상환액), `expense_ratio_svc_12m`, `dsr_svc_12m`, `deficit_months_svc_12m`, `worst_month_net_cash_svc_12m_krw`(월 소득 − 평균 지출 − 현재 상환). 기존 12개월 열의 이름·값·이상치 기록은 그대로다.
+- **급여소득자 소득.** 원천의 급여소득자 월 소득은 출렁인다(고객별 CV 평균 0.056). 서비스는 1개월 입력을 12개월로 펼치므로(`REQUIRED_INCOME_MONTHS = 1`) 서비스 정의 열에서만 기준월 소득 × 12로 계산한다. 원천·라벨·6개월·기존 12개월 열은 바꾸지 않았다. 급여소득자 기준월은 팀 확인 전 임시로 2026-08(`TODO`).
+- **모델 표.** 서비스 정의 9열은 `feature`. 기존 12개월 집계 중 10열(`income_12m_krw`, `income_cv_12m`, `zero_income_months_12m`, `dp_amount_to_income_12m`, `expense_12m_krw`, `debt_service_12m_krw`, `expense_ratio_12m`, `dsr_12m`, `deficit_months_12m`, `worst_month_net_cash_12m_krw`)은 모델 표에서 뺐다(사용자 승인. v3.5.13 묶음은 배포되지 않았다). 상세 `input_features_12m.csv`에는 값 그대로 남는다. `dp_payment_amount_12m_krw`는 그대로 `feature`다. 모델 표 legacy 252열(피처 236→235), thinfile 261열(피처 244→243).
+- **전처리 시연.** 새 설정 `reference/anomaly_injection_12m_svc.json`(seed 20261115)과 로그 `anomaly_log_12m_svc.csv`. 기존과 같은 결측 1%·단위 착오 0.5%·음수 상환 0.3% 교육용 가정이며, 기존 12개월 설정·로그는 바꾸지 않았다.
+- **학습·검증·시험 분리.** 새 `generate/build_data_split.py`·`reference/data_split.json`(seed 20261114)이 각 폴더에 `data_split.csv`를 만든다. 고객 ID 단위 TRAIN/VALID/TEST 70/15/15, 직군 × `label_any_delinquency_12m` 층화, 집단마다 따로. 모델 표에서 `dataset` 바로 뒤, `role = split`. DB 적재 규칙(`LABEL_TYPE_CODE` 늘 `SYNTHETIC`, TEST면 `EVAL_ELIGIBLE_YN = Y`)은 `DATA_SPEC.md`에 적었다. 이 `Y`는 시험 분할 표시이며, 씬파일 성능 비교에는 `eval_future_credit_exposure = 1` 필터도 함께 적용한다.
+- **서비스 더미 기관 응답(동의 무관).** 가상 기관 응답 6종을 동의와 무관하게 모든 회원 `status = OK` + 데이터로 바꿨다(`generate/service_dummy_logic.py`의 응답 함수와 짝 검사 3곳). 동의 확인은 목 서버가 요청 시점에 한다. `members.csv`의 `external_data_consent`는 그대로이며 뜻은 '시연 시작 시 동의 상태'다. 기존 동의 회원의 응답 값은 바뀌지 않도록 청구서 난수는 그 회원들 것을 먼저 뽑는다. 바뀐 출력은 비동의 회원의 응답 6개 파일 내용이다.
+- **사전 정정.** `telecom_late_months`·`utility_late_months` 설명의 "현 버전 0 또는 1"이 틀려 "0~12, 실제 생성 분포 0~5"로 고쳤다(`DATA_DICTIONARY.csv`, `field_dictionary.csv`). 미납이 시작되면 매달 30% 확률로 이어지는 규칙(v3.2.0)이라 여러 달이 나온다. 생성 값은 바뀌지 않았다.
+- **검증·바뀌지 않은 것.** 12개월 검증기를 서비스 정의 열까지 넓히고 `verify/verify_data_split.py`를 추가했다. 고정 예제 테스트를 11건 추가했다(정확히 .5 경계, 동의 회원 청구서 값 보존 포함). 재생성 결과 v3.5.13 생성 파일 85개 중 77개는 바이트가 같다. 바뀐 것은 두 집단의 `input_features_12m.csv`(기존 열 값 동일, 9열 추가)와 기관 응답 6개(동의 회원 응답은 그대로, 비동의 회원 82명만 OK + 데이터)다. 새 파일은 `data_split.csv`·`anomaly_log_12m_svc.csv` 각 2개와 DB 작업의 `member_asset_snapshots_v02.csv`다. DB 시드(DDL v0.2 구조)는 별도 작업이다. 최종 재생성 수치는 provenance.json에 기록한다.
+
+## v3.5.13 (2026-11-10) — 기본 모델 입력 12개월, 6개월 보존·참고용
+
+- **기본 기준.** 12개월이 기본 학습(role=feature)이다. 6개월 파일·열·값은 보존·참고용(compatibility_only)이며 기본 학습에서 제외한다. 모델 표의 기존 열 값·상대 순서를 유지하고 새 12개월 10열을 라벨 앞에 추가했다(간편결제 금액 12개월 열은 이미 있어 값 대조 후 기존 위치 유지). 라벨은 맨 끝쪽에 두며 씬파일 평가용 tail은 기존처럼 라벨 뒤 마지막 열이다.
+- **신규 집계.** data/·thinfile/의 input_features_12m.csv는 원천 12개월(2025-09~2026-08)로 소득·생활지출·상환 합계, 비율, CV, 무소득·적자 월수, 최저 현금흐름, 간편결제 금액·비율을 계산한다. 6개월 값을 두 배로 늘리지 않는다. 0소득 비율은 NULL, 누락·중복 월은 거부한다.
+- **설정·공유 수식.** members.model_feature_months는 12개월, 새 model_feature_months_6m는 기존 6개월이다. 기존 함수·열 이름을 유지하며 input_feature_logic.aggregate_input_features를 두 생성기가 공유한다. build_members.py의 오래된 6개월 설명만 정정했다.
+- **독립 전처리 시연.** anomaly_injection_12m.json(seed 20261113, 기존 설정 중복 없음)과 anomaly_log_12m.csv를 추가했다. 기존과 같은 결측 1%·단위 착오 0.5%·음수 상환 0.3%의 교육용 가정이며 라벨과 독립이다. 파생 비율은 주입 전 값으로 유지한다. 기존 6개월 주입 설정·로그는 그대로다.
+- **전달·검증.** 새 12개월 파일은 2_detail, 새 로그는 학습 금지 3_reference에 배치한다. 사전·출처 미분류 거부와 미래값 누수 방지를 유지했다. 신규 독립 재계산 검증기와 고정 예제 테스트를 추가했다. 실제 실행 결과·환경·불변 비교는 provenance.json의 v3_5_13_regeneration에 기록한다.
+- **서비스·DB.** 회원은 기존처럼 12개월 입력하며 서비스 더미에는 이상치를 넣지 않는다. DB 구조·API·라벨·원천 월별 이력은 변경하지 않는다. 실제 재생성 SQL 비교 결과는 새 작업 로그에 남긴다.
+
+## v3.5.12 (2026-11-09) — 등급 상태 입력 부족 제거 (문서만)
+
+- 회원 월 입력 12개월이 필수가 되어 덜 차면 점수를 산출하지 않으므로, 등급 상태 `INSUFFICIENT_INPUT`(입력 부족)을 없앴다. 상태는 `SCORED`·`NOT_SCORABLE` 두 개다. 서비스 점수 0~1000, 등급 경계 665·780(임시, D-01)을 `SERVICE_DUMMY_DATA.md`·`tools/handoff_README.md`에 적었다. 생성 코드와 데이터는 바뀌지 않았다. DB 묶음은 v2.4(`MEMBER_CREDIT_GRADE` CHECK·코멘트).
+
+## v3.5.11 (2026-11-05) — 회원 월 입력 12개월, 모델 집계 기간 키 분리
+
+- **배경(서비스 결정).** N-22 소득 변동성 진단의 비수기 판별에는 12개월 소득이 필요하다. v3.5.7에서 가입 장벽을 줄이려고 6개월로 줄였던 회원 월 입력(소득·생활지출·상환액)을 다시 최근 완결 12개월(2025-09~2026-08)로 늘린다. 12개월을 다 입력하지 않으면 입력 부족(`INSUFFICIENT_INPUT`)이다.
+- **설정 키 분리.** `reference/service_dummy_anchors.json`의 `members.input_months`는 원래 뜻(회원이 입력하는 달)대로 12개월로 바꾸고, 학습 모델 표의 입력 기반 집계 기간은 새 키 `members.model_feature_months`(6개월, 2026-03~2026-08)로 나눴다. `generate/build_input_features_6m.py`의 `input_months()`는 새 키를 읽는다. 함수 이름과 `*_6m` 열의 이름·의미는 그대로다.
+- **검증·테스트.** `verify/verify_input_features_6m.py`는 집계 기간이 회원 입력 기간의 마지막 연속 6개월인지 확인한다. 고정 예제 테스트: 회원 입력 12개월 기대값으로 수정, 입력 기간 밖 달이 빠지는지 1건 추가.
+- **바뀐 출력.** `service_dummy/members/member_monthly_inputs.csv` 하나(2,400 → 4,800행, 회원 400명 × 12개월). DB 묶음 v2.3의 `12_seed_member_monthly_input.sql`과 관련 코멘트·행 수 검사.
+- **바뀌지 않은 것.** 재생성 결과를 v3.5.10 학습 묶음(`2_detail/`)의 26개 파일(기존 집단 9, 씬파일 17; `input_features_6m.csv`, `monthly_history.csv`, `profiles.csv` 포함)과 값으로 비교해 모두 같았다. `member_monthly_inputs.csv`의 2026-03~2026-08 행 2,400건은 금액·입력일이 DB v2.2 시드와 모두 같다. 그 밖의 서비스 더미(외부 API 응답, 원장)는 이미 12개월이라 바뀌지 않는다.
+- **재생성 환경.** 2026-11-05, Python 3.11.9, numpy 2.4.6, pandas 3.0.5, scipy 1.17.1, scikit-learn 1.9.1 (`provenance.json`의 기록 환경과 다르지만 위 비교에서 값이 같았다). Windows에서는 `PYTHONUTF8=1`로 실행했다.
+
 ## v3.5.10 (2026-11-03) — 학습용 6개월 입력 집계에 전처리 시연용 결측·이상치 추가
 
 - **배경.** 모델 파트가 결측 처리와 이상치 탐지·처리를 시연할 수 있도록, `input_features_6m.csv`(`data/`, `thinfile/`)에 결측·이상치를 조금 넣었다. 생성 단계에서 넣어 데이터는 하나이고, 원래 값은 새 `anomaly_log.csv`(각 폴더)에 남겼다.

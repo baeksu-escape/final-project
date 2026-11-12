@@ -23,7 +23,9 @@
 | `label_any_delinquency_12m` | `profiles.csv` | 가상 향후 12개월 중 연체가 발생한 월이 1개월 이상. 부도확률이 아니다. 기존 집단은 원본 학원 생성기의 라벨, 씬파일 집단은 원장 위험요인과 미래 신용 사용 가정으로 새로 만든 라벨이다(`THINFILE.md`) |
 | `label_nonfin_effect_12m` | `labels_nonfinancial.csv` | 같은 정의에 통신·공과금 미납(승산비 2.5), 약한 현금흐름 효과, 국민연금·건강보험 비정시 납부(승산비 2.0, v3.5.0), 간편결제 규칙성(사용자 안 표준점수당 로짓 −0.15, v3.5.0)을 가정해 넣은 라벨. 기존 라벨은 그대로 둔다(`NONFINANCIAL_LABEL.md`) |
 
-두 집단의 라벨은 생성 방식이 다르므로 합쳐 쓸 때는 `cohort`로 구분하고 집단별 결과를 함께 본다. `labels_nonfinancial_metadata.csv`와 `target_metadata.csv`의 설계 확률은 라벨을 만든 값이므로 모델 입력에 넣지 않는다.
+두 집단의 라벨은 생성 방식이 다르므로 합쳐 쓸 때는 `cohort`로 구분하고 집단별 결과를 함께 본다.
+
+**DB 적재 규칙(v3.6.0, DDL v0.2 제안 기준).** 합성 고객을 `ASSESSMENT`에 적재할 때 두 라벨은 모두 합성 규칙으로 만든 값이므로 `LABEL_TYPE_CODE`는 늘 `SYNTHETIC`이다(데이터에는 열을 두지 않는다). `DATA_SPLIT_CODE`는 `data_split.csv`의 값을 그대로, `EVAL_ELIGIBLE_YN`은 `TEST`이면 모두 `Y`(나머지 `N`)로 넣는다. 이 `Y`는 **시험 분할 표시**이며 최종 평가 필터가 아니다. 씬파일 성능 비교에는 `eval_future_credit_exposure = 1` 조건도 함께 건다(씬파일 TEST 359명 중 246명). DDL v0.2는 팀 합의 전 초안이므로 합의 결과에 따라 바뀔 수 있다. `labels_nonfinancial_metadata.csv`와 `target_metadata.csv`의 설계 확률은 라벨을 만든 값이므로 모델 입력에 넣지 않는다.
 
 ## 0과 결측
 
@@ -48,9 +50,9 @@
 
 기존 집단 12,000명은 모두 등급이 있다. 180일 기준 등은 이 프로젝트의 설계 가정이며 공식 신용평가 조건이 아니다. CB는 교육용 등급이고 공식 신용점수가 아니다.
 
-## 6개월 입력 집계 (v3.5.7)
+## 6개월 입력 집계 (v3.5.7, 현재 보존·참고용)
 
-서비스 회원은 최근 완결 6개월(2026-03~2026-08)의 소득·생활지출·상환액만 입력한다. 학습한 모델을 회원에게 그대로 쓰려면 같은 기간의 값으로 학습해야 하므로, 두 집단 모두 `input_features_6m.csv`를 만든다(`generate/build_input_features_6m.py`, 검증 `verify/verify_input_features_6m.py`).
+서비스 회원은 최근 완결 12개월(2025-09~2026-08)의 소득·생활지출·상환액을 입력한다(v3.5.11, v3.5.7~v3.5.10은 6개월). v3.5.13부터 기본 학습은 아래 12개월 집계다. 기존 **최근 6개월(2026-03~2026-08)** 집계는 값·열·파일을 보존하고 참고용(`compatibility_only`)으로만 남긴다. 기간은 `reference/service_dummy_anchors.json`의 `members.model_feature_months_6m`가 정하며, 회원 입력 기간(`members.input_months`)의 마지막 6개월이어야 한다. 기존 결과와 비교할 수 있도록 두 집단 모두 `input_features_6m.csv`를 만든다(`generate/build_input_features_6m.py`, 검증 `verify/verify_input_features_6m.py`). v3.5.11에서 회원 입력 기간이 늘었어도 이 파일의 기간·값은 바뀌지 않았다.
 
 | 열 | 정의 |
 |---|---|
@@ -70,9 +72,58 @@
   | `negative` | `debt_service_6m_krw` | 0.3% | 원래 값 × −1 (원래 값이 0이 아닌 칸만) |
 
   한 칸에는 하나만 넣고, 라벨·위험도와 무관한 별도 seed의 난수로 뽑는다. 단위 착오도 원래 값이 0인 칸은 바뀌지 않으므로 뽑지 않는다. 파생 비율 열(`expense_ratio_6m`, `dsr_6m` 등)은 깨끗한 값으로 계산된 그대로라서 입력 열과 맞지 않는 칸이 있다(실제 데이터에서도 흔한 모습). `age`와 다른 파일은 바꾸지 않았다.
-- 원천 월자료(`monthly_history.csv`)와 `profiles.csv`의 12개월 집계는 바꾸지 않는다. 다만 전달 묶음의 **모델 표에는 12개월 소득 집계 대신 6개월 집계가 들어간다.** 모델 표에서 뺀 열과 이유는 학습 묶음 README(`tools/handoff_README.md`)에 있다.
+- 원천 월자료(`monthly_history.csv`)와 `profiles.csv`의 12개월 집계는 바꾸지 않는다. 전달 묶음의 **모델 표에는 두 기간이 모두 있지만 기본 학습은 12개월(`feature`), 6개월은 보존·참고용(`compatibility_only`)이다.** 모델 표에서 뺀 열과 이유는 학습 묶음 README(`tools/handoff_README.md`)에 있다.
 - 간편결제·사회보험·통신·공과금처럼 외부 API로 받는 정보는 회원 부담이 없으므로 12개월 집계를 그대로 쓴다.
 - 라벨(향후 12개월 연체)은 예측 기간이며 입력 기간과 별개라 그대로다. 비금융 효과 라벨은 12개월 원천으로 만든 "실제로 일어난 일" 역할이고 바꾸지 않았다.
+
+## 12개월 입력 집계 (v3.5.13, 기본 학습)
+
+**12개월이 기본 학습이며 6개월은 보존·참고용(compatibility_only)이다.** 각 집단의 `input_features_12m.csv`를 `generate/build_input_features_12m.py`로 만들고 `verify/verify_input_features_12m.py`로 독립 재계산한다. 기간은 `members.model_feature_months` = `members.input_months`의 연속 12개월(2025-09~2026-08)이다. 6개월 값을 두 배로 늘리지 않고 원천 월별 값을 합산한다. 누락·중복 월과 미관측 소득·지출·상환액은 거부한다.
+
+| 열 | 정의 |
+|---|---|
+| `income_12m_krw`, `expense_12m_krw`, `debt_service_12m_krw` | 12개월 실제 합계 |
+| `expense_ratio_12m`, `dsr_12m` | 12개월 지출·상환 합계 / 같은 기간 소득 합계. 소득 합이 0이면 null |
+| `income_cv_12m` | 월소득 모집단 표준편차(ddof=0) / 평균. 평균 0이면 null |
+| `zero_income_months_12m`, `deficit_months_12m` | 소득 0인 달 수, 소득 − 생활지출 − 상환액이 음수인 달 수 |
+| `worst_month_net_cash_12m_krw` | 위 월 현금흐름의 최솟값 |
+| `dp_payment_amount_12m_krw`, `dp_amount_to_income_12m` | 같은 12개월 간편결제 금액 합계, 해당 금액 / 소득 합계(소득 0이면 null) |
+
+간편결제는 기존 6개월 집계와 같은 이용 금액 정책으로 집계하고 거래 행이 없는 고객은 0으로 둔다. 서비스에서는 관측 여부를 확인한 원천을 전달해야 하며 미수집을 이용 0으로 바꾸는 정책을 추가하지 않는다.
+
+`reference/anomaly_injection_12m.json`의 별도 seed 20261113으로 전처리 시연용 결측·이상치를 넣는다. 소득·지출·상환 합계에 결측 각각 1%, 소득·지출 합계에 단위 착오(×1,000) 각각 0.5%, 상환 합계에 음수(×−1) 0.3%다. 기존과 같은 교육용 가정이며 한 칸에는 하나만, 라벨과 독립적으로 주입한다. 로그는 각 폴더 `anomaly_log_12m.csv`, 전달 위치는 `3_reference/*/anomaly_log_12m.csv`다. 비율·CV 등 파생 열은 주입 전 깨끗한 값이므로 오염된 합계와 불일치할 수 있다. 로그의 원래 값은 전처리 검증 정답지이며 학습에 넣지 않는다. 기존 6개월 주입 설정·로그·값은 유지한다.
+
+모델 표의 기존 열 값·상대 순서는 유지하고 12개월 집계 11열 중 새 10열을 라벨 앞에 추가한다(간편결제 금액 12개월 열은 기존 위치·값 유지). 라벨은 맨 끝쪽에 두고, 씬파일의 `eval_future_credit_exposure`는 기존처럼 두 라벨 뒤 마지막 열로 유지한다. `model_table_columns.csv`에서 기존 6개월 11열은 `compatibility_only`, 12개월 집계 11열(기존 간편결제 금액 열 포함)은 모두 `feature`다(v3.5.13 기준. v3.6.0부터 간편결제 금액 열을 뺀 10열은 모델 표에 넣지 않는다, 아래 「서비스 정의 12개월 열」). 기본 학습에는 `role == "feature"`인 열만 쓰고, 서비스 추론에도 같은 열 순서·수식·단위·전처리를 적용한다. 기존 profiles의 연간 열과 자산·설계·스냅샷 열을 이번 변경으로 일괄 학습 허용하지 않는다.
+
+## 서비스 정의 12개월 열 (v3.6.0, 기본 학습)
+
+서비스는 소득만 12개월(급여소득자는 1개월 입력을 12개월로 펼침, DDL v0.2 `DIM_WORKER_TYPE.REQUIRED_INCOME_MONTHS`)을 받고, 지출은 평균 월 지출 금액 하나, 상환은 현재 월 원리금 합계 하나를 받는다(R1). 학습 데이터도 같은 정의로 계산한 열을 `input_features_12m.csv` 뒤쪽에 붙였다. 기존 12개월 열의 이름·값·이상치 기록은 그대로다. 계산은 `generate/input_feature_logic.service_view_features`, 독립 재계산은 `verify/verify_input_features_12m.py`다.
+
+| 열 | 정의 |
+|---|---|
+| `income_svc_12m_krw` | 12개월 소득 합계. 급여소득자는 기준월 소득 × 12, 자영업자·프리랜서는 `income_12m_krw`와 같다 |
+| `income_cv_svc_12m`, `zero_income_months_svc_12m` | 위 월 소득의 CV(급여소득자 0, 평균 0이면 null)와 소득 0인 달 수 |
+| `expense_avg_month_krw` | 12개월 생활지출 평균(원 단위 정수, `ROUND_HALF_UP`: 정확히 .5이면 올림. v3.5.8 규칙의 '규칙으로 계산하는 금융 값', DB 시드·Java·Oracle `ROUND`와 같음) |
+| `debt_service_current_krw` | 기준월(2026-08) 상환액 |
+| `expense_ratio_svc_12m`, `dsr_svc_12m` | 평균 월 지출 × 12, 현재 월 상환액 × 12를 `income_svc_12m_krw`로 나눈 값. 소득 합이 0이면 null |
+| `deficit_months_svc_12m`, `worst_month_net_cash_svc_12m_krw` | 월 소득 − 평균 월 지출 − 현재 월 상환액이 음수인 달 수와 그 최솟값 |
+
+- **기준월.** 원천의 마지막 달 2026-08로 둔다. 급여소득자의 기준월(지난달/이번 달)은 팀 확인 전 임시값이다. `TODO(급여 기준월)`
+- **급여소득자 소득.** 원천 `monthly_history.csv`의 급여소득자 월 소득은 출렁인다(설정 `monthly_sigma.wage = 0.06`, 고객별 CV 평균 0.056). 원천·라벨·6개월·기존 12개월 열은 바꾸지 않고, 서비스 정의 열에서만 기준월 소득을 12개월로 펼친다.
+- **thinfile 스냅샷과의 관계.** `debt_service_current_krw × 12`는 `profiles.snapshot_annual_debt_service_krw`(기준일 현재 대출의 연간 상환예정액)와 72.4%(2,400명 중 1,738명) 정확히 같다. 618명은 연 상환액을 달마다 원 단위로 나눈 나머지 차이(12원 이하), 44명은 12개월 중 대출이 생기거나 끝나 기준월 상환액이 연간 예정액과 다르다.
+- **역할.** 9열은 `feature`다. 기존 12개월 집계 중 10열(`income_12m_krw`, `income_cv_12m`, `zero_income_months_12m`, `dp_amount_to_income_12m`, `expense_12m_krw`, `debt_service_12m_krw`, `expense_ratio_12m`, `dsr_12m`, `deficit_months_12m`, `worst_month_net_cash_12m_krw`)은 **모델 표에 넣지 않는다**. 급여소득자 소득 정의가 서비스와 다르거나 서비스 정의 열로 대체되기 때문이다. 이 열들은 상세 `input_features_12m.csv`에 값 그대로 남는다(v3.5.13 묶음은 배포되지 않아 모델 표에서 바로 뺐다). `dp_payment_amount_12m_krw`는 기존대로 `feature`다.
+- **전처리 시연.** `reference/anomaly_injection_12m_svc.json`(seed 20261115, 기존 12개월 설정과 별도)으로 `income_svc_12m_krw`·`expense_avg_month_krw`·`debt_service_current_krw`에 결측 1%, 앞의 두 열에 단위 착오(×1,000) 0.5%, 상환액에 음수(×−1) 0.3%를 넣는다. 기존과 같은 교육용 가정이며 기록은 각 폴더 `anomaly_log_12m_svc.csv`(전달 위치 `3_reference/*/`)다. 파생 비율은 주입 전 깨끗한 값이다.
+- **실측(기본 규모).** 평균 적자 달 수: legacy 3.848 → 3.849, thinfile 2.734 → 2.776. 평균 DSR: legacy 0.3357 → 0.3363, thinfile 0.0620 → 0.0663. 숫자 차이는 작고, 학습과 서비스의 정의를 맞추는 것이 목적이다.
+
+## 학습·검증·시험 분리 (v3.6.0)
+
+`generate/build_data_split.py`가 각 폴더에 `data_split.csv`(`customer_id`, `data_split`)를 만든다. 값은 DDL v0.2 `ASSESSMENT.DATA_SPLIT_CODE`와 같은 `TRAIN`/`VALID`/`TEST`다.
+
+- 고객 ID 단위(고객 한 명은 한 구분에만), 비율 70/15/15, 직군(`segment`) × `label_any_delinquency_12m` 층화, legacy·thinfile 각각, seed 20261114(폴더마다 `[seed, 폴더 순번]`). 설정은 `reference/data_split.json`.
+- 칸마다 고객 ID를 정렬한 뒤 섞고, 비율 × 칸 크기를 내림한 다음 남는 수를 나머지가 큰 구분부터(같으면 TRAIN·VALID·TEST 순) 1명씩 준다.
+- 실측: legacy 8,400 / 1,800 / 1,800, thinfile 1,680 / 361 / 359. 가장 작은 칸의 TEST는 legacy 11명, thinfile 7명(자영업자 × 연체 45명 칸)이다.
+- 보조 라벨 `label_nonfin_effect_12m`과 씬파일 `cohort`는 층화하지 않았다. 구분별 분포는 `verify/verify_data_split.py` 출력에 남는다.
+- 모델 표에서는 `dataset` 바로 뒤 열이고 `role = split`(학습에 쓰지 않음)이다. 성능 비교는 `TEST`만 쓰고, 씬파일은 `eval_future_credit_exposure = 1`인 고객만 쓴다(TEST 359명 중 246명). DB `EVAL_ELIGIBLE_YN = Y`는 TEST 표시일 뿐이므로 씬파일 비교에는 이 조건을 따로 건다.
 
 ## 반올림 규칙 (v3.5.8)
 
@@ -94,7 +145,15 @@
 | 간편결제·사회보험 원천(v3.5.0) | `digital_payment_monthly.csv`, `social_insurance_monthly.csv`, `nonfinancial_source_features.csv`(두 폴더 각각, `NONFINANCIAL_SOURCES.md`) |
 | 비금융 효과 라벨 | `data/labels_nonfinancial.csv`, `thinfile/labels_nonfinancial.csv` |
 | 6개월 입력 집계(v3.5.7) | `data/input_features_6m.csv`, `thinfile/input_features_6m.csv` (v3.5.10부터 결측·이상치 포함, 기록은 각 폴더 `anomaly_log.csv`) |
-| 서비스 개발용 더미 | `service_dummy/` (학습에 쓰지 않는다, `SERVICE_DUMMY_DATA.md`) |
+| 12개월 입력 집계(기본 학습, v3.5.13) | `data/input_features_12m.csv`, `thinfile/input_features_12m.csv`, 각 `anomaly_log_12m.csv`. v3.6.0 서비스 정의 열의 기록은 각 `anomaly_log_12m_svc.csv` |
+| 학습·검증·시험 분리(v3.6.0) | `data/data_split.csv`, `thinfile/data_split.csv` |
+| 서비스 개발용 더미 | `service_dummy/` (학습에 쓰지 않는다, `SERVICE_DUMMY_DATA.md`). v3.6.0: 아래 「서비스 더미 기관 응답과 동의」 |
 | 생성 설계·참고 | `thinfile/plan.csv`, `availability.csv`, `target_metadata.csv`, `cohort_summary.csv`, `*_metadata.csv` |
+
+### 서비스 더미 기관 응답과 동의 (v3.6.0)
+
+- 가상 기관 응답 6종(금융·통신·공과금·간편결제·공공보험·신용평가사, `service_dummy/external_api/*.jsonl`)은 **동의와 무관하게 모든 회원이 `status = OK` + 데이터**다. 실제 기관처럼 기관 쪽에는 전 회원 자료가 있고, **동의 확인은 목 서버(가상 기관 서버)가 요청 시점에** 한다(동의가 없으면 그때 403).
+- `members.csv`의 `external_data_consent`는 그대로 두며 뜻은 **시연 시작 시 동의 상태**다. 동의 화면에서 바꾸면 그 뒤 요청부터 목 서버가 응답한다.
+- v3.5.13까지 동의 표시가 1이던 회원의 응답 값은 그대로다. 청구서(통신·공과금)는 그 회원들의 난수를 먼저 뽑고 비동의 회원 것을 뒤에 이어 뽑아 기존 값을 유지했다. 바뀐 것은 비동의 회원 응답이 `CONSENT_REQUIRED`·빈 목록에서 `OK`·데이터가 된 것뿐이다.
 
 모든 파일은 생성 스크립트를 실행해야 만들어진다(`README.md`의 생성 순서). 시연 고객 목록은 포함된 코드가 만들지 않는다.

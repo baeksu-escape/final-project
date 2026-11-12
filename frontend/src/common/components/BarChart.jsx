@@ -1,5 +1,22 @@
 // N-24-3, N-12-8 막대 그래프 및 증감(±) 막대 컴포넌트
 // 지표별 수치 비교 및 0 기준선 상하 증감 막대를 SVG로 렌더링합니다.
+// props
+//   data : 막대 하나당 객체 하나
+//     [{
+//       label: 'X축에 표시할 이름 (예: 폐업률)',
+//       value: 수치 (음수면 0 기준선 아래로 그린다),
+//       color: '이 막대만 쓸 색. 없으면 null → 아래 기본색 규칙',
+//       tag:   '라벨 아래 보라색 작은 글자. 막대를 구분할 표시(예: [대안]). 없으면 null'
+//     }, ...]
+//     숫자 배열 [3, -2, ...]도 받는다(라벨은 1, 2, 3…)
+//   width, height : 차트 가로·세로 크기(px)
+//   positiveColor : 음수가 하나라도 있을 때 0 이상 막대 색
+//   negativeColor : 음수가 하나라도 있을 때 음수 막대 색
+//   defaultColor  : 음수가 하나도 없을 때 모든 막대 색
+//   unit          : 숫자 뒤 단위 (예: '%')
+//   showValues    : 막대 끝에 값 표시 여부 (음수가 있으면 양수에 + 를 붙인다)
+//   ariaLabel     : 화면 낭독기용 설명
+// 사용 예: <BarChart data={[{ label: '매출', value: 4.2 }, { label: '폐업률', value: -1.3, tag: '[내 동]' }]} unit="%" />
 import React from 'react';
 
 export default function BarChart({

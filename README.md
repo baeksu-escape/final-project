@@ -13,8 +13,8 @@
 | 위치 | 누가 읽나 | 내용 |
 |------|-----------|------|
 | `docs/spec/sql/dummy_db/` | 사람·AI | 서비스 개발용 더미 Oracle 21c DB (테이블 14개 + 시드). `run_all.sql` 실행 후 `99_check.sql`로 확인, 개발 DB에서만 |
-| `fastapi_server/data_generation/` | B조·AI | 합성 데이터 생성 코드 v3.5.7. 필드 정의 기준은 `data_generation/docs/DATA_DICTIONARY.csv` |
-| `fastapi_server/data/` | B조 | 학습용 데이터 v3.5.7. **Git 제외**, 공유 드라이브에서 받아 이 폴더에 압축 해제 (`fastapi_server/data/README.md`) |
+| `fastapi_server/data_generation/` | B조·AI | 합성 데이터 생성 코드(현재 버전은 `fastapi_server/data/README.md`). 필드 정의 기준은 `data_generation/docs/DATA_DICTIONARY.csv` |
+| `fastapi_server/data/` | B조 | 학습용 데이터. **Git 제외**, 공유 드라이브에서 받아 `fastapi_server/data/training/` 안에 압축 해제. 버전·폴더 구조는 `fastapi_server/data/README.md` |
 
 - `column_dictionary_207.csv`가 두 곳에 있다. `data_generation/reference/`는 기존 집단(12,000명) 원본 사전, `data/training/3_reference/thinfile/`은 씬파일 집단(2,400명) 사전이다. 이름은 생성 도구가 정한 것이라 바꾸지 않는다.
 - `.csv`·`.xlsx`·`.pkl`·`.joblib`는 Git에 올리지 않고 드라이브로 공유한다. 예외는 `data_generation/`의 정의서·통계 원자료 7개(약 480KB)뿐이다(`.gitignore` 참고).
