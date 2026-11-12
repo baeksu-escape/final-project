@@ -38,6 +38,7 @@
 | `frontend/src/features/auth/components/WithdrawalCard.jsx` | 새 파일. 회원 탈퇴 카드(안내문·비밀번호 확인·[탈퇴하기]·[취소]) |
 | `frontend/src/features/auth/pages/MyPage.jsx` | 맨 아래에 회원 탈퇴 카드 |
 | `frontend/src/features/auth/pages/LoginPage.jsx` | 다른 화면이 넘긴 알림(state.notice)을 토스트로 표시 |
+| `frontend/src/features/auth/authConstants.js` | 일반 로그인 실패 문구를 지시서 문구 "아이디 또는 비밀번호가 맞지 않습니다."로 |
 | `frontend/src/features/auth/api/myPageApi.js` | `DELETE /api/members/me`(🟡 제안 경로), `requestWithdrawal` |
 | `frontend/src/features/auth/mocks/myPageMockHandlers.js` | 탈퇴 mock: 비밀번호 확인, 대안 데이터·간편 로그인 연결 삭제, 상태 변경 |
 | `frontend/src/features/auth/mocks/authMockHandlers.js` | 탈퇴 계정 거르기(토큰 401 UNAUTHORIZED·로그인·소셜 연결), `withdrawMockAccount`, `findMockAccountByUserId`, 겹치지 않는 userId |
@@ -73,7 +74,8 @@
   - `client.js`의 401 → 로그아웃 처리는 Node에서 불러오지 못해(`import.meta.env`) 코드로만 확인했다.
 
 ## 다음 사람이 알아야 할 것
-- 옛 아이디 로그인 실패 문구는 기존 `LOGIN_FAILED_MESSAGE`("아이디 또는 비밀번호가 올바르지 않습니다.")를 그대로 썼다. 작업 지시서의 "맞지 않습니다"와 다르다. 문구는 바꾸지 않았다.
+- 일반 로그인 실패 문구 `LOGIN_FAILED_MESSAGE`를 작업 지시서대로 "아이디 또는 비밀번호가 맞지 않습니다."로 바꿨다(예전: "…올바르지 않습니다."). 같은 상수를 쓰는 로그인 화면과 소셜 기존 계정 연결 실패 문구도 함께 바뀐다.
+  - `common/mocks/mockHandlers.js`의 기본 로그인 응답에도 예전 문구가 남아 있다. 이 응답은 auth mock이 같은 키로 덮어써서 화면에 나오지 않는다. 공통 파일이라 고치지 않았다.
 - 데모 계정은 비밀번호가 없어(null) 비어 있지 않은 값이면 통과한다. 틀린 비밀번호 확인은 새로 가입한 계정이나 비밀번호를 바꾼 계정으로 해야 한다.
 - 공개 메인 화면(N-10)이 없고 로그아웃 상태의 `/`는 로그인 화면으로 가므로, "메인으로 보낸다"를 로그인 화면으로 보내는 것으로 처리했다.
 - 탈퇴는 되돌릴 수 없다. mock은 메모리에만 있어 새로고침하면 데모 계정이 되살아난다.

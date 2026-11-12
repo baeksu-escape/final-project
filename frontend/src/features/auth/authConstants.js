@@ -21,8 +21,8 @@ export const AUTH_ERROR_CODES = Object.freeze({
   DUPLICATE_EMAIL: 'DUPLICATE_EMAIL',
 })
 
-// N-01 로그인 실패 문구. 아이디와 비밀번호 중 무엇이 틀렸는지 알려 주지 않는다.
-export const LOGIN_FAILED_MESSAGE = '아이디 또는 비밀번호가 올바르지 않습니다.'
+// N-01 로그인 실패 문구. 아이디와 비밀번호 중 무엇이 틀렸는지 알려 주지 않는다. 탈퇴한 옛 아이디로 로그인할 때도 이 문구를 쓴다(FP-93 작업 지시서 문구).
+export const LOGIN_FAILED_MESSAGE = '아이디 또는 비밀번호가 맞지 않습니다.'
 export const ACCOUNT_LOCKED_MESSAGE = '잠긴 계정입니다. 관리자에게 문의해 주세요.'
 
 // N-02 필수 동의 문구.
