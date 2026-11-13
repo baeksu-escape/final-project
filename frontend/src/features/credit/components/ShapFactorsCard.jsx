@@ -1,10 +1,16 @@
+import { Link } from 'react-router-dom'
 import Card from '../../../common/components/Card.jsx'
+import { PATHS } from '../../../common/config/navigation.js'
 import '../styles/shapFactors.css'
 
-// N-14-2·N-14-3·N-14-4 항목별 점수 기여도와 대안 데이터 여부를 보여 준다.
+// N-14-2·N-14-3·N-14-4·N-14-5 항목별 점수 기여도를 정렬하고 개선할 수 있는 항목을 연결한다.
 export default function ShapFactorsCard({ shap, alternativeScore }) {
-  // TODO(A-16): 정렬 기준이 확정되면 서버 순위와 점수 절댓값 중 적용 기준을 확인한다.
-  const factors = [...(shap?.factors ?? [])].sort((a, b) => a.rank - b.rank)
+  const factors = [...(shap?.factors ?? [])].sort((a, b) => {
+    const group = (score) => score > 0 ? 0 : score < 0 ? 1 : 2
+    return group(a.shapScore) - group(b.shapScore)
+      || Math.abs(b.shapScore) - Math.abs(a.shapScore)
+      || a.rank - b.rank
+  })
   const maxScore = Math.max(30, ...factors.map((factor) => Math.abs(factor.shapScore)))
 
   return (
@@ -27,7 +33,8 @@ export default function ShapFactorsCard({ shap, alternativeScore }) {
                   <span className="shap-label">
                     {factor.alternativeYn === 'Y' && <b className="shap-tag">대안</b>}
                     {factor.featureName}{factor.featureValue != null && <> ({factor.featureValue}{factor.unitName ?? ''})</>}
-                    {factor.simulatableYn === 'Y' && <>{/* TODO(FP-89 미정): N-14-5 개선 미션 바로가기 */}</>}
+                    {/* TODO(FS-V1): 피처 목록이 정해지면 시뮬레이터 입력 강조 여부를 정한다. */}
+                    {factor.shapScore < 0 && factor.simulatableYn === 'Y' && <Link to={PATHS.SIMULATOR}>개선해 보기</Link>}
                   </span>
                   <span className="shap-bar" aria-hidden="true">
                     <span className="shap-midpoint" />

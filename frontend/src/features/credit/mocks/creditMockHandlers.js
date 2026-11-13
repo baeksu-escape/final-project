@@ -30,7 +30,6 @@ registerMockHandlers({
       report.gradeBands = null
       report.shap = null
       delete report.modelFeatures
-      delete report.previousScoreDiff
     }
     if (scenario === 'traditionalUnavailable') {
       report.traditional = { scorableYn: 'N', score: null, gradeBandCode: null, defaultProb: null }

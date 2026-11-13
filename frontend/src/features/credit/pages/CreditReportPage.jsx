@@ -4,7 +4,7 @@ import Button from '../../../common/components/Button.jsx'
 import Notice from '../../../common/components/Notice.jsx'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { DATA_INPUT_PATHS } from '../../dataInput/dataInputPaths.js'
-import { fetchCreditReport } from '../api/creditApi.js'
+import { fetchCreditDiagnosisHistory, fetchCreditReport } from '../api/creditApi.js'
 import ScoreComparisonCard from '../components/ScoreComparisonCard.jsx'
 import ShapFactorsCard from '../components/ShapFactorsCard.jsx'
 import '../styles/creditReport.css'
@@ -15,15 +15,37 @@ const REASONS = {
   STALE_INPUT: '입력 정보를 최신 상태로 갱신해 주세요.',
   MODEL_ERROR: '점수를 산출하지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
 }
+const LAST_SEEN_REQUEST_KEY = 'avenue.credit.lastSeenRequestId'
+
+// N-12-6 평가를 처음 볼 때 배너를 표시하고 확인한 평가 번호를 저장한다.
+// 저장소에 접근하지 못하면 배너를 표시한다.
+function isNewScore(report) {
+  if (report.gradeStatusCode !== 'SCORED') return false
+  try {
+    const lastSeen = localStorage.getItem(LAST_SEEN_REQUEST_KEY)
+    localStorage.setItem(LAST_SEEN_REQUEST_KEY, report.requestId)
+    return lastSeen !== report.requestId
+  } catch {
+    return true
+  }
+}
 
 // N-12-6 신용 리포트의 최신 평가와 산출 불가 상태를 보여 준다.
 export default function CreditReportPage() {
   const [state, setState] = useState({ loading: true, report: null, error: null })
-  const [alertVisible, setAlertVisible] = useState(true)
+  const [alertVisible, setAlertVisible] = useState(false)
+  const [scoreChange, setScoreChange] = useState(null)
   useEffect(() => {
     let active = true
     fetchCreditReport().then((report) => {
-      if (active) setState({ loading: false, report, error: null })
+      if (!active) return
+      setAlertVisible(isNewScore(report))
+      setState({ loading: false, report, error: null })
+      fetchCreditDiagnosisHistory()
+        .then(({ items }) => {
+          if (active) setScoreChange(items?.find((item) => item.diagnosisId === report.requestId)?.alternativeScoreChange ?? null)
+        })
+        .catch(() => {})
     }).catch((error) => {
       if (active) setState({ loading: false, report: null, error })
     })
@@ -38,9 +60,8 @@ export default function CreditReportPage() {
 
   const { report } = state
   const date = report.assessedAt ? new Date(report.assessedAt).toLocaleString('ko-KR') : '-'
-  const diff = report.previousScoreDiff
+  const diff = scoreChange
   const showInputLink = ['CONSENT_REQUIRED', 'INPUT_INCOMPLETE', 'STALE_INPUT'].includes(report.notScorableReasonCode)
-  // TODO(RPT-02 미정): 새 점수 판단 기준
   return (
     <div className="credit-report">
       {alertVisible && report.gradeStatusCode === 'SCORED' && (
