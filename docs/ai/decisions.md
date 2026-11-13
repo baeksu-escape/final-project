@@ -26,7 +26,7 @@
 | 모델 서버 | FastAPI — 점수·SHAP 계산, Spring Boot와 REST로 연동. 프론트는 모델 서버를 직접 부르지 않는다 |
 | 데이터·모형 | Python, pandas, scikit-learn, LightGBM, SHAP, joblib |
 | DB | Oracle |
-| AI 서비스 | Google Gemini API 무료 등급. 요약(N-31)과 용어 챗봇 자유 질문(N-32-2, 하루 10회)에만 쓴다 |
+| AI 서비스 | 서비스 기능은 Google Gemini API 무료 등급을 요약(N-31)과 용어 챗봇 자유 질문(N-32-2, 하루 10회)에만 사용한다. 개발용 AI 도구는 별개로 자유롭게 사용한다 |
 | 지도 | **네이버 지도 API** (N-24-4) (UI) — 시트의 "카카오맵"보다 우선 |
 | 저장소 구조 | 실제 저장소(`frontend/`, `backend/`, `fastapi_server/`, `docs/`)를 따른다. 없는 폴더를 임의로 만들지 않는다 |
 | 외부 연동 | 외부 금융·통신사 API는 더미 데이터로 모의 연동 (D-08) |
