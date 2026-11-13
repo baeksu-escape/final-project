@@ -127,6 +127,25 @@ class RunAllRuleTests(unittest.TestCase):
         else:
             self.assertNotIn('@@',run);self.assertIn('EXIT FAILURE',run)
 
+    def test_seed_only_checks_every_target_before_loading(self):
+        """N-05 최초 적재는 모든 시드 표의 존재·빈 상태를 먼저 확인한다."""
+        folder=DDL.parent
+        seeds=sorted(p.name for p in folder.glob('[1-8][0-9]_seed_*.sql'))
+        script=(folder/'run_seed_only.sql').read_text(encoding='utf-8')
+        calls=[line[2:] for line in script.splitlines() if line.startswith('@@')]
+        self.assertEqual(calls,seeds+['99_check.sql'])
+        self.assertNotIn('@@00_drop_all.sql',script)
+        self.assertNotIn('@@01_create_tables.sql',script)
+        self.assertIn('WHENEVER SQLERROR EXIT FAILURE ROLLBACK',script)
+        self.assertIn('WHENEVER OSERROR EXIT FAILURE ROLLBACK',script)
+        self.assertLess(script.index('END;\n/'),script.index('@@'+seeds[0]))
+        self.assertIn('FROM USER_TABLES',script)
+        self.assertIn('WHERE ROWNUM = 1',script)
+        self.assertIn('RAISE_APPLICATION_ERROR(-20002',script)
+        self.assertIn('RAISE_APPLICATION_ERROR(-20003',script)
+        for name in seeds:
+            self.assertIn("'"+name.split('_seed_',1)[1][:-4].upper()+"'",script)
+
 
 class PrivacyTests(unittest.TestCase):
     """정해진 암호문 포맷과 HMAC 정규화·키 오류 비노출을 검증한다."""
@@ -401,6 +420,9 @@ class FullSourceTests(unittest.TestCase):
         source=Path(os.environ['AVENUE_TEST_SERVICE_DUMMY'])
         with tempfile.TemporaryDirectory() as temp:
             out=Path(temp)/'valid';report=db.generate(source,out,DDL,TEST_ENV)
+            # N-05 재생성해도 최초 적재 경로와 저장소 파일이 같아야 한다.
+            self.assertEqual((out/'run_seed_only.sql').read_bytes().replace(b'\r\n',b'\n'),
+                             (DDL.parent/'run_seed_only.sql').read_bytes().replace(b'\r\n',b'\n'))
             self.assertEqual(report['rows']['APP_USER'],401)  # 더미 회원 400 + 관리자 시연 계정 1
             self.assertEqual(report['rows']['USER_EXPENSE_ITEM'],400)
             self.assertEqual(report['rows']['USER_ASSET_SNAPSHOT'],400)

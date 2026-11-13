@@ -94,7 +94,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 **점수대별 참고 범위(시연 가정, N-12·N-37):** 새 DB 상품의 `MIN_ALT_SCORE`는 은행(업권 0) 780, 상호금융(5) 665, 카드·저축은행·캐피탈(1·2·3) 0으로 둔다. 이는 실제 상품 심사 기준이 아니며 기존 상품 CSV 값은 바꾸지 않는다. 각 등급의 최저점 `MIN_SCORE`가 이 조건을 만족하는 상품만 모아 `SCORE_BAND_OFFER`의 최저/최고 금리와 최대 한도를 계산한다. 따라서 등급 내 모든 점수에서 해당 조건을 만족하는 범위다. 평균 금리는 그 최저·최고의 중간값으로 실제 고객 통계 평균이 아니다. 직군·소득 등 개별 신청 자격이나 승인 결과를 뜻하지 않는다.
 
-저장소 시드의 신용 프로필 318행에 카드 한도가 채워져 있다. `CARD_LIMIT_AMT`는 `(KC1000001 - L00000002) × 1000`원으로 계산하며 반올림하지 않는다. 원천 생성기의 총신용공여는 대출잔액·보증금액·카드 한도의 합이고 현재 보증 건수는 전원 0이다. 두 값 중 하나가 없거나 차이가 음수면 NULL이다. 보증금액이 생기면 이를 함께 빼야 한다. Spring도 신용평가사 응답을 불러올 때 같은 식을 쓴다. 생성 보고서의 `card_spend_over_limit`는 월 사용액이 계산 한도를 초과한 행 수다. 재직/활동 기간 `WORK_PERIOD_MONTHS`는 NULL이다. `PASSWORD_HASH`는 시연 계정 4개(사용자 3·관리자 1)만 BCrypt 해시가 있고 나머지는 NULL이다.
+저장소 시드의 신용 프로필 318행에 카드 한도가 채워져 있다. `CARD_LIMIT_AMT`는 `(KC1000001 - L00000002) × 1000`원으로 계산하며 반올림하지 않는다. 원천 생성기의 총신용공여는 대출잔액·보증금액·카드 한도의 합이고 현재 보증 건수는 전원 0이다. 두 값 중 하나가 없거나 차이가 음수면 NULL이다. 보증금액이 생기면 이를 함께 빼야 한다. 이는 기존 시드의 가상 신용평가사 응답 매핑이며 프로필은 동의 회원의 `IMPORTED` 행이다. 1차 서비스에서는 신용평가사 API를 쓰지 않고 회원이 카드·신용 정보를 직접 입력하므로 `MANUAL`, `CONSENT_ID`는 NULL이다. 생성 보고서의 `card_spend_over_limit`는 월 사용액이 계산 한도를 초과한 행 수다. 재직/활동 기간 `WORK_PERIOD_MONTHS`는 NULL이다. `PASSWORD_HASH`는 시연 계정 4개(사용자 3·관리자 1)만 BCrypt 해시가 있고 나머지는 NULL이다.
 
 현재 더미 원천에서 0원은 카드가 없는 회원이며, NULL은 원천 값이 없거나 계산이 음수인 경우다.
 
@@ -107,6 +107,8 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 생성기는 받은 DDL에서 타입·문자 길이·숫자 자릿수·NOT NULL·CHECK(Oracle NULL/UNKNOWN 포함)·PK·UNIQUE·복합 FK·조건부 UNIQUE INDEX를 읽어 검사한다. 모든 행 검증과 원천 대조가 끝나야 파일을 쓴다. SQL*Plus 2,499자 줄 제한도 생성 SQL에 적용한다. DDL v0.3.2는 11/12 범영 님이 Oracle 적재를 확인했으며 시드는 11/13 경환이 `run_all.sql`로 적재해 `99_check.sql`의 표 51개·표별 행 수 일치를 확인했다.
 
 성공한 출력의 `run_all.sql`은 `00_drop_all.sql` → 받은 DDL(내장 기준 INSERT 포함) → 테이블별 시드 → `99_check.sql`을 실행한다. SQL Developer F5 또는 SQL*Plus `@run_all.sql`을 사용한다. `WHENEVER SQLERROR/OSERROR EXIT FAILURE ROLLBACK`이 있으나 **DDL과 이미 COMMIT한 데이터는 오류 후 ROLLBACK으로 되돌아오지 않는다.** 반드시 새 개발 스키마에서 실행한다.
+
+**최초 시드 적재:** 확정 `docs/spec/sql/avenue_ddl.sql`을 먼저 실행한 뒤 같은 스키마에서 `run_seed_only.sql`을 실행한다. DDL에 내장된 기준 데이터는 유지한다. 시드 대상 테이블이 모두 존재하고 비어 있는지 모든 시드 실행 전에 검사하며, 하나라도 없거나 기존 행이 있으면 중단한다. 이 검사는 동시 쓰기를 잠그지 않으므로 적재 중 다른 작업이 같은 테이블에 쓰지 않아야 한다. 기존 행의 병합·삭제·재적재는 지원하지 않는다. 시드 파일의 중간 COMMIT과 IDENTITY 변경 때문에 적재 도중 오류가 나면 전체 롤백할 수 없다. `99_check.sql`은 비교 결과를 출력하므로 직접 확인한다. 생성기 재실행 시 이 실행 파일도 함께 생성한다.
 
 `00_drop_all.sql`은 첫 DROP 전에 USER_TABLES에서 옛 DB 표식(APP_MEMBER·MEMBER_MONTHLY_INPUT·MEMBER_LOAN·EXTERNAL_API_RESPONSE)을 확인하고 하나라도 있으면 오류로 종료한다. 단독 실행에도 WHENEVER SQLERROR EXIT가 적용된다. 표식이 없는 스키마의 공유 테이블까지 자동 식별하는 가드는 아니므로 별도 스키마 원칙은 유지한다.
 
