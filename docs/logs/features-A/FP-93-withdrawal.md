@@ -82,6 +82,34 @@
 - 탈퇴 회원의 평가를 통계(N-13·N-25·N-26)에 넣을지는 팀 결정이 남아 있다(D-28).
 - 새로 붙인 클래스: `withdrawal-card`, `withdrawal-card__open`, `withdrawal-form`, `withdrawal-form__notice`. 폼 버튼은 기존 `account-form__*`를 다시 썼다. 스타일은 넣지 않았다.
 
+## 추가 반영 (2026-11-13) — 탈퇴 뒤 로그인 화면 알림이 사라지는 문제
+- **발견:** 기능 단위 모의 테스트에서 탈퇴 뒤 로그인 화면에 "탈퇴를 마쳤습니다."가 뜨지 않았다. 실제 App을 jsdom에 그려 클릭으로 진행한 테스트다.
+- **원인**
+  - `logout()`이 로그인 상태를 비우면 화면이 다시 그려진다. 이때 아직 `/mypage`에 있는 라우트 가드(RouteGuard)가 `{ from: '/mypage' }`만 담아 로그인 화면으로 보낸다.
+  - 탈퇴 카드의 `navigate(..., { state: { notice } })`와 가드의 이동 중 어느 쪽이 나중일지 정해져 있지 않다. react-router 7의 BrowserRouter는 주소 이동을 `startTransition`으로 처리한다.
+  - 가드가 나중에 실행되면 notice가 사라진다. 테스트에서 실제로 가드가 나중이었다.
+- **바꾼 방법**(팀원 결정): 알림 문구를 로그인 상태 관리(AuthProvider)에 한 번만 쓰는 값으로 맡긴다.
+  - `common/auth/AuthProvider.jsx` (공유 파일)
+    - `notice` 상태와 `clearNotice()`를 추가했다.
+    - `logout({ notice })`는 로그아웃 상태와 알림을 같은 렌더에 반영한다. 인자 없는 기존 `logout()`은 그대로 동작한다(헤더 [로그아웃]).
+    - context의 기존 키는 그대로 두었다.
+  - `common/auth/useAuth.js`: 사용법 주석만 바꿨다.
+  - `WithdrawalCard.jsx`: `logout({ notice: '탈퇴를 마쳤습니다.' })` 뒤에 로그인 화면으로 보낸다. 화면 이동 state는 더 넘기지 않는다.
+  - `LoginPage.jsx`
+    - 들어올 때 맡아 둔 알림을 화면 상태로 옮겨 토스트로 보여 주고, 곧바로 `clearNotice()`로 비운다.
+    - 예전의 `location.state.notice` 방식은 이 방식으로 바꿨다. 다른 곳에서는 쓰지 않았다.
+    - 마크업과 className은 그대로다.
+- **확인함**
+  - `npm run lint`·`npm run build` 통과. mock 점검 30개(FP-93)·72개(FP-85) 통과.
+  - 기능 테스트(FP-93)
+    - 탈퇴 뒤 로그인 화면에 "탈퇴를 마쳤습니다."가 보인다. employee 탈퇴 포함 2곳에서 확인했다.
+    - 같은 화면에서 다른 계정으로 로그인했다가 헤더 [로그아웃]을 하면 알림이 다시 뜨지 않는다.
+    - 새로고침한 로그인 화면에도 알림이 없다.
+  - 이 브랜치 단독에서는 "직군 없는 새 계정의 마이페이지" 1건이 실패한다.
+    - 이 브랜치가 PR #45 수정 전의 FP-199 위에 있기 때문이다(마이페이지가 직군 가드 안에 있음).
+    - PR #45·FP-85·FP-86·FP-87과 합친 상태에서는 통과한다.
+- **팀 확인:** 공유 파일인 AuthProvider에 `notice`·`clearNotice`·`logout({ notice })`가 생겼다. 다른 기능도 로그아웃 뒤 로그인 화면에 알림을 띄울 때 같은 방법을 쓸 수 있다.
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

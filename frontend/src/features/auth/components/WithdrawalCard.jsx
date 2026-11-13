@@ -12,7 +12,7 @@ const WITHDRAWAL_NOTICE =
 const WITHDRAWAL_DONE_MESSAGE = '탈퇴를 마쳤습니다.'
 
 // N-04-7 회원 탈퇴 카드 — [회원 탈퇴]를 누르면 안내문과 비밀번호 확인 폼을 연다. 비밀번호가 맞아야 [탈퇴하기]가 동작한다.
-// 탈퇴는 상태 변경 방식이다(DDL v0.3.2 W1). 성공하면 로그아웃하고, 로그아웃 상태의 메인인 로그인 화면으로 보내며 알림 문구를 넘긴다.
+// 탈퇴는 상태 변경 방식이다(DDL v0.3.2 W1). 성공하면 로그아웃하고, 로그아웃 상태의 메인인 로그인 화면으로 보낸다. 알림 문구는 logout({ notice })로 맡긴다.
 export default function WithdrawalCard() {
   const { logout } = useAuth()
   const navigate = useNavigate()
@@ -49,8 +49,9 @@ export default function WithdrawalCard() {
       setPending(false)
       return
     }
-    await logout()
-    navigate(AUTH_PATHS.LOGIN, { replace: true, state: { notice: WITHDRAWAL_DONE_MESSAGE } })
+    // 알림은 로그아웃 상태와 함께 AuthProvider에 맡긴다. 라우트 가드가 먼저 로그인 화면으로 보내도 알림이 남는다.
+    await logout({ notice: WITHDRAWAL_DONE_MESSAGE })
+    navigate(AUTH_PATHS.LOGIN, { replace: true })
   }
 
   return (

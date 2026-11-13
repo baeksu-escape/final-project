@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { TextInput, Toast } from '../../../common/components/index.js'
@@ -17,18 +17,22 @@ function toLoginErrorMessage(error) {
 
 // N-01 로그인 화면 — 성공하면 공통 인증 구조가 토큰을 저장하고, GuestOnlyRoute가 역할에 맞는 첫 화면으로 보낸다.
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, notice: pendingNotice, clearNotice } = useAuth()
   const location = useLocation()
   // N-01-6 소셜 로그인 콜백이 돌려보내며 넘긴 안내 문구(관리자 차단·잠금·취소·오류).
   const socialMessage = location.state?.socialMessage
-  // N-04-7 다른 화면이 넘긴 알림(예: 회원 탈퇴 뒤 '탈퇴를 마쳤습니다.'). 토스트로 잠깐 보여 주고, 닫히면 다시 띄우지 않는다.
-  const [noticeClosed, setNoticeClosed] = useState(false)
-  const notice = noticeClosed ? '' : (location.state?.notice ?? '')
+  // N-04-7 로그아웃할 때 맡겨 둔 알림(예: 회원 탈퇴 뒤 '탈퇴를 마쳤습니다.'). 들어올 때 이 화면 상태로 옮겨 토스트로 잠깐 보여 준다.
+  const [notice, setNotice] = useState(pendingNotice)
   const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
+
+  // 맡아 둔 알림은 한 번만 쓴다. 꺼낸 뒤 바로 비워서 다음 로그아웃 때 다시 뜨지 않게 한다.
+  useEffect(() => {
+    if (pendingNotice) clearNotice()
+  }, [pendingNotice, clearNotice])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -78,7 +82,7 @@ export default function LoginPage() {
       </form>
       <SocialLoginButtons />
       <AuthLinks />
-      <Toast message={notice} onClose={() => setNoticeClosed(true)} />
+      <Toast message={notice} onClose={() => setNotice('')} />
     </section>
   )
 }
