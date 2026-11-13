@@ -1,7 +1,7 @@
 import { GRADE_STATUS } from '../../../common/config/scoreStatus.js'
 
 // N-04-6 mock 설정 — scenario 값 하나를 바꾸면 진단 내역 응답이 달라진다.
-//   'MANY'(합성 진단 여러 건) | 'MIXED'(여러 건 + 산출 불가 1건, 산출 불가 표시 확인용) | 'EMPTY'(0건, 안내 문구 확인용)
+//   'MANY'(합성 진단 여러 건) | 'MIXED'(여러 건 + 산출 불가 1건 + 기존 점수 없는 산출 1건, '—' 표시 확인용) | 'EMPTY'(0건, 안내 문구 확인용)
 export const mockDiagnosisHistorySettings = {
   scenario: 'MANY',
 }
@@ -25,4 +25,16 @@ export const MOCK_NOT_SCORABLE_DIAGNOSIS = Object.freeze({
   modelVersion: 'alt-v1.0',
   gradeStatusCode: GRADE_STATUS.NOT_SCORABLE,
   notScorableReasonCode: 'STALE_INPUT',
+})
+
+// 'MIXED' 시나리오에서 더하는 기존 점수 없는 평가 1건 — 산출은 됐지만(SCORED) 금융 이력이 부족해 기존 점수가 null이다(B팀 명세서 v0.3 3-1 traditional.scorableYn = 'N').
+// 금융 이력이 쌓이기 전인 가장 오래된 평가로 둔다. 대안 점수와 등급은 있다.
+export const MOCK_NO_EXISTING_SCORE_DIAGNOSIS = Object.freeze({
+  diagnosisId: '3f5a7c9e-1b3d-4f5a-8b7c-9d1e3f5a7c07',
+  calculatedAt: '2026-06-07T16:20:00',
+  existingScore: null,
+  alternativeScore: 612,
+  modelVersion: 'alt-v1.0',
+  gradeStatusCode: GRADE_STATUS.SCORED,
+  notScorableReasonCode: null,
 })

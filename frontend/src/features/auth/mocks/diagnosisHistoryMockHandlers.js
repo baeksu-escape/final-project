@@ -2,7 +2,12 @@ import { getGradeByScore } from '../../../common/config/grades.js'
 import { GRADE_STATUS } from '../../../common/config/scoreStatus.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { requireAccountByToken } from './authMockHandlers.js'
-import { MOCK_DIAGNOSES, MOCK_NOT_SCORABLE_DIAGNOSIS, mockDiagnosisHistorySettings } from './diagnosisHistoryMockData.js'
+import {
+  MOCK_DIAGNOSES,
+  MOCK_NO_EXISTING_SCORE_DIAGNOSIS,
+  MOCK_NOT_SCORABLE_DIAGNOSIS,
+  mockDiagnosisHistorySettings,
+} from './diagnosisHistoryMockData.js'
 
 registerMockHandlers({
   // N-04-6 진단 내역 조회(MEM-06) — 산출 일시 기준 최신순으로 돌려준다.
@@ -13,7 +18,10 @@ registerMockHandlers({
     const account = requireAccountByToken(token)
     const { scenario } = mockDiagnosisHistorySettings
     if (scenario === 'EMPTY' || account.user.hasScore === false) return { items: [] }
-    const diagnoses = scenario === 'MIXED' ? [...MOCK_DIAGNOSES, MOCK_NOT_SCORABLE_DIAGNOSIS] : [...MOCK_DIAGNOSES]
+    const diagnoses =
+      scenario === 'MIXED'
+        ? [...MOCK_DIAGNOSES, MOCK_NOT_SCORABLE_DIAGNOSIS, MOCK_NO_EXISTING_SCORE_DIAGNOSIS]
+        : [...MOCK_DIAGNOSES]
     diagnoses.sort((a, b) => a.calculatedAt.localeCompare(b.calculatedAt))
     let previousScored = null
     const items = diagnoses.map((diagnosis) => {

@@ -6,8 +6,13 @@ import { EMPTY_HISTORY_MESSAGE, GRADE_LABELS, NOT_SCORABLE_LABEL } from '../diag
 
 // 가장 오래된 진단처럼 변화 값이 없을 때 보일 문자.
 const NO_CHANGE = '—'
-// 산출 불가 평가의 기존·대안 점수 칸에 보일 문자.
+// 점수가 없는 칸에 보일 문자 — 산출 불가 평가이거나, 산출은 됐지만 그 점수가 null일 때(예: 금융 이력 부족으로 기존 점수 없음).
 const NO_SCORE = '—'
+
+// 점수 칸 값을 고른다. 산출 불가이거나 점수가 null이면 '—'를 보여 준다(B팀 명세서 v0.3 3-1·3-4).
+function formatScore(score, notScorable) {
+  return notScorable || score === null || score === undefined ? NO_SCORE : score
+}
 
 // 서버 시각 문자열(2026-11-09T14:30:00)을 "2026-11-09 14:30"으로 보여 준다.
 function formatCalculatedAt(value) {
@@ -22,6 +27,7 @@ function formatChange(change) {
 
 // N-04-6 진단 내역 조회 — 지난 평가를 최신순 표로 보여 준다. 순서·변화·등급은 서버가 보낸 값을 그대로 쓰고, 모델 버전은 보여 주지 않는다.
 // 산출 불가(NOT_SCORABLE) 평가는 등급 칸에 '산출 불가'와 사유를, 점수 칸에 '—'를 보여 주고 변화 칸은 비운다. 화면에서 점수로 등급을 계산하지 않는다.
+// 산출은 됐지만(SCORED) 기존 점수나 대안 점수가 null인 평가도 그 칸에 '—'를 보여 준다.
 export default function DiagnosisHistoryTable() {
   const [items, setItems] = useState(null)
   const [loadError, setLoadError] = useState('')
@@ -71,8 +77,8 @@ export default function DiagnosisHistoryTable() {
             <tr key={item.diagnosisId}>
               <td>{formatCalculatedAt(item.calculatedAt)}</td>
               <td>{JOB_TYPE_LABELS[item.jobType] ?? NO_CHANGE}</td>
-              <td>{notScorable ? NO_SCORE : item.existingScore}</td>
-              <td>{notScorable ? NO_SCORE : item.alternativeScore}</td>
+              <td>{formatScore(item.existingScore, notScorable)}</td>
+              <td>{formatScore(item.alternativeScore, notScorable)}</td>
               <td>
                 {notScorable
                   ? `${NOT_SCORABLE_LABEL} (${getNotScorableMessage(item.notScorableReasonCode)})`

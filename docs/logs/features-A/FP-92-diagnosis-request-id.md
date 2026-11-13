@@ -52,6 +52,31 @@
 - 점수 산출(FP-86) mock 결과는 진단 내역 mock과 연결되지 않았다. 진단 내역은 고정 합성 데이터를 쓴다.
 - 산출 불가 행의 등급 칸 문구가 길다. 칸이 넓어지면 줄바꿈 스타일이 필요할 수 있다(스타일 제안만).
 
+## 추가 반영 (2026-11-13) — 기존 점수가 없는 산출 행도 '—'로 표시
+- **근거:** B팀 명세서 v0.3
+  - 3-1: `traditional.scorableYn = 'N'`이면 기존 점수가 null이다.
+  - 3-4: `existingScore`는 산출할 수 없으면 null이다.
+- **바꾼 내용**
+  - `DiagnosisHistoryTable.jsx`
+    - `gradeStatusCode`가 SCORED여도 `existingScore`나 `alternativeScore`가 null이면 그 칸에 `NO_SCORE`('—')를 보여 준다(`formatScore`).
+    - 마크업과 className은 그대로다.
+  - `diagnosisHistoryMockData.js`
+    - `MOCK_NO_EXISTING_SCORE_DIAGNOSIS`를 추가했다. 이 행은 SCORED이고 `existingScore`는 null, 대안 점수는 612다.
+    - 가장 오래된 평가(2026-06-07)로 두었고, diagnosisId는 합성 UUID다.
+    - 'MIXED' 시나리오에만 들어간다.
+  - `diagnosisHistoryMockHandlers.js`: MIXED 목록에 위 행을 더했다. 정렬과 변화 계산 로직은 그대로다.
+- **API:** 경로와 필드는 그대로다. SCORED 행에서도 `existingScore`가 null일 수 있다는 점만 표시에 반영했다.
+- **확인함**
+  - `npm run lint` 통과, `npm run build` 통과
+  - Node 스크립트로 mock 처리 함수를 직접 불러 22개 항목 통과
+    - MIXED가 7건이고 최신순이다.
+    - 기존 점수 없는 행은 등급이 있고 변화는 null이다(첫 SCORED).
+    - 다음 행(7/5)의 변화는 +28이다.
+    - MIXED 변화 값은 118·0·null·-5·32·28·null이다.
+    - MANY는 바뀌지 않았다.
+- **확인 못 함:** 브라우저에서 표를 직접 보는 확인. `scenario`를 `MIXED`로 바꾸고 `npm run dev`(VITE_USE_MOCK=true)로 확인해야 한다.
+- **이 브랜치의 처리:** 이 브랜치는 `feature-A/FP-199-V3-UPDATE`(PR #45)에 직접 병합했다.
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 
