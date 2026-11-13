@@ -4,6 +4,10 @@ import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 
 // 값이 없는 항목(새 가입자의 닉네임·가입일 등)에 보일 문자.
 const EMPTY_VALUE = '-'
+// 휴대폰을 등록하지 않은 계정(휴대폰 null)에 보일 문구.
+const NO_PHONE = '등록 안 함'
+// 직군을 아직 고르지 않은 계정(jobType null)에 보일 문구.
+const NO_JOB_TYPE = '직군 미선택'
 
 // N-04-1 내 정보 카드 — 7개 항목을 보여 준다. 이름·휴대폰·이메일은 서버가 가려서 보낸 값을 그대로 쓴다.
 // N-04-2 [가림 해제]를 누르면 비밀번호 칸을 열고, 확인은 onUnmask(password)가 맡는다(틀리면 오류를 던진다). 해제 뒤에는 unmasked 값을 보여 준다.
@@ -18,10 +22,10 @@ export default function MyProfileCard({ profile, unmasked, onUnmask }) {
     ['아이디', profile.loginId],
     ['닉네임', profile.nickname],
     ['이름', shown.name],
-    ['휴대폰', shown.phone],
+    ['휴대폰', shown.phone ?? NO_PHONE],
     ['이메일', shown.email],
     ['가입일', profile.joinedAt],
-    ['직군', JOB_TYPE_LABELS[profile.jobType]],
+    ['직군', JOB_TYPE_LABELS[profile.jobType] ?? NO_JOB_TYPE],
   ]
 
   // 비밀번호 칸을 닫고 입력한 값과 안내를 지운다.

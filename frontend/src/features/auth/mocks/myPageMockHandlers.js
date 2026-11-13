@@ -5,25 +5,31 @@ import { isValidEmail, isValidPassword } from '../validation.js'
 import { consumeVerification, isMockEmailInUse, requireAccountByToken } from './authMockHandlers.js'
 import { MY_PAGE_DEMO_PROFILES } from './myPageMockData.js'
 
+// 아래 네 함수는 값이 없으면(null·빈 값) 오류 없이 null을 돌려준다. 휴대폰은 DDL에서 null일 수 있다(PHONE_ENC nullable).
+
 // 이름은 첫 글자(세 글자 이상이면 마지막 글자도)만 남기고 가린다. 예) 홍길동 → 홍*동
 function maskName(name) {
+  if (!name) return null
   if (name.length <= 2) return name.slice(0, 1) + '*'.repeat(name.length - 1)
   return name.slice(0, 1) + '*'.repeat(name.length - 2) + name.slice(-1)
 }
 
 // 숫자만 있는 휴대폰 번호에 하이픈을 넣는다. 예) 01012345678 → 010-1234-5678
 function formatPhone(phone) {
+  if (!phone) return null
   return phone.length === 11 ? `${phone.slice(0, 3)}-${phone.slice(3, 7)}-${phone.slice(7)}` : `${phone.slice(0, 3)}-${phone.slice(3, 6)}-${phone.slice(6)}`
 }
 
 // 휴대폰 가운데 자리를 가린다. 예) 010-1234-5678 → 010-****-5678
 function maskPhone(phone) {
+  if (!phone) return null
   const [head, middle, tail] = formatPhone(phone).split('-')
   return `${head}-${'*'.repeat(middle.length)}-${tail}`
 }
 
 // 이메일 아이디 부분의 앞 두 글자만 남기고 가린다. 예) employee@example.com → em******@example.com
 function maskEmail(email) {
+  if (!email) return null
   const [local, domain] = email.split('@')
   const visible = Math.min(2, local.length - 1)
   return `${local.slice(0, visible)}${'*'.repeat(local.length - visible)}@${domain}`
@@ -36,24 +42,25 @@ function matchesPassword(account, password) {
 }
 
 registerMockHandlers({
-  // N-04-1 내 정보 조회 — 이름·휴대폰·이메일은 서버가 가린 값으로 보낸다.
+  // N-04-1 내 정보 조회 — 이름·휴대폰·이메일은 서버가 가린 값으로 보낸다. 휴대폰이 없으면 null이다.
+  // 닉네임·가입일은 계정에 저장된 값(nickname, createdAt)을 먼저 쓰고, 없을 때만 데모 값을 쓴다.
   'GET /api/members/me/profile': ({ token }) => {
     const account = requireAccountByToken(token)
     const extra = MY_PAGE_DEMO_PROFILES[account.loginId]
     return {
       profile: {
         loginId: account.loginId,
-        nickname: extra?.nickname ?? null,
+        nickname: account.nickname ?? extra?.nickname ?? null,
         name: maskName(account.user.name),
         phone: maskPhone(account.phone),
         email: maskEmail(account.email),
-        joinedAt: extra?.joinedAt ?? null,
+        joinedAt: account.createdAt?.slice(0, 10) ?? extra?.joinedAt ?? null,
         jobType: account.user.jobType,
       },
     }
   },
 
-  // N-04-2 가림 해제 — 비밀번호가 맞을 때만 원래 값을 돌려준다. 401은 로그아웃을 일으키므로 400을 쓴다.
+  // N-04-2 가림 해제 — 비밀번호가 맞을 때만 원래 값을 돌려준다. 401은 로그아웃을 일으키므로 400을 쓴다. 휴대폰이 없으면 null이다.
   'POST /api/members/me/profile/unmask': ({ body, token }) => {
     const account = requireAccountByToken(token)
     if (!matchesPassword(account, body?.password)) throw new ApiError(400, '비밀번호가 올바르지 않습니다.')
