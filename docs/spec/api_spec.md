@@ -147,3 +147,103 @@
   - `getIncomeVolatility(userId)`
   - `getCashFlowForecast(userId, { incomeChangePercent, expenseChangePercent, loanPaymentChangePercent, forecastMonths })`
 - mock 모드(`VITE_USE_MOCK`)에서는 위 예시와 같은 회원 2번 값을 돌려준다. 전망 mock은 쿼리 조건을 반영해 계산한다.
+
+---
+
+## N-16 자산·부채 건전성 · N-20 DSR 계산기 (FP-166, 담당 광희)
+
+| 메서드 | 경로 | 용도 | 데이터 출처 |
+|---|---|---|---|
+| POST | `/api/diagnosis/dsr/calculate` | N-20-4 DSR·위험 단계 | 요청 본문 |
+| POST | `/api/diagnosis/financial-health/calculate` | N-16-1·2 건전성 지표, N-16-3 값 바꿔 보기 | 요청 본문 |
+
+- 두 API 모두 **DB를 읽지 않고 받은 값으로 계산만** 한다. 저장 데이터 조회 연결(N-16·N-20 "저장 데이터 조회")은 후속 작업이다.
+- 상환 부담률(N-16-1)과 DSR(N-20-4)은 백엔드 `FinancialHealthCalculator.calculateRepaymentBurdenRatio()` **함수 하나를 함께 쓴다**.
+- 비율은 `금액 ÷ 기준 × 100`이다. BigDecimal로 계산해 소수 둘째 자리에서 반올림(HALF_UP)한다.
+- 오류: 금액이 음수이면 `400`이다. DSR API는 연소득이 0이어도 `400`이다(본문 형식은 D-20 미정).
+
+### 위험 단계 기준 (기준 **이상**이면 그 단계, 설정 상수)
+
+| 비율 | 계산 | 주의 `CAUTION` | 위험 `DANGER` |
+|---|---|---|---|
+| 상환 부담률(DSR) | 연간 원리금 ÷ 연소득 | 30% 이상 | 40% 이상 |
+| 자산 대비 부채 | 총부채 ÷ 총자산 | 40% 이상 | 60% 이상 |
+| 순자산 대비 부채 | 총부채 ÷ 순자산 | 70% 이상 | 100% 이상 |
+
+그 밖에는 `SAFE`다. **나누는 값(연소득·총자산·순자산)이 0 이하이면 비율과 단계가 `null`(계산 불가)**이다.
+
+### POST `/api/diagnosis/dsr/calculate`
+
+요청:
+
+```json
+{ "annualIncome": 30000000, "annualDebtService": 12000000 }
+```
+
+응답 `200` (기존 프론트 mock과 같은 필드):
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `annualIncome`, `annualDebtService` | 정수 | 받은 값 그대로 |
+| `dsrRatio` | 소수 | DSR(%) |
+| `riskLevel` | 문자열 | `SAFE` / `CAUTION` / `DANGER` |
+| `riskBadgeText` | 문자열 | `안전` / `주의` / `위험` |
+| `description` | 문자열 | 단계 안내 문구 |
+
+```json
+{ "annualIncome": 30000000, "annualDebtService": 12000000, "dsrRatio": 40.0, "riskLevel": "DANGER", "riskBadgeText": "위험", "description": "상환 부담률이 40% 이상이라 연체 위험이 높은 위험 단계입니다." }
+```
+
+### POST `/api/diagnosis/financial-health/calculate`
+
+요청:
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `totalAsset` | 정수 | 총자산 |
+| `annualIncome` | 정수 | 연소득(급여소득자 월급 × 12, 그 밖에는 월별 합, N-20-3) |
+| `totalDebt` | 정수 | 총부채 = 대출 잔액 합계 |
+| `annualDebtService` | 정수 | 연간 원리금 상환액 |
+
+응답 `200`:
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `totalAsset`, `totalDebt` | 정수 | 받은 값 |
+| `netAsset` | 정수 | 순자산 = 총자산 − 총부채(음수 가능) |
+| `repaymentBurdenRatio`, `repaymentBurdenLevel` | 소수 또는 `null`, 문자열 또는 `null` | 상환 부담률과 단계 |
+| `debtToAssetRatio`, `debtToAssetLevel` | 위와 같음 | 자산 대비 부채와 단계 |
+| `debtToNetAssetRatio`, `debtToNetAssetLevel` | 위와 같음 | 순자산 대비 부채와 단계 |
+
+예시 (총자산 1억, 연소득 4,000만, 총부채 5,000만, 연 원리금 1,400만):
+
+```json
+{
+  "totalAsset": 100000000,
+  "totalDebt": 50000000,
+  "netAsset": 50000000,
+  "repaymentBurdenRatio": 35.0,
+  "repaymentBurdenLevel": "CAUTION",
+  "debtToAssetRatio": 50.0,
+  "debtToAssetLevel": "CAUTION",
+  "debtToNetAssetRatio": 100.0,
+  "debtToNetAssetLevel": "DANGER"
+}
+```
+
+프론트: `features/diagnosis/api/diagnosisApi.js`의 `calculateDsr(payload)`, `calculateFinancialHealth(payload)`. mock도 백엔드와 같은 규칙으로 계산한다.
+
+---
+
+## 공통 재계산 틀 (N-17-3 · N-18-4 · N-21-4, 백엔드 내부 함수)
+
+API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/RecalculationFrame.apply(현재 값 Map, 바꿀 값 목록)`.
+
+| 변경 방식 | 뜻 | 예 |
+|---|---|---|
+| `SET` | 값으로 바꾼다 | 통신비 정시 납부 기간 → 24 (N-18 슬라이더) |
+| `PERCENT` | 비율로 바꾼다 | 소득 −20 → 현재 × 0.8 (N-17, N-21) |
+| `ADD` | 더한다 | 금리 +1 (%p) (N-17) |
+
+- 원래 값은 바꾸지 않고 새 값을 돌려준다(N-18-10 되돌리기).
+- 현재 값에 없는 항목 이름이면 오류를 낸다.
