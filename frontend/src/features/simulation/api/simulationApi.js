@@ -6,7 +6,13 @@ import '../mocks/simulationMockHandlers.js'
 export const SIMULATION_API = Object.freeze({
   RECOMMEND_LOANS: '/api/simulation/loans/recommend',
   RECALCULATE_CREDIT_CARE: '/api/simulation/credit-care/recalculate',
+  SCORE_BAND_OFFER: '/api/simulation/score-band-offer',
 })
+
+// N-18-7 점수(0~1000)에 맞는 점수대의 참고 금리 범위·평균·한도와 등급을 조회한다. 더미 데이터라 dummyNotice가 항상 true다.
+export function getScoreBandOfferInfo(score) {
+  return apiGet(`${SIMULATION_API.SCORE_BAND_OFFER}?score=${score}`)
+}
 
 // N-18-7 같은 점수대 금리·한도·추천 대출상품 3종 조회
 export function recommendLoans(score, jobType) {

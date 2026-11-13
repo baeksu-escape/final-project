@@ -70,6 +70,14 @@ export const DUMMY_LOAN_PRODUCTS = [
   },
 ]
 
+// N-18-7 GET /api/simulation/score-band-offer mock용 점수대 자료 — 더미 시드(21_seed_score_band_offer.sql)·등급 구간(CUT-0.1)과 같은 값이다.
+export const SCORE_BAND_OFFER_ROWS = Object.freeze([
+  { minScore: 0, maxScore: 664, gradeBand: 'CAUTION', rateMin: 6.4, rateMax: 19.64, rateAvg: 13.02, limit: 47000000 },
+  { minScore: 665, maxScore: 779, gradeBand: 'STANDARD', rateMin: 5.28, rateMax: 19.64, rateAvg: 12.46, limit: 47000000 },
+  { minScore: 780, maxScore: 1000, gradeBand: 'GOOD', rateMin: 3.75, rateMax: 19.64, rateAvg: 11.695, limit: 128000000 },
+])
+export const SCORE_BAND_OFFER_BASE_DATE = '2026-09-18'
+
 // 점수대에 따른 기본 금리 및 한도 가이드 (Good: >=780, Standard: 665~779, Caution: <=664)
 export function getScoreBandOffer(score = 680) {
   if (score >= 780) {

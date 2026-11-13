@@ -1,6 +1,12 @@
 // N-18 신용케어 시뮬레이터 mock 핸들러 — 한도·금리 추천 및 점수 재계산
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
-import { DUMMY_LOAN_PRODUCTS, getScoreBandOffer } from './simulationMockData.js'
+import { ApiError } from '../../../common/api/ApiError.js'
+import {
+  DUMMY_LOAN_PRODUCTS,
+  getScoreBandOffer,
+  SCORE_BAND_OFFER_BASE_DATE,
+  SCORE_BAND_OFFER_ROWS,
+} from './simulationMockData.js'
 
 // N-18-7 같은 점수대 금리·한도·추천 대출 상품 조회 (3종 추천) — GET은 쿼리스트링, POST는 본문에서 값을 읽는다.
 function handleLoanRecommend({ body, query }) {
@@ -97,8 +103,31 @@ function handleCreditCareRecalculate({ body }) {
   }
 }
 
+// N-18-7 같은 점수대 참고 금리·한도 mock — 백엔드와 같이 점수가 0~1000 밖이면 400을 낸다.
+function handleScoreBandOffer({ query }) {
+  const score = Number(query?.score)
+  if (query?.score === undefined || !Number.isInteger(score) || score < 0 || score > 1000) {
+    throw new ApiError(400, '점수는 0~1000 사이여야 합니다.')
+  }
+  const band = SCORE_BAND_OFFER_ROWS.find((row) => score >= row.minScore && score <= row.maxScore)
+  return {
+    score,
+    gradeBand: band.gradeBand,
+    cutoffVersion: 'CUT-0.1',
+    bandMinScore: band.minScore,
+    bandMaxScore: band.maxScore,
+    expectedMinRate: band.rateMin,
+    expectedMaxRate: band.rateMax,
+    expectedAvgRate: band.rateAvg,
+    expectedLimitAmount: band.limit,
+    baseDate: SCORE_BAND_OFFER_BASE_DATE,
+    dummyNotice: true,
+  }
+}
+
 // mock 핸들러 등록
 registerMockHandlers({
+  'GET /api/simulation/score-band-offer': handleScoreBandOffer,
   'GET /api/simulation/loans/recommend': handleLoanRecommend,
   'POST /api/simulation/loans/recommend': handleLoanRecommend,
   'POST /api/simulation/credit-care/recalculate': handleCreditCareRecalculate,

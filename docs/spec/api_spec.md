@@ -247,3 +247,52 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 
 - 원래 값은 바꾸지 않고 새 값을 돌려준다(N-18-10 되돌리기).
 - 현재 값에 없는 항목 이름이면 오류를 낸다.
+
+---
+
+## N-18-7 같은 점수대 참고 금리·한도 (FP-170, 담당 광희)
+
+| 메서드 | 경로 | 용도 | 데이터 출처 |
+|---|---|---|---|
+| GET | `/api/simulation/score-band-offer?score=` | 점수대의 참고 금리·한도와 등급 | DB `SCORE_BAND_OFFER`, `SCORE_GRADE_BAND`(ACTIVE 버전) |
+
+- **상품 추천(N-18-7 상품 3종)은 A조 담당이라 이 API에 없다.** A조 추천 API는 백엔드 `ScoreBandOfferService.findOffer(score)`를 재사용할 수 있다.
+- 기존 프론트 mock `GET /api/simulation/loans/recommend`(금리·한도 + 상품)는 A조 몫으로 그대로 둔다.
+- 금리·한도는 **더미 데이터**다. 화면에는 "같은 점수대의 참고 정보"로만 보여 준다(`dummyNotice`가 항상 `true`).
+- 오류:
+  - `score`가 없거나 숫자가 아니거나 0~1000 밖이면 `400`
+  - 맞는 점수대·등급 자료가 없으면(시드 미적재 등) `404`
+
+응답 `200`:
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `score` | 정수 | 조회한 점수 |
+| `gradeBand` | 문자열 | `GOOD` / `STANDARD` / `CAUTION` |
+| `cutoffVersion` | 문자열 | 등급 구간 버전(예: `CUT-0.1`) |
+| `bandMinScore`, `bandMaxScore` | 정수 | 점수대 범위 |
+| `expectedMinRate`, `expectedMaxRate` | 소수 | 참고 연 금리 범위(%) |
+| `expectedAvgRate` | 소수 또는 `null` | 참고 평균 금리(%). 화면은 "연 a~b% (평균 c%)" |
+| `expectedLimitAmount` | 정수 | 참고 한도(원) |
+| `baseDate` | 문자열 | 자료 기준일 `"YYYY-MM-DD"` |
+| `dummyNotice` | 불리언 | 더미 안내 표시(항상 `true`) |
+
+예시 (`?score=720`, 더미 시드 기준):
+
+```json
+{
+  "score": 720,
+  "gradeBand": "STANDARD",
+  "cutoffVersion": "CUT-0.1",
+  "bandMinScore": 665,
+  "bandMaxScore": 779,
+  "expectedMinRate": 5.28,
+  "expectedMaxRate": 19.64,
+  "expectedAvgRate": 12.46,
+  "expectedLimitAmount": 47000000,
+  "baseDate": "2026-09-18",
+  "dummyNotice": true
+}
+```
+
+프론트: `features/simulation/api/simulationApi.js`의 `getScoreBandOfferInfo(score)`. mock은 시드와 같은 3개 점수대 값을 돌려준다.
