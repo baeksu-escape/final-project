@@ -314,11 +314,16 @@ public final class IncomeVolatilityCalculator {
     // 하위 호환 및 통합 인터페이스 (MonthlyIncomeItem 기반)
     // =========================================================================
 
+    /**
+     * N-22-4·N-21-7 공통: 소득이 가장 높은 달(성수기)과 가장 낮은 달(비수기), 그 차이를 구한다.
+     * 두 기능이 이 함수 하나를 함께 쓰므로, 고치면 소득 변동성·현금흐름 화면이 함께 바뀐다. 데이터가 없으면 "-"와 0을 돌려준다.
+     */
     public static PeakOffPeakResult calculatePeakOffPeakGap(List<MonthlyIncomeItem> monthlyIncomes) {
         if (monthlyIncomes == null || monthlyIncomes.isEmpty()) {
             return new PeakOffPeakResult(0L, "-", 0L, "-", 0L);
         }
 
+        // 금액이 같은 달이 여럿이면 목록에서 먼저 나온(이른) 달을 고른다.
         MonthlyIncomeItem peakItem = monthlyIncomes.stream()
                 .max(Comparator.comparingLong(MonthlyIncomeItem::getIncome))
                 .orElse(monthlyIncomes.get(0));
@@ -332,11 +337,16 @@ public final class IncomeVolatilityCalculator {
                 offPeakItem.getYearMonth(), offPeakItem.getIncome());
     }
 
+    /**
+     * N-22 소득 변동성 화면에 필요한 값을 한 번에 계산해 응답으로 묶는다(N-22-3 지표, N-22-4 격차, N-22-5 부족 달).
+     * API(POST·GET)가 모두 이 함수를 부른다. 소득 목록이 비어 있으면 모든 값이 0인 응답을 돌려준다.
+     */
     public static IncomeVolatilityResponse calculateVolatility(List<MonthlyIncomeItem> monthlyIncomes, long monthlyFixedExpense) {
         if (monthlyIncomes == null || monthlyIncomes.isEmpty()) {
             return IncomeVolatilityResponse.builder().build();
         }
 
+        // 1) 기준월 순서로 정렬한다. "최근 3개월"과 "마지막 입력월"이 이 순서에 기대기 때문이다.
         List<MonthlyIncomeItem> sortedList = monthlyIncomes.stream()
                 .sorted(Comparator.comparing(MonthlyIncomeItem::getYearMonth))
                 .collect(Collectors.toList());
@@ -345,19 +355,24 @@ public final class IncomeVolatilityCalculator {
                 .map(item -> BigDecimal.valueOf(item.getIncome()))
                 .collect(Collectors.toList());
 
+        // 2) 평균·변동계수(CV)·12% 초과 여부·소득 0원 달 수는 FP-184 계산을 그대로 쓴다.
         IncomeVolatilityResult result = calculateVolatility(bdIncomes, 1);
+        // 3) 성수기·비수기 달과 격차 (N-21-7과 공유)
         PeakOffPeakResult peakOffPeak = calculatePeakOffPeakGap(sortedList);
 
+        // 4) 가장 낮은 달 소득 대비 고정지출 비율(%). 100%를 넘으면 그 달은 고정지출도 못 냈다는 뜻이다.
         double fixedExpenseRatio = 0.0;
         if (peakOffPeak.offPeakIncome > 0) {
             fixedExpenseRatio = ((double) monthlyFixedExpense / peakOffPeak.offPeakIncome) * 100.0;
             fixedExpenseRatio = Math.round(fixedExpenseRatio * 100.0) / 100.0;
         }
 
+        // 5) 소득 부족 달(N-22-5): 소득 < 고정지출인 달과, 마지막 입력월 기준으로 그 달이 다시 오기까지 남은 개월 수
         YearMonth lastInputMonth = sortedList.get(sortedList.size() - 1).toYearMonth();
         DeficitMonthsResult deficitResult = calculateDeficitMonthsWithTimeline(
                 sortedList, BigDecimal.valueOf(monthlyFixedExpense), lastInputMonth);
 
+        // 내부 계산 결과(BigDecimal)를 화면 응답 형식(원 단위 long)으로 옮긴다.
         List<DeficitMonthItem> legacyDeficitList = deficitResult.getDeficitItems().stream()
                 .map(d -> DeficitMonthItem.builder()
                         .yearMonth(d.getMonthIdentifier())
@@ -367,6 +382,7 @@ public final class IncomeVolatilityCalculator {
                         .build())
                 .collect(Collectors.toList());
 
+        // 6) 최근 3개월 평균과 12개월 평균의 차이. 음수면 요즘 소득이 평소보다 줄었다는 뜻이다.
         int count = sortedList.size();
         int recentMonthsCount = Math.min(3, count);
         List<BigDecimal> recent3 = bdIncomes.subList(count - recentMonthsCount, count);
@@ -376,7 +392,7 @@ public final class IncomeVolatilityCalculator {
 
         return IncomeVolatilityResponse.builder()
                 .meanIncome(meanLong)
-                .medianIncome(meanLong)
+                .medianIncome(calculateMedianIncome(sortedList))
                 .incomeCv(result.getCoefficientOfVariation().doubleValue())
                 .isHighVolatility(result.isHighVolatility())
                 .fixedExpenseToLowestIncomeRatio(fixedExpenseRatio)
@@ -396,6 +412,27 @@ public final class IncomeVolatilityCalculator {
                 .build();
     }
 
+    /**
+     * N-22-3 월별 소득의 중앙값을 구한다. 개수가 짝수면 가운데 두 값의 평균(원 단위 반올림)이다.
+     */
+    public static long calculateMedianIncome(List<MonthlyIncomeItem> monthlyIncomes) {
+        if (monthlyIncomes == null || monthlyIncomes.isEmpty()) {
+            return 0L;
+        }
+        List<Long> sorted = monthlyIncomes.stream()
+                .map(MonthlyIncomeItem::getIncome)
+                .sorted()
+                .collect(Collectors.toList());
+        int size = sorted.size();
+        if (size % 2 == 1) {
+            return sorted.get(size / 2);
+        }
+        return Math.round((sorted.get(size / 2 - 1) + sorted.get(size / 2)) / 2.0);
+    }
+
+    /**
+     * N-21-6 최근 12개월 중 지출이 소득보다 큰(적자) 달 수를 센다. 이력이 없으면 0이다.
+     */
     public static int countPastDeficitMonths(List<MonthlyIncomeItem> past12MonthsHistory) {
         if (past12MonthsHistory == null) return 0;
         int count = 0;
@@ -407,6 +444,10 @@ public final class IncomeVolatilityCalculator {
         return count;
     }
 
+    /**
+     * N-21 현금흐름 전망 화면에 필요한 값을 한 번에 계산한다(N-21-5 월별 전망, N-21-6 과거 적자 달, N-21-7 격차).
+     * 기준 소득·지출·원리금에 변화율(%)을 한 번 적용하고, 전망 기간 동안 매달 같은 값으로 이어 간다.
+     */
     public static CashFlowForecastResponse forecastCashFlow(
             List<MonthlyIncomeItem> pastHistory,
             long baseIncome,
@@ -418,14 +459,17 @@ public final class IncomeVolatilityCalculator {
             int forecastMonths,
             YearMonth startForecastMonth) {
 
+        // 1) 과거 12개월 기준 값: 적자 달 수(N-21-6), 성수기·비수기 격차(N-21-7)
         int pastDeficits = countPastDeficitMonths(pastHistory);
         PeakOffPeakResult peakOffPeak = calculatePeakOffPeakGap(pastHistory);
 
+        // 2) 변화율 적용: 예) 소득 -10%면 기준 소득 × 0.9. 원 단위로 반올림한다.
         long forecastMonthlyIncome = Math.round(baseIncome * (1.0 + incomeChangePercent / 100.0));
         long forecastMonthlyExpense = Math.round(baseFixedExpense * (1.0 + expenseChangePercent / 100.0));
         long forecastMonthlyLoan = Math.round(baseLoanPayment * (1.0 + loanPaymentChangePercent / 100.0));
         long monthlyNetCash = forecastMonthlyIncome - (forecastMonthlyExpense + forecastMonthlyLoan);
 
+        // 3) 시작월부터 전망 기간만큼 월별 항목을 만들고, 누적 잉여와 가장 빠듯한 달(순현금 최소)을 함께 구한다.
         List<MonthlyForecastItem> forecastItems = new ArrayList<>();
         long totalSurplus = 0L;
         String worstMonth = "-";
@@ -466,6 +510,7 @@ public final class IncomeVolatilityCalculator {
                 .build();
     }
 
+    /** calculatePeakOffPeakGap()의 결과: 격차, 성수기 달·금액, 비수기 달·금액 */
     public static class PeakOffPeakResult {
         public final long gap;
         public final String peakMonth;

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- N-22-1·N-21-1 소득 변동성·현금흐름 전망용 저장 데이터 조회 -->
+<mapper namespace="com.baeksuescape.finance.mapper.IncomeVolatilityMapper">
+
+    <resultMap id="incomeMonthRowMap" type="com.baeksuescape.finance.dto.IncomeMonthRow">
+        <result property="yearMonth" column="BASE_MONTH"/>
+        <result property="income" column="INCOME_AMT"/>
+        <result property="incomeKindCode" column="INCOME_KIND_CODE"/>
+    </resultMap>
+
+    <!-- 최근 12개월 소득: 최신 12행을 고른 뒤 기준월 오름차순으로 돌려준다 -->
+    <select id="selectRecentIncomeMonths" resultMap="incomeMonthRowMap">
+        SELECT BASE_MONTH, INCOME_AMT, INCOME_KIND_CODE
+          FROM (SELECT BASE_MONTH, INCOME_AMT, INCOME_KIND_CODE
+                  FROM USER_INCOME_MONTH
+                 WHERE USER_ID = #{userId}
+                 ORDER BY BASE_MONTH DESC
+                 FETCH FIRST 12 ROWS ONLY)
+         ORDER BY BASE_MONTH
+    </select>
+
+    <!-- 최신 기준월의 월 고정 지출(FIXED) 합계 -->
+    <select id="selectLatestFixedExpense" resultType="long">
+        SELECT NVL(SUM(MONTHLY_AMT), 0)
+          FROM USER_EXPENSE_ITEM
+         WHERE USER_ID = #{userId}
+           AND EXPENSE_GROUP_CODE = 'FIXED'
+           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_EXPENSE_ITEM WHERE USER_ID = #{userId})
+    </select>
+
+    <!-- 최신 기준월의 월 지출 합계(고정·할부·정기결제·기타) -->
+    <select id="selectLatestTotalExpense" resultType="long">
+        SELECT NVL(SUM(MONTHLY_AMT), 0)
+          FROM USER_EXPENSE_ITEM
+         WHERE USER_ID = #{userId}
+           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_EXPENSE_ITEM WHERE USER_ID = #{userId})
+    </select>
+
+    <!-- 최신 기준월의 대출 월 원리금 합계 -->
+    <select id="selectLatestLoanMonthlyPayment" resultType="long">
+        SELECT NVL(SUM(MONTHLY_PAYMENT_AMT), 0)
+          FROM USER_LOAN
+         WHERE USER_ID = #{userId}
+           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_LOAN WHERE USER_ID = #{userId})
+    </select>
+</mapper>

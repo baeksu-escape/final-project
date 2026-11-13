@@ -1,5 +1,6 @@
 package com.baeksuescape.finance.controller;
 
+import com.baeksuescape.finance.dto.CashFlowConditionRequest;
 import com.baeksuescape.finance.dto.CashFlowForecastRequest;
 import com.baeksuescape.finance.dto.CashFlowForecastResponse;
 import com.baeksuescape.finance.dto.IncomeVolatilityRequest;
@@ -7,9 +8,12 @@ import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
 import com.baeksuescape.finance.service.IncomeVolatilityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -41,6 +45,27 @@ public class IncomeVolatilityController {
     public ResponseEntity<CashFlowForecastResponse> forecastCashFlow(@RequestBody CashFlowForecastRequest request) {
         CashFlowForecastResponse response = incomeVolatilityService.forecastCashFlow(request);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * N-22 소득 변동성 진단 API — 저장 데이터 기반 (N-22-1, N-22-3~5).
+     * DB의 최근 12개월 소득과 월 고정지출로 계산한다.
+     * TODO(로그인 연동) 로그인(JWT)이 생기면 userId 쿼리를 없애고 토큰에서 회원 번호를 읽는다.
+     */
+    @GetMapping("/income-volatility")
+    public ResponseEntity<IncomeVolatilityResponse> diagnoseSavedIncomeVolatility(@RequestParam long userId) {
+        return ResponseEntity.ok(incomeVolatilityService.diagnoseSavedIncomeVolatility(userId));
+    }
+
+    /**
+     * N-21 현금흐름 전망 API — 저장 데이터 기반 (N-21-1, N-21-5~7).
+     * DB의 소득·월 지출 합계·월 원리금에 쿼리로 받은 전망 조건(N-21-2)을 적용한다.
+     * TODO(로그인 연동) 로그인(JWT)이 생기면 userId 쿼리를 없애고 토큰에서 회원 번호를 읽는다.
+     */
+    @GetMapping("/cash-flow/forecast")
+    public ResponseEntity<CashFlowForecastResponse> forecastSavedCashFlow(@RequestParam long userId,
+                                                                          @ModelAttribute CashFlowConditionRequest condition) {
+        return ResponseEntity.ok(incomeVolatilityService.forecastSavedCashFlow(userId, condition));
     }
 }
 

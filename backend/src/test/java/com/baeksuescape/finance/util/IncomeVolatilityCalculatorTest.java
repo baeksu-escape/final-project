@@ -70,6 +70,22 @@ class IncomeVolatilityCalculatorTest {
     }
 
     @Test
+    @DisplayName("N-22-3 중앙값은 평균이 아니라 정렬한 가운데 값이어야 한다")
+    void testMedianIncome() {
+        List<MonthlyIncomeItem> items = createSample12Months();
+
+        IncomeVolatilityResponse response = IncomeVolatilityCalculator.calculateVolatility(items, 2000000L);
+
+        // 정렬하면 6·7번째 값이 330만·350만 → 중앙값 340만 (평균은 약 341만 6,667원)
+        assertEquals(3400000L, response.getMedianIncome());
+        assertNotEquals(response.getMeanIncome(), response.getMedianIncome());
+
+        // 홀수 개면 가운데 값 하나
+        List<MonthlyIncomeItem> odd = items.subList(0, 3); // 300만, 320만, 350만
+        assertEquals(3200000L, IncomeVolatilityCalculator.calculateMedianIncome(odd));
+    }
+
+    @Test
     @DisplayName("N-22-5 소득 부족 달 확인 및 다음 비수기 도래 개월 수 검증")
     void testEvaluateDeficitMonths() {
         List<MonthlyIncomeItem> items = createSample12Months();

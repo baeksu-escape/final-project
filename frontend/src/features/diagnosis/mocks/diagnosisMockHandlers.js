@@ -1,6 +1,13 @@
 // N-20 DSR 계산 및 N-17 시나리오 상환 여력 재계산 mock 핸들러
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
-import { evaluateDsrRisk } from './diagnosisMockData.js'
+import {
+  evaluateDsrRisk,
+  evaluateHealthLevel,
+  HEALTH_RISK_THRESHOLDS,
+  SAMPLE_CASH_FLOW_BASE,
+  SAMPLE_INCOME_VOLATILITY,
+  SAMPLE_MONTHLY_INCOMES,
+} from './diagnosisMockData.js'
 
 // N-20-4 DSR(연소득 대비 연원리금 상환비율) 및 위험 단계 계산
 function handleDsrCalculate({ body }) {
@@ -76,9 +83,92 @@ function handleScenarioRecalculate({ body }) {
   }
 }
 
+// N-16-1·2 건전성 지표 mock — 백엔드와 같은 규칙(소수 둘째 자리 반올림, 나누는 값이 0 이하면 null)으로 계산한다.
+function handleFinancialHealth({ body }) {
+  const totalAsset = Number(body?.totalAsset ?? 0)
+  const annualIncome = Number(body?.annualIncome ?? 0)
+  const totalDebt = Number(body?.totalDebt ?? 0)
+  const annualDebtService = Number(body?.annualDebtService ?? 0)
+  const netAsset = totalAsset - totalDebt
+
+  const ratio = (numerator, denominator) =>
+    denominator > 0 ? Math.round((numerator / denominator) * 10000) / 100 : null
+
+  const repaymentBurdenRatio = ratio(annualDebtService, annualIncome)
+  const debtToAssetRatio = ratio(totalDebt, totalAsset)
+  const debtToNetAssetRatio = ratio(totalDebt, netAsset)
+
+  return {
+    totalAsset,
+    totalDebt,
+    netAsset,
+    repaymentBurdenRatio,
+    repaymentBurdenLevel: evaluateHealthLevel(repaymentBurdenRatio, HEALTH_RISK_THRESHOLDS.repaymentBurden),
+    debtToAssetRatio,
+    debtToAssetLevel: evaluateHealthLevel(debtToAssetRatio, HEALTH_RISK_THRESHOLDS.debtToAsset),
+    debtToNetAssetRatio,
+    debtToNetAssetLevel: evaluateHealthLevel(debtToNetAssetRatio, HEALTH_RISK_THRESHOLDS.debtToNetAsset),
+  }
+}
+
+// N-22 저장 데이터 기반 소득 변동성 진단 mock — userId와 관계없이 시드 회원 2번 예시를 돌려준다.
+function handleIncomeVolatility() {
+  return structuredClone(SAMPLE_INCOME_VOLATILITY)
+}
+
+// N-21 저장 데이터 기반 현금흐름 전망 mock — 쿼리의 변화율·기간으로 마지막 입력월 다음 달부터 월별 전망을 만든다.
+function handleCashFlowForecast({ query }) {
+  const incomeChangePercent = Number(query?.incomeChangePercent ?? 0)
+  const expenseChangePercent = Number(query?.expenseChangePercent ?? 0)
+  const loanPaymentChangePercent = Number(query?.loanPaymentChangePercent ?? 0)
+  const requestedMonths = Number(query?.forecastMonths ?? 0)
+  const forecastMonths = requestedMonths > 0 ? requestedMonths : 6
+
+  const { baseMonthlyIncome, monthlyTotalExpense, monthlyLoanPayment } = SAMPLE_CASH_FLOW_BASE
+  const forecastIncome = Math.round(baseMonthlyIncome * (1 + incomeChangePercent / 100))
+  const forecastExpense = Math.round(monthlyTotalExpense * (1 + expenseChangePercent / 100))
+  const forecastLoanPayment = Math.round(monthlyLoanPayment * (1 + loanPaymentChangePercent / 100))
+  const netCashFlow = forecastIncome - (forecastExpense + forecastLoanPayment)
+
+  const lastMonth = SAMPLE_MONTHLY_INCOMES[SAMPLE_MONTHLY_INCOMES.length - 1].yearMonth
+  const [lastYear, lastMonthNumber] = lastMonth.split('-').map(Number)
+  const monthlyForecasts = Array.from({ length: forecastMonths }, (_, index) => {
+    const date = new Date(lastYear, lastMonthNumber + index, 1)
+    const forecastYearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    return {
+      forecastYearMonth,
+      forecastIncome,
+      forecastExpense,
+      forecastLoanPayment,
+      netCashFlow,
+      deficit: netCashFlow < 0,
+    }
+  })
+
+  const pastDeficitMonthsCount = SAMPLE_MONTHLY_INCOMES.filter(
+    ({ income }) => monthlyTotalExpense > income
+  ).length
+
+  return {
+    pastDeficitMonthsCount,
+    peakOffPeakGap: SAMPLE_INCOME_VOLATILITY.peakOffPeakGap,
+    peakMonth: SAMPLE_INCOME_VOLATILITY.peakMonth,
+    peakIncome: SAMPLE_INCOME_VOLATILITY.peakIncome,
+    offPeakMonth: SAMPLE_INCOME_VOLATILITY.offPeakMonth,
+    offPeakIncome: SAMPLE_INCOME_VOLATILITY.offPeakIncome,
+    monthlyForecasts,
+    worstForecastMonth: monthlyForecasts[0].forecastYearMonth,
+    worstNetCashFlow: netCashFlow,
+    totalAccumulatedSurplus: netCashFlow * forecastMonths,
+  }
+}
+
 // mock 핸들러 등록
 registerMockHandlers({
   'POST /api/diagnosis/dsr/calculate': handleDsrCalculate,
   'POST /api/diagnosis/scenario/recalculate': handleScenarioRecalculate,
+  'POST /api/diagnosis/financial-health/calculate': handleFinancialHealth,
+  'GET /api/diagnosis/income-volatility': handleIncomeVolatility,
+  'GET /api/diagnosis/cash-flow/forecast': handleCashFlowForecast,
 })
 
