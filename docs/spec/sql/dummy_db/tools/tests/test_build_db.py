@@ -375,6 +375,9 @@ class FullSourceTests(unittest.TestCase):
             rows=original_read(path)
             if Path(path).name=='loans.csv' and rows:
                 rows[0]['loan_type_code']='CREDIT';rows[0]['rate_type']='FIXED'
+                # 옛 원천처럼 두 열이 없는 행을 만들어 대체값을 확인한다.
+                for row in rows[1:]:
+                    row.pop('loan_type_code',None);row.pop('rate_type',None)
             return rows
         with tempfile.TemporaryDirectory() as temp:
             ddl=Path(temp)/'extended.sql'
