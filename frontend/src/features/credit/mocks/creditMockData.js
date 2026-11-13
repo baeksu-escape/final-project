@@ -33,5 +33,4 @@ export const scoredReport = {
     traditional: [{ name: '대출', alternativeYn: 'N' }, { name: '카드', alternativeYn: 'N' }],
     alternative: [{ name: '대출', alternativeYn: 'N' }, { name: '카드', alternativeYn: 'N' }, { name: '통신비 납부', alternativeYn: 'Y' }],
   },
-  previousScoreDiff: 12,
 }
