@@ -2,7 +2,7 @@
 
 **기준 DDL은 `docs/spec/sql/avenue_ddl.sql`의 v0.3.2(51개 표)다.** 옛 v2.4 묶음은 11/12 삭제했고 이력은 git에 남아 있다. 폴더·파일 이름에는 버전을 넣지 않고 버전은 문서에 적는다. 별도 Oracle 개발 사용자(스키마)에 적재하는 것을 권장한다.
 
-`01_create_tables.sql`은 기준 DDL의 바이트 동일 사본이다. 현재 저장소의 기존 시드와 검사 SQL은 이전 DDL로 만들어졌으므로, 기준 DDL과 생성기 대응을 확인한 뒤 사용자가 팀 키로 다시 생성해야 한다.
+`01_create_tables.sql`은 기준 DDL의 바이트 동일 사본이며 시드와 검사 SQL은 DDL v0.3.2 기준이다. 13번 대출 시드는 11/13 v3.6.1 원천으로 교체했다.
 
 ## 저장소 상태와 생성
 
@@ -88,11 +88,11 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 대출 종류·금리 방식은 원장 `members/ledgers/loans.csv`의 `loan_type_code`·`rate_type`에서 읽는다. 기관 응답 `financial_responses.jsonl`의 `loanTypeCode`와 같은 원천 값이며(DDL 주석은 기관 응답 기준으로 적혀 있다), 열이 없는 옛 원천이면 각각 `OTHER`·`UNKNOWN`을 쓴다. kind→종류 매핑은 가정이다(TODO(D-27), 대출 입력 항목 미확정). 대출별 월 상환액은 원천 기준월의 회원 총 상환액을 원장 연 상환액 비중으로 정수 배분하며, 합계를 정확히 보존한다. 비중이 모두 0이면 잔액 비중, 그것도 0이면 같은 비중을 쓴다. 실제 상환 스케줄을 재현한 값은 아니다.
 
-**대출·동의 보존:** 전 회원에 대해 `USER_LOAN.MONTHLY_PAYMENT_AMT` 합계 = 원천 기준월 `debt_service_krw`를 검사한다(대출이 없으면 0). v0.3.2의 `USER_LOAN.CONSENT_ID`는 MANUAL이면 NULL, IMPORTED면 해당 LOANS 동의 ID로 연결한다. 현재 저장소의 기존 대출 시드에는 이 열이 없어 재생성이 필요하다. 통신·간편결제·사회보험·신용 프로필의 IMPORTED 행과 USER_CONSENT는 응답 status와 무관하게 시작 동의 상태를 따른다. 동의 회원의 기관 응답이 OK가 아니면 정상 데이터로 간주하지 않고 중단한다.
+**대출·동의 보존:** 전 회원에 대해 `USER_LOAN.MONTHLY_PAYMENT_AMT` 합계 = 원천 기준월 `debt_service_krw`를 검사한다(대출이 없으면 0). v0.3.2의 `USER_LOAN.CONSENT_ID`는 MANUAL이면 NULL, IMPORTED면 해당 LOANS 동의 ID로 연결한다. 저장소 시드의 IMPORTED 157행에는 동의 ID가 있다. 통신·간편결제·사회보험·신용 프로필의 IMPORTED 행과 USER_CONSENT는 응답 status와 무관하게 시작 동의 상태를 따른다. 동의 회원의 기관 응답이 OK가 아니면 정상 데이터로 간주하지 않고 중단한다.
 
 **점수대별 참고 범위(시연 가정, N-12·N-37):** 새 DB 상품의 `MIN_ALT_SCORE`는 은행(업권 0) 780, 상호금융(5) 665, 카드·저축은행·캐피탈(1·2·3) 0으로 둔다. 이는 실제 상품 심사 기준이 아니며 기존 상품 CSV 값은 바꾸지 않는다. 각 등급의 최저점 `MIN_SCORE`가 이 조건을 만족하는 상품만 모아 `SCORE_BAND_OFFER`의 최저/최고 금리와 최대 한도를 계산한다. 따라서 등급 내 모든 점수에서 해당 조건을 만족하는 범위다. 평균 금리는 그 최저·최고의 중간값으로 실제 고객 통계 평균이 아니다. 직군·소득 등 개별 신청 자격이나 승인 결과를 뜻하지 않는다.
 
-기존 저장소 시드는 재생성하지 않아 카드 한도가 NULL이다. 다음 생성부터 `CARD_LIMIT_AMT`는 `(KC1000001 - L00000002) × 1000`원으로 계산하며 반올림하지 않는다. 원천 생성기의 총신용공여는 대출잔액·보증금액·카드 한도의 합이고 현재 보증 건수는 전원 0이다. 두 값 중 하나가 없거나 차이가 음수면 NULL이다. 보증금액이 생기면 이를 함께 빼야 한다. Spring도 신용평가사 응답을 불러올 때 같은 식을 쓴다. 생성 보고서의 `card_spend_over_limit`는 월 사용액이 계산 한도를 초과한 행 수다. 재직/활동 기간 `WORK_PERIOD_MONTHS`는 NULL이다. `PASSWORD_HASH`는 시연 계정 4개(사용자 3·관리자 1)만 BCrypt 해시가 있고 나머지는 NULL이다.
+저장소 시드의 신용 프로필 318행에 카드 한도가 채워져 있다. `CARD_LIMIT_AMT`는 `(KC1000001 - L00000002) × 1000`원으로 계산하며 반올림하지 않는다. 원천 생성기의 총신용공여는 대출잔액·보증금액·카드 한도의 합이고 현재 보증 건수는 전원 0이다. 두 값 중 하나가 없거나 차이가 음수면 NULL이다. 보증금액이 생기면 이를 함께 빼야 한다. Spring도 신용평가사 응답을 불러올 때 같은 식을 쓴다. 생성 보고서의 `card_spend_over_limit`는 월 사용액이 계산 한도를 초과한 행 수다. 재직/활동 기간 `WORK_PERIOD_MONTHS`는 NULL이다. `PASSWORD_HASH`는 시연 계정 4개(사용자 3·관리자 1)만 BCrypt 해시가 있고 나머지는 NULL이다.
 
 현재 더미 원천에서 0원은 카드가 없는 회원이며, NULL은 원천 값이 없거나 계산이 음수인 경우다.
 
@@ -102,13 +102,13 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 ## 검사·적재
 
-생성기는 받은 DDL에서 타입·문자 길이·숫자 자릿수·NOT NULL·CHECK(Oracle NULL/UNKNOWN 포함)·PK·UNIQUE·복합 FK·조건부 UNIQUE INDEX를 읽어 검사한다. 모든 행 검증과 원천 대조가 끝나야 파일을 쓴다. SQL*Plus 2,499자 줄 제한도 생성 SQL에 적용한다. 이 검사는 Oracle 실행을 대신하지 않으며 현재 실제 Oracle 적재는 하지 않았다.
+생성기는 받은 DDL에서 타입·문자 길이·숫자 자릿수·NOT NULL·CHECK(Oracle NULL/UNKNOWN 포함)·PK·UNIQUE·복합 FK·조건부 UNIQUE INDEX를 읽어 검사한다. 모든 행 검증과 원천 대조가 끝나야 파일을 쓴다. SQL*Plus 2,499자 줄 제한도 생성 SQL에 적용한다. DDL v0.3.2는 11/12 범영 님이 Oracle 적재를 확인했으며 시드는 11/13 경환이 `run_all.sql`로 적재해 `99_check.sql`의 표 51개·표별 행 수 일치를 확인했다.
 
 성공한 출력의 `run_all.sql`은 `00_drop_all.sql` → 받은 DDL(내장 기준 INSERT 포함) → 테이블별 시드 → `99_check.sql`을 실행한다. SQL Developer F5 또는 SQL*Plus `@run_all.sql`을 사용한다. `WHENEVER SQLERROR/OSERROR EXIT FAILURE ROLLBACK`이 있으나 **DDL과 이미 COMMIT한 데이터는 오류 후 ROLLBACK으로 되돌아오지 않는다.** 반드시 새 개발 스키마에서 실행한다.
 
 `00_drop_all.sql`은 첫 DROP 전에 USER_TABLES에서 옛 DB 표식(APP_MEMBER·MEMBER_MONTHLY_INPUT·MEMBER_LOAN·EXTERNAL_API_RESPONSE)을 확인하고 하나라도 있으면 오류로 종료한다. 단독 실행에도 WHENEVER SQLERROR EXIT가 적용된다. 표식이 없는 스키마의 공유 테이블까지 자동 식별하는 가드는 아니므로 별도 스키마 원칙은 유지한다.
 
-재생성한 `99_check.sql`은 기준 DDL의 테이블 51개·테이블별 기대 행 수·COMMENT 누락을 출력한다. 현재 저장소의 검사 SQL은 이전 생성본이다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
+`99_check.sql`은 DDL v0.3.2 기준 테이블 51개·테이블별 기대 행 수·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
 
 테스트(저장소 루트, cryptography가 설치된 Python):
 
