@@ -132,6 +132,7 @@ registerMockHandlers({
       loginId: body.loginId,
       password: body.password,
       locked: false,
+      createdAt: new Date().toISOString(), // N-04-1 마이페이지 가입일로 쓴다.
       email: body.email,
       phone: normalizePhone(body.phone),
       ageGroup: body.ageGroup,
