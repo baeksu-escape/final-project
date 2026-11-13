@@ -29,6 +29,7 @@ export const AUTH_ERROR_CODES = Object.freeze({
   ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',
   DUPLICATE_LOGIN_ID: 'DUPLICATE_LOGIN_ID',
   DUPLICATE_EMAIL: 'DUPLICATE_EMAIL',
+  DUPLICATE_NICKNAME: 'DUPLICATE_NICKNAME',
 })
 
 // N-01 로그인 실패 문구. 아이디와 비밀번호 중 무엇이 틀렸는지 알려 주지 않는다.

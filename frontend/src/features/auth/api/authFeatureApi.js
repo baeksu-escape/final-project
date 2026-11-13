@@ -12,9 +12,11 @@ export const AUTH_FEATURE_API = Object.freeze({
   PASSWORD_RESET: '/api/auth/password/reset',
 })
 
-// N-02 회원가입 — { loginId, name, phone, email, password, birthYear, ageGroup, agreeCreditInfo, emailVerificationToken } → { userId }
+// N-02 회원가입 — { loginId, name, nickname, phone, email, password, birthYear, ageGroup, agreeCreditInfo, emailVerificationToken } → { userId }
+//   nickname: 닉네임(앞뒤 공백을 뺀 2~12자, '탈퇴'로 시작할 수 없음). 신용 라운지에 작성자로 보인다.
 //   birthYear: 출생연도(숫자). ageGroup은 birthYear로 계산해 함께 보낸다(authConstants.js toAgeGroup). TODO(D-20) 백엔드 확정 시 ageGroup 제거.
-//   400: 칸별 오류는 data.fieldErrors [{ field, message }]로 온다(예: field 'birthYear').
+//   400: 칸별 오류는 data.fieldErrors [{ field, message }]로 온다(예: field 'birthYear', 'nickname').
+//   409: 이미 있는 닉네임이면 data.code 'DUPLICATE_NICKNAME'.
 export function requestSignup(payload) {
   return apiPost(AUTH_FEATURE_API.SIGNUP, payload)
 }

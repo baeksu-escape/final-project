@@ -7,12 +7,13 @@ import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
 import EmailVerification from '../components/EmailVerification.jsx'
 import PasswordRuleList from '../components/PasswordRuleList.jsx'
-import { LOGIN_ID_RULE_TEXT, MIN_SIGNUP_AGE, getMaxBirthYear, normalizePhone, validateSignup } from '../validation.js'
+import { LOGIN_ID_RULE_TEXT, MIN_SIGNUP_AGE, NICKNAME_MAX, getMaxBirthYear, normalizePhone, validateSignup } from '../validation.js'
 
 // 가입 화면 입력값의 처음 상태. N-02-1 연령대 선택 대신 출생연도(4자리 숫자 글자)를 받는다.
 const EMPTY_FORM = {
   loginId: '',
   name: '',
+  nickname: '',
   phone: '',
   email: '',
   password: '',
@@ -62,6 +63,7 @@ export default function SignupPage() {
       await requestSignup({
         loginId: form.loginId,
         name: form.name.trim(),
+        nickname: form.nickname.trim(),
         phone: normalizePhone(form.phone),
         email: form.email,
         password: form.password,
@@ -77,6 +79,7 @@ export default function SignupPage() {
       const fieldErrors = error?.data?.fieldErrors
       if (code === AUTH_ERROR_CODES.DUPLICATE_LOGIN_ID) setServerErrors({ loginId: error.message })
       else if (code === AUTH_ERROR_CODES.DUPLICATE_EMAIL) setServerErrors({ email: error.message })
+      else if (code === AUTH_ERROR_CODES.DUPLICATE_NICKNAME) setServerErrors({ nickname: error.message })
       // 서버가 칸별 오류(fieldErrors [{ field, message }])를 주면 그 칸 옆에 보여 준다(예: 출생연도).
       else if (Array.isArray(fieldErrors) && fieldErrors.length > 0) {
         setServerErrors(Object.fromEntries(fieldErrors.map(({ field, message }) => [field, message])))
@@ -114,6 +117,16 @@ export default function SignupPage() {
           maxLength={20}
         />
         <TextInput label="이름" value={form.name} onChange={update('name')} error={errors.name} autoComplete="name" />
+        {/* N-02-1 닉네임 — DDL APP_USER.NICKNAME(2~12자, 중복 불가). 중복이면 서버 오류를 이 칸 아래에 보여 준다. */}
+        <TextInput
+          label="닉네임"
+          value={form.nickname}
+          onChange={update('nickname')}
+          error={errors.nickname}
+          hint="2~12자, 신용 라운지에 작성자로 보입니다"
+          autoComplete="nickname"
+          maxLength={NICKNAME_MAX}
+        />
         <TextInput
           label="휴대폰"
           type="tel"
