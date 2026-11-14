@@ -12,7 +12,7 @@
 ## 데이터 위치
 | 위치 | 누가 읽나 | 내용 |
 |------|-----------|------|
-| [docs/spec/sql/](docs/spec/sql/README.md) | 사람·AI | 서비스 DB 구성·합성 데이터 사용 안내. 기준 DDL은 Oracle 21c·46개 테이블이며, 최초 적재·기존 DB 변경·실험용 초기화의 실행 순서를 구분 |
+| [docs/spec/sql/](docs/spec/sql/README.md) | 사람·AI | 서비스 DB 구성·합성 데이터 사용 안내. 기준 DDL은 Oracle 21c·47개 테이블이며, 최초 적재·기존 DB 변경·실험용 초기화의 실행 순서를 구분 |
 | [docs/spec/sql/dummy_db/](docs/spec/sql/dummy_db/README.md) | 사람·AI | 서비스 시연용 더미 회원 시드·기관 응답·생성 도구. DDL 적용 후 빈 시드 대상에는 `run_seed_only.sql`, 실험용 전체 초기화에만 `run_all.sql` 사용 |
 | `fastapi_server/data_generation/` | B조·AI | 합성 데이터 생성 코드(현재 버전은 `fastapi_server/data/README.md`). 필드 정의 기준은 `data_generation/docs/DATA_DICTIONARY.csv` |
 | `fastapi_server/data/` | B조 | 학습용 데이터. **Git 제외**, 공유 드라이브에서 받아 `fastapi_server/data/training/` 안에 압축 해제. 버전·폴더 구조는 `fastapi_server/data/README.md` |

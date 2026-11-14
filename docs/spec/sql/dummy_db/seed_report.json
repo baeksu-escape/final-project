@@ -1,6 +1,6 @@
 {
-  "ddl_sha256": "1325110b080b1892e0f28d7ddc672a8134fdf69ac3f372e1f406c6b349b37a77",
-  "table_count": 46,
+  "ddl_sha256": "9da13b44f2e0ad79858c930c280bc730e0ae2535f60eeafce94bd836c1362cb1",
+  "table_count": 47,
   "rows": {
     "DIM_WORKER_TYPE": 3,
     "DIM_ROLE": 2,
@@ -42,6 +42,7 @@
     "BOARD_COMMENT": 0,
     "CONTENT_REPORT": 0,
     "BOARD_POST_LOG": 0,
+    "USER_NOTIFICATION": 0,
     "APP_SETTING": 4,
     "GLOSSARY_TERM": 0,
     "CHATBOT_PRESET_QUESTION": 0,

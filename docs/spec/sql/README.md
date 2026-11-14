@@ -39,7 +39,7 @@
 
 ## 일반적인 최초 준비 순서
 
-1. 대상 Oracle 개발 스키마와 DDL 버전을 확인한다. 기준은 현재 `avenue_ddl.sql`의 Oracle 21c·46개 테이블이다(N-24 상권 5개 표 제거 후). 이미 사용 중인 DB라면 위 표의 ALTER·보정 경로를 먼저 검토한다.
+1. 대상 Oracle 개발 스키마와 DDL 버전을 확인한다. 기준은 현재 `avenue_ddl.sql`의 Oracle 21c·47개 테이블이다(상권 5개 표 제거·빈 알림 표 추가 후). 이미 사용 중인 DB라면 위 표의 ALTER·보정 경로를 먼저 검토한다.
 2. 빈 스키마에서 원본 `avenue_ddl.sql`을 실행한다. 테이블과 DDL에 내장된 기준 데이터가 생성된다. 최신 구조가 이미 있다면 생략한다.
 3. 같은 스키마에서 `dummy_db/run_seed_only.sql`을 실행한다. SQL Developer의 스크립트 실행(F5) 또는 SQL*Plus에서 해당 파일을 실행하며, 함께 제공된 시드 파일의 상대 위치를 유지한다.
 4. 마지막에 실행되는 `99_check.sql`의 기대·실제 테이블 수와 행 수를 직접 확인한다. 이는 결과 출력이며 모든 불일치를 자동 오류로 바꾸는 검사는 아니다. 생성 당시 기준은 `seed_report.json`에서 확인한다.
@@ -55,7 +55,7 @@ C조 담당자의 결정과 사용자 승인에 따라 상권 분석은 DB·API 
 
 기준 DDL에서 `DIM_ADM_DONG`, `DIM_SERVICE_CATEGORY`, `FACT_DONG_SALES`, `FACT_DONG_STORE`, `FACT_DONG_LIVING_POP`과 전용 FK·인덱스를 제거했다. C8 지도 코드 열은 추가하지 않는다. `FACT_HFS_STAT`, `FACT_HFS_WORKER_STAT`, `FACT_INDUSTRY_AGE_INCOME`, `FACT_POLICY_RATE`는 다른 기능용이므로 유지한다.
 
-기존 DB의 상권 표는 DDL 파일을 수정해도 자동으로 사라지지 않는다. 전용 삭제 SQL은 수동 적용용이며 `run_all.sql`·`run_seed_only.sql`에 자동 연결하지 않는다. 최신 초기화 묶음은 46개 표를 대상으로 하므로, 옛 상권 표를 제거하려면 전용 SQL을 별도로 실행해야 한다. 실제 Oracle 삭제 확인은 별도다.
+기존 DB의 상권 표는 DDL 파일을 수정해도 자동으로 사라지지 않는다. 전용 삭제 SQL은 수동 적용용이며 `run_all.sql`·`run_seed_only.sql`에 자동 연결하지 않는다. 최신 초기화 묶음은 47개 표를 대상으로 하므로, 옛 상권 표를 제거하려면 전용 SQL을 별도로 실행해야 한다. 실제 Oracle 삭제 확인은 별도다.
 
 ## 생성 코드와 설계 근거를 남기는 이유
 
@@ -64,3 +64,7 @@ C조 담당자의 결정과 사용자 승인에 따라 상권 분석은 DB·API 
 사용 준비와 재생성은 다른 작업이다. 일반적인 시연 준비는 전달된 학습 CSV와 준비된 서비스 시드를 사용하고, 전체 데이터 생성·실험을 매번 실행하지 않는다. 재현이나 규칙 변경이 필요한 경우에만 [생성 패키지 README](../../../fastapi_server/data_generation/README.md)의 순서와 검증 절차를 따른다. 이 안내가 자동 실행 기능을 추가하는 것은 아니다.
 
 학습용 생성 결과의 공유·버전은 [데이터 README](../../../fastapi_server/data/README.md)를 따르고, 서비스 시드 재생성과 개발 키 취급은 [더미 시드 README](dummy_db/README.md)를 따른다. 키·비밀번호·개인 설정 파일은 문서나 저장소에 남기지 않는다. 합성 데이터의 성능은 실제 예측력의 근거로 제시하지 않는다.
+
+## 알림 테이블은 빈 구조만 준비한다
+
+회의 결정에 따라 `USER_NOTIFICATION`은 빈 테이블로만 만든다. 알림 시드·API·생성·발송 로직은 추가하지 않는다. 기존 DB에는 [create_user_notification.sql](create_user_notification.sql)을 한 번 실행한다. `APP_USER`가 먼저 있어야 하며, 테이블이 이미 있으면 재실행하지 않는다. 새 스키마에는 기준 DDL에 포함되어 있으므로 별도 실행하지 않는다. 실제 Oracle 적용은 아직 확인하지 않았다.

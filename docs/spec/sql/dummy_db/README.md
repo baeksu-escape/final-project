@@ -1,6 +1,6 @@
 # 서비스 DB DDL v0.3.2 더미 시드 — 별도 개발 스키마 권장
 
-**기준 DDL은 `docs/spec/sql/avenue_ddl.sql`의 v0.3.2 기반 개정본(상권 5개 표 제거 후 46개 표)이다.** 옛 v2.4 묶음은 11/12 삭제했고 이력은 git에 남아 있다. 폴더·파일 이름에는 버전을 넣지 않고 버전은 문서에 적는다. 별도 Oracle 개발 사용자(스키마)에 적재하는 것을 권장한다.
+**기준 DDL은 `docs/spec/sql/avenue_ddl.sql`의 v0.3.2 기반 개정본(상권 5개 표 제거·빈 알림 표 추가 후 47개 표)이다.** 옛 v2.4 묶음은 11/12 삭제했고 이력은 git에 남아 있다. 폴더·파일 이름에는 버전을 넣지 않고 버전은 문서에 적는다. 별도 Oracle 개발 사용자(스키마)에 적재하는 것을 권장한다.
 
 **처음 준비한다면 [DB 구성과 합성 데이터 사용 안내](../README.md)부터 읽는다.** 이 폴더는 서비스 시연용 더미 회원·기관 응답·시드 생성 도구를 보관한다. 모델 학습용 CSV와는 용도가 다르며, 학습 데이터의 생성 과정과 설계 근거는 별도 생성 패키지에 보존한다.
 
@@ -130,7 +130,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 ## 검사·적재
 
-생성기는 받은 DDL에서 타입·문자 길이·숫자 자릿수·NOT NULL·CHECK(Oracle NULL/UNKNOWN 포함)·PK·UNIQUE·복합 FK·조건부 UNIQUE INDEX를 읽어 검사한다. 모든 행 검증과 원천 대조가 끝나야 파일을 쓴다. SQL*Plus 2,499자 줄 제한도 생성 SQL에 적용한다. 당시 DDL v0.3.2는 11/12 범영 님이 Oracle 적재를 확인했으며 시드는 11/13 경환이 `run_all.sql`로 적재해 `99_check.sql`의 표 51개·표별 행 수 일치를 확인했다. 이는 상권 표 제거 전 기록이며, 현재 46개 표 개정본의 실제 Oracle 적재·삭제는 아직 확인하지 않았다.
+생성기는 받은 DDL에서 타입·문자 길이·숫자 자릿수·NOT NULL·CHECK(Oracle NULL/UNKNOWN 포함)·PK·UNIQUE·복합 FK·조건부 UNIQUE INDEX를 읽어 검사한다. 모든 행 검증과 원천 대조가 끝나야 파일을 쓴다. SQL*Plus 2,499자 줄 제한도 생성 SQL에 적용한다. 당시 DDL v0.3.2는 11/12 범영 님이 Oracle 적재를 확인했으며 시드는 11/13 경환이 `run_all.sql`로 적재해 `99_check.sql`의 표 51개·표별 행 수 일치를 확인했다. 이는 상권 표 제거 전 기록이며, 현재 47개 표 개정본의 실제 Oracle 적재·삭제는 아직 확인하지 않았다.
 
 성공한 출력의 `run_all.sql`은 `00_drop_all.sql` → 받은 DDL(내장 기준 INSERT 포함) → 테이블별 시드 → `99_check.sql`을 실행한다. SQL Developer F5 또는 SQL*Plus `@run_all.sql`을 사용한다. `WHENEVER SQLERROR/OSERROR EXIT FAILURE ROLLBACK`이 있으나 **DDL과 이미 COMMIT한 데이터는 오류 후 ROLLBACK으로 되돌아오지 않는다.** 반드시 새 개발 스키마에서 실행한다.
 
@@ -138,7 +138,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 `00_drop_all.sql`은 첫 DROP 전에 USER_TABLES에서 옛 DB 표식(APP_MEMBER·MEMBER_MONTHLY_INPUT·MEMBER_LOAN·EXTERNAL_API_RESPONSE)을 확인하고 하나라도 있으면 오류로 종료한다. 단독 실행에도 WHENEVER SQLERROR EXIT가 적용된다. 표식이 없는 스키마의 공유 테이블까지 자동 식별하는 가드는 아니므로 별도 스키마 원칙은 유지한다.
 
-`99_check.sql`은 현재 개정 DDL 기준 테이블 46개·테이블별 기대 행 수·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
+`99_check.sql`은 현재 개정 DDL 기준 테이블 47개·테이블별 기대 행 수·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
 
 테스트(저장소 루트, cryptography가 설치된 Python):
 
