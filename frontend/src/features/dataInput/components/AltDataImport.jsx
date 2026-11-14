@@ -81,8 +81,10 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
     setPendingKey(source.key)
     setMessages(source.key, {})
     try {
-      const { importedAt, rows } = await importAltData(source, baseMonth, consentId)
+      const { importedAt, rows, notice } = await importAltData(source, baseMonth, consentId)
       onImported(source.key, { importedAt, rows })
+      // 기관 기록이 없는 계정이면 서버가 안내 문구(notice)를 보낸다 — 기존 안내 자리(표 위)에 보여 준다.
+      if (notice) setMessages(source.key, { notice })
     } catch (error) {
       setMessages(source.key, { error: error.message })
       if (error.data?.code === 'CONSENT_REQUIRED') {

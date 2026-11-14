@@ -5,8 +5,11 @@ export const VALIDATION_LIMITS = Object.freeze({
   MONTHLY_AMOUNT_MAX: 1_000_000_000,
   // 임시 — 쌓인 금액(대출 잔액·자산)의 상한: 1,000억원
   BALANCE_AMOUNT_MAX: 100_000_000_000,
-  // 임시 — 대출 연 금리 상한(%)
-  ANNUAL_RATE_MAX_PERCENT: 100,
+  // 확정 — 대출 연 금리 상한(%). DDL CK_ULN_RATE(0~20%, 법정 최고금리)와 같다.
+  ANNUAL_RATE_MAX_PERCENT: 20,
+  // D-29 카드·신용 이용 — 연체·신규 대출 건수 상한(DDL NUMBER(3)), 현금서비스 이용 개월 상한(최근 12개월).
+  CREDIT_COUNT_MAX: 999,
+  CASH_ADVANCE_MONTHS_MAX: 12,
   // 임시 — 대출 남은 기간 상한(개월, 50년)
   REMAINING_MONTHS_MAX: 600,
   // 확정 — 월별 소득은 기준월부터 거꾸로 최근 12개월까지만 받는다.

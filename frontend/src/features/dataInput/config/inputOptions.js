@@ -1,4 +1,14 @@
-// 대출 업권 선택지 — 더미 DB MEMBER_LOAN.SECTOR_CODE(0~6)와 같은 값을 쓴다.
+// N-05-3 대출 종류 선택지 — DDL DIM_LOAN_TYPE 6개(USER_LOAN.LOAN_TYPE_CODE). 대부업은 종류에 없고 '카드·신용 이용'의 대부업 대출 잔액 칸으로 받는다.
+export const LOAN_TYPE_OPTIONS = Object.freeze([
+  { value: 'CREDIT', label: '신용대출' },
+  { value: 'BUSINESS_OPERATING', label: '사업자 운전자금' },
+  { value: 'JEONSE', label: '전세자금대출' },
+  { value: 'MORTGAGE', label: '주택담보대출' },
+  { value: 'CARD_LOAN', label: '카드론' },
+  { value: 'OTHER', label: '기타' },
+])
+
+// 대출 업권 선택지 — 옛 더미 DB MEMBER_LOAN.SECTOR_CODE(0~6) 값. FP-86 작업 5부터 화면은 LOAN_TYPE_OPTIONS를 쓰고 이 목록은 더 이상 쓰지 않는다.
 export const LOAN_SECTOR_OPTIONS = Object.freeze([
   { value: '0', label: '은행' },
   { value: '1', label: '카드' },
@@ -21,6 +31,8 @@ export const OTHER_EXPENSE_CATEGORY_OPTIONS = Object.freeze([
   { value: 'EDUCATION', label: '교육비' },
   { value: 'MEDICAL', label: '의료비' },
   { value: 'SUBSCRIPTION', label: '구독·멤버십' },
+  // FP-86 작업 5: DDL USER_EXPENSE_ITEM.EXPENSE_GROUP_CODE의 INSTALLMENT(할부)로 저장한다.
+  { value: 'INSTALLMENT', label: '할부' },
   { value: 'FAMILY_EVENT', label: '경조사비' },
   { value: 'ETC', label: '기타' },
 ])
