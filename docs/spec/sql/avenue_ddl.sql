@@ -1,7 +1,7 @@
 -- ====================================================================
 -- Avenue 서비스 DB DDL v0.3.2 · Oracle 21c, UTF-8
 -- 상태: v0.3.1 확정본 + C조 요청 반영(경환, 2026-11-11·12), 팀 공유 전. 아래 v0.3.1 머리말은 이력으로 그대로 둔다.
---  - 서비스 DB 기준 DDL = 이 파일 (표 51개). 옛 dummy_db/ 14개 표(APP_MEMBER 계열)와 경환 v0.2(46개 표)를 대신한다 (D-05, 점검 결과 결정 5).
+--  - 서비스 DB 기준 DDL = 이 파일 (표 46개, N-24 상권 5개 표 제거). 옛 dummy_db/ 14개 표(APP_MEMBER 계열)와 경환 v0.2(46개 표)를 대신한다 (D-05, 점검 결과 결정 5).
 --  - A-1 점수 범위 = 0~1000. 점수 CHECK와 등급 구간(CUT-0.1)이 이 범위를 쓴다. decisions.md의 "300~900"은 문서 담당자가 고쳐야 한다.
 --  - U2·U3·E2 = 아래 v0.3.1 내용으로 확정. E2(키 버전 접두어)는 우선 이대로 운영하고, 키 운영 방식이 정해지면 다시 확인한다.
 -- 실행: 빈 스키마에서 SQL Developer "스크립트 실행"(F5)으로 한 번에 실행한다. 마지막에 COMMIT이 있다.
@@ -72,7 +72,9 @@
 --  W4 [2026-11-12] 대안 데이터 6개 표 동의 FK의 ON DELETE SET NULL 제거 (W3 CHECK와 충돌, 동의 이력은 지우지 않음)
 --  W5 [2026-11-12] APP_USER.ADM_DONG_CODE·SERVICE_CATEGORY_CODE와 FK 2개 삭제 (팀원 검수, 쓰는 곳 없음)
 --  W6 [2026-11-12] 새 표 SYSTEM_LOG (N-28 관리자 시스템 로그). 표 50 → 51
---  C8 (보류) DIM_ADM_DONG.GEO_ADM_CODE — 행정동 경계 파일을 정한 뒤 결정
+--  C8 [2026-11-14 종료] N-24는 정적 JSON을 사용하므로 지도 코드 열을 추가하지 않는다.
+--  [2026-11-14 · N-24] C조의 정적 JSON 전환 결정에 따라 상권 5개 표와 전용 FK·인덱스를 제거했다.
+--     기존 C1·C3·C5 기록은 이력이며 현재 구조에는 없다. 직군 공공통계 표는 유지한다.
 -- ====================================================================
 
 
@@ -113,31 +115,6 @@ CREATE TABLE DIM_LOAN_TYPE (
 );
 COMMENT ON TABLE  DIM_LOAN_TYPE IS '대출 종류 코드 (신용대출, 주택담보, 카드론, 대부업 등)';
 COMMENT ON COLUMN DIM_LOAN_TYPE.PRIVATE_LENDER_YN IS '대부업 여부. UI 대출 종류에는 대부업이 없어 지금은 모두 N이고, 대부업 잔액은 USER_CREDIT_PROFILE.PRIVATE_LENDER_LOAN_BALANCE_AMT에 둔다';
-
--- N-24 서울 행정동.
-CREATE TABLE DIM_ADM_DONG (
-    ADM_DONG_CODE          VARCHAR2(10 CHAR)    NOT NULL,
-    GU_NAME                VARCHAR2(20 CHAR)    NOT NULL,
-    DONG_NAME              VARCHAR2(30 CHAR)    NOT NULL,
-    CONSTRAINT PK_DIM_ADM_DONG PRIMARY KEY (ADM_DONG_CODE)
-);
-COMMENT ON TABLE  DIM_ADM_DONG IS '서울 행정동 (경계 GeoJSON은 파일로 둔다)';
--- v0.3.2 (C6) C조 열 주석 보완
-COMMENT ON COLUMN DIM_ADM_DONG.ADM_DONG_CODE IS '서울시 상권분석서비스 행정동 코드 (상권 FACT 표와 같은 코드)';
-COMMENT ON COLUMN DIM_ADM_DONG.GU_NAME IS '구 이름 (구 선택, 구별 평균, 구 안 순위)';
-COMMENT ON COLUMN DIM_ADM_DONG.DONG_NAME IS '행정동 이름 (행정동 검색, 지도 라벨, 동 상세 제목)';
-
--- N-24 상권 업종.
-CREATE TABLE DIM_SERVICE_CATEGORY (
-    SERVICE_CATEGORY_CODE  VARCHAR2(10 CHAR)    NOT NULL,
-    SERVICE_CATEGORY_NAME  VARCHAR2(50 CHAR)    NOT NULL,
-    MAP_GROUP_CODE         VARCHAR2(20 CHAR),                   -- v0.3.2 (C3)
-    CONSTRAINT PK_DIM_SERVICE_CATEGORY PRIMARY KEY (SERVICE_CATEGORY_CODE),
-    CONSTRAINT CK_DSC_MAP_GROUP CHECK (MAP_GROUP_CODE IN ('CAFE', 'FOOD', 'FASHION', 'CONV', 'BEAUTY', 'BAKERY', 'PUB', 'EDU'))  -- v0.3.2 (C3)
-);
-COMMENT ON TABLE  DIM_SERVICE_CATEGORY IS '상권 업종 코드 (지도 화면 8개 업종 포함)';
--- v0.3.2 (C3)
-COMMENT ON COLUMN DIM_SERVICE_CATEGORY.MAP_GROUP_CODE IS '지도 업종 칩 묶음 (CAFE=커피·음료, FOOD=치킨·음식점, FASHION=의류·패션, CONV=편의점, BEAUTY=미용·뷰티, BAKERY=베이커리·디저트, PUB=호프·주점, EDU=학원·교육). 칩에 없는 업종은 NULL';
 
 -- v0.2 (B4) 산출 불가 사유. 등급 상태는 SCORED / NOT_SCORABLE 2종을 그대로 두고, 못 구한 이유만 이 코드로 따로 기록한다.
 -- CHECK 목록 없이 FK로만 막는다: 새 사유는 이 표에 행만 추가하면 된다.
@@ -991,7 +968,7 @@ COMMENT ON TABLE  LOAN_PRODUCT_FAVORITE IS '대출 상품 즐겨찾기 (N-37-3, 
 
 
 -- ====================================================================
--- 6. 공공통계·상권·금리 (N-15, N-17, N-24) — 담당 팀이 원천 자료에 맞춰 열을 확정
+-- 6. 공공통계·금리 (N-15, N-17) — 담당 팀이 원천 자료에 맞춰 열을 확정
 -- ====================================================================
 
 -- N-17 정책금리.
@@ -1059,57 +1036,6 @@ COMMENT ON COLUMN FACT_HFS_WORKER_STAT.SOURCE_SEGMENT_NAME IS '값을 가져온 
 COMMENT ON COLUMN FACT_HFS_WORKER_STAT.AVG_INCOME_AMT IS '평균 연소득 (원)';
 COMMENT ON COLUMN FACT_HFS_WORKER_STAT.AVG_ASSET_AMT IS '평균 총자산 (원)';
 COMMENT ON COLUMN FACT_HFS_WORKER_STAT.AVG_DEBT_AMT IS '평균 총부채 (원)';
-
--- N-24-2 행정동·업종 분기 매출.
-CREATE TABLE FACT_DONG_SALES (
-    BASE_QUARTER           VARCHAR2(7 CHAR)     NOT NULL,
-    ADM_DONG_CODE          VARCHAR2(10 CHAR)    NOT NULL,
-    SERVICE_CATEGORY_CODE  VARCHAR2(10 CHAR)    NOT NULL,
-    SALES_AMT              NUMBER(18),
-    CONSTRAINT PK_FACT_DONG_SALES PRIMARY KEY (BASE_QUARTER, ADM_DONG_CODE, SERVICE_CATEGORY_CODE),
-    CONSTRAINT FK_FDS_DONG FOREIGN KEY (ADM_DONG_CODE) REFERENCES DIM_ADM_DONG (ADM_DONG_CODE),
-    CONSTRAINT FK_FDS_CATEGORY FOREIGN KEY (SERVICE_CATEGORY_CODE) REFERENCES DIM_SERVICE_CATEGORY (SERVICE_CATEGORY_CODE),
-    CONSTRAINT CK_FDS_QUARTER CHECK (REGEXP_LIKE(BASE_QUARTER, '^\d{4}-Q[1-4]$'))
-);
-COMMENT ON TABLE  FACT_DONG_SALES IS '행정동·업종 분기 매출 (N-24)';
-COMMENT ON COLUMN FACT_DONG_SALES.SALES_AMT IS '분기 매출 (원, 비공개면 NULL → "자료 없음")';
--- v0.3.2 (C6) C조 열 주석 보완
-COMMENT ON COLUMN FACT_DONG_SALES.BASE_QUARTER IS '기준 분기 (YYYY-Qn). 매출 전년비를 내려면 최근 5개 분기 이상을 적재한다';
-
--- N-24-2 행정동·업종 분기 점포.
-CREATE TABLE FACT_DONG_STORE (
-    BASE_QUARTER           VARCHAR2(7 CHAR)     NOT NULL,
-    ADM_DONG_CODE          VARCHAR2(10 CHAR)    NOT NULL,
-    SERVICE_CATEGORY_CODE  VARCHAR2(10 CHAR)    NOT NULL,
-    STORE_COUNT            NUMBER(7),
-    OPEN_COUNT             NUMBER(7),
-    CLOSE_COUNT            NUMBER(7),
-    CONSTRAINT PK_FACT_DONG_STORE PRIMARY KEY (BASE_QUARTER, ADM_DONG_CODE, SERVICE_CATEGORY_CODE),
-    CONSTRAINT FK_FDT_DONG FOREIGN KEY (ADM_DONG_CODE) REFERENCES DIM_ADM_DONG (ADM_DONG_CODE),
-    CONSTRAINT FK_FDT_CATEGORY FOREIGN KEY (SERVICE_CATEGORY_CODE) REFERENCES DIM_SERVICE_CATEGORY (SERVICE_CATEGORY_CODE),
-    CONSTRAINT CK_FDT_QUARTER CHECK (REGEXP_LIKE(BASE_QUARTER, '^\d{4}-Q[1-4]$'))
-);
-COMMENT ON TABLE  FACT_DONG_STORE IS '행정동·업종 분기 점포 수·개업·폐업 (N-24, 개업률·폐업률은 계산)';
--- v0.3.2 (C6) C조 열 주석 보완
-COMMENT ON COLUMN FACT_DONG_STORE.STORE_COUNT IS '점포 수. 점포당 매출의 분모, 경쟁 밀집도, 점포 수 증감';
-COMMENT ON COLUMN FACT_DONG_STORE.OPEN_COUNT IS '개업 점포 수. 개업률 = OPEN_COUNT / STORE_COUNT';
-COMMENT ON COLUMN FACT_DONG_STORE.CLOSE_COUNT IS '폐업 점포 수. 폐업률 = CLOSE_COUNT / STORE_COUNT (지도 기본 지표)';
-
--- v0.3.2 (C1) N-24-4·5 행정동 분기 생활인구. 유동인구 증감 = (이번 분기 − 작년 같은 분기) ÷ 작년 같은 분기.
-CREATE TABLE FACT_DONG_LIVING_POP (
-    BASE_QUARTER           VARCHAR2(7 CHAR)     NOT NULL,
-    ADM_DONG_CODE          VARCHAR2(10 CHAR)    NOT NULL,
-    AVG_LIVING_POP         NUMBER(12,1)         NOT NULL,
-    CONSTRAINT PK_FACT_DONG_LIVING_POP PRIMARY KEY (BASE_QUARTER, ADM_DONG_CODE),
-    CONSTRAINT FK_FDL_DONG FOREIGN KEY (ADM_DONG_CODE) REFERENCES DIM_ADM_DONG (ADM_DONG_CODE),
-    CONSTRAINT CK_FDL_QUARTER CHECK (REGEXP_LIKE(BASE_QUARTER, '^\d{4}-Q[1-4]$')),
-    CONSTRAINT CK_FDL_POP CHECK (AVG_LIVING_POP >= 0)
-);
-COMMENT ON TABLE  FACT_DONG_LIVING_POP IS '행정동 분기 생활인구 (N-24-4 지도 지표 "유동인구 증감", N-24-5 동 상세 KPI). 원천: 서울 생활인구(행정동 단위)';
-COMMENT ON COLUMN FACT_DONG_LIVING_POP.BASE_QUARTER IS '기준 분기 (YYYY-Qn, FACT_DONG_SALES와 같은 형식). 작년 같은 분기와 비교해 증감률을 낸다';
-COMMENT ON COLUMN FACT_DONG_LIVING_POP.ADM_DONG_CODE IS '행정동 (상권 FACT 표와 같은 코드)';
-COMMENT ON COLUMN FACT_DONG_LIVING_POP.AVG_LIVING_POP IS '분기 일평균 생활인구 (명). 일별·시간대별 원자료를 분기로 평균한 값';
-
 
 -- ====================================================================
 -- 7. 커뮤니티·신고 (N-06, N-33, N-34)
@@ -1366,9 +1292,6 @@ CREATE INDEX IX_AAL_TARGET ON ACCESS_AUDIT_LOG (TARGET_USER_ID, ACCESSED_AT);
 -- v0.3.2 (W6) N-28 시간순·구분별 조회
 CREATE INDEX IX_SYL_CREATED ON SYSTEM_LOG (CREATED_AT);
 CREATE INDEX IX_SYL_TYPE ON SYSTEM_LOG (LOG_TYPE_CODE, CREATED_AT);
--- v0.3.2 (C5) N-24-2·5 동·업종 최근 4분기 조회 (PK가 분기부터 시작해 앞에서부터 못 씀)
-CREATE INDEX IX_FDS_DONG_CAT ON FACT_DONG_SALES (ADM_DONG_CODE, SERVICE_CATEGORY_CODE, BASE_QUARTER);
-CREATE INDEX IX_FDT_DONG_CAT ON FACT_DONG_STORE (ADM_DONG_CODE, SERVICE_CATEGORY_CODE, BASE_QUARTER);
 -- v0.3.2 (C7) 게시글별 이력 조회, 참조 행이 있으면 삭제를 막는 FK의 부모 삭제 검사 때 표 잠금 방지
 CREATE INDEX IX_BPL_POST ON BOARD_POST_LOG (POST_ID, CREATED_AT);
 CREATE INDEX IX_BPL_ACTOR ON BOARD_POST_LOG (ACTOR_USER_ID);

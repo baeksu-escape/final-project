@@ -1,6 +1,6 @@
 # 서비스 DB DDL v0.3.2 더미 시드 — 별도 개발 스키마 권장
 
-**기준 DDL은 `docs/spec/sql/avenue_ddl.sql`의 v0.3.2(51개 표)다.** 옛 v2.4 묶음은 11/12 삭제했고 이력은 git에 남아 있다. 폴더·파일 이름에는 버전을 넣지 않고 버전은 문서에 적는다. 별도 Oracle 개발 사용자(스키마)에 적재하는 것을 권장한다.
+**기준 DDL은 `docs/spec/sql/avenue_ddl.sql`의 v0.3.2 기반 개정본(상권 5개 표 제거 후 46개 표)이다.** 옛 v2.4 묶음은 11/12 삭제했고 이력은 git에 남아 있다. 폴더·파일 이름에는 버전을 넣지 않고 버전은 문서에 적는다. 별도 Oracle 개발 사용자(스키마)에 적재하는 것을 권장한다.
 
 **처음 준비한다면 [DB 구성과 합성 데이터 사용 안내](../README.md)부터 읽는다.** 이 폴더는 서비스 시연용 더미 회원·기관 응답·시드 생성 도구를 보관한다. 모델 학습용 CSV와는 용도가 다르며, 학습 데이터의 생성 과정과 설계 근거는 별도 생성 패키지에 보존한다.
 
@@ -9,6 +9,7 @@
 - **일반적인 최초 준비:** 원본 `avenue_ddl.sql`로 테이블 생성 → 같은 스키마에서 `run_seed_only.sql`로 빈 시드 대상 테이블에 적재 → `99_check.sql` 결과 확인.
 - **최신 테이블이 이미 있고 시드 대상만 비어 있음:** DDL을 다시 실행하지 않고 `run_seed_only.sql`만 실행한다. 기존 기준 데이터는 유지한다.
 - **데이터가 있는 DB의 구조 변경:** 해당 ALTER SQL만 적용한다. 이번 자산·대출 상태 변경은 아래 O-15 안내를 따른다. 기존 데이터 보정은 별도다.
+- **기존 DB의 상권 표 제거:** `../drop_unused_market_tables.sql`로 상권 전용 표 5개만 별도로 삭제한다. 최신 초기화 묶음은 이 5개 표를 만들거나 지우지 않는다.
 - **버려도 되는 실험용 DB 전체 초기화:** `run_all.sql`을 실행한다. 대상 테이블을 삭제·재생성하므로 기존 데이터가 지워진다.
 - **이미 적재된 시드의 일부 갱신:** 두 실행 파일 모두 사용하지 않고 변경 범위에 맞는 별도 SQL을 검토한다.
 
@@ -107,7 +108,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 | `USER_CREDIT_PROFILE` | 기존 신용평가사 값 유지. 신규 대출 건수·현금서비스 개월·대부업 잔액은 동의된 회원 원장에서 파생 |
 | 상품·대상 직군·특징·점수대 안내 | 기존 상품 17개를 유지하며 설명·기간·특징은 교육용 더미 문구. 평균 금리는 더미 최소·최대의 중간값으로 실제 통계 평균이 아님 |
 | 기준 코드·모델 등록 | 받은 DDL 안 기준 INSERT 25행을 그대로 사용, 중복 생성하지 않음 |
-| 평가·게시판·신고·운영 로그·통계 | `ASSESSMENT`, `ASSESSMENT_FACTOR` 등은 빈 테이블. 게시글·게시글 로그·시스템 로그는 시연 원천이 없고, `FACT_DONG_LIVING_POP`·`FACT_HFS_WORKER_STAT`은 C조가 원자료를 적재한다 |
+| 평가·게시판·신고·운영 로그·통계 | `ASSESSMENT`, `ASSESSMENT_FACTOR` 등은 빈 테이블. 게시글·게시글 로그·시스템 로그는 시연 원천이 없고, `FACT_HFS_WORKER_STAT` 등 공공통계는 담당자가 적재한다. N-24 상권은 정적 JSON을 사용하므로 관련 표 5개를 제거했으며 DB 적재 대상이 아니다 |
 
 탈퇴 회원은 시드에 없다. 탈퇴 시 `WITHDRAWN`과 탈퇴 시각을 기록하고 개인정보를 표시값으로 바꾼다. `wd_` 아이디와 `탈퇴` 닉네임 접두어는 예약한다. 불러온 6개 표의 행은 동의 ID가 필수이며 직접 입력은 NULL이다(W3). 동의는 최대 1년이고 만료·철회·탈퇴 시 해당 동의로 불러온 행을 삭제한다.
 
@@ -129,7 +130,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 ## 검사·적재
 
-생성기는 받은 DDL에서 타입·문자 길이·숫자 자릿수·NOT NULL·CHECK(Oracle NULL/UNKNOWN 포함)·PK·UNIQUE·복합 FK·조건부 UNIQUE INDEX를 읽어 검사한다. 모든 행 검증과 원천 대조가 끝나야 파일을 쓴다. SQL*Plus 2,499자 줄 제한도 생성 SQL에 적용한다. DDL v0.3.2는 11/12 범영 님이 Oracle 적재를 확인했으며 시드는 11/13 경환이 `run_all.sql`로 적재해 `99_check.sql`의 표 51개·표별 행 수 일치를 확인했다.
+생성기는 받은 DDL에서 타입·문자 길이·숫자 자릿수·NOT NULL·CHECK(Oracle NULL/UNKNOWN 포함)·PK·UNIQUE·복합 FK·조건부 UNIQUE INDEX를 읽어 검사한다. 모든 행 검증과 원천 대조가 끝나야 파일을 쓴다. SQL*Plus 2,499자 줄 제한도 생성 SQL에 적용한다. 당시 DDL v0.3.2는 11/12 범영 님이 Oracle 적재를 확인했으며 시드는 11/13 경환이 `run_all.sql`로 적재해 `99_check.sql`의 표 51개·표별 행 수 일치를 확인했다. 이는 상권 표 제거 전 기록이며, 현재 46개 표 개정본의 실제 Oracle 적재·삭제는 아직 확인하지 않았다.
 
 성공한 출력의 `run_all.sql`은 `00_drop_all.sql` → 받은 DDL(내장 기준 INSERT 포함) → 테이블별 시드 → `99_check.sql`을 실행한다. SQL Developer F5 또는 SQL*Plus `@run_all.sql`을 사용한다. `WHENEVER SQLERROR/OSERROR EXIT FAILURE ROLLBACK`이 있으나 **DDL과 이미 COMMIT한 데이터는 오류 후 ROLLBACK으로 되돌아오지 않는다.** 반드시 새 개발 스키마에서 실행한다.
 
@@ -137,7 +138,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 `00_drop_all.sql`은 첫 DROP 전에 USER_TABLES에서 옛 DB 표식(APP_MEMBER·MEMBER_MONTHLY_INPUT·MEMBER_LOAN·EXTERNAL_API_RESPONSE)을 확인하고 하나라도 있으면 오류로 종료한다. 단독 실행에도 WHENEVER SQLERROR EXIT가 적용된다. 표식이 없는 스키마의 공유 테이블까지 자동 식별하는 가드는 아니므로 별도 스키마 원칙은 유지한다.
 
-`99_check.sql`은 DDL v0.3.2 기준 테이블 51개·테이블별 기대 행 수·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
+`99_check.sql`은 현재 개정 DDL 기준 테이블 46개·테이블별 기대 행 수·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
 
 테스트(저장소 루트, cryptography가 설치된 Python):
 
