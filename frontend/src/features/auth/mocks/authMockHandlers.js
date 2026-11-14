@@ -3,7 +3,7 @@ import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { MOCK_USERS, toMockToken } from '../../../common/mocks/mockUsers.js'
 import { ROLES } from '../../../common/config/roles.js'
 import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, EMAIL_PURPOSES, LOGIN_FAILED_MESSAGE } from '../authConstants.js'
-import { isValidEmail, isValidPassword, normalizePhone } from '../validation.js'
+import { isValidEmail, isValidPassword, normalizePhone, validateBirthYear, validateNickname } from '../validation.js'
 import {
   DEMO_ACCOUNT_CONTACTS,
   LOCKED_DEMO_ACCOUNT,
@@ -160,11 +160,22 @@ registerMockHandlers({
   'POST /api/auth/signup': ({ body }) => {
     if (body?.agreeCreditInfo !== true) throw new ApiError(400, '필수 동의 항목에 동의해 주세요.')
     if (!isValidPassword(body.password)) throw new ApiError(400, '비밀번호 규칙을 지켜 주세요.')
+    // N-02-1 출생연도 — 화면과 같은 규칙(validateBirthYear)으로 다시 검사하고, 어기면 칸별 오류로 돌려준다.
+    const birthYearError = validateBirthYear(body.birthYear)
+    if (birthYearError) throw new ApiError(400, birthYearError, { fieldErrors: [{ field: 'birthYear', message: birthYearError }] })
+    // N-02-1 닉네임 — 화면과 같은 규칙(validateNickname)으로 다시 검사하고, 어기면 칸별 오류로 돌려준다.
+    const nicknameError = validateNickname(body.nickname)
+    if (nicknameError) throw new ApiError(400, nicknameError, { fieldErrors: [{ field: 'nickname', message: nicknameError }] })
+    const nickname = body.nickname.trim()
     if (accounts.some((item) => item.loginId === body.loginId)) {
       throw new ApiError(409, '이미 사용 중인 아이디입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_LOGIN_ID })
     }
     if (accounts.some((item) => item.email === body.email)) {
       throw new ApiError(409, '이미 가입된 이메일입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_EMAIL })
+    }
+    // N-02-1 닉네임 중복 불가(DDL UK_APU_NICKNAME) — 탈퇴 회원의 표시값('탈퇴'+userId)도 계정 행에 남아 있으므로 함께 비교한다.
+    if (accounts.some((item) => item.nickname === nickname)) {
+      throw new ApiError(409, '이미 사용 중인 닉네임입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_NICKNAME })
     }
     // N-01-6 소셜 계정으로 가입하면 임시 연결 키가 함께 온다. 이메일 인증을 통과한 뒤에 키를 지운다.
     if (body.socialLinkKey !== undefined && !mockLinkKeys.has(body.socialLinkKey)) {
@@ -177,9 +188,12 @@ registerMockHandlers({
       loginId: body.loginId,
       password: body.password,
       locked: false,
+      createdAt: new Date().toISOString(), // N-04-1 마이페이지 가입일로 쓴다.
       email: body.email,
       phone: normalizePhone(body.phone),
       ageGroup: body.ageGroup,
+      birthYear: Number(body.birthYear),
+      nickname,
       user: { userId, name: body.name, role: ROLES.USER, jobType: null, hasScore: false },
     })
     return { userId }

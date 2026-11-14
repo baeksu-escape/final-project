@@ -44,7 +44,7 @@ export default function AppRoutes() {
           {/* 직군 선택 (FP-85 N-05-1) — 직군이 없는 사용자만 머문다 */}
           <Route path={PATHS.SELECT_JOB} element={<JobSelectPage />} />
 
-          {/* 일반 사용자 전용 + 직군 선택 완료 — N-08-1 주 메뉴 9개와 헤더의 마이 페이지 */}
+          {/* 일반 사용자 전용 + 직군 선택 완료 — N-08-1 주 메뉴 9개 */}
           <Route element={<RouteGuard requiredRole={ROLES.USER} requireJobType />}>
             {/* 점수가 있어야 보는 화면 — 점수가 없으면 데이터 입력으로 보낸다(11/06 확정 UI) */}
             <Route element={<RouteGuard requireScore />}>
@@ -59,8 +59,12 @@ export default function AppRoutes() {
             <Route path={PATHS.LOANS} element={<PlaceholderPage title="대출 상품" nId="N-37" />} />
             <Route path={PATHS.COMPARISON} element={<PlaceholderPage title="비교 분석" nId="N-13·N-26" />} />
             <Route path={PATHS.LOUNGE} element={<PlaceholderPage title="신용 라운지" nId="N-06" />} />
-            <Route path={PATHS.MY_PAGE} element={<MyPage />} />
             <Route path={DATA_INPUT_PATHS.DATA_INPUT} element={<DataInputPage />} />
+          </Route>
+
+          {/* 일반 사용자 전용, 직군 선택 전에도 연다 — N-08-1 직군 선택·데이터 입력 중에도 헤더의 [마이 페이지]로 들어온다(PR #45 검토) */}
+          <Route element={<RouteGuard requiredRole={ROLES.USER} />}>
+            <Route path={PATHS.MY_PAGE} element={<MyPage />} />
           </Route>
 
           {/* 관리자 전용 — N-08-1 관리자 탭 5개 */}
