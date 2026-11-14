@@ -1,8 +1,36 @@
 # 서비스 DB DDL v0.3.2 더미 시드 — 별도 개발 스키마 권장
 
-**기준 DDL은 `docs/spec/sql/avenue_ddl.sql`의 v0.3.2(51개 표)다.** 옛 v2.4 묶음은 11/12 삭제했고 이력은 git에 남아 있다. 폴더·파일 이름에는 버전을 넣지 않고 버전은 문서에 적는다. 별도 Oracle 개발 사용자(스키마)에 적재하는 것을 권장한다.
+**기준 DDL은 `docs/spec/sql/avenue_ddl.sql`의 v0.3.2 기반 개정본(상권 5개 표 제거·빈 알림 표 추가 후 47개 표)이다.** 옛 v2.4 묶음은 11/12 삭제했고 이력은 git에 남아 있다. 폴더·파일 이름에는 버전을 넣지 않고 버전은 문서에 적는다. 별도 Oracle 개발 사용자(스키마)에 적재하는 것을 권장한다.
 
-`01_create_tables.sql`은 기준 DDL의 바이트 동일 사본이다. 현재 저장소의 기존 시드와 검사 SQL은 이전 DDL로 만들어졌으므로, 기준 DDL과 생성기 대응을 확인한 뒤 사용자가 팀 키로 다시 생성해야 한다.
+**처음 준비한다면 [DB 구성과 합성 데이터 사용 안내](../README.md)부터 읽는다.** 이 폴더는 서비스 시연용 더미 회원·기관 응답·시드 생성 도구를 보관한다. 모델 학습용 CSV와는 용도가 다르며, 학습 데이터의 생성 과정과 설계 근거는 별도 생성 패키지에 보존한다.
+
+## 상황에 맞는 실행 파일 선택
+
+- **일반적인 최초 준비:** 원본 `avenue_ddl.sql`로 테이블 생성 → 같은 스키마에서 `run_seed_only.sql`로 빈 시드 대상 테이블에 적재 → `99_check.sql` 결과 확인.
+- **최신 테이블이 이미 있고 시드 대상만 비어 있음:** DDL을 다시 실행하지 않고 `run_seed_only.sql`만 실행한다. 기존 기준 데이터는 유지한다.
+- **데이터가 있는 DB의 구조 변경:** 해당 ALTER SQL만 적용한다. 이번 자산·대출 상태 변경은 아래 O-15 안내를 따른다. 기존 데이터 보정은 별도다.
+- **기존 DB의 상권 표 제거:** `../drop_unused_market_tables.sql`로 상권 전용 표 5개만 별도로 삭제한다. 최신 초기화 묶음은 이 5개 표를 만들거나 지우지 않는다.
+- **버려도 되는 실험용 DB 전체 초기화:** `run_all.sql`을 실행한다. 대상 테이블을 삭제·재생성하므로 기존 데이터가 지워진다.
+- **이미 적재된 시드의 일부 갱신:** 두 실행 파일 모두 사용하지 않고 변경 범위에 맞는 별도 SQL을 검토한다.
+
+아래 생성 절차는 시드 파일을 다시 만드는 사람을 위한 것이다. **이미 제공된 시드를 적재하는 사람은 데이터 생성·개발 키 생성 단계를 반복하지 않는다.** 생성기는 SQL 파일을 만들고, Oracle 적재는 위 실행 파일로 별도로 수행한다. 피처 사전(FS-DRAFT)의 별도 적용 순서와 현재 자동 연결 상태는 [전체 안내](../README.md)를 따른다.
+
+`01_create_tables.sql`은 기준 DDL의 바이트 동일 사본이며 시드와 검사 SQL은 DDL v0.3.2 기준이다. 13번 대출 시드는 11/13 v3.6.1 원천으로 교체했다.
+
+`external_api/`는 INP-03(대안 데이터 불러오기)이 2차 mock 서버 전까지 읽는 기관 응답 더미(v3.6.1, 회원 400명 전원)이며 형식은 `external_api/README.md`를 따른다.
+
+## 대출 없음 선택과 자산 미입력 (N-05-3·4·8, O-15 A안)
+
+`USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT`는 NULL을 허용하며, 값이 있으면 기존처럼 0 이상이어야 한다. NULL은 자산 미입력이고 실제 총자산 0원과 구분한다. `NO_LOAN_YN CHAR(1)`도 NULL을 허용한다. Y는 대출 없음 선택 완료, N은 대출 있음, NULL은 대출 없음 여부 미입력·미확인이다.
+
+- 자산 입력 완료: 해당 회원·기준월의 `TOTAL_ASSET_AMT IS NOT NULL`.
+- 대출 입력 완료: 같은 회원·기준월의 `USER_LOAN` 행이 있거나 `NO_LOAN_YN = 'Y'`.
+- 대출의 "해당 없음"을 저장할 때 자산 행이 없으면 `TOTAL_ASSET_AMT = NULL`, `NO_LOAN_YN = 'Y'`로 만든다. 기존 자산 행이 있으면 총자산을 보존한다. 이후 대출을 추가하면 `NO_LOAN_YN = 'N'`으로 바꾼다. 이 상태 갱신은 입력 API 담당자가 구현한다.
+- 동의 철회 등으로 대출 행이 삭제돼도 대출 없음 선택을 뜻하지 않으므로 자동으로 Y를 설정하지 않는다. 총자산이 NULL인 재무 진단은 이를 0원으로 바꾸지 않는다. 현재 총자산은 모델 입력에 포함되지 않는다.
+
+새 스키마는 개정 `avenue_ddl.sql` 또는 같은 내용의 `01_create_tables.sql`을 사용한다. 이미 적재된 Oracle에는 **`docs/spec/sql/alter_user_asset_snapshot_no_loan.sql`만 별도로 실행**한다. 이 파일은 테이블을 재생성하거나 기존 데이터를 Y/N으로 일괄 보정하지 않는다. 새 열의 기존 행은 NULL로 유지하며, 대출 행이 없다는 이유만으로 미입력 회원을 대출 없음 선택 완료로 판단하지 않는다. 대상은 원본 DDL과 같은 **Oracle 21c**이며 제약 정의 조회에 `SEARCH_CONDITION_VC`를 사용한다. Oracle DDL은 자동 커밋되므로 실행 전 대상 스키마와 스크립트의 사전 검사·실행 후 검사 결과를 확인한다. 마지막 제약 조회에서 `CK_UAS_AMT`와 `CK_UAS_NO_LOAN` 두 행이 모두 있고 `STATUS = ENABLED`, `VALIDATED = VALIDATED`인지 확인한다. 누락되거나 다르면 적용 완료로 보지 말고 DB 담당자에게 확인한다. 실제 Oracle 적용 검증은 별도다.
+
+커밋용 합성 시드는 대출 원장이 완전한 회원 400명이므로 같은 회원·기준월의 대출 유무로 `NO_LOAN_YN`을 채운다(현재 Y 253명, N 147명). 기존 총자산 값·행 ID·기준월은 유지한다. **이미 적재된 DB에 이 INSERT 시드를 다시 실행하지 않는다.** 이번 ALTER는 기존 DB의 합성 시드에도 Y/N을 채우지 않으므로, 해당 데이터 보정이 필요하면 적재 이력과 현재 변경 여부를 확인한 뒤 별도로 수행한다.
 
 ## 저장소 상태와 생성
 
@@ -74,13 +102,13 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 | `USER_INCOME_MONTH` | 급여는 `SALARY` 기준월 1행, 자영업·프리랜서는 `MONTHLY_INCOME` 12행. 원천 금액·입력일 유지 |
 | `USER_EXPENSE_ITEM` | 회원마다 `FIXED` 1행 = 원천 12개월 월 지출 평균, 원 단위 `ROUND_HALF_UP`. 세부 종류는 NULL |
 | `USER_LOAN` | 전 회원 대출 원장을 기준월 한 세트로 보존. 시작 동의 회원은 IMPORTED, 미동의 회원은 MANUAL. 잔액 원 단위 보존, 연 금리는 비율×100 후 DDL 소수 3자리 반올림 |
-| `USER_ASSET_SNAPSHOT` | 새 자산 보조 CSV의 합성 원천 자산을 기준월 1행으로 그대로 옮김 |
+| `USER_ASSET_SNAPSHOT` | 자산 보조 CSV의 합성 원천 자산을 기준월 1행으로 그대로 옮김. `NO_LOAN_YN`은 같은 회원·기준월의 대출이 없으면 Y, 있으면 N |
 | `USER_UTILITY_PAYMENT` | 공과금 응답 `utility_responses.jsonl`을 통신비와 같은 `map_bill_rows()`로 매핑. 시작 동의 회원만 IMPORTED, 회원·월 12행. 미납 개월(LATE+UNPAID)을 원장 `utility_late`와 달마다·합계로 대조 |
 | 통신·간편결제·사회보험 | 시작 동의 회원만 IMPORTED로 매핑하고 해당 회원의 Y 동의 ID 연결. 응답 전원 OK여도 미동의 회원 제외. 회원/월별 키·관측 상태·금액·납부 상태 대조 |
 | `USER_CREDIT_PROFILE` | 기존 신용평가사 값 유지. 신규 대출 건수·현금서비스 개월·대부업 잔액은 동의된 회원 원장에서 파생 |
 | 상품·대상 직군·특징·점수대 안내 | 기존 상품 17개를 유지하며 설명·기간·특징은 교육용 더미 문구. 평균 금리는 더미 최소·최대의 중간값으로 실제 통계 평균이 아님 |
 | 기준 코드·모델 등록 | 받은 DDL 안 기준 INSERT 25행을 그대로 사용, 중복 생성하지 않음 |
-| 평가·게시판·신고·운영 로그·통계 | `ASSESSMENT`, `ASSESSMENT_FACTOR` 등은 빈 테이블. 게시글·게시글 로그·시스템 로그는 시연 원천이 없고, `FACT_DONG_LIVING_POP`·`FACT_HFS_WORKER_STAT`은 C조가 원자료를 적재한다 |
+| 평가·게시판·신고·운영 로그·통계 | `ASSESSMENT`, `ASSESSMENT_FACTOR` 등은 빈 테이블. 게시글·게시글 로그·시스템 로그는 시연 원천이 없고, `FACT_HFS_WORKER_STAT` 등 공공통계는 담당자가 적재한다. N-24 상권은 정적 JSON을 사용하므로 관련 표 5개를 제거했으며 DB 적재 대상이 아니다 |
 
 탈퇴 회원은 시드에 없다. 탈퇴 시 `WITHDRAWN`과 탈퇴 시각을 기록하고 개인정보를 표시값으로 바꾼다. `wd_` 아이디와 `탈퇴` 닉네임 접두어는 예약한다. 불러온 6개 표의 행은 동의 ID가 필수이며 직접 입력은 NULL이다(W3). 동의는 최대 1년이고 만료·철회·탈퇴 시 해당 동의로 불러온 행을 삭제한다.
 
@@ -88,11 +116,11 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 대출 종류·금리 방식은 원장 `members/ledgers/loans.csv`의 `loan_type_code`·`rate_type`에서 읽는다. 기관 응답 `financial_responses.jsonl`의 `loanTypeCode`와 같은 원천 값이며(DDL 주석은 기관 응답 기준으로 적혀 있다), 열이 없는 옛 원천이면 각각 `OTHER`·`UNKNOWN`을 쓴다. kind→종류 매핑은 가정이다(TODO(D-27), 대출 입력 항목 미확정). 대출별 월 상환액은 원천 기준월의 회원 총 상환액을 원장 연 상환액 비중으로 정수 배분하며, 합계를 정확히 보존한다. 비중이 모두 0이면 잔액 비중, 그것도 0이면 같은 비중을 쓴다. 실제 상환 스케줄을 재현한 값은 아니다.
 
-**대출·동의 보존:** 전 회원에 대해 `USER_LOAN.MONTHLY_PAYMENT_AMT` 합계 = 원천 기준월 `debt_service_krw`를 검사한다(대출이 없으면 0). v0.3.2의 `USER_LOAN.CONSENT_ID`는 MANUAL이면 NULL, IMPORTED면 해당 LOANS 동의 ID로 연결한다. 현재 저장소의 기존 대출 시드에는 이 열이 없어 재생성이 필요하다. 통신·간편결제·사회보험·신용 프로필의 IMPORTED 행과 USER_CONSENT는 응답 status와 무관하게 시작 동의 상태를 따른다. 동의 회원의 기관 응답이 OK가 아니면 정상 데이터로 간주하지 않고 중단한다.
+**대출·동의 보존:** 전 회원에 대해 `USER_LOAN.MONTHLY_PAYMENT_AMT` 합계 = 원천 기준월 `debt_service_krw`를 검사한다(대출이 없으면 0). v0.3.2의 `USER_LOAN.CONSENT_ID`는 MANUAL이면 NULL, IMPORTED면 해당 LOANS 동의 ID로 연결한다. 저장소 시드의 IMPORTED 157행에는 동의 ID가 있다. 통신·간편결제·사회보험·신용 프로필의 IMPORTED 행과 USER_CONSENT는 응답 status와 무관하게 시작 동의 상태를 따른다. 동의 회원의 기관 응답이 OK가 아니면 정상 데이터로 간주하지 않고 중단한다.
 
 **점수대별 참고 범위(시연 가정, N-12·N-37):** 새 DB 상품의 `MIN_ALT_SCORE`는 은행(업권 0) 780, 상호금융(5) 665, 카드·저축은행·캐피탈(1·2·3) 0으로 둔다. 이는 실제 상품 심사 기준이 아니며 기존 상품 CSV 값은 바꾸지 않는다. 각 등급의 최저점 `MIN_SCORE`가 이 조건을 만족하는 상품만 모아 `SCORE_BAND_OFFER`의 최저/최고 금리와 최대 한도를 계산한다. 따라서 등급 내 모든 점수에서 해당 조건을 만족하는 범위다. 평균 금리는 그 최저·최고의 중간값으로 실제 고객 통계 평균이 아니다. 직군·소득 등 개별 신청 자격이나 승인 결과를 뜻하지 않는다.
 
-기존 저장소 시드는 재생성하지 않아 카드 한도가 NULL이다. 다음 생성부터 `CARD_LIMIT_AMT`는 `(KC1000001 - L00000002) × 1000`원으로 계산하며 반올림하지 않는다. 원천 생성기의 총신용공여는 대출잔액·보증금액·카드 한도의 합이고 현재 보증 건수는 전원 0이다. 두 값 중 하나가 없거나 차이가 음수면 NULL이다. 보증금액이 생기면 이를 함께 빼야 한다. Spring도 신용평가사 응답을 불러올 때 같은 식을 쓴다. 생성 보고서의 `card_spend_over_limit`는 월 사용액이 계산 한도를 초과한 행 수다. 재직/활동 기간 `WORK_PERIOD_MONTHS`는 NULL이다. `PASSWORD_HASH`는 시연 계정 4개(사용자 3·관리자 1)만 BCrypt 해시가 있고 나머지는 NULL이다.
+저장소 시드의 신용 프로필 318행에 카드 한도가 채워져 있다. `CARD_LIMIT_AMT`는 `(KC1000001 - L00000002) × 1000`원으로 계산하며 반올림하지 않는다. 원천 생성기의 총신용공여는 대출잔액·보증금액·카드 한도의 합이고 현재 보증 건수는 전원 0이다. 두 값 중 하나가 없거나 차이가 음수면 NULL이다. 보증금액이 생기면 이를 함께 빼야 한다. 이는 기존 시드의 가상 신용평가사 응답 매핑이며 프로필은 동의 회원의 `IMPORTED` 행이다. 1차 서비스에서는 신용평가사 API를 쓰지 않고 회원이 카드·신용 정보를 직접 입력하므로 `MANUAL`, `CONSENT_ID`는 NULL이다. 생성 보고서의 `card_spend_over_limit`는 월 사용액이 계산 한도를 초과한 행 수다. 재직/활동 기간 `WORK_PERIOD_MONTHS`는 NULL이다. `PASSWORD_HASH`는 시연 계정 4개(사용자 3·관리자 1)만 BCrypt 해시가 있고 나머지는 NULL이다.
 
 현재 더미 원천에서 0원은 카드가 없는 회원이며, NULL은 원천 값이 없거나 계산이 음수인 경우다.
 
@@ -102,13 +130,15 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 ## 검사·적재
 
-생성기는 받은 DDL에서 타입·문자 길이·숫자 자릿수·NOT NULL·CHECK(Oracle NULL/UNKNOWN 포함)·PK·UNIQUE·복합 FK·조건부 UNIQUE INDEX를 읽어 검사한다. 모든 행 검증과 원천 대조가 끝나야 파일을 쓴다. SQL*Plus 2,499자 줄 제한도 생성 SQL에 적용한다. 이 검사는 Oracle 실행을 대신하지 않으며 현재 실제 Oracle 적재는 하지 않았다.
+생성기는 받은 DDL에서 타입·문자 길이·숫자 자릿수·NOT NULL·CHECK(Oracle NULL/UNKNOWN 포함)·PK·UNIQUE·복합 FK·조건부 UNIQUE INDEX를 읽어 검사한다. 모든 행 검증과 원천 대조가 끝나야 파일을 쓴다. SQL*Plus 2,499자 줄 제한도 생성 SQL에 적용한다. 당시 DDL v0.3.2는 11/12 범영 님이 Oracle 적재를 확인했으며 시드는 11/13 경환이 `run_all.sql`로 적재해 `99_check.sql`의 표 51개·표별 행 수 일치를 확인했다. 이는 상권 표 제거 전 기록이며, 현재 47개 표 개정본의 실제 Oracle 적재·삭제는 아직 확인하지 않았다.
 
 성공한 출력의 `run_all.sql`은 `00_drop_all.sql` → 받은 DDL(내장 기준 INSERT 포함) → 테이블별 시드 → `99_check.sql`을 실행한다. SQL Developer F5 또는 SQL*Plus `@run_all.sql`을 사용한다. `WHENEVER SQLERROR/OSERROR EXIT FAILURE ROLLBACK`이 있으나 **DDL과 이미 COMMIT한 데이터는 오류 후 ROLLBACK으로 되돌아오지 않는다.** 반드시 새 개발 스키마에서 실행한다.
 
+**최초 시드 적재:** 확정 `docs/spec/sql/avenue_ddl.sql`을 먼저 실행한 뒤 같은 스키마에서 `run_seed_only.sql`을 실행한다. DDL에 내장된 기준 데이터는 유지한다. 시드 대상 테이블이 모두 존재하고 비어 있는지 모든 시드 실행 전에 검사하며, 하나라도 없거나 기존 행이 있으면 중단한다. 이 검사는 동시 쓰기를 잠그지 않으므로 적재 중 다른 작업이 같은 테이블에 쓰지 않아야 한다. 기존 행의 병합·삭제·재적재는 지원하지 않는다. 시드 파일의 중간 COMMIT과 IDENTITY 변경 때문에 적재 도중 오류가 나면 전체 롤백할 수 없다. `99_check.sql`은 비교 결과를 출력하므로 직접 확인한다. 생성기 재실행 시 이 실행 파일도 함께 생성한다.
+
 `00_drop_all.sql`은 첫 DROP 전에 USER_TABLES에서 옛 DB 표식(APP_MEMBER·MEMBER_MONTHLY_INPUT·MEMBER_LOAN·EXTERNAL_API_RESPONSE)을 확인하고 하나라도 있으면 오류로 종료한다. 단독 실행에도 WHENEVER SQLERROR EXIT가 적용된다. 표식이 없는 스키마의 공유 테이블까지 자동 식별하는 가드는 아니므로 별도 스키마 원칙은 유지한다.
 
-재생성한 `99_check.sql`은 기준 DDL의 테이블 51개·테이블별 기대 행 수·COMMENT 누락을 출력한다. 현재 저장소의 검사 SQL은 이전 생성본이다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
+`99_check.sql`은 현재 개정 DDL 기준 테이블 47개·테이블별 기대 행 수·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
 
 테스트(저장소 루트, cryptography가 설치된 Python):
 

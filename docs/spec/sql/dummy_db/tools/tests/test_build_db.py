@@ -29,6 +29,63 @@ KEYTOOL_SPEC=importlib.util.spec_from_file_location('gen_dev_keys',SCRIPT.parent
 keytool=importlib.util.module_from_spec(KEYTOOL_SPEC);KEYTOOL_SPEC.loader.exec_module(keytool)
 
 
+class AssetLoanTests(unittest.TestCase):
+    """N-05-3·4·8 고정 예제로 자산 미입력과 대출 없음·입력 미완료를 구분한다."""
+
+    def test_asset_amount_preserves_null_zero_and_source_value(self):
+        """N-05-4 총자산을 대출 유무와 무관하게 원천 값 그대로 옮긴다."""
+        for source, expected in [(None,None),('0',0),('155396930',155396930)]:
+            with self.subTest(source=source):
+                row=db.map_asset_snapshot(7,dict(base_month='2026-08',total_asset_amt=source))
+                self.assertEqual(row,dict(USER_ID=7,BASE_MONTH='2026-08',TOTAL_ASSET_AMT=expected))
+
+    def test_loan_presence_uses_member_and_month_even_for_zero_balance(self):
+        """N-05-3·8 잔액이 0이어도 대출 행이 있으면 N이며 다른 회원·월은 Y다."""
+        assets=[dict(USER_ID=uid,BASE_MONTH=month,TOTAL_ASSET_AMT=amount,NO_LOAN_YN=flag)
+                for uid,month,amount,flag in [(1,'2026-08',0,'N'),(1,'2026-07',None,'Y'),(2,'2026-08',10,'Y')]]
+        loans=[dict(USER_ID=1,BASE_MONTH='2026-08',BALANCE_AMT=0)]
+        db.check_asset_loans(assets,loans)
+        for index, flag in [(0,'Y'),(1,'N'),(2,'N'),(2,None),(2,'X')]:
+            bad=copy.deepcopy(assets);bad[index]['NO_LOAN_YN']=flag
+            with self.subTest(index=index,flag=flag),self.assertRaisesRegex(ValueError,'NO_LOAN_YN'):
+                db.check_asset_loans(bad,loans)
+        bad=copy.deepcopy(assets);bad[2].pop('NO_LOAN_YN')
+        with self.assertRaisesRegex(ValueError,'NO_LOAN_YN'):db.check_asset_loans(bad,loans)
+        for bad in [assets[:1]+assets[:1],assets[1:]]:
+            with self.assertRaisesRegex(ValueError,'범위'):db.check_asset_loans(bad,loans)
+
+    def test_nullable_ddl_distinguishes_unentered_from_no_loan(self):
+        """N-05-4·8 실제 DDL은 미입력 NULL과 0원·Y/N을 허용하고 잘못된 표시를 거부한다."""
+        tables,base=db.parse_ddl(DDL.read_text(encoding='utf-8-sig'))
+        table=tables['USER_ASSET_SNAPSHOT']
+        for amount,flag in [(None,None),(0,'Y'),(0,'N'),(10,'Y')]:
+            row=dict(ASSET_ID=1,USER_ID=1,BASE_MONTH='2026-08',TOTAL_ASSET_AMT=amount,NO_LOAN_YN=flag)
+            # FK와 무관한 해당 테이블의 nullable·CHECK 제약만 고정 예제로 검사한다.
+            isolated=copy.deepcopy(table);isolated['fks']=[]
+            db.validate_rows({'USER_ASSET_SNAPSHOT':isolated},{'USER_ASSET_SNAPSHOT':[row]})
+        row['NO_LOAN_YN']='X'
+        with self.assertRaises(ValueError):
+            db.validate_rows({'USER_ASSET_SNAPSHOT':isolated},{'USER_ASSET_SNAPSHOT':[row]})
+
+    def test_generator_sets_flags_without_changing_assets(self):
+        """N-05-3·4·8 생성기는 다른 월·회원의 대출을 섞지 않고 원천 자산을 보존한다."""
+        assets=[dict(USER_ID=uid,BASE_MONTH=month,TOTAL_ASSET_AMT=amount)
+                for uid,month,amount in [(1,'2026-08',0),(1,'2026-07',None),(2,'2026-08',123)]]
+        before=copy.deepcopy(assets)
+        db.set_asset_loan_flags(assets,[dict(USER_ID=1,BASE_MONTH='2026-08',BALANCE_AMT=0)])
+        self.assertEqual([r['NO_LOAN_YN'] for r in assets],['N','Y','Y'])
+        self.assertEqual([{k:v for k,v in r.items() if k!='NO_LOAN_YN'} for r in assets],before)
+        db.set_asset_loan_flags(assets,[])
+        self.assertEqual([r['NO_LOAN_YN'] for r in assets],['Y','Y','Y'])
+
+    def test_source_checks_rejects_missing_flag_before_reading_source(self):
+        """N-05-8 원천 검수 진입점에서도 미입력 표시를 대출 없음으로 통과시키지 않는다."""
+        generated={'USER_ASSET_SNAPSHOT':[dict(USER_ID=1,BASE_MONTH='2026-08',NO_LOAN_YN=None)],'USER_LOAN':[]}
+        with patch.object(db,'read_csv',side_effect=AssertionError('원천 읽기 금지')):
+            with self.assertRaisesRegex(ValueError,'NO_LOAN_YN'):
+                db.source_checks(Path('unused'),[],[],generated,{})
+
+
 class KeyToolTests(unittest.TestCase):
     """팀 개발 키 도구: 저장소 밖에만, 덮어쓰지 않고, 값을 출력하지 않는다."""
     def test_writes_two_32_byte_keys_outside_repo_and_never_overwrites(self):
@@ -127,6 +184,25 @@ class RunAllRuleTests(unittest.TestCase):
         else:
             self.assertNotIn('@@',run);self.assertIn('EXIT FAILURE',run)
 
+    def test_seed_only_checks_every_target_before_loading(self):
+        """N-05 최초 적재는 모든 시드 표의 존재·빈 상태를 먼저 확인한다."""
+        folder=DDL.parent
+        seeds=sorted(p.name for p in folder.glob('[1-8][0-9]_seed_*.sql'))
+        script=(folder/'run_seed_only.sql').read_text(encoding='utf-8')
+        calls=[line[2:] for line in script.splitlines() if line.startswith('@@')]
+        self.assertEqual(calls,seeds+['99_check.sql'])
+        self.assertNotIn('@@00_drop_all.sql',script)
+        self.assertNotIn('@@01_create_tables.sql',script)
+        self.assertIn('WHENEVER SQLERROR EXIT FAILURE ROLLBACK',script)
+        self.assertIn('WHENEVER OSERROR EXIT FAILURE ROLLBACK',script)
+        self.assertLess(script.index('END;\n/'),script.index('@@'+seeds[0]))
+        self.assertIn('FROM USER_TABLES',script)
+        self.assertIn('WHERE ROWNUM = 1',script)
+        self.assertIn('RAISE_APPLICATION_ERROR(-20002',script)
+        self.assertIn('RAISE_APPLICATION_ERROR(-20003',script)
+        for name in seeds:
+            self.assertIn("'"+name.split('_seed_',1)[1][:-4].upper()+"'",script)
+
 
 class PrivacyTests(unittest.TestCase):
     """정해진 암호문 포맷과 HMAC 정규화·키 오류 비노출을 검증한다."""
@@ -205,14 +281,14 @@ class CardLimitTests(unittest.TestCase):
 
 
 class SchemaTests(unittest.TestCase):
-    """DDL v0.3.2 51개 테이블과 SQL NULL·복합 제약을 검증한다."""
+    """N-24 상권 표 제거 후 47개 테이블과 SQL NULL·복합 제약을 검증한다."""
     def setUp(self):
         """각 테스트에 독립 DDL 정의·기준 행을 제공한다."""
         self.tables,self.base=db.parse_ddl(DDL.read_text(encoding='utf-8-sig'))
 
     def test_received_ddl_and_base_inserts(self):
         """기준 INSERT 25행과 선택 기능 세 개가 실제 DDL에 있는지 확인한다."""
-        self.assertEqual(len(self.tables),51);self.assertIn('SYSTEM_LOG',self.tables);self.assertIn('USER_UTILITY_PAYMENT',self.tables);self.assertEqual(sum(map(len,self.base.values())),25)
+        self.assertEqual(len(self.tables),47);self.assertIn('SYSTEM_LOG',self.tables);self.assertIn('USER_UTILITY_PAYMENT',self.tables);self.assertEqual(sum(map(len,self.base.values())),25)
         db.validate_rows(self.tables,self.base)
         self.assertIn('LOAN_PRODUCT_FEATURE',self.tables)
         self.assertIn('TERM_TEXT',self.tables['LOAN_PRODUCT']['columns'])
@@ -375,6 +451,9 @@ class FullSourceTests(unittest.TestCase):
             rows=original_read(path)
             if Path(path).name=='loans.csv' and rows:
                 rows[0]['loan_type_code']='CREDIT';rows[0]['rate_type']='FIXED'
+                # 옛 원천처럼 두 열이 없는 행을 만들어 대체값을 확인한다.
+                for row in rows[1:]:
+                    row.pop('loan_type_code',None);row.pop('rate_type',None)
             return rows
         with tempfile.TemporaryDirectory() as temp:
             ddl=Path(temp)/'extended.sql'
@@ -398,6 +477,9 @@ class FullSourceTests(unittest.TestCase):
         source=Path(os.environ['AVENUE_TEST_SERVICE_DUMMY'])
         with tempfile.TemporaryDirectory() as temp:
             out=Path(temp)/'valid';report=db.generate(source,out,DDL,TEST_ENV)
+            # N-05 재생성해도 최초 적재 경로와 저장소 파일이 같아야 한다.
+            self.assertEqual((out/'run_seed_only.sql').read_bytes().replace(b'\r\n',b'\n'),
+                             (DDL.parent/'run_seed_only.sql').read_bytes().replace(b'\r\n',b'\n'))
             self.assertEqual(report['rows']['APP_USER'],401)  # 더미 회원 400 + 관리자 시연 계정 1
             self.assertEqual(report['rows']['USER_EXPENSE_ITEM'],400)
             self.assertEqual(report['rows']['USER_ASSET_SNAPSHOT'],400)
