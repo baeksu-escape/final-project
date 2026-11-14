@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- N-12-1·N-14-1 저장된 평가를 인증 회원의 범위에서 읽는다. -->
+<mapper namespace="com.baeksuescape.credit.mapper.ReportMapper">
+    <sql id="assessmentColumns">
+        a.ASSESSMENT_ID AS assessmentId,
+        a.REQUEST_ID AS requestId,
+        a.ASSESSED_AT AS assessedAt,
+        a.INPUT_BASE_MONTH AS inputBaseMonth,
+        a.WORKER_TYPE_CODE AS workerTypeCode,
+        a.GRADE_STATUS_CODE AS gradeStatusCode,
+        a.NOT_SCORABLE_REASON_CODE AS notScorableReasonCode,
+        a.MODEL_VERSION AS modelVersion,
+        a.CUTOFF_VERSION AS cutoffVersion,
+        a.TRAD_SCORABLE_YN AS tradScorableYn,
+        a.TRAD_SCORE AS tradScore,
+        a.TRAD_GRADE_BAND_CODE AS tradGradeBandCode,
+        a.TRAD_DEFAULT_PROB AS tradDefaultProb,
+        a.ALT_SCORABLE_YN AS altScorableYn,
+        a.ALT_SCORE AS altScore,
+        a.ALT_GRADE_BAND_CODE AS altGradeBandCode,
+        a.ALT_DEFAULT_PROB AS altDefaultProb,
+        a.SHAP_BASE_SCORE AS shapBaseScore,
+        a.AI_SUMMARY AS aiSummary
+    </sql>
+    <!-- N-12-1 합성 집단을 제외하고 같은 시각이면 평가 번호로 최신을 결정한다. -->
+    <select id="findLatest" resultType="com.baeksuescape.credit.dto.ReportAssessment">
+        SELECT <include refid="assessmentColumns"/>
+        FROM ASSESSMENT a
+        WHERE a.USER_ID = #{userId} AND a.DATASET_CODE = 'SERVICE'
+        ORDER BY a.ASSESSED_AT DESC, a.ASSESSMENT_ID DESC
+        FETCH FIRST 1 ROW ONLY
+    </select>
+    <!-- N-12-1 요청 번호와 로그인 회원을 함께 검사한다. -->
+    <select id="findByRequestId" resultType="com.baeksuescape.credit.dto.ReportAssessment">
+        SELECT <include refid="assessmentColumns"/>
+        FROM ASSESSMENT a
+        WHERE a.USER_ID = #{userId} AND a.DATASET_CODE = 'SERVICE'
+          AND a.REQUEST_ID = #{requestId}
+    </select>
+    <!-- N-12-6 현재 활성 버전이 아닌 평가 당시 등급 경계를 사용한다. -->
+    <select id="findGradeBands" resultType="com.baeksuescape.credit.dto.ReportResponse$GradeBand">
+        SELECT b.GRADE_BAND_CODE AS gradeBandCode, b.MIN_SCORE AS minScore, b.MAX_SCORE AS maxScore
+        FROM ASSESSMENT a
+        JOIN SCORE_GRADE_BAND b ON b.CUTOFF_VERSION = a.CUTOFF_VERSION
+        WHERE a.USER_ID = #{userId} AND a.DATASET_CODE = 'SERVICE' AND a.ASSESSMENT_ID = #{assessmentId}
+        ORDER BY b.MIN_SCORE ASC
+    </select>
+    <!-- N-14-1·N-14-2 피처 코드와 버전을 함께 연결하고 저장된 전체 순위를 그대로 반환한다. -->
+    <select id="findFactors" resultType="com.baeksuescape.credit.dto.ReportResponse$Factor">
+        SELECT f.FEATURE_RANK AS rank, f.FEATURE_CODE AS featureCode, d.FEATURE_NAME AS featureName,
+               d.UNIT_NAME AS unitName, f.FEATURE_VALUE AS featureValue, f.SHAP_SCORE AS shapScore,
+               d.ALTERNATIVE_YN AS alternativeYn, d.SIMULATABLE_YN AS simulatableYn
+        FROM ASSESSMENT a
+        JOIN ASSESSMENT_FACTOR f ON f.ASSESSMENT_ID = a.ASSESSMENT_ID
+                               AND f.FEATURE_SET_VERSION = a.FEATURE_SET_VERSION
+        JOIN DIM_FEATURE d ON d.FEATURE_SET_VERSION = f.FEATURE_SET_VERSION AND d.FEATURE_CODE = f.FEATURE_CODE
+        WHERE a.USER_ID = #{userId} AND a.DATASET_CODE = 'SERVICE' AND a.ASSESSMENT_ID = #{assessmentId}
+        ORDER BY f.FEATURE_RANK ASC
+    </select>
+</mapper>
