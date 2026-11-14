@@ -1,0 +1,47 @@
+# FP-94·95 자산·부채 건전성·현금흐름 mock 화면
+
+이번 범위는 N-16과 N-21 UI 시연이다. FP-96 소득 변동성 지표와 FP-210 시나리오 구현은 포함하지 않는다. 실제 API 경로는 정하지 않았고 실제 서버·DB 연결은 미검증이다.
+
+UI 원본은 `5unyCwrGcxS3WrWFUk9qid`의 `1794641606-4f83` 버전으로 앞선 FP90·91과 같다. 직군별 공통 시연값이며 회원별 실제 DB 자료가 아니다. 원본 HTML을 저장소에 복제하지 않았다.
+
+## 파일과 역할
+
+- Codex1: `pages/AssetDebtPage.jsx`, 건전성 components, `styles/assetDebt.css`, `api/financeApi.js`, `mocks/financeMockData.js`, `mocks/financeMockCalculations.js`, 라우트 두 화면 연결 및 문서.
+- Claude: `pages/CashFlowPage.jsx`, 현금흐름 components·상태 훅, `styles/cashFlow.css`.
+- Codex2: `utils/financeCalculations.js`, `adapters/financeAdapter.js`.
+- root: 계획·조율·통합 검토. 각 코드의 읽기 교차 검수는 사용자 최종검수가 아니다.
+
+## 공통 계약
+
+- `getAssetDebtData(userId, workerTypeCode)`: `totalAssetAmount`, `annualIncomeAmount`, `totalDebtAmount`, `annualPaymentAmount`, `loans`, `peer`, `assumptions`.
+- 대출 행은 `loanId`, `loanTypeName`, `balanceAmount`, `annualRatePct`, `rateTypeCode`, `remainingMonths`, `monthlyPaymentAmount`. 표는 원본 UI 열(종류·잔액·금리·방식·월 상환)만 사용한다.
+- `getCashFlowData(userId, workerTypeCode)`: 정확히 12개 연속 월의 `months[{baseMonth,incomeAmount}]`, `fixedExpenseAmount`, `otherExpenseAmount`, `monthlyPaymentAmount`, `currentScore`.
+- `forecastCashFlow({userId,baseline,conditions})`: 조건은 `incomeVariationPct`, `fixedExpenseAmount`, `paymentStatus`, `months`. 결과는 `forecastMonths`, `monthlyExpenseAmount`, `cumulativeSurplusAmount`, `tightestMonth`, `scorePath`, `currentScore`, `endScore`, `source`.
+- 금액은 정수 원 단위, 비율은 %, 점수는 0~1000이다. 미입력은 NULL을 유지한다. UI와 mock 요청 입구에서 형식·범위 검사를 하며 실제 서버 검증을 의미하지 않는다.
+- `VITE_USE_MOCK=false`는 미연결 오류를 표시한다. 자동 mock 대체나 외부 전송·저장은 없다.
+
+## N-16 건전성
+
+- 총자산·연소득·총부채 3개를 바꾸면 `calculateAssetDebtPreview`가 즉시 결과를 반환한다. 되돌리기는 기준값으로 복원하며 개별 대출 행은 바꾸지 않는다.
+- 순수 비율 계산은 `calculateAssetDebt`와 공용 `calculateDsr`를 사용한다. 기준 상수는 DSR 30/40, 자산 대비 40/60, 순자산 대비 70/100 한 벌이다.
+- 총자산 NULL은 0원과 다르다. 분모 0·순자산 0 이하의 비율은 NULL과 사유로 표시한다. 유효한 위험·주의는 미산출 지표 때문에 숨기지 않는다.
+- 금액 입력은 공통 NumberInput을 사용해 음수·소수·안전정수 초과를 검사한다. NULL은 형식 오류 대신 미입력 안내로 구분한다.
+- 같은 직군 평균은 UI 원본의 시연값이다. 공통 CompareBar에 NULL을 넘겨 0으로 바꾸지 않고 비교 불가로 표시한다.
+- 직군 평균 막대·범례·수치는 건전성 화면의 평균 행 안에서만 `--vio2` 토큰을 사용한다. 사용자 막대와 공통 컴포넌트·테마 정의는 변경하지 않는다.
+- 시연 상환액은 총부채 변경 비율로 저장 연 상환액을 조정한다. 저장 부채가 0원인 경우 새 부채의 월 4.8% ×12를 사용한다. 이 추정은 mocks에만 있으며 실제 금융 계산 규칙이 아니다.
+
+## N-21 현금흐름
+
+- 첫 로드에 UI 기본 조건(변동 폭 100%, 제때 납부, 12개월, 저장 고정 지출)으로 한 번 예측한다. 후속 요청에 따라 이후 조건 4개 변경은 500ms 입력이 멈추면 최신 유효값으로 한 번 자동 예측한다. 마지막 적용 조건과 같으면 요청하지 않는다.
+- 조건과 적용값을 분리하고 회원·직군·재조회·조건 변경·새 예측·화면 이탈 시 예약과 늦은 응답을 무효화한다. 빈 고정 지출·음수·소수·미완성 12개월 소득과 미입력/잘못된 기타 지출·월 상환액은 화면에서 요청하지 않는다. 실패 때만 다시 시도 버튼을 표시한다.
+- 상태 안내는 조건 카드의 고정 5em 공간 한 곳에서 바뀌고 긴 문구는 스크롤로 읽는다. 다시 시도 버튼은 오른쪽 열에 유지한다. 다시 계산할 때도 이전 차트·요약을 유지하며 이전 조건 차트는 흐리게 표시한다. 처음 결과 로딩만 최소 높이 자리표시를 사용한다. 브라우저·반응형 시각 확인은 미실시다.
+- 12개월 실적 다음에 3·6·12개월 전망을 잇고 월 지출선·예상 점수선과 요약 3개를 표시한다. 소득 변동성 KPI는 이번 범위 밖이다.
+- 시연식: 평균 + (작년 순번 월소득−평균)×변동 폭, 0 미만은 0. 지출은 고정+기타+원리금이다. 제때 납부 +1.2/밀림 −3, 적자 월 −0.8 점수 변화는 시연 가정이다.
+- 급여소득자의 12개월은 월급을 반복하고 다른 직군은 UI 월별 소득을 사용한다. 같은 원본 기준값 한 벌에서 연소득·부채·상환액을 집계한다.
+- 소득·지출·상환 기준값이 미입력이면 예측을 거부하며 0으로 채우지 않는다. 현재점수 NULL이면 점수 경로·결과만 미산출로 유지한다.
+
+## 확인
+
+후속 요청(평균 색 대비·500ms 자동 예측·고정 상태 공간)과 기준값 guard 보완 완료 코드로 Codex1이 `npm.cmd run lint`·`npm.cmd run build`를 각 1회 실행해 통과했다(Vite 183 modules). 추적 파일과 미추적 신규 파일 전체의 공백 검사도 통과했다. Claude는 건전성·공유 데이터를, Codex1·Codex2는 현금흐름을 읽기 교차 검토했다. 급여소득자의 고정 월급 등 시연 자료값은 바꾸지 않았다.
+
+브라우저 동작·반응형·실제 서버 연결과 사용자 최종검수는 미실시다. 화면 동작은 `npm.cmd run dev`로 직접 확인해야 한다. 프론트 테스트 파일은 추가하지 않았다.

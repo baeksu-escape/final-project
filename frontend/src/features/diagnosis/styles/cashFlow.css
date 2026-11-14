@@ -1,0 +1,45 @@
+/* N-21 현금흐름 예측 화면 전용 스타일. 클래스 접두어 cf-, 기존 테마 토큰을 재사용한다. */
+.cf-page { display: grid; gap: 20px; }
+.cf-heading h1 { margin: 0 0 8px; }
+.cf-heading p, .cf-hint { color: var(--mut); }
+.cf-hint { font-size: 13px; }
+.cf-warn { color: var(--warn); font-size: 13px; }
+.cf-neg { color: var(--bad); }
+.cf-pos { color: var(--mint); }
+.cf-row { display: flex; justify-content: space-between; margin: -4px 0 0; }
+/* 자동 예측 상태 줄 — 높이를 고정해 문구·버튼이 바뀌어도 아래·옆 화면이 움직이지 않게 한다. 넘치는 문구는 숨기지 않고 줄 안에서 스크롤로 읽는다. */
+.cf-status { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; block-size: 5em; font-size: 13px; line-height: 1.5; color: var(--mut); }
+.cf-status__text { block-size: 100%; overflow: auto; }
+.cf-status--warn { color: var(--warn); }
+.cf-chart-wrap--stale { opacity: .6; transition: opacity .2s; }
+.cf-placeholder { min-block-size: 320px; display: grid; place-items: center; }
+.cf-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 18px; align-items: start; }
+.cf-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--mut); margin: 0; }
+.cf-swatch { display: inline-block; width: 12px; height: 10px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+.cf-swatch--act { background: var(--vio); }
+.cf-swatch--deficit { background: var(--bad); }
+.cf-swatch--forecast { background: var(--vio); opacity: .35; }
+.cf-swatch--expense { background: var(--warn); height: 3px; }
+.cf-swatch--score { background: var(--mint); height: 3px; }
+.cf-chart-wrap { overflow-x: auto; }
+.cf-chart { width: 100%; min-width: 560px; height: auto; display: block; }
+.cf-chart__grid { stroke: var(--line); }
+.cf-chart__axis { font-size: 11px; fill: var(--mut2); }
+.cf-chart__score-axis { font-size: 11px; fill: var(--mint); }
+.cf-chart__bar { fill: var(--vio); }
+.cf-chart__bar--deficit { fill: var(--bad); }
+.cf-chart__bar--forecast { fill-opacity: .32; stroke: var(--vio); stroke-width: 1.4; stroke-dasharray: 4 3; }
+.cf-chart__bar--deficit.cf-chart__bar--forecast { stroke: var(--bad); }
+.cf-chart__expense-halo { stroke: var(--panel); stroke-width: 6; stroke-opacity: .85; }
+.cf-chart__expense { stroke: var(--warn); stroke-width: 2.5; stroke-dasharray: 8 5; }
+.cf-chart__expense-label { font-size: 12px; font-weight: 700; fill: var(--warn); paint-order: stroke; stroke: var(--panel); stroke-width: 4; }
+.cf-chart__score-halo { fill: none; stroke: var(--panel); stroke-width: 7; stroke-opacity: .9; stroke-linejoin: round; }
+.cf-chart__score { fill: none; stroke: var(--mint); stroke-width: 3; stroke-linejoin: round; }
+.cf-chart__score-dot { fill: var(--mint); stroke: var(--panel); stroke-width: 2.5; }
+.cf-chart__score-label { font-size: 12px; font-weight: 700; fill: var(--mint); paint-order: stroke; stroke: var(--panel); stroke-width: 4; }
+.cf-chart__split { stroke: var(--mut2); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.cf-chart__split-label { font-size: 12px; font-weight: 700; fill: var(--mut); }
+.cf-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.cf-summary__item { display: grid; gap: 2px; padding: 14px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; }
+.cf-big { font: 700 22px/1.2 var(--f-d); font-variant-numeric: tabular-nums; }
+@media (max-width: 960px) { .cf-layout, .cf-summary { grid-template-columns: 1fr; } }
