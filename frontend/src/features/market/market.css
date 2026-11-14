@@ -1,0 +1,500 @@
+/* N-24 상권 분석 화면 전용 스타일 — 'Avenue 기능 데모 v2'의 서울 상권 히트맵 기준.
+   색·글꼴은 tokens.css 변수를 쓰고, 히트맵 7색만 데모 값을 이 파일에 둔다(두 테마 공통). */
+.market-page {
+  --market-neu: #45ad78;
+  --market-neg1: #f2a3b6;
+  --market-neg2: #ee7495;
+  --market-neg3: #e2416c;
+  --market-pos1: #a6dcf3;
+  --market-pos2: #6cc0ea;
+  --market-pos3: #3b98d6;
+  --market-none: var(--line);
+  --market-sales: #a78bfa;
+  --market-sales-dim: #4b3f8f;
+
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  /* 데모 앱 폭. 넓은 화면에서 정보 카드가 커지면 SVG 글자까지 같이 커지는 것을 막는다 */
+  max-width: 1320px;
+}
+
+/* 색 구간 — 쓰는 곳에서 var(--bin)으로 칠한다 */
+.market-bin--neg3 { --bin: var(--market-neg3); }
+.market-bin--neg2 { --bin: var(--market-neg2); }
+.market-bin--neg1 { --bin: var(--market-neg1); }
+.market-bin--neu { --bin: var(--market-neu); }
+.market-bin--pos1 { --bin: var(--market-pos1); }
+.market-bin--pos2 { --bin: var(--market-pos2); }
+.market-bin--pos3 { --bin: var(--market-pos3); }
+.market-bin--none { --bin: var(--market-none); }
+
+/* 공통 글자 */
+.market-tag {
+  font: 600 11px var(--f-d);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mut2);
+}
+
+.market-hint {
+  font-size: 12.5px;
+  color: var(--mut2);
+}
+
+.market-num {
+  font-family: var(--f-d);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-text--bad { color: var(--market-neg2); }
+.market-text--good { color: var(--market-pos2); }
+
+.market-page p {
+  margin: 0;
+}
+
+/* 머리말 */
+.market-page__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.market-page__title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+/* 보기 조건 */
+.market-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.market-filters__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.market-filters__row--region {
+  align-items: flex-end;
+}
+
+.market-filters__label {
+  min-width: 44px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mut2);
+}
+
+.market-filters__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.market-filters__search {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: 5px;
+  max-width: 340px;
+}
+
+.market-filters__search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.market-metric-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 118px;
+  padding: 8px 14px;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--panel2);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.market-metric-chip b {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.market-metric-chip span {
+  font-size: 12px;
+  color: var(--mut);
+}
+
+.market-metric-chip[aria-pressed='true'] {
+  border-color: var(--acc);
+  background: var(--sel);
+}
+
+/* 지도 + 오른쪽 정보 (데모 상권 탭처럼 지도 아래에 정보 카드를 가로로 놓는다) */
+.market-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.market-map__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 220px;
+  border: 1px dashed var(--line2);
+  border-radius: 10px;
+  background: var(--panel2);
+  text-align: center;
+}
+
+.market-side {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.market-side > .card {
+  flex: 1 1 250px;
+  min-width: 0;
+}
+
+.market-summary .card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--fg2);
+}
+
+/* 범례 */
+.market-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 4px 2px;
+}
+
+.market-legend__ramp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.market-ramp {
+  display: flex;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.market-ramp__cell {
+  display: block;
+  width: 34px;
+  height: 12px;
+  background: var(--bin);
+}
+
+/* SVG 차트 */
+.market-chart__axis { stroke: var(--line2); }
+.market-chart__grid { stroke: var(--line); }
+.market-chart__hit { cursor: pointer; }
+.market-chart__hit:focus-visible { outline: 2px solid var(--info); }
+.market-chart__label { fill: var(--mut); font-family: var(--f-b); }
+.market-chart__label--on { fill: var(--fg); font-weight: 700; }
+.market-chart__bar { fill: var(--bin); }
+.market-chart__bar--on { stroke: var(--fg); stroke-width: 1; }
+.market-chart__value { fill: var(--fg2); }
+.market-chart__tick { fill: var(--mut2); }
+.market-chart__tick--close { fill: var(--market-neg1); }
+.market-chart__avg { stroke: var(--fg); }
+.market-chart__avg-text { fill: var(--fg); }
+
+/* 주의할 동·좋은 동 */
+.market-rank__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 12px;
+}
+
+.market-rank__title {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.market-rank {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.market-rank__item {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.market-rank__value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.3;
+}
+
+.market-rank__value .market-hint {
+  font-size: 11px;
+}
+
+.market-rank__item:hover {
+  background: var(--sel);
+}
+
+.market-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  background: var(--bin);
+  vertical-align: middle;
+}
+
+.market-dot--sales { background: var(--market-sales); }
+.market-dot--close { background: var(--market-neg2); margin-left: 10px; }
+
+/* 행정동 상세 창 — 이 화면에서만 공통 모달을 데모 크기(880px)로 넓힌다 */
+.market-page .modal {
+  width: min(880px, 100%);
+  gap: 16px;
+}
+
+.market-page .modal__body {
+  gap: 16px;
+}
+
+.market-detail__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.market-detail__badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.market-detail__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.market-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--bin);
+  color: #0b1222;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.market-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 10px;
+}
+
+.market-kpis--two {
+  grid-template-columns: 1fr 1fr;
+}
+
+.market-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--bin, var(--market-neu));
+  border-radius: 12px;
+  background: var(--panel2);
+}
+
+.market-kpi--store {
+  border-left-color: var(--market-sales);
+}
+
+.market-kpi[aria-current='true'] {
+  outline: 1px solid var(--vio);
+}
+
+.market-kpi__value {
+  font: 700 22px/1.2 var(--f-d);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-kpi__cmp {
+  font-size: 11.5px;
+  color: var(--mut2);
+}
+
+.market-detail__panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.market-detail__panel {
+  display: flex;
+  flex: 1 1 300px;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.market-detail__title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.market-detail__text {
+  font-size: 13px;
+  color: var(--fg2);
+}
+
+.market-trend__bar { fill: var(--market-sales-dim); }
+.market-trend__bar--last { fill: var(--market-sales); }
+.market-trend__line { stroke: var(--market-neg2); }
+.market-trend__dot { fill: var(--market-neg2); }
+
+.market-detail__ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.market-detail__ranking-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.market-table-wrap {
+  overflow-x: auto;
+}
+
+.market-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.market-table th {
+  padding: 6px;
+  border-bottom: 1px solid var(--line2);
+  color: var(--mut2);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.market-table td {
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.market-table__r {
+  text-align: right;
+}
+
+.market-table th.market-table__r {
+  text-align: right;
+}
+
+.market-table__bar-col {
+  width: 34%;
+}
+
+.market-table__row--me td {
+  background: var(--sel);
+}
+
+.market-table__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.market-table__link:hover {
+  text-decoration: underline;
+}
+
+.market-track {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--line);
+}
+
+.market-track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: var(--bin);
+}
+
+.market-track i.market-rank-bar--plain {
+  background: var(--market-sales);
+}
+
+.market-note {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--mut2);
+  font-size: 12px;
+}
+
+.market-footnote {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

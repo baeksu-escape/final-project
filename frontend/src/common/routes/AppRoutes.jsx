@@ -20,13 +20,14 @@ import { SOCIAL_PATHS } from '../../features/auth/socialLoginConfig.js'
 import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import DataInputPage from '../../features/dataInput/pages/DataInputPage.jsx'
 import JobSelectPage from '../../features/dataInput/pages/JobSelectPage.jsx'
+import MarketPage from '../../features/market/pages/MarketPage.jsx'
 
 // N-08 직군별 재무 진단 서브탭 내용. 담당 팀은 해당 PlaceholderPage를 자기 화면으로 바꾼다.
 const DIAGNOSIS_CONTENTS = {
   'asset-debt': <PlaceholderPage title="자산·부채 건전성" nId="N-16" headingLevel={2} />,
   'income-volatility': <PlaceholderPage title="소득 변동성" nId="N-22" headingLevel={2} />,
   'cash-flow': <PlaceholderPage title="현금흐름" nId="N-21" headingLevel={2} />,
-  market: <PlaceholderPage title="상권 지표" nId="N-24" headingLevel={2} />,
+  market: <MarketPage />,
 }
 
 // 앱 전체 라우트. 다른 팀은 자기 화면의 element 한 줄만 바꾼다(가드·경로 구조는 그대로 둔다).
