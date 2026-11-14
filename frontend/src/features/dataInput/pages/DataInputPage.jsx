@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { PATHS } from '../../../common/config/navigation.js'
+import { GRADE_STATUS, getNotScorableMessage } from '../../../common/config/scoreStatus.js'
 import { fetchFinancialInput, requestScoreCalculation, saveFinancialInput } from '../api/dataInputApi.js'
 import AltDataImport from '../components/AltDataImport.jsx'
 import FieldControl from '../components/FieldControl.jsx'
@@ -14,7 +15,13 @@ import { BASE_MONTH_FIELD, getSectionsForJob } from '../config/inputSections.js'
 import { buildPayload, createEmptyValues, toValues, withFixedMonthRows } from '../utils/inputValues.js'
 import { monthRule } from '../validation/inputRules.js'
 import { errorKeyOf, getInputNotices, validateFinancialInput } from '../validation/inputValidation.js'
-import { fromServerFieldErrors } from '../validation/serverErrors.js'
+import { SCORE_ERROR_CODES, fromServerFieldErrors } from '../validation/serverErrors.js'
+
+// N-05-8 같은 requestId로 다시 보내도 되는 실패인지 본다 — 서버에 연결하지 못함(0)·시간 초과(408·504)·서버 오류(5xx).
+// 이때는 서버가 요청을 처리했는지 모르므로 같은 값을 다시 보내 서버가 한 번만 계산하게 한다.
+function isRetryableFailure(error) {
+  return error?.status === 0 || error?.status === 408 || error?.status >= 500
+}
 
 // N-05 데이터 입력 화면 — 내 직군의 소득 섹션과 공통 섹션(부채·자산·월 고정 지출·할부·정기결제)을 설정대로 그리고,
 // 기준월과 함께 저장한 뒤 입력 완료 현황을 보여 준다. 대안 데이터는 모의 연동으로 따로 불러온다.
@@ -38,6 +45,10 @@ export default function DataInputPage() {
   const [savedBaseMonths, setSavedBaseMonths] = useState([])
   const [calculating, setCalculating] = useState(false)
   const [calculateError, setCalculateError] = useState('')
+  // N-05-8 점수 산출 요청 번호 — 다시 보낼 때 같은 값을 쓰려고 화면이 들고 있는다. 처리 결과를 받으면 비운다.
+  const requestIdRef = useRef(null)
+  // 요청 중에 버튼을 빠르게 두 번 눌러도 한 번만 보내도록 막는 표시.
+  const calculatingRef = useRef(false)
 
   // 들어오면 저장된 입력과 완료 현황, 불러온 대안 데이터를 받아 화면을 채운다.
   useEffect(() => {
@@ -145,16 +156,46 @@ export default function DataInputPage() {
     setStatus((prev) => (prev ? { ...prev, altData: { ...prev.altData, [sourceKey]: false } } : prev))
   }
 
-  // N-05-8 [점수 산출하기] — 마지막으로 저장한 입력으로 산출을 요청하고, 성공하면 신용 리포트로 보낸다.
+  // N-05-8 [점수 산출하기] — 마지막으로 저장한 입력으로 산출을 요청한다(RPT-01). 점수·등급은 화면에서 계산하지 않는다.
+  // - requestId: 처음 누를 때 소문자 UUID를 만들고, 네트워크 오류·시간 초과로 다시 누르면 같은 값을 보낸다. 처리 결과를 받으면 비운다.
+  // - SCORED면 신용 리포트로, NOT_SCORABLE이면 입력 화면에 머물며 사유별 안내를 보여 준다.
+  // - 409 JOB_TYPE_REQUIRED는 직군 선택으로 보내고, REQUEST_ID_CONFLICT는 새 requestId를 만든다. 그 밖의 409(입력 미완료)는 서버 문구를 보여 준다.
   const handleCalculateScore = async () => {
+    if (calculatingRef.current) return
+    calculatingRef.current = true
     setCalculating(true)
     setCalculateError('')
+    if (!requestIdRef.current) requestIdRef.current = crypto.randomUUID()
     try {
-      await requestScoreCalculation()
-      updateUser({ hasScore: true })
-      navigate(PATHS.REPORT)
+      const result = await requestScoreCalculation(requestIdRef.current)
+      requestIdRef.current = null
+      if (result.gradeStatusCode === GRADE_STATUS.SCORED) {
+        updateUser({ hasScore: true })
+        navigate(PATHS.REPORT)
+        return
+      }
+      setCalculateError(getNotScorableMessage(result.notScorableReasonCode))
     } catch (error) {
+      if (isRetryableFailure(error)) {
+        setCalculateError(error.message)
+        return
+      }
+      requestIdRef.current = null
+      const code = error.data?.code
+      if (code === SCORE_ERROR_CODES.JOB_TYPE_REQUIRED) {
+        // 직군 선택 화면은 직군이 있는 사용자를 첫 화면으로 돌려보내므로, 화면의 직군 정보도 비운 뒤 이동한다.
+        updateUser({ jobType: null })
+        navigate(PATHS.SELECT_JOB)
+        return
+      }
+      if (code === SCORE_ERROR_CODES.REQUEST_ID_CONFLICT) {
+        requestIdRef.current = crypto.randomUUID()
+        setCalculateError('다시 시도해 주세요.')
+        return
+      }
       setCalculateError(error.message)
+    } finally {
+      calculatingRef.current = false
       setCalculating(false)
     }
   }
