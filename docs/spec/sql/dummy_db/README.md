@@ -6,6 +6,19 @@
 
 `external_api/`는 INP-03(대안 데이터 불러오기)이 2차 mock 서버 전까지 읽는 기관 응답 더미(v3.6.1, 회원 400명 전원)이며 형식은 `external_api/README.md`를 따른다.
 
+## 대출 없음 선택과 자산 미입력 (N-05-3·4·8, O-15 A안)
+
+`USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT`는 NULL을 허용하며, 값이 있으면 기존처럼 0 이상이어야 한다. NULL은 자산 미입력이고 실제 총자산 0원과 구분한다. `NO_LOAN_YN CHAR(1)`도 NULL을 허용한다. Y는 대출 없음 선택 완료, N은 대출 있음, NULL은 대출 없음 여부 미입력·미확인이다.
+
+- 자산 입력 완료: 해당 회원·기준월의 `TOTAL_ASSET_AMT IS NOT NULL`.
+- 대출 입력 완료: 같은 회원·기준월의 `USER_LOAN` 행이 있거나 `NO_LOAN_YN = 'Y'`.
+- 대출의 "해당 없음"을 저장할 때 자산 행이 없으면 `TOTAL_ASSET_AMT = NULL`, `NO_LOAN_YN = 'Y'`로 만든다. 기존 자산 행이 있으면 총자산을 보존한다. 이후 대출을 추가하면 `NO_LOAN_YN = 'N'`으로 바꾼다. 이 상태 갱신은 입력 API 담당자가 구현한다.
+- 동의 철회 등으로 대출 행이 삭제돼도 대출 없음 선택을 뜻하지 않으므로 자동으로 Y를 설정하지 않는다. 총자산이 NULL인 재무 진단은 이를 0원으로 바꾸지 않는다. 현재 총자산은 모델 입력에 포함되지 않는다.
+
+새 스키마는 개정 `avenue_ddl.sql` 또는 같은 내용의 `01_create_tables.sql`을 사용한다. 이미 적재된 Oracle에는 **`docs/spec/sql/alter_user_asset_snapshot_no_loan.sql`만 별도로 실행**한다. 이 파일은 테이블을 재생성하거나 기존 데이터를 Y/N으로 일괄 보정하지 않는다. 새 열의 기존 행은 NULL로 유지하며, 대출 행이 없다는 이유만으로 미입력 회원을 대출 없음 선택 완료로 판단하지 않는다. 대상은 원본 DDL과 같은 **Oracle 21c**이며 제약 정의 조회에 `SEARCH_CONDITION_VC`를 사용한다. Oracle DDL은 자동 커밋되므로 실행 전 대상 스키마와 스크립트의 사전 검사·실행 후 검사 결과를 확인한다. 마지막 제약 조회에서 `CK_UAS_AMT`와 `CK_UAS_NO_LOAN` 두 행이 모두 있고 `STATUS = ENABLED`, `VALIDATED = VALIDATED`인지 확인한다. 누락되거나 다르면 적용 완료로 보지 말고 DB 담당자에게 확인한다. 실제 Oracle 적용 검증은 별도다.
+
+커밋용 합성 시드는 대출 원장이 완전한 회원 400명이므로 같은 회원·기준월의 대출 유무로 `NO_LOAN_YN`을 채운다(현재 Y 253명, N 147명). 기존 총자산 값·행 ID·기준월은 유지한다. **이미 적재된 DB에 이 INSERT 시드를 다시 실행하지 않는다.** 이번 ALTER는 기존 DB의 합성 시드에도 Y/N을 채우지 않으므로, 해당 데이터 보정이 필요하면 적재 이력과 현재 변경 여부를 확인한 뒤 별도로 수행한다.
+
 ## 저장소 상태와 생성
 
 **커밋용 시드는 팀 개발 키 한 쌍으로 만든다(회의 결정).** 키는 저장소 밖(디스코드 비공개 채널)으로만 공유하고, 그 키로 만든 시드 SQL을 이 폴더에 커밋한다. 절차는 아래 「팀 개발 키로 시드 만들기」에 있다.
@@ -76,7 +89,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 | `USER_INCOME_MONTH` | 급여는 `SALARY` 기준월 1행, 자영업·프리랜서는 `MONTHLY_INCOME` 12행. 원천 금액·입력일 유지 |
 | `USER_EXPENSE_ITEM` | 회원마다 `FIXED` 1행 = 원천 12개월 월 지출 평균, 원 단위 `ROUND_HALF_UP`. 세부 종류는 NULL |
 | `USER_LOAN` | 전 회원 대출 원장을 기준월 한 세트로 보존. 시작 동의 회원은 IMPORTED, 미동의 회원은 MANUAL. 잔액 원 단위 보존, 연 금리는 비율×100 후 DDL 소수 3자리 반올림 |
-| `USER_ASSET_SNAPSHOT` | 새 자산 보조 CSV의 합성 원천 자산을 기준월 1행으로 그대로 옮김 |
+| `USER_ASSET_SNAPSHOT` | 자산 보조 CSV의 합성 원천 자산을 기준월 1행으로 그대로 옮김. `NO_LOAN_YN`은 같은 회원·기준월의 대출이 없으면 Y, 있으면 N |
 | `USER_UTILITY_PAYMENT` | 공과금 응답 `utility_responses.jsonl`을 통신비와 같은 `map_bill_rows()`로 매핑. 시작 동의 회원만 IMPORTED, 회원·월 12행. 미납 개월(LATE+UNPAID)을 원장 `utility_late`와 달마다·합계로 대조 |
 | 통신·간편결제·사회보험 | 시작 동의 회원만 IMPORTED로 매핑하고 해당 회원의 Y 동의 ID 연결. 응답 전원 OK여도 미동의 회원 제외. 회원/월별 키·관측 상태·금액·납부 상태 대조 |
 | `USER_CREDIT_PROFILE` | 기존 신용평가사 값 유지. 신규 대출 건수·현금서비스 개월·대부업 잔액은 동의된 회원 원장에서 파생 |
