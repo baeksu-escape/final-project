@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { getHomePath } from '../auth/accessRules.js'
 import { useAuth } from '../auth/useAuth.js'
 
-// N-08 접근 제한 안내 — 내 역할로 볼 수 없는 화면에 들어왔을 때 보여 준다.
+// N-08 접근 제한 안내 — 역할이 다른 화면은 이제 라우트 가드가 첫 화면으로 보내므로(11/06 확정 UI), 이 화면은 /forbidden 주소로 직접 들어올 때만 보인다.
 export default function ForbiddenPage() {
   const { user } = useAuth()
   return (
