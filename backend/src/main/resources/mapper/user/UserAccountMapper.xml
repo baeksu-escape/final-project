@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-87 인증 필터용 APP_USER 조회 (DDL v0.3.2) -->
+<mapper namespace="com.baeksuescape.user.mapper.UserAccountMapper">
+
+    <!-- 요청마다 계정 상태를 확인한다. 탈퇴(WITHDRAWN) 회원은 필터가 인증하지 않는다. -->
+    <select id="selectAccountStatus" resultType="string">
+        SELECT ACCOUNT_STATUS_CODE
+          FROM APP_USER
+         WHERE USER_ID = #{userId}
+    </select>
+</mapper>
