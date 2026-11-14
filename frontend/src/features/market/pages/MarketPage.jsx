@@ -8,12 +8,13 @@ import DongRankList from '../components/DongRankList.jsx'
 import GuAverageChart from '../components/GuAverageChart.jsx'
 import MarketFilters from '../components/MarketFilters.jsx'
 import MarketLegend from '../components/MarketLegend.jsx'
+import MarketMap from '../components/MarketMap.jsx'
 import MarketSummary from '../components/MarketSummary.jsx'
 import { dongRows, dongValue, getMetric, guAverages, metricStats } from '../utils/marketStats.js'
 import '../market.css'
 
 // N-24-3 상권 분석 — 서울 행정동별 상권 지표를 업종·지표·구로 골라 요약·구별 평균·분포·상하위 동으로 보여 주고,
-// 동을 고르면 행정동 상세 창(N-24-5)을 연다. 모든 직군이 서울 전체에서 시작한다. 지도(N-24-4)는 FP-205에서 붙인다.
+// 지도(N-24-4)나 목록에서 동을 고르면 행정동 상세 창(N-24-5)을 연다. 모든 직군이 서울 전체에서 시작한다.
 export default function MarketPage() {
   const [base, setBase] = useState(null)
   const [baseError, setBaseError] = useState('')
@@ -49,7 +50,7 @@ export default function MarketPage() {
   if (error) return <Notice type="warn">{error} 잠시 뒤 다시 열어 주세요.</Notice>
   if (!base || !loaded.data) return <p className="market-hint">상권 데이터를 불러오는 중입니다…</p>
 
-  const { meta, dongs, dongCategories } = base
+  const { meta, dongs, dongCategories, geo } = base
   const categoryData = loaded.data
   const quarter = meta.baseQuarter
   const category = meta.categories.find((c) => c.code === loaded.code)
@@ -102,12 +103,20 @@ export default function MarketPage() {
 
       <div className="market-main">
         <Card className="market-map">
-          {/* TODO(FP-205) N-24-4 행정동 보로노이 히트맵이 이 자리에 들어간다 */}
-          <div className="market-map__placeholder">
-            <p>지도는 준비 중입니다 (N-24-4).</p>
-            <p className="market-hint">지금은 행정동 검색이나 아래 주의할 동·좋은 동 목록에서 동을 눌러 상세를 볼 수 있습니다.</p>
-          </div>
+          <MarketMap
+            geo={geo}
+            rows={rows}
+            metric={metric}
+            category={category}
+            gu={gu}
+            openCode={openCode}
+            onOpen={setOpenCode}
+            onReset={() => setGu(ALL_GU)}
+          />
           <MarketLegend metric={metric} stats={stats} />
+          <p className="market-hint">
+            단순화한 모식도입니다. 행정동 중심점으로 나눈 칸이라 실제 동 경계와 다릅니다. 동을 누르면 상세가 열리고, 끌어서 옮기거나 휠로 확대할 수 있습니다.
+          </p>
         </Card>
         <div className="market-side">
           <MarketSummary

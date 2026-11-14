@@ -150,17 +150,103 @@
   gap: 14px;
 }
 
-.market-map__placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 220px;
-  border: 1px dashed var(--line2);
+/* 지도 (N-24-4) — 칸 색은 --bin, 선 굵기는 확대해도 그대로(non-scaling-stroke) */
+.market-map__wrap {
+  position: relative;
+}
+
+.market-map__svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.6 / 1;
   border-radius: 10px;
   background: var(--panel2);
-  text-align: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.market-map__svg:active {
+  cursor: grabbing;
+}
+
+.market-map__land { fill: var(--line); }
+
+.market-map__dong {
+  fill: var(--bin);
+  stroke: var(--panel2);
+  stroke-width: 0.8;
+  cursor: pointer;
+  transition: fill 0.25s, opacity 0.25s;
+}
+
+.market-map__dong:hover,
+.market-map__dong--on {
+  stroke: var(--fg);
+  stroke-width: 2.2;
+}
+
+.market-map__dong--dim { opacity: 0.28; }
+
+.market-map__gu {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: 1.4;
+  opacity: 0.6;
+}
+
+.market-map__outline {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: 2;
+}
+
+.market-map__gu-label,
+.market-map__dong-label {
+  font-family: var(--f-b);
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.market-map__gu-label {
+  fill: var(--fg);
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.market-map__dong-label {
+  fill: #0b1222;
+  font-weight: 500;
+}
+
+.market-map__ctl {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.market-map__tip {
+  position: absolute;
+  z-index: 5;
+  min-width: 150px;
+  padding: 8px 10px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--float-bg);
+  box-shadow: var(--shadow);
+  font-size: 12.5px;
+  pointer-events: none;
+}
+
+.market-map__tip--flip {
+  transform: translateX(calc(-100% - 28px));
 }
 
 .market-side {

@@ -16,14 +16,15 @@ function loadJson(path) {
   return cache.get(path)
 }
 
-// 화면 처음에 필요한 공통 파일: 기준 분기·업종·지표 정의, 행정동 목록, 동별 업종 요약.
+// 화면 처음에 필요한 공통 파일: 기준 분기·업종·지표 정의, 행정동 목록, 동별 업종 요약, 지도 다각형(N-24-4).
 export async function loadMarketBase() {
-  const [meta, dongs, dongCategories] = await Promise.all([
+  const [meta, dongs, dongCategories, geo] = await Promise.all([
     loadJson('meta.json'),
     loadJson('dongs.json'),
     loadJson('dong-categories.json'),
+    loadJson('geo.json'),
   ])
-  return { meta, dongs, dongCategories }
+  return { meta, dongs, dongCategories, geo }
 }
 
 // 업종 하나의 서울·구·행정동 지표와 순위.

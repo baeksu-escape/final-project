@@ -47,3 +47,24 @@ python -I -X utf8 frontend/scripts/market/build_market_data.py --raw C:\workspac
 - 강북구 6개 동(번1·2·3동, 수유1·2·3동)은 생활인구 원본 코드가 상권 원본과 달라 코드 순서대로 짝지었다(추정). 구로구 항동은 생활인구 원본에 없다.
 - 점포가 몇 곳뿐인 동은 비율이 크게 튈 수 있다(예: 커피·음료 폐업률 최대 60%).
 - 화면에는 출처 "서울 열린데이터광장"을 표시한다.
+
+## 5. 지도 다각형 만들기 (N-24-4, FP-205)
+
+지도는 지도 API 없이 행정동 중심점으로 나눈 보로노이 칸을 SVG로 그린다. `build_market_geo.py`가 `geo.json`을 만든다.
+
+| 데이터 | 받을 파일 | 둘 곳 |
+|---|---|---|
+| 서울시 상권분석서비스(영역-행정동) | shapefile ZIP(`.shp` `.shx` `.dbf` `.prj` `.cpg`) | `C:\workspace\data_raw\market\area\` (압축 해제) |
+
+```
+python -m pip install shapely
+python -I -X utf8 frontend/scripts/market/build_market_geo.py --raw C:\workspace\data_raw\market --out frontend/public/data/market
+```
+
+`build_market_data.py`를 먼저 돌려 `dongs.json`이 있어야 한다(구 이름을 여기서 읽는다). 행정동 425개·구 25개가 아니거나 코드가 `dongs.json`과 다르면 파일을 쓰지 않고 멈춘다.
+
+- 원본 좌표는 중부원점 TM(미터)이다. 동 중심점(`XCNTS_VALU`, `YDNTS_VALU`)으로 보로노이 칸을 만들고, 동 경계를 모두 합친 서울 외곽선으로 자른다.
+- 구 경계는 같은 구의 칸을 합친 것이라 실제 구 경계와 조금 다르다. 화면에 "단순화한 모식도"라고 표시한다.
+- 한강은 원본에 없어 그리지 않는다.
+
+`geo.json`: `{ w, h, outline, gu: [{ name, path, x, y, box }], dongs: { [동 코드]: { path, x, y } } }`. 좌표는 왼쪽 위가 0,0이고 가로 1000 기준이다. `box`는 구를 고를 때 확대할 영역 `[x, y, 너비, 높이]`다.
