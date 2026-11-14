@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-87 N-02-2 가입 동의 (USER_CONSENT, DDL v0.3.2). 가입 동의는 제공 기관·항목이 없다. -->
+<mapper namespace="com.baeksuescape.user.mapper.UserConsentMapper">
+
+    <insert id="insertSignupConsent">
+        INSERT INTO USER_CONSENT (USER_ID, CONSENT_TYPE_CODE, REQUIRED_YN, AGREED_YN, AGREED_AT, CREATED_AT)
+        VALUES (#{userId}, #{consentTypeCode}, #{requiredYn}, #{agreedYn}, #{agreedAt,jdbcType=TIMESTAMP}, #{now})
+    </insert>
+</mapper>

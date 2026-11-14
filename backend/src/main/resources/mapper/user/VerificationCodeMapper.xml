@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-87 인증코드 발송·확인 이력 (VERIFICATION_CODE, DDL v0.3.2). 코드·이메일 원문은 저장하지 않는다. -->
+<mapper namespace="com.baeksuescape.user.mapper.VerificationCodeMapper">
+
+    <sql id="codeColumns">
+        VERIFICATION_ID AS verificationId, PURPOSE_CODE AS purposeCode, CHANNEL_CODE AS channelCode, TARGET_HMAC AS targetHmac,
+        USER_ID AS userId, CODE_HASH AS codeHash, ATTEMPT_COUNT AS attemptCount, EXPIRES_AT AS expiresAt,
+        VERIFIED_AT AS verifiedAt, CREATED_AT AS createdAt
+    </sql>
+
+    <insert id="insertCode" useGeneratedKeys="true" keyProperty="verificationId" keyColumn="VERIFICATION_ID">
+        INSERT INTO VERIFICATION_CODE (PURPOSE_CODE, CHANNEL_CODE, TARGET_HMAC, USER_ID, CODE_HASH, ATTEMPT_COUNT, EXPIRES_AT, CREATED_AT)
+        VALUES (#{purposeCode}, #{channelCode}, #{targetHmac}, #{userId,jdbcType=NUMERIC}, #{codeHash}, 0, #{expiresAt}, #{createdAt})
+    </insert>
+
+    <!-- 같은 목적·대상의 가장 최근 발송 1건 -->
+    <select id="selectLatest" resultType="com.baeksuescape.user.dto.VerificationCode">
+        SELECT <include refid="codeColumns"/>
+          FROM VERIFICATION_CODE
+         WHERE PURPOSE_CODE = #{purposeCode}
+           AND TARGET_HMAC = #{targetHmac}
+         ORDER BY VERIFICATION_ID DESC
+         FETCH FIRST 1 ROWS ONLY
+    </select>
+
+    <select id="selectById" resultType="com.baeksuescape.user.dto.VerificationCode">
+        SELECT <include refid="codeColumns"/>
+          FROM VERIFICATION_CODE
+         WHERE VERIFICATION_ID = #{verificationId}
+    </select>
+
+    <update id="increaseAttempt">
+        UPDATE VERIFICATION_CODE SET ATTEMPT_COUNT = ATTEMPT_COUNT + 1 WHERE VERIFICATION_ID = #{verificationId}
+    </update>
+
+    <update id="markVerified">
+        UPDATE VERIFICATION_CODE
+           SET VERIFIED_AT = #{now}, EXPIRES_AT = #{tokenExpiresAt}, USER_ID = COALESCE(#{userId,jdbcType=NUMERIC}, USER_ID)
+         WHERE VERIFICATION_ID = #{verificationId}
+           AND VERIFIED_AT IS NULL
+    </update>
+
+    <!-- 인증 토큰은 한 번만 쓴다: 확인된 행이고 아직 유효할 때만 EXPIRES_AT을 지금으로 당긴다. -->
+    <update id="consume">
+        UPDATE VERIFICATION_CODE
+           SET EXPIRES_AT = #{now}
+         WHERE VERIFICATION_ID = #{verificationId}
+           AND VERIFIED_AT IS NOT NULL
+           AND EXPIRES_AT &gt; #{now}
+    </update>
+</mapper>
