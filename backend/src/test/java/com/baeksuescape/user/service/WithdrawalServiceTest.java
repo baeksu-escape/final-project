@@ -16,6 +16,8 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,6 +49,8 @@ import com.baeksuescape.user.service.altdata.AltDataKind;
 class WithdrawalServiceTest {
 
     private static final Path MAPPER_DIR = Path.of("src/main/resources/mapper/user");
+    // 이 요청 토큰의 발급 시각 — 기본은 방금 로그인(UserFixtures.CLOCK의 지금).
+    private static final Instant JUST_NOW = UserFixtures.CLOCK.instant();
 
     @Mock
     private UserAccountMapper userMapper;
@@ -79,7 +83,7 @@ class WithdrawalServiceTest {
     @Test
     void wrongOrEmptyPasswordIs400OnPasswordFieldAndWritesNothing() {
         for (String wrong : new String[] { "wrong-pass1", "", null }) {
-            assertThatThrownBy(() -> service.withdraw(7L, password(wrong)))
+            assertThatThrownBy(() -> service.withdraw(7L, password(wrong), JUST_NOW))
                     .isInstanceOfSatisfying(ApiException.class, e -> {
                         assertThat(e.getStatus().value()).isEqualTo(400);
                         assertThat(e.getCode()).isEqualTo("INVALID_PASSWORD");
@@ -94,22 +98,49 @@ class WithdrawalServiceTest {
         verifyNoInteractions(socialMapper, verificationMapper, consentMapper, altDataMapper);
     }
 
+    // PR #52 리뷰 7 — 비밀번호가 없는 간편 로그인 전용 계정은 비밀번호 대신 "토큰 발급 후 10분 이내"를 확인한다.
     @Test
-    void socialOnlyAccountWithoutPasswordCanWithdrawWithoutCheck() {
+    void socialOnlyAccountCanWithdrawWithin10MinutesOfLogin() {
         account.setPasswordHash(null);
 
-        service.withdraw(7L, password(""));
+        service.withdraw(7L, password(""), JUST_NOW.minus(Duration.ofMinutes(9)));
 
+        verify(userMapper).updateWithdrawn(7L, NOW);
+    }
+
+    @Test
+    void socialOnlyAccountAfter10MinutesIs403RecentLoginRequired() {
+        account.setPasswordHash(null);
+
+        for (Instant issuedAt : new Instant[] { JUST_NOW.minus(Duration.ofMinutes(11)), null }) {
+            assertThatThrownBy(() -> service.withdraw(7L, password("anything"), issuedAt))
+                    .isInstanceOfSatisfying(ApiException.class, e -> {
+                        assertThat(e.getStatus().value()).isEqualTo(403);
+                        assertThat(e.getCode()).isEqualTo("RECENT_LOGIN_REQUIRED");
+                        assertThat(e.getFieldErrors()).singleElement().satisfies(item -> {
+                            assertThat(item.field()).isEqualTo("password");
+                            assertThat(item.message()).isEqualTo("보안을 위해 간편 로그인으로 다시 로그인한 뒤 10분 안에 탈퇴해 주세요.");
+                        });
+                    });
+        }
+        verify(userMapper, never()).updateWithdrawn(anyLong(), any());
+        verifyNoInteractions(socialMapper, verificationMapper, consentMapper, altDataMapper);
+    }
+
+    @Test
+    void accountWithPasswordIgnoresLoginTimeAndChecksPassword() {
+        // 비밀번호가 있는 계정은 지금처럼 비밀번호만 본다 — 로그인한 지 오래돼도 비밀번호가 맞으면 탈퇴된다.
+        service.withdraw(7L, password(UserFixtures.PASSWORD), JUST_NOW.minus(Duration.ofHours(2)));
         verify(userMapper).updateWithdrawn(7L, NOW);
     }
 
     @Test
     void alreadyWithdrawnOrMissingAccountIs401() {
         account.setAccountStatusCode(UserAccount.WITHDRAWN);
-        assertThatThrownBy(() -> service.withdraw(7L, password(UserFixtures.PASSWORD)))
+        assertThatThrownBy(() -> service.withdraw(7L, password(UserFixtures.PASSWORD), JUST_NOW))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(401));
 
-        assertThatThrownBy(() -> service.withdraw(99L, password(UserFixtures.PASSWORD)))
+        assertThatThrownBy(() -> service.withdraw(99L, password(UserFixtures.PASSWORD), JUST_NOW))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(401));
         verify(userMapper, never()).updateWithdrawn(anyLong(), any());
     }
@@ -119,16 +150,18 @@ class WithdrawalServiceTest {
         String emailHmac = account.getEmailHmac();
         String phoneHmac = account.getPhoneHmac();
 
-        service.withdraw(7L, password(UserFixtures.PASSWORD));
+        service.withdraw(7L, password(UserFixtures.PASSWORD), JUST_NOW);
 
-        // 순서: 불러온 데이터·동의 → 간편 로그인 연결 → 인증 기록(덮어쓰기 전 HMAC) → 개인정보 덮어쓰기. 시각은 서버의 서울 시각.
+        // 순서: 회원 행 잠금(PR #52 리뷰 4·5) → 계정 읽기 → 불러온 데이터·동의 → 간편 로그인 연결 → 인증 기록(덮어쓰기 전 HMAC) → 개인정보 덮어쓰기.
+        // 시각은 서버의 서울 시각.
         InOrder order = inOrder(consentMapper, socialMapper, verificationMapper, userMapper);
+        order.verify(userMapper).lockUser(7L);
+        order.verify(userMapper).selectById(7L);
         order.verify(consentMapper).selectAltConsents(7L);
         order.verify(socialMapper).deleteByUserId(7L);
         order.verify(verificationMapper).deleteForWithdrawal(7L, emailHmac, phoneHmac);
         order.verify(userMapper).updateWithdrawn(7L, NOW);
-        // ASSESSMENT 등 딸린 데이터는 보관한다 — 회원 표는 읽기와 탈퇴 표시 외에는 건드리지 않는다.
-        verify(userMapper).selectById(7L);
+        // ASSESSMENT 등 딸린 데이터는 보관한다 — 회원 표는 잠금·읽기·탈퇴 표시 외에는 건드리지 않는다.
         verifyNoMoreInteractions(userMapper, socialMapper, verificationMapper);
     }
 
@@ -137,7 +170,7 @@ class WithdrawalServiceTest {
         account.setPhoneEnc(null);
         account.setPhoneHmac(null);
 
-        service.withdraw(7L, password(UserFixtures.PASSWORD));
+        service.withdraw(7L, password(UserFixtures.PASSWORD), JUST_NOW);
 
         verify(verificationMapper).deleteForWithdrawal(7L, account.getEmailHmac(), null);
     }
@@ -151,7 +184,7 @@ class WithdrawalServiceTest {
         expired.setExpiresAt(NOW.minusDays(1));
         given(consentMapper.selectAltConsents(7L)).willReturn(List.of(active, alreadyWithdrawn, expired));
 
-        service.withdraw(7L, password(UserFixtures.PASSWORD));
+        service.withdraw(7L, password(UserFixtures.PASSWORD), JUST_NOW);
 
         for (long consentId : new long[] { 1L, 2L, 3L }) {
             verify(altDataMapper).deleteTelecomByConsent(consentId);

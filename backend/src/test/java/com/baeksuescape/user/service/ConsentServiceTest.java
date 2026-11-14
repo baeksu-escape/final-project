@@ -10,7 +10,9 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.util.List;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -141,6 +144,26 @@ class ConsentServiceTest {
         DataInputDtos.ConsentWithdrawn result = service.withdraw(1L, 9L);
         verify(consentMapper, never()).withdraw(eq(9L), any());
         assertThat(result.withdrawnAt().toLocalDateTime()).isEqualTo(NOW.minusDays(2));
+    }
+
+    // PR #52 리뷰 4 — 동의·철회는 맨 앞에서 회원 행을 잠근다. 같은 항목 동의가 동시에 들어와도 두 번째는 첫 번째 동의를 보고 돌려받는다.
+    @Test
+    void agreeAndWithdrawLockMemberRowFirst() {
+        given(consentMapper.selectAltConsents(1L)).willReturn(List.of());
+        given(consentMapper.selectAltConsent(1L, 9L)).willReturn(consent(9L, 1L, AltDataKind.TELECOM, true));
+
+        service.agree(1L, agree(AltDataKind.TELECOM));
+        InOrder agreeOrder = inOrder(userMapper, consentMapper);
+        agreeOrder.verify(userMapper).lockUser(1L);
+        agreeOrder.verify(userMapper).selectById(1L);
+        agreeOrder.verify(consentMapper).selectAltConsents(1L);
+        agreeOrder.verify(consentMapper).insertAltConsent(any());
+
+        service.withdraw(1L, 9L);
+        InOrder withdrawOrder = inOrder(userMapper, consentMapper);
+        withdrawOrder.verify(userMapper, times(2)).lockUser(1L);
+        withdrawOrder.verify(consentMapper).selectAltConsent(1L, 9L);
+        withdrawOrder.verify(consentMapper).withdraw(9L, NOW);
     }
 
     @Test

@@ -5,6 +5,7 @@ import static com.baeksuescape.user.service.DataInputFixtures.codeOf;
 import static com.baeksuescape.user.service.DataInputFixtures.consent;
 import static com.baeksuescape.user.service.DataInputFixtures.member;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
@@ -32,6 +33,8 @@ import org.mockito.quality.Strictness;
 import com.baeksuescape.global.TestKeys;
 import com.baeksuescape.global.config.AvenueProperties;
 import com.baeksuescape.global.config.AvenueProperties.MissingMemberMode;
+import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
 import com.baeksuescape.user.dto.DataInputDtos;
 import com.baeksuescape.user.dto.DataInputRows.BillRow;
 import com.baeksuescape.user.dto.DataInputRows.ConsentRow;
@@ -179,6 +182,47 @@ class AltDataImportServiceTest {
         ArgumentCaptor<BillRow> rows = ArgumentCaptor.forClass(BillRow.class);
         verify(altDataMapper, times(7)).insertTelecom(rows.capture());
         assertThat(rows.getAllValues().get(0).getUserId()).isEqualTo(500L);
+        // PR #52 리뷰 6 — 후보 목록은 종류·직군마다 처음 한 번만 만든다(세 번 불러와도 DB 조회 1번).
+        verify(altDataMapper, times(1)).selectDummyUserIds("EMPLOYEE");
+        assertThat(service.borrowCandidates("EMPLOYEE", AltDataKind.TELECOM)).containsExactly(1L, 2L);
+    }
+
+    @Test
+    void borrowCandidatesAreNotCachedWhileEmpty() {
+        build(testSourceDir(), MissingMemberMode.BORROW);
+        given(altDataMapper.selectDummyUserIds("EMPLOYEE")).willReturn(List.of());
+        assertThat(service.borrowCandidates("EMPLOYEE", AltDataKind.TELECOM)).isEmpty();
+        // 시드를 넣은 뒤에는 다시 찾아 후보를 만든다.
+        given(altDataMapper.selectDummyUserIds("EMPLOYEE")).willReturn(List.of(2L, 1L));
+        assertThat(service.borrowCandidates("EMPLOYEE", AltDataKind.TELECOM)).containsExactly(1L, 2L);
+        verify(altDataMapper, times(2)).selectDummyUserIds("EMPLOYEE");
+    }
+
+    // PR #52 리뷰 4·5 — 같은 회원의 동시 불러오기가 지우기·넣기를 겹치지 않도록 맨 앞에서 회원 행을 잠근다.
+    @Test
+    void importLocksMemberRowFirst() {
+        importTelecom(1L, 10L);
+
+        InOrder order = inOrder(userMapper, consentMapper, altDataMapper);
+        order.verify(userMapper).lockUser(1L);
+        order.verify(userMapper).selectById(1L);
+        order.verify(consentMapper).selectAltConsent(1L, 10L);
+        order.verify(altDataMapper).deleteImportedTelecom(1L);
+    }
+
+    // PR #52 리뷰 3 — baseMonth는 형식만 검사한다(저장에는 쓰지 않음). 틀리면 400 + baseMonth 칸 오류.
+    @Test
+    void badBaseMonthFormatIs400OnBaseMonthField() {
+        for (String bad : new String[] { "2026-13", "202610", "2026-1" }) {
+            ApiException error = catchThrowableOfType(
+                    () -> service.importData(1L, "telecom", new DataInputDtos.AltDataImportRequest(bad, 10L)), ApiException.class);
+            assertThat(error.getStatus().value()).isEqualTo(400);
+            assertThat(error.getFieldErrors()).containsExactly(new FieldErrorItem("baseMonth", "연-월(YYYY-MM) 형식으로 입력해 주세요."));
+        }
+        verify(altDataMapper, never()).deleteImportedTelecom(anyLong());
+        // 형식이 맞으면 기준월과 상관없이 파일 기간 그대로 저장한다(기준월 2020-01이어도 2025-09~ 행).
+        DataInputDtos.AltDataImportResponse response = service.importData(1L, "telecom", new DataInputDtos.AltDataImportRequest("2020-01", 10L));
+        assertThat(response.rows()).isNotEmpty();
     }
 
     @Test

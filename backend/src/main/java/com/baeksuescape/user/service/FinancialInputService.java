@@ -34,6 +34,7 @@ import com.baeksuescape.user.mapper.FinancialInputMapper;
 public class FinancialInputService {
 
     static final String INVALID_INPUT = "INVALID_INPUT";
+    static final String CREDIT_PROFILE_IMPORTED = "CREDIT_PROFILE_IMPORTED";
     private static final String EMPLOYEE = "EMPLOYEE";
     private static final String MANUAL = "MANUAL";
     private static final String FIXED = "FIXED";
@@ -58,8 +59,10 @@ public class FinancialInputService {
     }
 
     // INP-02 저장 — 화면과 같은 규칙으로 다시 검사하고, 어기면 400 INVALID_INPUT과 칸별 오류를 돌려준다.
+    // 맨 앞에서 회원 행을 잠가 같은 회원의 동시 저장이 대출·지출 행을 겹쳐 넣지 않게 한다(PR #52 리뷰 5).
     @Transactional
     public DataInputDtos.SaveResponse save(long userId, DataInputDtos.FinancialInput request) {
+        users.lock(userId);
         UserAccount user = users.requireUserWithJob(userId);
         String jobType = user.getWorkerTypeCode();
         if (request == null || !jobType.equals(request.jobType())) {
@@ -88,7 +91,8 @@ public class FinancialInputService {
     // ── 저장 ──
 
     // N-05-2 소득 — 급여소득자는 기준월 SALARY 1행, 자영업자·프리랜서는 최근 12개월을 달마다 MONTHLY_INCOME으로 저장한다.
-    // 12개월 중 빈 달은 그 달 행을 지운다(빈칸은 미입력, 0원은 입력한 값). 다른 기준월에 저장한 달은 그대로 둔다(D-16).
+    // 저장한 기준월의 12개월 구간은 이번 입력이 기준이다: 구간 안의 달은 이번 값으로 바꾸고, 빈 달은 그 달 행을 지운다(빈칸은 미입력, 0원은 입력한 값).
+    // 구간 밖의 달은 그대로 둔다. 그래서 다른 기준월에 저장한 달도 이번 구간과 겹치면 이번 값으로 바뀌거나 지워진다(PR #52 리뷰 2, 의도한 동작).
     private void saveIncome(long userId, String jobType, String baseMonth, DataInputDtos.Income income, LocalDateTime now) {
         if (EMPLOYEE.equals(jobType)) {
             mapper.mergeIncome(incomeRow(userId, baseMonth, "SALARY", income.monthlySalary(), now));
@@ -188,8 +192,10 @@ public class FinancialInputService {
                 row.getDelinqCount12m(), row.getCashAdvanceMonths(), row.getNewLoanCount3m()).allMatch(Objects::isNull);
         if (empty) {
             mapper.deleteManualCredit(userId, baseDate);
-        } else {
-            mapper.mergeManualCredit(row);
+        } else if (mapper.mergeManualCredit(row) == 0) {
+            // UK_UCP_USER_DATE(USER_ID, BASE_DATE)로 기준일당 한 행뿐이다. 그 기준일에 불러온(IMPORTED) 행이 있으면 MERGE가 0행을 바꾼다.
+            // 저장된 척 성공으로 응답하지 않고 409로 실패시켜 트랜잭션 전체(소득·대출·자산·지출 저장 포함)를 되돌린다(PR #52 리뷰 1).
+            throw new ApiException(HttpStatus.CONFLICT, CREDIT_PROFILE_IMPORTED, "불러온 신용 정보가 있어 직접 입력을 저장할 수 없습니다.");
         }
     }
 

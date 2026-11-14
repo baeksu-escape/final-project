@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.baeksuescape.global.config.AvenueProperties;
 import com.baeksuescape.global.config.AvenueProperties.MissingMemberMode;
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
 import com.baeksuescape.user.dto.DataInputDtos;
 import com.baeksuescape.user.dto.DataInputRows.BillRow;
 import com.baeksuescape.user.dto.DataInputRows.ConsentRow;
@@ -39,7 +41,11 @@ public class AltDataImportService {
     static final String SOURCE_UNAVAILABLE = "ALT_DATA_SOURCE_UNAVAILABLE";
     static final String NO_RECORD_NOTICE = "이 계정은 기관 기록이 없습니다.";
     static final String BORROWED_NOTICE = "시연용 예시 데이터입니다.";
+    // 화면 inputRules.js monthRule과 같은 문구.
+    static final String BASE_MONTH_FORMAT_MESSAGE = "연-월(YYYY-MM) 형식으로 입력해 주세요.";
 
+    // BORROW 후보 캐시 — key '종류:직군' → 후보 USER_ID 목록(오름차순).
+    private final Map<String, List<Long>> borrowCandidates = new ConcurrentHashMap<>();
     private final AltDataSource source;
     private final AltDataMapper altDataMapper;
     private final UserConsentMapper consentMapper;
@@ -56,13 +62,21 @@ public class AltDataImportService {
     }
 
     // INP-03 불러오기 — 요청의 consentId가 내 것이고, 같은 기관·항목의 유효한 동의여야 한다(아니면 409 CONSENT_REQUIRED).
+    // baseMonth는 화면 기준월 확인용이다: 형식(YYYY-MM)만 검사하고 저장에는 쓰지 않는다. 기관 파일의 기간을 그대로 저장한다(더미 시드와 같다).
+    // 맨 앞에서 회원 행을 잠가, 같은 항목을 동시에 불러와도 지우기·넣기가 겹쳐 행이 중복되지 않게 한다(PR #52 리뷰 4·5).
     @Transactional
     public DataInputDtos.AltDataImportResponse importData(long userId, String apiSegment, DataInputDtos.AltDataImportRequest request) {
+        users.lock(userId);
         AltDataKind kind = AltDataKind.fromApiSegment(apiSegment)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "요청한 주소를 찾을 수 없습니다."));
         UserAccount user = users.requireUserWithJob(userId);
         if (request == null || request.baseMonth() == null || request.baseMonth().isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "기준월을 먼저 입력해 주세요.");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "기준월을 먼저 입력해 주세요.",
+                    List.of(new FieldErrorItem("baseMonth", "기준월을 먼저 입력해 주세요.")));
+        }
+        if (!DataInputRules.isValidMonth(request.baseMonth())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", BASE_MONTH_FORMAT_MESSAGE,
+                    List.of(new FieldErrorItem("baseMonth", BASE_MONTH_FORMAT_MESSAGE)));
         }
         LocalDateTime now = users.now();
         ConsentRow consent = request.consentId() == null ? null : consentMapper.selectAltConsent(userId, request.consentId());
@@ -93,15 +107,31 @@ public class AltDataImportService {
         return new DataInputDtos.AltDataImportResponse(kind.key(), users.toOffset(now), rows, consent.getConsentId(), notice);
     }
 
-    // BORROW — 같은 직군의 더미 회원 중 이 계정이 늘 같은 회원을 고르도록 USER_ID로 정한다.
+    // BORROW — 같은 직군의 더미 회원 중 이 계정이 늘 같은 회원을 고르도록 USER_ID로 정한다(후보[USER_ID % 후보 수]).
     private Optional<Long> borrowedMember(UserAccount user, AltDataKind kind) {
-        List<Long> candidates = altDataMapper.selectDummyUserIds(user.getWorkerTypeCode()).stream()
-                .filter(memberId -> source.find(kind, memberId).isPresent())
-                .toList();
+        List<Long> candidates = borrowCandidates(user.getWorkerTypeCode(), kind);
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
         return Optional.of(candidates.get(Math.floorMod(user.getUserId(), candidates.size())));
+    }
+
+    // BORROW 후보 — 이 직군의 더미 회원 중 기관 파일에 있는 USER_ID(오름차순). 종류·직군마다 처음 한 번만 만들어 둔다(PR #52 리뷰 6).
+    // 기관 파일은 서버 시작 때 읽어 고정되므로 다시 만들 필요가 없다. 후보가 없으면(시드 적재 전 등) 저장하지 않고 다음에 다시 찾는다.
+    List<Long> borrowCandidates(String workerTypeCode, AltDataKind kind) {
+        String key = kind.name() + ":" + workerTypeCode;
+        List<Long> cached = borrowCandidates.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        List<Long> candidates = altDataMapper.selectDummyUserIds(workerTypeCode).stream()
+                .filter(memberId -> source.find(kind, memberId).isPresent())
+                .sorted()
+                .toList();
+        if (!candidates.isEmpty()) {
+            borrowCandidates.putIfAbsent(key, candidates);
+        }
+        return candidates;
     }
 
     // 이전에 불러온 행(이 회원·이 항목)을 지우고 응답을 새로 넣은 뒤, 화면 표 행으로 돌려준다. 응답이 없으면 지우기만 한다.

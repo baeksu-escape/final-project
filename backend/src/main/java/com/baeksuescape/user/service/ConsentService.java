@@ -44,8 +44,10 @@ public class ConsentService {
     }
 
     // INP-05 항목 하나에 동의 — 대안 데이터 5종의 제공 기관·항목만 받는다. 같은 항목에 유효한 동의가 있으면 그 동의를 돌려준다.
+    // 맨 앞에서 회원 행을 잠가, 같은 항목 동의가 동시에 두 번 들어와도 두 번째는 첫 번째의 동의를 돌려받는다(PR #52 리뷰 4).
     @Transactional
     public DataInputDtos.ConsentAgreed agree(long userId, DataInputDtos.ConsentAgree request) {
+        users.lock(userId);
         users.requireUserWithJob(userId);
         if (request == null || !ALT_DATA_PROVISION.equals(request.consentTypeCode())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "동의 종류를 확인해 주세요.");
@@ -73,9 +75,10 @@ public class ConsentService {
         return new DataInputDtos.ConsentAgreed(row.getConsentId(), users.toOffset(now));
     }
 
-    // INP-06 [연결 해제] — 본인 동의가 아니면 404. 이미 철회했으면 그 시각을 그대로 돌려준다.
+    // INP-06 [연결 해제] — 본인 동의가 아니면 404. 이미 철회했으면 그 시각을 그대로 돌려준다. 맨 앞에서 회원 행을 잠근다.
     @Transactional
     public DataInputDtos.ConsentWithdrawn withdraw(long userId, long consentId) {
+        users.lock(userId);
         users.requireUserWithJob(userId);
         ConsentRow consent = consentMapper.selectAltConsent(userId, consentId);
         if (consent == null) {

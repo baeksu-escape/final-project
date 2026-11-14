@@ -118,6 +118,24 @@
   - '카드·신용 이용' 섹션과 '할부' 선택지 추가
   - FieldControl에 체크 칸이 추가됨(공통 Checkbox, 새 className 없음)
 
+## [2026-11-14 · JWC / Claude Code] PR #52 리뷰 반영
+- **1. 카드·신용 저장 실패를 성공으로 응답하던 문제:** `mergeManualCredit`이 0행을 바꾸면 409로 실패시킨다.
+  - 원인: 같은 기준일에 IMPORTED 행이 있으면(`UK_UCP_USER_DATE`) MERGE가 0행을 바꾼다.
+  - 응답: 409 `CREDIT_PROFILE_IMPORTED` "불러온 신용 정보가 있어 직접 입력을 저장할 수 없습니다."(fieldErrors 없음)
+  - 저장 트랜잭션 전체(소득·대출 포함)를 되돌린다.
+- **2. 소득 12개월 구간:** 동작은 바꾸지 않았다. 저장한 기준월의 구간은 이번 입력이 기준이라, 구간 안의 달은 이번 값으로 바뀌거나(빈 달은 삭제) 구간 밖은 그대로다. 주석과 테스트 이름을 실제 동작에 맞췄다.
+- **3. 불러오기 baseMonth:** 형식(YYYY-MM)이 틀리면 400 + `fieldErrors[{field:'baseMonth'}]`이다. 저장에는 쓰지 않는다(기관 파일 기간 그대로, 화면 기준월 확인용).
+- **4·5. 동시 요청 중복:** DB 제약은 추가하지 않았다. 대신 쓰기 트랜잭션 맨 앞에서 `UserAccountMapper.lockUser`(`SELECT USER_ID FROM APP_USER WHERE USER_ID = ? FOR UPDATE`)로 회원 행을 잠근다.
+  - 적용 API: INP-02·03·05·06, MEM-07
+- **6. BORROW 후보:** 기관 파일은 시작할 때 `JsonlAltDataSource`가 메모리 색인(파일 → USER_ID → 응답)으로 읽어 두며, `find`는 이 색인을 바로 찾는다.
+  - 이번 변경: 후보 목록(종류·직군별, 오름차순)을 처음 한 번만 만들어 둔다. 후보가 없으면 저장하지 않는다.
+  - 고르는 규칙(후보[USER_ID % 후보 수])은 그대로다.
+- **API 변경:** INP-02에 409 `CREDIT_PROFILE_IMPORTED`, INP-03에 400 baseMonth 칸 오류가 생겼다. 요청·응답 필드는 그대로다.
+- **확인:** `./mvnw test` 153개 통과
+  - 새 테스트: 신용 409·롤백 대상, 잠금 순서(입력 저장·동의·철회·불러오기·탈퇴), baseMonth 형식, 후보 캐시
+  - `UserLockSqlTest`: H2(Oracle 모드)에서 lockUser SQL이 같은 회원의 두 번째 트랜잭션을 막고 다른 회원은 막지 않음
+- **확인 못 함:** 실제 Oracle에서의 잠금 대기, IMPORTED 신용 행이 있을 때의 409(지금 화면에는 신용 불러오기가 없음)
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

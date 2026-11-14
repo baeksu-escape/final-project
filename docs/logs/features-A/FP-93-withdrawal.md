@@ -155,6 +155,21 @@
     - PR #45·FP-85·FP-86·FP-87과 합친 상태에서는 통과한다.
 - **팀 확인:** 공유 파일인 AuthProvider에 `notice`·`clearNotice`·`logout({ notice })`가 생겼다. 다른 기능도 로그아웃 뒤 로그인 화면에 알림을 띄울 때 같은 방법을 쓸 수 있다.
 
+## [2026-11-14 · JWC / Claude Code] PR #52 리뷰 반영 — 간편 로그인 전용 계정 탈퇴 재인증, 회원 행 잠금
+- **팀 결정(리뷰 7):** 비밀번호가 없는 간편 로그인 전용 계정은 비밀번호 대신 최근 로그인을 확인한다.
+  - 기준: 이 요청 JWT의 발급 시각(iat)이 10분 이내여야 탈퇴된다.
+  - 10분이 지났거나 iat를 모르면 403 `RECENT_LOGIN_REQUIRED` + `fieldErrors[{ field: 'password', message: '보안을 위해 간편 로그인으로 다시 로그인한 뒤 10분 안에 탈퇴해 주세요.' }]`
+  - 비밀번호가 있는 계정은 지금처럼 비밀번호를 확인한다.
+  - 10분은 `WithdrawalService.RECENT_LOGIN_WINDOW` 상수로 두었다. `TODO(2차: 간편 로그인 재인증 화면)`
+- **바뀐 파일**
+  - `MyPageController`: 요청 토큰의 iat를 읽어 넘긴다.
+  - `JwtTokenProvider.issuedAt(token)` 추가: 공유 보안 파일이지만 새 메서드만 더했고, 기존 `parse`는 그대로다.
+  - `WithdrawalService`: 맨 앞에서 `lockUser`를 부르고 최근 로그인을 확인한다.
+- **확인:** `WithdrawalServiceTest` 11개 통과
+  - iat 9분 성공, 11분·iat 없음 403, 비밀번호 계정은 iat와 상관없음, 잠금이 첫 단계
+- **화면:** 고치지 않았다. 403은 로그아웃을 일으키지 않고, 탈퇴 카드가 password 칸 오류로 보여 준다.
+  - 화면이 빈 비밀번호 칸을 막으므로, 간편 로그인 전용 계정은 아무 글자나 넣어야 서버까지 간다(기존 보고와 같음).
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

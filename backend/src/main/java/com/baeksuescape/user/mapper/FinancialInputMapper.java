@@ -53,6 +53,7 @@ public interface FinancialInputMapper {
     // ── 카드·신용(USER_CREDIT_PROFILE, 직접 입력 행만) ──
     CreditRow selectManualCredit(@Param("userId") long userId, @Param("baseDate") LocalDate baseDate);
 
+    // 바뀐 행 수. 같은 기준일에 불러온(IMPORTED) 행이 있으면 0이다(UK_UCP_USER_DATE, 직접 입력 행만 바꾼다).
     int mergeManualCredit(CreditRow row);
 
     int deleteManualCredit(@Param("userId") long userId, @Param("baseDate") LocalDate baseDate);

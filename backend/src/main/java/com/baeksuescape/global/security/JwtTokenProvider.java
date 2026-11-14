@@ -69,6 +69,22 @@ public class JwtTokenProvider {
         }
     }
 
+    // FP-93 토큰 발급 시각(iat). 간편 로그인 전용 계정 탈퇴의 "최근 로그인" 확인에 쓴다. 검증에 실패하거나 iat가 없으면 빈 값.
+    public Optional<Instant> issuedAt(String token) {
+        try {
+            Date issuedAt = Jwts.parser()
+                    .verifyWith(key)
+                    .clock(() -> Date.from(clock.instant()))
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload()
+                    .getIssuedAt();
+            return Optional.ofNullable(issuedAt).map(Date::toInstant);
+        } catch (JwtException | IllegalArgumentException e) {
+            return Optional.empty();
+        }
+    }
+
     // 토큰 유효 시간(초). 로그인 응답에 함께 줄 때 쓴다.
     public long lifetimeSeconds() {
         return lifetime.toSeconds();
