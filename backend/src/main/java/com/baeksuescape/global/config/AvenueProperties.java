@@ -55,12 +55,16 @@ public class AvenueProperties implements InitializingBean {
     public static class Email {
         private EmailMode mode = EmailMode.LOG;
         private String fixedCode;
+        // SMTP 모드에서 보내는 사람 주소
+        private String from;
     }
 
     @Getter
     @Setter
     public static class Social {
         private SocialMode mode = SocialMode.DEV;
+        // 간편 로그인을 마친 뒤 돌려보낼 프론트 콜백 주소(프론트 SOCIAL_PATHS.CALLBACK)
+        private String callbackUrl = "http://localhost:5173/oauth/callback";
     }
 
     @Getter

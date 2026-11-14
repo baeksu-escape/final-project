@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-87 N-01-6 간편 로그인 연결 (USER_SOCIAL_ACCOUNT, DDL v0.3.2) -->
+<mapper namespace="com.baeksuescape.user.mapper.UserSocialAccountMapper">
+
+    <select id="selectUserId" resultType="long">
+        SELECT USER_ID
+          FROM USER_SOCIAL_ACCOUNT
+         WHERE PROVIDER_CODE = #{providerCode}
+           AND PROVIDER_USER_ID = #{providerUserId}
+    </select>
+
+    <select id="countByUserAndProvider" resultType="int">
+        SELECT COUNT(*) FROM USER_SOCIAL_ACCOUNT WHERE USER_ID = #{userId} AND PROVIDER_CODE = #{providerCode}
+    </select>
+
+    <insert id="insertLink">
+        INSERT INTO USER_SOCIAL_ACCOUNT (USER_ID, PROVIDER_CODE, PROVIDER_USER_ID)
+        VALUES (#{userId}, #{providerCode}, #{providerUserId})
+    </insert>
+</mapper>

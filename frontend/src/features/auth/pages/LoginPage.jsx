@@ -11,6 +11,8 @@ import SocialLoginButtons from '../components/SocialLoginButtons.jsx'
 // 로그인 실패 원인을 화면 문구로 바꾼다. 아이디·비밀번호 중 무엇이 틀렸는지는 알려 주지 않는다.
 function toLoginErrorMessage(error) {
   if (error?.data?.code === AUTH_ERROR_CODES.ACCOUNT_LOCKED) return ACCOUNT_LOCKED_MESSAGE
+  // 관리자 로그인 준비 중 안내는 서버 문구를 그대로 보여 준다(비밀번호가 틀렸다고 잘못 보이지 않게).
+  if (error?.data?.code === AUTH_ERROR_CODES.ADMIN_2FA_NOT_READY) return error.message
   if (error?.status === 0) return error.message
   return LOGIN_FAILED_MESSAGE
 }

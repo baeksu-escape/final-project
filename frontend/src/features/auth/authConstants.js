@@ -30,6 +30,8 @@ export const AUTH_ERROR_CODES = Object.freeze({
   DUPLICATE_LOGIN_ID: 'DUPLICATE_LOGIN_ID',
   DUPLICATE_EMAIL: 'DUPLICATE_EMAIL',
   DUPLICATE_NICKNAME: 'DUPLICATE_NICKNAME',
+  // 실제 서버: 관리자 2단계 인증(AUTH-11) 준비 전에는 관리자 로그인을 409로 막는다(FP-87 작업 2, 작업 7에서 연다).
+  ADMIN_2FA_NOT_READY: 'ADMIN_2FA_NOT_READY',
 })
 
 // N-01 로그인 실패 문구. 아이디와 비밀번호 중 무엇이 틀렸는지 알려 주지 않는다.

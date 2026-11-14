@@ -9,4 +9,118 @@
           FROM APP_USER
          WHERE USER_ID = #{userId}
     </select>
+
+    <!-- 계정 한 행에서 서비스가 쓰는 열. 별칭은 UserAccount 필드 이름과 같다. -->
+    <sql id="accountColumns">
+        USER_ID AS userId, LOGIN_ID AS loginId, PASSWORD_HASH AS passwordHash, NICKNAME AS nickname,
+        NAME_ENC AS nameEnc, PHONE_ENC AS phoneEnc, PHONE_HMAC AS phoneHmac, EMAIL_ENC AS emailEnc, EMAIL_HMAC AS emailHmac,
+        BIRTH_YEAR AS birthYear, WORKER_TYPE_CODE AS workerTypeCode, ROLE_CODE AS roleCode,
+        ACCOUNT_STATUS_CODE AS accountStatusCode, LOGIN_FAIL_COUNT AS loginFailCount, CREATED_AT AS createdAt
+    </sql>
+
+    <select id="selectById" resultType="com.baeksuescape.user.dto.UserAccount">
+        SELECT <include refid="accountColumns"/>
+          FROM APP_USER
+         WHERE USER_ID = #{userId}
+    </select>
+
+    <select id="selectByLoginId" resultType="com.baeksuescape.user.dto.UserAccount">
+        SELECT <include refid="accountColumns"/>
+          FROM APP_USER
+         WHERE LOGIN_ID = #{loginId}
+    </select>
+
+    <!-- N-03 아이디 찾기 후보: 일반 회원만, 탈퇴 회원 제외 -->
+    <select id="selectUsersByPhoneHmac" resultType="com.baeksuescape.user.dto.UserAccount">
+        SELECT <include refid="accountColumns"/>
+          FROM APP_USER
+         WHERE PHONE_HMAC = #{phoneHmac}
+           AND ROLE_CODE = 'ROLE_USER'
+           AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
+         ORDER BY USER_ID
+    </select>
+
+    <!-- N-03 비밀번호 재설정 대상: 일반 회원만, 탈퇴 회원 제외 -->
+    <select id="selectUserByLoginIdAndEmailHmac" resultType="com.baeksuescape.user.dto.UserAccount">
+        SELECT <include refid="accountColumns"/>
+          FROM APP_USER
+         WHERE LOGIN_ID = #{loginId}
+           AND EMAIL_HMAC = #{emailHmac}
+           AND ROLE_CODE = 'ROLE_USER'
+           AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
+    </select>
+
+    <!-- 가입 중복 확인. 탈퇴 회원은 아이디·이메일 HMAC이 표시값으로 덮어써져 있어 잡히지 않는다. -->
+    <select id="countByLoginId" resultType="int">
+        SELECT COUNT(*) FROM APP_USER WHERE LOGIN_ID = #{loginId}
+    </select>
+
+    <select id="countByEmailHmac" resultType="int">
+        SELECT COUNT(*) FROM APP_USER WHERE EMAIL_HMAC = #{emailHmac}
+    </select>
+
+    <select id="countByNickname" resultType="int">
+        SELECT COUNT(*) FROM APP_USER WHERE NICKNAME = #{nickname}
+    </select>
+
+    <!-- N-01-2 점수 있음 여부(ASSESSMENT는 읽기만 한다) -->
+    <select id="countScoredAssessments" resultType="int">
+        SELECT COUNT(*) FROM ASSESSMENT WHERE USER_ID = #{userId} AND GRADE_STATUS_CODE = 'SCORED'
+    </select>
+
+    <!-- N-02-4 가입: 일반 회원, ACTIVE, 직군은 로그인 후 선택(NULL) -->
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="userId" keyColumn="USER_ID">
+        INSERT INTO APP_USER (
+            LOGIN_ID, PASSWORD_HASH, NICKNAME, NAME_ENC, PHONE_ENC, PHONE_HMAC, EMAIL_ENC, EMAIL_HMAC,
+            BIRTH_YEAR, ROLE_CODE, ACCOUNT_STATUS_CODE, LOGIN_FAIL_COUNT, CREATED_AT
+        ) VALUES (
+            #{loginId}, #{passwordHash}, #{nickname}, #{nameEnc}, #{phoneEnc,jdbcType=VARCHAR}, #{phoneHmac,jdbcType=VARCHAR},
+            #{emailEnc}, #{emailHmac}, #{birthYear}, 'ROLE_USER', 'ACTIVE', 0, #{createdAt}
+        )
+    </insert>
+
+    <update id="updateLoginSuccess">
+        UPDATE APP_USER
+           SET LOGIN_FAIL_COUNT = 0, LAST_LOGIN_AT = #{now}
+         WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="updateLoginFailure">
+        UPDATE APP_USER
+           SET LOGIN_FAIL_COUNT = #{failCount}
+        <if test="lock">
+             , ACCOUNT_STATUS_CODE = 'LOCKED', LOCKED_AT = #{now}, LOCK_REASON = '비밀번호 5회 연속 실패'
+        </if>
+             , UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="updatePasswordAndUnlock">
+        UPDATE APP_USER
+           SET PASSWORD_HASH = #{passwordHash}, LOGIN_FAIL_COUNT = 0,
+               ACCOUNT_STATUS_CODE = CASE WHEN ACCOUNT_STATUS_CODE = 'LOCKED' THEN 'ACTIVE' ELSE ACCOUNT_STATUS_CODE END,
+               LOCKED_AT = NULL, LOCK_REASON = NULL, UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+           AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
+    </update>
+
+    <update id="updatePassword">
+        UPDATE APP_USER
+           SET PASSWORD_HASH = #{passwordHash}, UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="updateEmail">
+        UPDATE APP_USER
+           SET EMAIL_ENC = #{emailEnc}, EMAIL_HMAC = #{emailHmac}, UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- N-05-1 직군 첫 선택만. 변경(N-04-8)은 우선순위 미정이라 막는다. -->
+    <update id="updateWorkerTypeIfEmpty">
+        UPDATE APP_USER
+           SET WORKER_TYPE_CODE = #{workerTypeCode}, UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+           AND WORKER_TYPE_CODE IS NULL
+    </update>
 </mapper>

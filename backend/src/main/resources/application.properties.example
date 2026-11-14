@@ -20,8 +20,12 @@ avenue.auth.jwt.expires-minutes=60
 avenue.auth.email.mode=LOG
 # FIXED일 때만 쓰는 고정 인증코드
 avenue.auth.email.fixed-code=
-# 소셜 로그인: DEV(개발용 가짜 제공자) | REAL(실제 OAuth)
+# SMTP일 때 보내는 사람 주소. 메일 서버 설정은 spring.mail.*를 환경변수(SPRING_MAIL_HOST, SPRING_MAIL_PORT, SPRING_MAIL_USERNAME, SPRING_MAIL_PASSWORD)로 넣는다.
+avenue.auth.email.from=
+# 소셜 로그인: DEV(개발용 가짜 제공자) | REAL(실제 OAuth, 아직 지원하지 않음)
 avenue.auth.social.mode=DEV
+# 간편 로그인을 마친 뒤 돌려보낼 프론트 콜백 주소
+avenue.auth.social.callback-url=http://localhost:5173/oauth/callback
 # 다른 팀 경로를 인증 없이 임시로 열어 둔다(쉼표로 구분). 빼려면 인증 담당에게 말한다(backend/README.md).
 avenue.auth.temporary-open-paths=/api/finance/**,/api/diagnosis/**,/api/simulation/**
 

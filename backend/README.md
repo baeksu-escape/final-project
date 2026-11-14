@@ -13,6 +13,21 @@
 
 키가 없거나 형식이 틀리면 서버가 시작할 때 설정 이름을 알려 주는 오류로 멈춘다. 오류에 키 값은 나오지 않는다.
 
+이메일 인증코드(`avenue.auth.email.mode`)는 다음과 같이 고른다.
+- 기본값 `LOG`: 메일을 보내지 않고 서버 로그에 `[개발용 인증코드] … 코드=123456`을 남긴다. 받는 주소는 가린 값으로 남는다.
+- `FIXED`: `avenue.auth.email.fixed-code`를 코드로 쓴다.
+- `SMTP`: 아래 설정이 없으면 시작할 때 멈춘다.
+  - `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`(환경변수)
+  - `avenue.auth.email.from`(보내는 주소)
+
+간편 로그인은 `avenue.auth.social.mode=DEV`(기본)일 때 **개발용 가짜 제공자**로만 동작한다.
+- 외부 제공자로 나가지 않는다.
+- 제공자마다 가짜 사용자가 하나라서, 먼저 연결한 계정 하나로만 그 제공자 로그인이 된다.
+- 응답에는 `devMode: true`가 붙는다.
+- `REAL`은 아직 지원하지 않는다.
+
+프론트를 실제 서버에 붙일 때는 프론트 `.env`에 `VITE_USE_MOCK=false`, `VITE_API_BASE_URL=http://localhost:8080`을 넣는다. Vite 프록시는 없다.
+
 3. 테스트: `./mvnw test`. test 프로필(`src/test/resources/application-test.properties`)이 메모리 DB(H2)와 **공개 테스트 키**를 쓰므로 실제 DB·키 없이 돈다.
 
 ## 인증 사용법 (FP-87)
