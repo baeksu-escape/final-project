@@ -73,6 +73,51 @@
   - 브라우저에서 탈퇴 → 로그인 화면 토스트 → 옛 아이디 로그인 → 다시 가입 → 간편 로그인을 직접 눌러 보는 확인. `npm run dev`(VITE_USE_MOCK=true)로 확인해야 한다.
   - `client.js`의 401 → 로그아웃 처리는 Node에서 불러오지 못해(`import.meta.env`) 코드로만 확인했다.
 
+## [2026-11-14 · JWC / Claude Code] Spring 탈퇴 API(MEM-07) 구현 — 브랜치 `feature-A/FP-85-86-93-bundle`
+- **무엇:** 위 mock과 같은 동작을 Spring에 만들었다. `DELETE /api/members/me`에 `{ password }`를 보내면 `{}`를 돌려준다.
+  - 비밀번호가 틀리거나 비면 400 `{ code: 'INVALID_PASSWORD', message: '비밀번호가 올바르지 않습니다.', fieldErrors: [{ field: 'password', … }] }`이다.
+  - 간편 로그인 전용 계정(PASSWORD_HASH NULL)은 비밀번호 확인을 건너뛴다.
+- **처리 (`WithdrawalService`, 한 트랜잭션)**
+  1. 계정을 읽고, 이메일·휴대폰 HMAC을 덮어쓰기 전에 들고 있는다.
+  2. 대안 데이터 동의를 모두 돈다(`ConsentService.withdrawAllForLeave`).
+     - 그 동의로 불러온 IMPORTED 행을 6표에서 지운다. INP-06의 `deleteImportedRows`를 같이 쓴다.
+     - 아직 철회하지 않은 동의(만료 포함)에 WITHDRAWN_AT을 채운다. 동의 행 자체는 남긴다.
+  3. `USER_SOCIAL_ACCOUNT`를 삭제한다.
+  4. `VERIFICATION_CODE`를 삭제한다. 대상은 `USER_ID = 회원 OR TARGET_HMAC = 이메일 HMAC [OR = 휴대폰 HMAC]`이고, USER_ID가 NULL인 가입 인증 기록도 포함한다(decisions.md 회원 탈퇴 줄, N-04-7).
+  5. `APP_USER`를 `CK_APU_PII_BY_STATUS` 식 그대로 덮어쓴다(`updateWithdrawn`).
+     - 상태 값: ACCOUNT_STATUS_CODE='WITHDRAWN', WITHDRAWN_AT=서버 서울 시각
+     - 표시값: LOGIN_ID='wd_'‖USER_ID, NICKNAME='탈퇴'‖USER_ID, NAME_ENC·EMAIL_ENC='WITHDRAWN', EMAIL_HMAC='WITHDRAWN:'‖USER_ID
+     - NULL로 비우는 칸: 휴대폰·비밀번호
+  - 진단 내역(ASSESSMENT)과 직접 입력 데이터, 가입 동의, 게시글은 건드리지 않는다.
+- **탈퇴 후:** 같은 토큰은 기존 JWT 필터가 WITHDRAWN을 보고 인증하지 않아 모든 `/api/members/me/**`가 401이다. 원래 아이디·이메일·닉네임으로 바로 다시 가입할 수 있다.
+- **바뀐 파일**
+
+  | 파일 | 변경 내용 (1줄) |
+  |------|-----------------|
+  | `user/controller/MyPageController.java` | `@DeleteMapping` MEM-07 |
+  | `user/dto/MyPageDtos.java` | `Withdraw(password)` 요청 |
+  | `user/service/WithdrawalService.java` | 새 파일. 탈퇴 처리(위 순서) |
+  | `user/service/ConsentService.java` | `withdrawAllForLeave` 추가 |
+  | `user/mapper/UserAccountMapper.java`·`.xml` | `updateWithdrawn` |
+  | `user/mapper/UserSocialAccountMapper.java`·`.xml` | `deleteByUserId` |
+  | `user/mapper/VerificationCodeMapper.java`·`.xml` | `deleteForWithdrawal` |
+  | 테스트 `WithdrawalServiceTest`(9)·`WithdrawalApiTest`(2) | 새 파일 |
+
+- **DB:** DDL 변경은 없다. 쓰는 표는 APP_USER(UPDATE), USER_CONSENT(UPDATE), 대안 데이터 6표·USER_SOCIAL_ACCOUNT·VERIFICATION_CODE(DELETE)다.
+- **확인함**
+  - `./mvnw test` 143개 통과
+    - `WithdrawalServiceTest` 9개: 틀린·빈 비밀번호, 간편 로그인 전용, 처리 순서와 덮어쓰기 전 HMAC, 휴대폰 없음, 동의 3종(유효·이미 철회·만료)
+    - SQL 문 확인: updateWithdrawn의 CK 값, 가입 인증 기록(USER_ID NULL·같은 이메일 HMAC)이 OR 조건으로 지워짐, ASSESSMENT를 건드리지 않음
+    - `WithdrawalApiTest` 2개: 틀린 비밀번호 400, 탈퇴 → 같은 토큰으로 회원 API·로그아웃 401, 탈퇴 전에는 같은 아이디 가입 409였다가 탈퇴 후 200
+  - `npm run lint`·`npm run build` 통과. 프론트 코드는 바꾸지 않았다.
+  - `VITE_USE_MOCK=false` 화면을 Playwright로 확인했다. Spring 응답은 page.route로 위 계약대로 흉내 냈다.
+    - 틀린 비밀번호는 칸 옆에 오류가 뜬다.
+    - 탈퇴하면 로그아웃 요청이 401을 받아도 로그인 화면에 '탈퇴를 마쳤습니다.'가 뜨고, 토큰이 지워진다.
+- **확인 못 함:** 실제 Oracle에서의 확인은 작업 3에서 한다(CK 통과, UNIQUE, 삭제 행 수, 실제 Spring과 화면 연결).
+- **보고 목록**
+  - 탈퇴 폼은 비밀번호 칸이 비면 막는다. 그래서 간편 로그인 전용 계정은 아무 글자나 넣어야 탈퇴된다(서버는 통과). 안내·칸 숨김은 프론트 담당이 정한다.
+  - mock의 비밀번호 오류에는 code가 없고, Spring은 MEM-02와 같은 `INVALID_PASSWORD`를 준다. 화면은 fieldErrors만 본다.
+
 ## 다음 사람이 알아야 할 것
 - 일반 로그인 실패 문구 `LOGIN_FAILED_MESSAGE`를 작업 지시서대로 "아이디 또는 비밀번호가 맞지 않습니다."로 바꿨다(예전: "…올바르지 않습니다."). 같은 상수를 쓰는 로그인 화면과 소셜 기존 계정 연결 실패 문구도 함께 바뀐다.
   - `common/mocks/mockHandlers.js`의 기본 로그인 응답에도 예전 문구가 남아 있다. 이 응답은 auth mock이 같은 키로 덮어써서 화면에 나오지 않는다. 공통 파일이라 고치지 않았다.

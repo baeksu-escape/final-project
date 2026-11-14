@@ -56,4 +56,8 @@ public interface UserAccountMapper {
 
     // N-05-1 직군 첫 선택 — 직군이 비어 있을 때만 저장한다. 바뀐 행 수(0이면 이미 선택됨).
     int updateWorkerTypeIfEmpty(@Param("userId") long userId, @Param("workerTypeCode") String workerTypeCode, @Param("now") LocalDateTime now);
+
+    // N-04-7 회원 탈퇴 — 행은 남기고 상태를 WITHDRAWN으로 바꾸며 개인정보 칸을 CK_APU_PII_BY_STATUS의 표시값으로 덮어쓴다.
+    // 바뀐 행 수(0이면 이미 탈퇴했거나 회원이 없음).
+    int updateWithdrawn(@Param("userId") long userId, @Param("now") LocalDateTime now);
 }

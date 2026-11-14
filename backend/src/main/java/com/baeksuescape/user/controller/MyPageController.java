@@ -3,6 +3,7 @@ package com.baeksuescape.user.controller;
 import java.util.Map;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,6 +16,7 @@ import com.baeksuescape.global.security.AuthUser;
 import com.baeksuescape.user.dto.AuthResponses;
 import com.baeksuescape.user.dto.MyPageDtos;
 import com.baeksuescape.user.service.MyPageService;
+import com.baeksuescape.user.service.WithdrawalService;
 
 import jakarta.validation.Valid;
 
@@ -25,9 +27,11 @@ import jakarta.validation.Valid;
 public class MyPageController {
 
     private final MyPageService myPageService;
+    private final WithdrawalService withdrawalService;
 
-    public MyPageController(MyPageService myPageService) {
+    public MyPageController(MyPageService myPageService, WithdrawalService withdrawalService) {
         this.myPageService = myPageService;
+        this.withdrawalService = withdrawalService;
     }
 
     // MEM-01 N-04-1 내 정보 조회(가린 값)
@@ -53,6 +57,13 @@ public class MyPageController {
     @PutMapping("/password")
     public Map<String, Object> changePassword(@AuthenticationPrincipal AuthUser user, @Valid @RequestBody MyPageDtos.PasswordChange request) {
         myPageService.changePassword(user.userId(), request);
+        return Map.of();
+    }
+
+    // MEM-07 N-04-7 회원 탈퇴(상태 변경, DDL v0.3.2 W1). 본문 { password } → {} (프론트 myPageMockHandlers.js와 같다).
+    @DeleteMapping
+    public Map<String, Object> withdraw(@AuthenticationPrincipal AuthUser user, @RequestBody(required = false) MyPageDtos.Withdraw request) {
+        withdrawalService.withdraw(user.userId(), request);
         return Map.of();
     }
 

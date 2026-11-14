@@ -14,4 +14,7 @@ public interface UserSocialAccountMapper {
     int countByUserAndProvider(@Param("userId") long userId, @Param("providerCode") String providerCode);
 
     int insertLink(@Param("userId") long userId, @Param("providerCode") String providerCode, @Param("providerUserId") String providerUserId);
+
+    // N-04-7 회원 탈퇴 — 이 회원의 간편 로그인 연결을 모두 지운다.
+    int deleteByUserId(@Param("userId") long userId);
 }

@@ -18,4 +18,9 @@
         INSERT INTO USER_SOCIAL_ACCOUNT (USER_ID, PROVIDER_CODE, PROVIDER_USER_ID)
         VALUES (#{userId}, #{providerCode}, #{providerUserId})
     </insert>
+
+    <!-- N-04-7 회원 탈퇴: 간편 로그인 연결을 지운다. 같은 소셜 계정으로 다시 연결할 수 있다(UK_USA_PROVIDER_USER가 풀린다). -->
+    <delete id="deleteByUserId">
+        DELETE FROM USER_SOCIAL_ACCOUNT WHERE USER_ID = #{userId}
+    </delete>
 </mapper>
