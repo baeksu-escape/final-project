@@ -3,7 +3,7 @@ import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { MOCK_USERS, toMockToken } from '../../../common/mocks/mockUsers.js'
 import { ROLES } from '../../../common/config/roles.js'
 import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, EMAIL_PURPOSES, LOGIN_FAILED_MESSAGE } from '../authConstants.js'
-import { isValidEmail, isValidPassword, normalizePhone } from '../validation.js'
+import { isValidEmail, isValidPassword, normalizePhone, validateBirthYear, validateNickname } from '../validation.js'
 import {
   DEMO_ACCOUNT_CONTACTS,
   LOCKED_DEMO_ACCOUNT,
@@ -24,8 +24,8 @@ let sequence = 0
 // 아이디·비밀번호 찾기에서 계정이 없을 때 쓰는 문구. 어느 항목이 틀렸는지는 알려 주지 않는다.
 const NO_MATCH_MESSAGE = '입력한 정보와 일치하는 계정이 없습니다.'
 
-// 토큰으로 계정을 찾는다. 없으면 401.
-function requireAccountByToken(token) {
+// 토큰으로 계정을 찾는다. 없으면 401. N-04 마이페이지 mock도 이 계정 목록을 함께 쓴다.
+export function requireAccountByToken(token) {
   const account = accounts.find((item) => toMockToken(item.user.userId) === token)
   if (!account) throw new ApiError(401, '로그인이 필요합니다.')
   return account
@@ -34,6 +34,11 @@ function requireAccountByToken(token) {
 // N-01-6 소셜 로그인 mock이 아이디로 계정을 찾을 때 쓴다. 없으면 undefined.
 export function findMockAccount(loginId) {
   return accounts.find((item) => item.loginId === loginId)
+}
+
+// N-04-3 이메일 변경 mock이 다른 계정이 이미 쓰는 이메일인지 볼 때 쓴다.
+export function isMockEmailInUse(email) {
+  return accounts.some((item) => item.email === email)
 }
 
 // FP-85 등 다른 기능의 mock이 토큰 주인의 사용자 정보를 바꿀 때 쓴다(예: 직군 저장). patch를 비우면 조회만 한다.
@@ -51,7 +56,8 @@ function maskLoginId(loginId) {
 }
 
 // 이메일 인증 토큰이 목적·이메일(재설정이면 아이디까지)과 맞는지 확인하고 맞으면 꺼내서 지운다(한 번만 사용).
-function consumeVerification(token, { purpose, email, loginId }) {
+// N-04-3 이메일 변경 mock도 이 함수로 인증 토큰을 확인한다.
+export function consumeVerification(token, { purpose, email, loginId }) {
   const saved = verifications.get(token)
   const matches = saved && saved.purpose === purpose && saved.email === email && (loginId === undefined || saved.loginId === loginId)
   if (!matches) throw new ApiError(400, '이메일 인증을 다시 진행해 주세요.')
@@ -73,10 +79,11 @@ registerMockHandlers({
   // 저장된 토큰으로 내 정보 조회(새로 가입한 계정 포함).
   'GET /api/auth/me': ({ token }) => ({ user: structuredClone(requireAccountByToken(token).user) }),
 
-  // N-02·N-03 인증코드 발송 — 가입 목적이면 이미 가입된 이메일을 막는다. 재설정 목적은 계정이 있는지 알려 주지 않는다.
+  // N-02·N-03 인증코드 발송 — 가입·이메일 변경(N-04-3) 목적이면 이미 가입된 이메일을 막는다. 재설정 목적은 계정이 있는지 알려 주지 않는다.
   'POST /api/auth/email/send': ({ body }) => {
     if (!isValidEmail(body?.email)) throw new ApiError(400, '이메일 형식이 올바르지 않습니다.')
-    if (body.purpose === EMAIL_PURPOSES.SIGNUP && accounts.some((item) => item.email === body.email)) {
+    const blocksUsedEmail = body.purpose === EMAIL_PURPOSES.SIGNUP || body.purpose === EMAIL_PURPOSES.CHANGE_EMAIL
+    if (blocksUsedEmail && accounts.some((item) => item.email === body.email)) {
       throw new ApiError(409, '이미 가입된 이메일입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_EMAIL })
     }
     sentCodes.set(`${body.purpose}:${body.email}`, Date.now() + MOCK_EMAIL_CODE_TTL_SECONDS * 1000)
@@ -105,11 +112,22 @@ registerMockHandlers({
   'POST /api/auth/signup': ({ body }) => {
     if (body?.agreeCreditInfo !== true) throw new ApiError(400, '필수 동의 항목에 동의해 주세요.')
     if (!isValidPassword(body.password)) throw new ApiError(400, '비밀번호 규칙을 지켜 주세요.')
+    // N-02-1 출생연도 — 화면과 같은 규칙(validateBirthYear)으로 다시 검사하고, 어기면 칸별 오류로 돌려준다.
+    const birthYearError = validateBirthYear(body.birthYear)
+    if (birthYearError) throw new ApiError(400, birthYearError, { fieldErrors: [{ field: 'birthYear', message: birthYearError }] })
+    // N-02-1 닉네임 — 화면과 같은 규칙(validateNickname)으로 다시 검사하고, 어기면 칸별 오류로 돌려준다.
+    const nicknameError = validateNickname(body.nickname)
+    if (nicknameError) throw new ApiError(400, nicknameError, { fieldErrors: [{ field: 'nickname', message: nicknameError }] })
+    const nickname = body.nickname.trim()
     if (accounts.some((item) => item.loginId === body.loginId)) {
       throw new ApiError(409, '이미 사용 중인 아이디입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_LOGIN_ID })
     }
     if (accounts.some((item) => item.email === body.email)) {
       throw new ApiError(409, '이미 가입된 이메일입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_EMAIL })
+    }
+    // N-02-1 닉네임 중복 불가(DDL UK_APU_NICKNAME) — 탈퇴 회원의 표시값('탈퇴'+userId)도 계정 행에 남아 있으므로 함께 비교한다.
+    if (accounts.some((item) => item.nickname === nickname)) {
+      throw new ApiError(409, '이미 사용 중인 닉네임입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_NICKNAME })
     }
     // N-01-6 소셜 계정으로 가입하면 임시 연결 키가 함께 온다. 이메일 인증을 통과한 뒤에 키를 지운다.
     if (body.socialLinkKey !== undefined && !mockLinkKeys.has(body.socialLinkKey)) {
@@ -122,9 +140,12 @@ registerMockHandlers({
       loginId: body.loginId,
       password: body.password,
       locked: false,
+      createdAt: new Date().toISOString(), // N-04-1 마이페이지 가입일로 쓴다.
       email: body.email,
       phone: normalizePhone(body.phone),
       ageGroup: body.ageGroup,
+      birthYear: Number(body.birthYear),
+      nickname,
       user: { userId, name: body.name, role: ROLES.USER, jobType: null, hasScore: false },
     })
     return { userId }

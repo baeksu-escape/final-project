@@ -1,9 +1,9 @@
-// N-02 비밀번호 규칙 — 입력하는 동안 PasswordRuleList가 이 목록으로 충족 여부를 보여 준다.
+// N-02 비밀번호 규칙 — 영문과 숫자를 섞어 8자 이상, 기호는 요구하지 않는다(decisions.md 1-2). 가입·비밀번호 찾기·마이페이지가 함께 쓴다.
+// 입력하는 동안 PasswordRuleList가 이 목록으로 충족 여부를 보여 준다.
 export const PASSWORD_RULES = Object.freeze([
   { key: 'length', label: '8자 이상', test: (value) => value.length >= 8 },
   { key: 'letter', label: '영문 포함', test: (value) => /[A-Za-z]/.test(value) },
   { key: 'number', label: '숫자 포함', test: (value) => /\d/.test(value) },
-  { key: 'symbol', label: '기호 포함', test: (value) => /[^A-Za-z0-9\s]/.test(value) },
 ])
 
 // 비밀번호가 모든 규칙을 지키는지 돌려준다.
@@ -33,6 +33,46 @@ export function isValidLoginId(value) {
 // 화면 안내·오류 문구에 쓰는 아이디 규칙 설명.
 export const LOGIN_ID_RULE_TEXT ='영문 소문자로 시작하는 4~20자 영문 소문자·숫자'
 
+// N-02-1 가입 출생연도 검사 규칙.
+// 팀 결정(A안) — 출생연도만 받으므로 생일 경과는 따지지 않고 '올해 20세가 되는 해까지'로 판단한다
+// 하한 1930은 DDL v0.3.2 APP_USER.BIRTH_YEAR CHECK(1930~2006)와 같다.
+// TODO DDL CHECK의 상한은 2006으로 고정돼 있어, 2027년부터는 화면 상한(올해 − 20)과 달라진다. DB 담당과 CHECK 상한을 맞춰야 한다.
+export const BIRTH_YEAR_MIN = 1930
+export const MIN_SIGNUP_AGE = 20
+
+// 가입할 수 있는 가장 늦은 출생연도(올해 − 20). 연도를 코드에 박지 않고 실행 시점의 올해로 계산한다.
+export function getMaxBirthYear() {
+  return new Date().getFullYear() - MIN_SIGNUP_AGE
+}
+
+// 출생연도를 검사해 오류 문구를 돌려준다. 문제가 없으면 ''. 가입 화면과 가입 mock이 같은 규칙을 쓴다.
+// 4자리 정수이고 1930 ≤ 출생연도 ≤ (올해 − 20)이어야 한다.
+export function validateBirthYear(value) {
+  const text = String(value ?? '').trim()
+  if (!text) return '출생연도를 넣어 주세요.'
+  const maxYear = getMaxBirthYear()
+  const year = Number(text)
+  if (!/^\d{4}$/.test(text) || year < BIRTH_YEAR_MIN || year > maxYear) {
+    return `올해 기준 ${MIN_SIGNUP_AGE}세 이상(${maxYear}년생까지)만 가입할 수 있습니다. 출생연도를 확인해 주세요.`
+  }
+  return ''
+}
+
+// N-02-1 가입 닉네임 검사 규칙 — DDL v0.3.2 APP_USER.NICKNAME VARCHAR2(12 CHAR) NOT NULL, CK_APU_NICKNAME_LEN(2~12자), UK_APU_NICKNAME(중복 불가).
+// '탈퇴'로 시작하는 닉네임은 탈퇴 회원 표시값으로 예약돼 일반 회원이 쓸 수 없다(CK_APU_PII_BY_STATUS). 중복 여부는 서버(mock)가 본다.
+export const NICKNAME_MIN = 2
+export const NICKNAME_MAX = 12
+export const WITHDRAWN_NICKNAME_PREFIX = '탈퇴'
+
+// 닉네임을 앞뒤 공백을 뺀 값으로 검사해 오류 문구를 돌려준다. 문제가 없으면 ''. 가입 화면과 가입 mock이 같은 규칙을 쓴다.
+export function validateNickname(value) {
+  const text = String(value ?? '').trim()
+  if (!text) return '닉네임을 넣어 주세요.'
+  if (text.length < NICKNAME_MIN || text.length > NICKNAME_MAX) return `닉네임은 ${NICKNAME_MIN}~${NICKNAME_MAX}자로 넣어 주세요.`
+  if (text.startsWith(WITHDRAWN_NICKNAME_PREFIX)) return '쓸 수 없는 닉네임입니다.'
+  return ''
+}
+
 // 새 비밀번호와 확인 값을 검사해 { password?, passwordConfirm? } 오류 객체를 돌려준다(재설정 화면과 가입 화면이 함께 쓴다).
 export function validateNewPassword(password, passwordConfirm) {
   const errors = {}
@@ -51,6 +91,9 @@ export function validateSignup(form, { emailVerified }) {
 
   if (!form.name.trim()) errors.name = '이름을 입력해 주세요.'
 
+  const nicknameError = validateNickname(form.nickname)
+  if (nicknameError) errors.nickname = nicknameError
+
   if (!form.phone) errors.phone = '휴대폰 번호를 입력해 주세요.'
   else if (!isValidPhone(form.phone)) errors.phone = '휴대폰 번호 형식이 올바르지 않습니다. 예) 010-1234-5678'
 
@@ -60,7 +103,8 @@ export function validateSignup(form, { emailVerified }) {
 
   Object.assign(errors, validateNewPassword(form.password, form.passwordConfirm))
 
-  if (!form.ageGroup) errors.ageGroup = '연령대를 선택해 주세요.'
+  const birthYearError = validateBirthYear(form.birthYear)
+  if (birthYearError) errors.birthYear = birthYearError
   if (!form.agreeCreditInfo) errors.agreeCreditInfo = '필수 동의 항목입니다.'
   return errors
 }

@@ -20,7 +20,7 @@ export default function DeductionList({ deductions, onFill }) {
                   <div><Button size="sm" variant="primary" onClick={() => onFill(item.example)}>예시 값 넣어 보기</Button></div>
                 </>
               ) : (
-                <span className="sim-hint">이 시뮬레이터에서 바로 바꿀 수 없는 항목입니다. <Link to={item.linkKey ? `${PATHS.DIAGNOSIS}/${item.linkKey}` : PATHS.REPORT}>{item.linkText ?? '신용 리포트에서 내용을 확인해 보세요.'}</Link></span>
+                <span className="sim-hint">이 시뮬레이터에서 바로 바꿀 수 없는 항목입니다. <Link to={PATHS[item.linkKey] ?? PATHS.REPORT}>{item.linkText ?? '신용 리포트에서 내용을 확인해 보세요.'}</Link></span>
               )}
             </li>
           ))}

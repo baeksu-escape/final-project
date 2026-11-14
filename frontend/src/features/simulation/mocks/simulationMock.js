@@ -14,6 +14,6 @@ export const simulationExample = {
   deductions: [
     { featureCode: 'card_util_pct', label: '카드 사용 비율 68%', shapScore: -24, editable: true, condition: '월 카드 사용액 · 카드 한도', example: { cardMonthlyUsage: 2_400_000 }, exampleText: '한도의 30% 아래로 쓰기', exampleScoreChange: 20 },
     { featureCode: 'cash_advance_months', label: '현금서비스 이용 2개월', shapScore: -12, editable: true, condition: '현금서비스 이용 기간', example: { cashAdvanceMonths: 0 }, exampleText: '현금서비스 쓰지 않기', exampleScoreChange: 5 },
-    { featureCode: 'income_cv', label: '월별 소득 변동이 큼', shapScore: -9, editable: false, linkKey: 'income-volatility', linkText: '현금흐름·소득 변동성에서 소득 흐름을 확인해 보세요.' },
+    { featureCode: 'income_cv', label: '월별 소득 변동이 큼', shapScore: -9, editable: false, linkKey: 'CASH_FLOW', linkText: '현금흐름·소득 변동성에서 소득 흐름을 확인해 보세요.' },
   ],
 }
