@@ -21,6 +21,9 @@ import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import DataInputPage from '../../features/dataInput/pages/DataInputPage.jsx'
 import JobSelectPage from '../../features/dataInput/pages/JobSelectPage.jsx'
 import CreditReportPage from '../../features/credit/pages/CreditReportPage.jsx'
+import LoanProductsPage from '../../features/loans/pages/LoanProductsPage.jsx'
+import LoanProductDetailPage from '../../features/loans/pages/LoanProductDetailPage.jsx'
+import SimulationPage from '../../features/simulation/pages/SimulationPage.jsx'
 
 // N-08 직군별 재무 진단 서브탭 내용. 담당 팀은 해당 PlaceholderPage를 자기 화면으로 바꾼다.
 const DIAGNOSIS_CONTENTS = {
@@ -57,7 +60,9 @@ export default function AppRoutes() {
           <Route element={<RouteGuard requiredRole={ROLES.USER} requireJobType />}>
             <Route path={PATHS.REPORT} element={<CreditReportPage />} />
             <Route path={`${PATHS.DIAGNOSIS}/:subTab?`} element={<DiagnosisPage contents={DIAGNOSIS_CONTENTS} />} />
-            <Route path={PATHS.SIMULATOR} element={<PlaceholderPage title="점수·금리 시뮬레이터" nId="N-18" />} />
+            <Route path={PATHS.SIMULATOR} element={<SimulationPage />} />
+            <Route path={PATHS.LOANS} element={<LoanProductsPage />} />
+            <Route path={PATHS.LOAN_DETAIL} element={<LoanProductDetailPage />} />
             <Route path={PATHS.MY_PAGE} element={<PlaceholderPage title="마이 페이지" nId="N-04" />} />
             <Route path={DATA_INPUT_PATHS.DATA_INPUT} element={<DataInputPage />} />
           </Route>

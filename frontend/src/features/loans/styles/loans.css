@@ -1,0 +1,32 @@
+/* N-37 목록·상세·추천 카드 전용 스타일. 기존 테마 토큰을 재사용한다. */
+.loans-page { display: grid; gap: 20px; }
+.loans-heading h1, .loan-detail-banner h1 { margin: 0 0 8px; }
+.loans-heading p, .loan-hint { color: var(--mut); }
+.loan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.loan-card { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel); min-width: 0; }
+.loan-banner { padding: 18px; color: #fff; position: relative; min-height: 130px; }
+.loan-banner--bank { background: #2f6f5e; }
+.loan-banner--neutral { background: var(--mut); }
+.loan-banner--savings { background: #b8742a; }
+.loan-banner--policy { background: #3a5a9a; }
+.loan-banner h2 { margin: 20px 0 0; font-size: 19px; }
+.loan-ribbon { float: right; font-size: 12px; border: 1px solid currentColor; border-radius: 20px; padding: 2px 7px; }
+.loan-card__body { display: grid; gap: 12px; padding: 16px; }
+.loan-card__body p { margin: 0; line-height: 1.65; }
+.loan-card__numbers { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; }
+.loan-card__numbers span { display: grid; gap: 5px; }
+.loan-hint { font-size: 13px; }
+.loan-score { color: var(--bad); font-size: 13px; }
+.loan-score--met { color: var(--mint); }
+.loan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.loan-actions a { text-decoration: none; }
+.loan-empty { padding: 32px; border: 1px dashed var(--line); border-radius: 12px; color: var(--mut); }
+.loan-detail-banner { padding: 28px; border-radius: 14px; color: #fff; }
+.loan-detail-banner h1 { margin-top: 12px; }
+.loan-detail-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.loan-detail-facts > div { display: grid; gap: 8px; padding: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.loan-detail-facts span { color: var(--mut); font-size: 13px; }
+.loan-detail-conditions { display: grid; grid-template-columns: 140px 1fr; gap: 12px; }
+.loan-detail-conditions dd { margin: 0; }
+@media (max-width: 1100px) { .loan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .loan-detail-facts { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .loan-grid, .loan-detail-facts { grid-template-columns: 1fr; } .loan-detail-conditions { grid-template-columns: 1fr; gap: 6px; } .loan-detail-conditions dd { margin-bottom: 10px; } }

@@ -9,6 +9,8 @@ export const PATHS = Object.freeze({
   REPORT: '/report',
   DIAGNOSIS: '/diagnosis',
   SIMULATOR: '/simulator',
+  LOANS: '/loans',
+  LOAN_DETAIL: '/loans/:productId',
   MY_PAGE: '/mypage',
 
   ADMIN_MODEL: '/admin/model',
@@ -21,6 +23,7 @@ export const USER_TABS = Object.freeze([
   { key: 'report', label: '신용 리포트', path: PATHS.REPORT, nId: 'N-12' },
   { key: 'diagnosis', label: '직군별 재무 진단', path: PATHS.DIAGNOSIS, nId: 'N-16·N-21·N-22·N-24' },
   { key: 'simulator', label: '점수·금리 시뮬레이터', path: PATHS.SIMULATOR, nId: 'N-18' },
+  { key: 'loans', label: '대출 상품', path: PATHS.LOANS, nId: 'N-37' },
   { key: 'mypage', label: '마이 페이지', path: PATHS.MY_PAGE, nId: 'N-04' },
 ])
 

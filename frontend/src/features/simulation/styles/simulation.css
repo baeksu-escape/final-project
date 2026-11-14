@@ -1,0 +1,32 @@
+/* N-18 신용케어 시뮬레이터 전용 스타일. 기존 테마 토큰을 재사용한다. */
+.sim-page { display: grid; gap: 20px; }
+.sim-heading h1 { margin: 0 0 8px; }
+.sim-heading p, .sim-hint { color: var(--mut); }
+.sim-hint { font-size: 13px; }
+.sim-warn { color: var(--warn); font-size: 13px; }
+.sim-neg { color: var(--bad); }
+.sim-pos { color: var(--mint); }
+.sim-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.sim-row--baseline { justify-content: flex-start; align-items: baseline; }
+.sim-big { font: 700 44px/1.05 var(--f-d); font-variant-numeric: tabular-nums; margin: 0; }
+.sim-mid { font: 700 26px/1.1 var(--f-d); font-variant-numeric: tabular-nums; }
+.sim-deduction-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; list-style: none; padding: 0; margin: 0; }
+.sim-deduction { display: grid; gap: 6px; padding: 14px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; }
+.sim-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.sim-result { position: sticky; top: 12px; }
+.sim-slider-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; }
+.sim-money-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 12px; margin-top: 12px; }
+.sim-field { display: grid; gap: 4px; border-radius: 8px; }
+.sim-field--focus { outline: 2px solid var(--vio); outline-offset: 6px; }
+.sim-impacts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sim-impacts > div { display: grid; gap: 2px; padding: 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; }
+.sim-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sim-table th, .sim-table td { padding: 8px; border-bottom: 1px solid var(--line); text-align: right; }
+.sim-table th[scope="row"], .sim-table thead th:first-child { text-align: left; font-weight: 500; }
+.sim-product-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 960px) {
+  .sim-layout, .sim-deduction-grid { grid-template-columns: 1fr; }
+  .sim-result { position: static; }
+  .sim-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) { .sim-product-grid { grid-template-columns: 1fr; } }
