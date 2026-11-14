@@ -20,6 +20,7 @@ import { SOCIAL_PATHS } from '../../features/auth/socialLoginConfig.js'
 import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import DataInputPage from '../../features/dataInput/pages/DataInputPage.jsx'
 import JobSelectPage from '../../features/dataInput/pages/JobSelectPage.jsx'
+import MarketPage from '../../features/market/pages/MarketPage.jsx'
 
 // 앱 전체 라우트. 다른 팀은 자기 화면의 element 한 줄만 바꾼다(가드·경로 구조는 그대로 둔다).
 export default function AppRoutes() {
@@ -52,7 +53,7 @@ export default function AppRoutes() {
               <Route path={PATHS.ASSET_DEBT} element={<PlaceholderPage title="자산·부채 건전성" nId="N-16" />} />
               <Route path={PATHS.SCENARIO} element={<PlaceholderPage title="시나리오 테스트" nId="N-17" />} />
               <Route path={PATHS.CASH_FLOW} element={<PlaceholderPage title="현금흐름·소득 변동성" nId="N-21·N-22" />} />
-              <Route path={PATHS.MARKET} element={<PlaceholderPage title="상권 분석" nId="N-24" />} />
+              <Route path={PATHS.MARKET} element={<MarketPage />} />
               <Route path={PATHS.SIMULATOR} element={<PlaceholderPage title="신용케어 시뮬레이터" nId="N-18" />} />
             </Route>
             {/* 점수 없이도 여는 화면 */}
