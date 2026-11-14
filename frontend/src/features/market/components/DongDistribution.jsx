@@ -9,6 +9,13 @@ const LABEL_GAP = 70
 // N-24-3 행정동 분포 — 고른 범위의 동 값을 14구간으로 나눠 막대로 그리고 서울 평균을 점선으로 표시한다.
 export default function DongDistribution({ metric, stats, rows }) {
   const bins = histogram(rows, stats, DIST_BIN_COUNT)
+  if (bins.length === 0 || stats.seoul == null) {
+    return (
+      <Card title="행정동 분포" className="market-side-card">
+        <p className="market-hint">이 업종·지표는 자료가 없습니다.</p>
+      </Card>
+    )
+  }
   const cmax = Math.max(...bins.map((bin) => bin.count), 1)
   const span = stats.high - stats.low || 1
   const avgX = Math.min(W, Math.max(0, ((stats.seoul - stats.low) / span) * W))

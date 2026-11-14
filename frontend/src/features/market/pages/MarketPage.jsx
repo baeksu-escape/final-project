@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Card, Notice } from '../../../common/components/index.js'
+import { Button, Card, Notice } from '../../../common/components/index.js'
 import { loadMarketBase, loadMarketCategory } from '../api/marketData.js'
 import { ALL_GU, DEFAULT_CATEGORY, DEFAULT_METRIC, MAP_METRICS } from '../config/marketConfig.js'
 import DongDetailModal from '../components/DongDetailModal.jsx'
@@ -23,8 +23,10 @@ export default function MarketPage() {
   const [metricKey, setMetricKey] = useState(DEFAULT_METRIC)
   const [gu, setGu] = useState(ALL_GU)
   const [openCode, setOpenCode] = useState(null)
+  // [다시 시도]를 누를 때마다 1씩 올려 파일을 다시 읽게 한다(실패한 요청은 캐시에서 지워져 있다)
+  const [attempt, setAttempt] = useState(0)
 
-  // 처음 한 번: 기준 분기·업종·지표 정의, 행정동 목록, 동별 업종 요약
+  // 처음 한 번(또는 다시 시도할 때): 기준 분기·업종·지표 정의, 행정동 목록, 동별 업종 요약, 지도
   useEffect(() => {
     let alive = true
     loadMarketBase()
@@ -33,7 +35,7 @@ export default function MarketPage() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [attempt])
 
   // 업종을 바꿀 때마다 그 업종 파일을 읽는다. 새 파일이 올 때까지는 이전 업종 화면을 그대로 둔다.
   useEffect(() => {
@@ -44,10 +46,28 @@ export default function MarketPage() {
     return () => {
       alive = false
     }
-  }, [categoryKey])
+  }, [categoryKey, attempt])
 
-  const error = baseError || loaded.error
-  if (error) return <Notice type="warn">{error} 잠시 뒤 다시 열어 주세요.</Notice>
+  const retry = () => {
+    setBaseError('')
+    setLoaded((prev) => ({ ...prev, error: '' }))
+    setAttempt((n) => n + 1)
+  }
+  const retryButton = (
+    <Button size="sm" onClick={retry}>
+      다시 시도
+    </Button>
+  )
+
+  // 보여 줄 화면이 아직 없을 때만 화면 전체를 오류로 바꾼다
+  const fatalError = baseError || (!loaded.data && loaded.error)
+  if (fatalError) {
+    return (
+      <Notice type="warn">
+        {fatalError} {retryButton}
+      </Notice>
+    )
+  }
   if (!base || !loaded.data) return <p className="market-hint">상권 데이터를 불러오는 중입니다…</p>
 
   const { meta, dongs, dongCategories, geo } = base
@@ -83,6 +103,13 @@ export default function MarketPage() {
         <h2 className="market-page__title">서울 상권 히트맵</h2>
         <p className="market-hint">업종과 지표를 고르면 행정동 색이 바뀝니다. 동을 누르면 그 동의 상세 현황과 업종 순위가 열립니다.</p>
       </header>
+
+      {/* 업종을 바꾸다 실패하면 이전 업종 화면과 선택 바는 그대로 두고 안내만 띄운다 */}
+      {loaded.error && (
+        <Notice type="warn">
+          {loaded.error} 지금은 {category.name} 화면을 그대로 보여 줍니다. {retryButton}
+        </Notice>
+      )}
 
       <MarketFilters
         metrics={metrics.map((m) => ({ metric: m.metric, seoul: m.stats.seoul }))}

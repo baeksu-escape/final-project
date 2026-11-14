@@ -17,9 +17,11 @@ export default function MarketLegend({ metric, stats }) {
         </span>
         <span className="market-hint">좋음</span>
       </span>
-      <span className="market-hint market-num">
-        초록 = 서울 평균 {formatMetric(metric, stats.seoul)} 근처 ({formatMetric(metric, low)} ~ {formatMetric(metric, high)})
-      </span>
+      {stats.seoul != null && (
+        <span className="market-hint market-num">
+          초록 = 서울 평균 {formatMetric(metric, stats.seoul)} 근처 ({formatMetric(metric, low)} ~ {formatMetric(metric, high)})
+        </span>
+      )}
       <span className="market-legend__ramp">
         <i className="market-ramp__cell market-bin--none" aria-hidden="true" />
         <span className="market-hint">자료 없음</span>

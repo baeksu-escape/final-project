@@ -39,6 +39,7 @@ export default function DongDetailModal({ dong, meta, categoryData, category, me
   const totals = categoryData.rankTotal[metric.key]
 
   const summary = dongCategories[dong.code] || {}
+  const myStores = summary[category.code]?.storeCount ?? null
   const storeOrder = meta.categories
     .map((c) => ({ code: c.code, v: summary[c.code]?.storeCount ?? -1 }))
     .sort((a, b) => b.v - a.v)
@@ -118,8 +119,16 @@ export default function DongDetailModal({ dong, meta, categoryData, category, me
             </div>
           </div>
           <p className="market-detail__text">
-            {dong.name}의 {josa(category.name, '은', '는')} 점포 {formatMetric(storeMetric, summary[category.code]?.storeCount ?? null)}으로 이 동에서{' '}
-            <b>{storeOrder + 1}번째</b>로 많은 업종입니다.
+            {myStores == null ? (
+              <>
+                {dong.name}의 {josa(category.name, '은', '는')} 점포 자료가 없습니다.
+              </>
+            ) : (
+              <>
+                {dong.name}의 {josa(category.name, '은', '는')} 점포 {formatMetric(storeMetric, myStores)}으로 이 동에서{' '}
+                <b>{storeOrder + 1}번째</b>로 많은 업종입니다.
+              </>
+            )}
             {ranked.length > 1 && (
               <>
                 {' '}

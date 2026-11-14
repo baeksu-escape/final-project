@@ -32,12 +32,15 @@ export function dongValue(categoryData, quarter, code, key) {
 // 색을 칠할 기준값. 가운데는 서울 평균(합계 기준), 폭은 행정동 값의 표준편차.
 export function metricStats(categoryData, quarter, dongs, key) {
   const values = dongs.map((dong) => dongValue(categoryData, quarter, dong.code, key)).filter((v) => v != null)
+  const seoul = categoryData.seoul[quarter]?.[key] ?? null
+  // 값이 하나도 없으면 범위는 비워 두고, 화면은 "자료 없음"으로 보여 준다
+  if (values.length === 0) return { seoul, sd: 1, min: null, max: null, low: null, high: null }
   const mean = values.reduce((a, b) => a + b, 0) / values.length
   const sd = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length) || 1
   const sorted = [...values].sort((a, b) => a - b)
   const pick = (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]
   return {
-    seoul: categoryData.seoul[quarter][key],
+    seoul,
     sd,
     min: sorted[0],
     max: sorted[sorted.length - 1],
@@ -47,9 +50,9 @@ export function metricStats(categoryData, quarter, dongs, key) {
   }
 }
 
-// 서울 평균에서 좋은 쪽으로 몇 표준편차 떨어졌는지. 값이 없으면 null.
+// 서울 평균에서 좋은 쪽으로 몇 표준편차 떨어졌는지. 값이나 서울 평균이 없으면 null.
 export function scoreOf(value, stats, metric) {
-  if (value == null) return null
+  if (value == null || stats.seoul == null) return null
   return (metric.dir * (value - stats.seoul)) / stats.sd
 }
 
@@ -100,8 +103,9 @@ export function guAverages(categoryData, quarter, stats, metric) {
   return sortWorstFirst(rows)
 }
 
-// low~high를 같은 폭으로 나눠 구간마다 동 수를 센다. 범위 밖 값은 양 끝 구간에 넣는다.
+// low~high를 같은 폭으로 나눠 구간마다 동 수를 센다. 범위 밖 값은 양 끝 구간에 넣는다. 값이 없으면 빈 배열.
 export function histogram(rows, stats, count) {
+  if (stats.low == null) return []
   const step = (stats.high - stats.low) / count || 1
   const bins = Array.from({ length: count }, (_, i) => ({ from: stats.low + step * i, to: stats.low + step * (i + 1), count: 0 }))
   rows.forEach((row) => {
@@ -118,6 +122,7 @@ export function categoryRanking(dongSummary, categories, option) {
   return rows.sort((a, b) => {
     const va = a.summary[option.value]
     const vb = b.summary[option.value]
+    if (va == null && vb == null) return 0
     if (va == null) return 1
     if (vb == null) return -1
     return option.dir * (vb - va)
