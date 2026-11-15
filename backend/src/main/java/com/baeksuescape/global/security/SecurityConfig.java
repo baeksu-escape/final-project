@@ -37,6 +37,8 @@ public class SecurityConfig {
             "/api/auth/password/reset",
             "/api/auth/social/**",
             "/api/auth/admin/verify-code",
+            // FP-80 관리자 첫 로그인 비밀번호 설정(ADMIN_PASSWORD_SETUP 토큰을 본문으로 받는다)
+            "/api/auth/admin/password-setup",
     };
 
     @Bean
@@ -71,7 +73,8 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(properties.getCors().getAllowedOrigins());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        // FP-80 X-Step-Up-Token: 관리자 재확인 토큰(관리자 추가·비밀번호 변경·임시 비밀번호 재발급)
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Step-Up-Token"));
         config.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);

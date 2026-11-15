@@ -31,9 +31,9 @@ public class AuthController {
         this.emailVerification = emailVerification;
     }
 
-    // AUTH-01 N-01-1 로그인
+    // AUTH-01 N-01-1 로그인. 일반 사용자는 { accessToken, user }, 관리자는 { twoFactorRequired, challengeToken, maskedEmail }(FP-80).
     @PostMapping("/login")
-    public AuthResponses.Login login(@Valid @RequestBody AuthRequests.Login request) {
+    public AuthResponses.LoginResult login(@Valid @RequestBody AuthRequests.Login request) {
         return authService.login(request);
     }
 

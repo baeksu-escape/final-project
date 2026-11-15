@@ -47,7 +47,7 @@ public ProfileResponse profile(@AuthenticationPrincipal AuthUser user) {
 ### 권한 규칙 (`global/security/SecurityConfig`)
 | 경로 | 권한 |
 |---|---|
-| `POST /api/auth/login`, `signup`, `email/**`, `find-id`, `password/reset`, `social/**`, `admin/verify-code` | 인증 없음 |
+| `POST /api/auth/login`, `signup`, `email/**`, `find-id`, `password/reset`, `social/**`, `admin/verify-code`, `admin/password-setup` | 인증 없음 |
 | `avenue.auth.temporary-open-paths`에 있는 경로 | 인증 없음 (임시) |
 | `/api/admin/**` | `ROLE_ADMIN` |
 | `/api/members/me/**`, `/api/report/**` | `ROLE_USER` |
@@ -58,6 +58,12 @@ public ProfileResponse profile(@AuthenticationPrincipal AuthUser user) {
 - 잠긴(`LOCKED`) 계정은 로그인만 막는다.
 - 실패 응답: 401 `{ "code": "UNAUTHORIZED", ... }`, 403 `{ "code": "FORBIDDEN", ... }`.
 - 비밀번호 해시는 `PasswordEncoder` 빈(BCrypt)을 주입받아 쓴다.
+- (FP-80) JWT는 `scope` 클레임이 `ACCESS`인 토큰만 로그인으로 받는다. 관리자 2단계 인증·재확인용 짧은 토큰으로 `/api/**`를 부르면 401이다.
+
+### 시스템 로그 남기기 (`global/log/SystemLogService`, FP-80)
+- `systemLog.record(SystemLogService.Type.AUTH|INFO|WARN, "출처(예: board)", "내용", 관련 USER_ID 또는 null)`로 `SYSTEM_LOG`에 1건 남긴다.
+- 부르는 쪽 트랜잭션과 따로 저장하고, 저장에 실패해도 예외를 던지지 않는다(본 요청은 그대로 성공한다).
+- 내용에 이름·연락처·이메일 원문, 비밀번호·인증번호·토큰을 넣지 않는다. 아이디는 `SystemLogService.maskLoginId(loginId)`(앞 2자 + `***`)로만 쓴다.
 
 ### 오류 던지기 (`global/exception`)
 모든 오류 응답은 `{ "code", "message", "fieldErrors": [{ "field", "message" }] }`이다. 프론트 `serverErrors.js`가 이 모양을 읽는다.

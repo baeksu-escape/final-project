@@ -28,4 +28,8 @@ public interface VerificationCodeMapper {
 
     // 인증 토큰을 한 번 쓴다. 아직 쓰지 않았고 유효하면 EXPIRES_AT을 지금으로 당기고 1을 돌려준다(0이면 이미 썼거나 만료).
     int consume(@Param("verificationId") long verificationId, @Param("now") LocalDateTime now);
+
+    // N-04-7 회원 탈퇴 — 이 회원의 인증 기록을 지운다. 회원 번호뿐 아니라 이메일·휴대폰 HMAC으로도 찾는다(가입 인증은 USER_ID가 NULL).
+    // phoneHmac은 휴대폰이 없으면 null이다. HMAC은 개인정보를 덮어쓰기 전에 읽어 둔 값을 넘긴다.
+    int deleteForWithdrawal(@Param("userId") long userId, @Param("emailHmac") String emailHmac, @Param("phoneHmac") String phoneHmac);
 }

@@ -71,6 +71,8 @@ export function validateFinancialInput(values, sections, { checkRequired = true,
       }
     } else {
       for (const field of section.fields) {
+        // FP-86 비활성 칸(예: "신용 이력이 없어요" 체크 시 카드·연체 칸)은 null로 보내므로 검사하지 않는다.
+        if (field.disabledWhen?.(value)) continue
         const key = errorKeyOf(section.key, field.key)
         checkField(field, value[field.key], { row: value, values, nowMonth }, errors, key, checkRequired)
       }

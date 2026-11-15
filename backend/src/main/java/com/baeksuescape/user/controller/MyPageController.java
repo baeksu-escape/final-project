@@ -1,20 +1,26 @@
 package com.baeksuescape.user.controller;
 
+import java.time.Instant;
 import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.baeksuescape.global.security.AuthUser;
+import com.baeksuescape.global.security.JwtTokenProvider;
 import com.baeksuescape.user.dto.AuthResponses;
 import com.baeksuescape.user.dto.MyPageDtos;
 import com.baeksuescape.user.service.MyPageService;
+import com.baeksuescape.user.service.WithdrawalService;
 
 import jakarta.validation.Valid;
 
@@ -24,10 +30,16 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/members/me")
 public class MyPageController {
 
-    private final MyPageService myPageService;
+    private static final String BEARER = "Bearer ";
 
-    public MyPageController(MyPageService myPageService) {
+    private final MyPageService myPageService;
+    private final WithdrawalService withdrawalService;
+    private final JwtTokenProvider tokenProvider;
+
+    public MyPageController(MyPageService myPageService, WithdrawalService withdrawalService, JwtTokenProvider tokenProvider) {
         this.myPageService = myPageService;
+        this.withdrawalService = withdrawalService;
+        this.tokenProvider = tokenProvider;
     }
 
     // MEM-01 N-04-1 내 정보 조회(가린 값)
@@ -53,6 +65,16 @@ public class MyPageController {
     @PutMapping("/password")
     public Map<String, Object> changePassword(@AuthenticationPrincipal AuthUser user, @Valid @RequestBody MyPageDtos.PasswordChange request) {
         myPageService.changePassword(user.userId(), request);
+        return Map.of();
+    }
+
+    // MEM-07 N-04-7 회원 탈퇴(상태 변경, DDL v0.3.2 W1). 본문 { password } → {} (프론트 myPageMockHandlers.js와 같다).
+    // 간편 로그인 전용 계정의 최근 로그인 확인용으로 이 요청 토큰의 발급 시각(iat)을 함께 넘긴다. 토큰은 JWT 필터가 이미 검증했다.
+    @DeleteMapping
+    public Map<String, Object> withdraw(@AuthenticationPrincipal AuthUser user, @RequestBody(required = false) MyPageDtos.Withdraw request,
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        Instant issuedAt = tokenProvider.issuedAt(authorization.substring(BEARER.length()).trim()).orElse(null);
+        withdrawalService.withdraw(user.userId(), request, issuedAt);
         return Map.of();
     }
 
