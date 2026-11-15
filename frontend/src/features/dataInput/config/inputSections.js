@@ -2,13 +2,14 @@ import { JOB_TYPES } from '../../../common/config/jobTypes.js'
 import { formatWithComma } from '../../../common/utils/number.js'
 import {
   amountRule,
+  cardSpendRule,
   countEnteredMonths,
   incomeMonthRule,
   incomeRemainingNotice,
   monthRule,
   numberRule,
 } from '../validation/inputRules.js'
-import { LOAN_RATE_TYPE_OPTIONS, LOAN_SECTOR_OPTIONS, OTHER_EXPENSE_CATEGORY_OPTIONS } from './inputOptions.js'
+import { LOAN_RATE_TYPE_OPTIONS, LOAN_TYPE_OPTIONS, OTHER_EXPENSE_CATEGORY_OPTIONS } from './inputOptions.js'
 import { VALIDATION_LIMITS } from './validationLimits.js'
 
 // FP-86 금액 칸 규칙 — 월 단위 금액과 쌓인 금액(잔액·자산)의 상한이 다르다. 상한값은 validationLimits.js에 있다.
@@ -23,6 +24,8 @@ const balanceAmountRule = amountRule(VALIDATION_LIMITS.BALANCE_AMOUNT_MAX)
 //   required: 필수 여부   options: select 선택지   unit·min·max·step: number 보조값   hint: 안내 문구
 //   validate(value, { row, values, nowMonth }): FP-86 상세 검증을 꽂는 자리 — 문제가 있으면 오류 문구를 돌려준다(값이 있을 때만 호출).
 //     규칙 함수는 validation/inputRules.js에 있다.
+//   input: 'checkbox'는 체크 칸(값은 true/false)이다.
+//   disabledWhen(sectionValue): 칸 섹션 전용 — true면 칸을 비활성화하고, 검사하지 않으며, 요청 본문에 null로 보낸다.
 //
 // 섹션(section) 설정
 //   kind: 'fields'(칸 묶음) | 'list'(줄 추가·삭제)   fields | itemFields: 칸 목록
@@ -122,6 +125,57 @@ function sumAssets(value) {
   )
 }
 
+// "신용 이력이 없어요"를 체크했는지 — 체크하면 대부업 잔액 외 칸을 비활성화하고 null로 보낸다.
+const hasNoCreditHistory = (value) => value?.noCreditHistory === true
+
+// D-29 카드·신용 이용(11/06 확정 UI 순서) — 신용평가사 API 대신 회원이 직접 입력해 USER_CREDIT_PROFILE(SOURCE_CODE='MANUAL')에 저장한다.
+// 입력 완료 현황(completionItems.js 6항목)에는 넣지 않는다. 최근 3개월 최장 연체일수 칸은 두지 않는다(O-16).
+const CREDIT_PROFILE_SECTION = {
+  key: 'creditProfile',
+  title: '카드·신용 이용',
+  description: '신용카드와 대출 이용 기록을 입력해 주세요. 신용카드·대출을 써 본 적이 없으면 아래 항목을 체크해 주세요.',
+  kind: 'fields',
+  fields: [
+    { key: 'cardLimitAmount', label: '카드 한도', input: 'money', validate: balanceAmountRule, disabledWhen: hasNoCreditHistory },
+    { key: 'cardMonthlySpendAmount', label: '월 카드 사용액', input: 'money', validate: cardSpendRule, disabledWhen: hasNoCreditHistory },
+    {
+      key: 'delinquencyCount12m',
+      label: '최근 1년 연체(30일 이상)',
+      input: 'number',
+      unit: '회',
+      min: 0,
+      max: VALIDATION_LIMITS.CREDIT_COUNT_MAX,
+      step: 1,
+      validate: numberRule({ max: VALIDATION_LIMITS.CREDIT_COUNT_MAX, integer: true, unit: '회' }),
+      disabledWhen: hasNoCreditHistory,
+    },
+    {
+      key: 'cashAdvanceMonths',
+      label: '현금서비스 이용(최근 12개월)',
+      input: 'number',
+      unit: '개월',
+      min: 0,
+      max: VALIDATION_LIMITS.CASH_ADVANCE_MONTHS_MAX,
+      step: 1,
+      validate: numberRule({ max: VALIDATION_LIMITS.CASH_ADVANCE_MONTHS_MAX, integer: true, unit: '개월' }),
+      disabledWhen: hasNoCreditHistory,
+    },
+    {
+      key: 'newLoanCount3m',
+      label: '최근 3개월 신규 대출(상환 중)',
+      input: 'number',
+      unit: '건',
+      min: 0,
+      max: VALIDATION_LIMITS.CREDIT_COUNT_MAX,
+      step: 1,
+      validate: numberRule({ max: VALIDATION_LIMITS.CREDIT_COUNT_MAX, integer: true, unit: '건' }),
+      disabledWhen: hasNoCreditHistory,
+    },
+    { key: 'privateLenderLoanBalanceAmount', label: '대부업 대출 잔액', input: 'money', validate: balanceAmountRule },
+    { key: 'noCreditHistory', label: '신용 이력이 없어요', input: 'checkbox' },
+  ],
+}
+
 // 모든 직군이 함께 입력하는 섹션(화면 순서대로).
 export const COMMON_SECTIONS = Object.freeze([
   {
@@ -133,7 +187,8 @@ export const COMMON_SECTIONS = Object.freeze([
     addLabel: '대출 추가',
     emptyMessage: '추가한 대출이 없습니다.',
     itemFields: [
-      { key: 'sectorCode', label: '업권', input: 'select', options: LOAN_SECTOR_OPTIONS, required: true },
+      // N-05-3 대출 종류(DIM_LOAN_TYPE). FP-86 작업 5에서 옛 '업권'(sectorCode)을 바꿨다 — INP-02 요청 필드도 loanTypeCode.
+      { key: 'loanTypeCode', label: '대출 종류', input: 'select', options: LOAN_TYPE_OPTIONS, required: true },
       { key: 'balanceAmount', label: '대출 잔액', input: 'money', required: true, validate: balanceAmountRule },
       {
         key: 'annualRatePercent',
@@ -156,10 +211,13 @@ export const COMMON_SECTIONS = Object.freeze([
         min: 0,
         max: VALIDATION_LIMITS.REMAINING_MONTHS_MAX,
         step: 1,
+        // DDL USER_LOAN.REMAINING_MONTHS는 NOT NULL이라 필수다(0개월은 입력할 수 있다).
+        required: true,
         validate: numberRule({ max: VALIDATION_LIMITS.REMAINING_MONTHS_MAX, integer: true, unit: '개월' }),
       },
     ],
   },
+  CREDIT_PROFILE_SECTION,
   {
     key: 'assets',
     title: '자산',

@@ -12,6 +12,14 @@ import { errorKeyOf } from './inputValidation.js'
 // 서버가 입력값 오류를 알려 줄 때의 코드(error.data.code).
 export const INPUT_ERROR_CODE = 'INVALID_INPUT'
 
+// N-05-8 [점수 산출하기]가 409로 막힐 때의 코드(error.data.code). Avenue API 명세서 B팀 v0.2 3-1 기준.
+//   INPUT_INCOMPLETE: 입력 완료 현황이 덜 참 / JOB_TYPE_REQUIRED: 직군 미선택 / REQUEST_ID_CONFLICT: 이미 쓰인 requestId
+export const SCORE_ERROR_CODES = Object.freeze({
+  INPUT_INCOMPLETE: 'INPUT_INCOMPLETE',
+  JOB_TYPE_REQUIRED: 'JOB_TYPE_REQUIRED',
+  REQUEST_ID_CONFLICT: 'REQUEST_ID_CONFLICT',
+})
+
 const ROW_FIELD_PATH = /^(\w+)\.items\[(\d+)\]\.(\w+)$/
 const LIST_PATH = /^(\w+)\.items$/
 const SECTION_FIELD_PATH = /^(\w+)\.(\w+)$/

@@ -15,6 +15,7 @@ export default function SectionFields({ section, value, onFieldChange, errors })
           value={value[field.key]}
           onChange={(fieldValue) => onFieldChange(field.key, fieldValue)}
           error={errors[errorKeyOf(section.key, field.key)]}
+          disabled={field.disabledWhen?.(value) ?? false}
         />
       ))}
       {section.summary && <p className="input-section__summary">{section.summary(value)}</p>}

@@ -1,0 +1,178 @@
+# 마이페이지 회원 탈퇴 추가 — 상태 변경 방식, 간편 로그인 연결 삭제 (FP-93)
+
+- **날짜:** 2026-11-12
+- **작성자:** JWC / Claude Code
+- **브랜치:** `feature-A/FP-93-withdrawal` (`feature-A/FP-85-utility-consent`에서 분기)
+- **관련 N-ID:** N-04-7 (함께 고친 곳: N-01-1 로그인, N-01-6 소셜 로그인 mock)
+- **관련 결정:** DDL v0.3.2 W1(탈퇴 = 상태 변경), `CK_APU_PII_BY_STATUS`, API 정의서 1장 "탈퇴 회원" 규칙
+  - 팀 결정: 재가입 제한 없음, 탈퇴하면 `USER_SOCIAL_ACCOUNT` 삭제
+
+## 무엇을, 왜 바꿨나
+- 마이페이지 맨 아래에 '회원 탈퇴' 카드를 추가했다(`WithdrawalCard.jsx`).
+  - [회원 탈퇴]를 누르면 안내문과 비밀번호 확인 폼이 열린다. 버튼은 [탈퇴하기]·[취소]다.
+  - 비밀번호가 틀리면 칸 옆에 오류를 보여 준다.
+  - 성공하면 로그아웃하고 로그인 화면으로 보낸다. 로그인 화면은 "탈퇴를 마쳤습니다." 알림을 공통 `Toast`로 띄운다.
+- 탈퇴 mock은 계정 행을 지우지 않고 값만 바꾼다.
+
+  | 항목 | 탈퇴 후 값 |
+  |---|---|
+  | 상태 | `accountStatus = 'WITHDRAWN'`, `withdrawnAt = 현재 시각` |
+  | 아이디 | `'wd_' + userId` |
+  | 닉네임 | `'탈퇴' + userId` |
+  | 이름·이메일 | `'WITHDRAWN'` |
+  | 휴대폰·비밀번호 | null |
+
+  - 그 이메일로 보낸 인증코드·인증 토큰도 지운다(N-04-7 "인증 기록 삭제").
+- 동의로 불러온 대안 데이터를 지우고, 동의 이력에는 철회 시각을 채운다. FP-85 저장소의 `withdrawAllAltDataOfUser`를 쓴다.
+- 진단 내역은 보관한다. 탈퇴한 토큰은 401이라 조회만 막힌다.
+- 탈퇴한 토큰으로 `/api/members/me/**`(그리고 `/api/auth/me`)를 부르면 401 `{ code: 'UNAUTHORIZED' }`를 돌려준다. `common/api/client.js`의 기존 401 → 로그아웃 처리가 그대로 동작한다.
+- 옛 아이디로 로그인하면 일반 실패 문구가 나온다. 같은 아이디·이메일로 바로 다시 가입할 수 있다.
+  - 다시 가입한 계정은 새 userId(`u-아이디-2` 등)를 받는다. 탈퇴 계정의 옛 토큰·mock 데이터와 섞이지 않는다.
+- 소셜 로그인 mock에 간편 로그인 연결 기록(`mockSocialLinks`, 제공자 → userId)을 추가했다.
+  - 탈퇴하면 그 회원의 연결 기록을 지운다.
+  - 같은 제공자로 다시 로그인하면 '처음 연결' 흐름으로 간다.
+
+## 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `frontend/src/features/auth/components/WithdrawalCard.jsx` | 새 파일. 회원 탈퇴 카드(안내문·비밀번호 확인·[탈퇴하기]·[취소]) |
+| `frontend/src/features/auth/pages/MyPage.jsx` | 맨 아래에 회원 탈퇴 카드 |
+| `frontend/src/features/auth/pages/LoginPage.jsx` | 다른 화면이 넘긴 알림(state.notice)을 토스트로 표시 |
+| `frontend/src/features/auth/authConstants.js` | 일반 로그인 실패 문구를 지시서 문구 "아이디 또는 비밀번호가 맞지 않습니다."로 |
+| `frontend/src/features/auth/api/myPageApi.js` | `DELETE /api/members/me`(🟡 제안 경로), `requestWithdrawal` |
+| `frontend/src/features/auth/mocks/myPageMockHandlers.js` | 탈퇴 mock: 비밀번호 확인, 대안 데이터·간편 로그인 연결 삭제, 상태 변경 |
+| `frontend/src/features/auth/mocks/authMockHandlers.js` | 탈퇴 계정 거르기(토큰 401 UNAUTHORIZED·로그인·소셜 연결), `withdrawMockAccount`, `findMockAccountByUserId`, 겹치지 않는 userId |
+| `frontend/src/features/auth/mocks/socialLoginMockData.js` | 간편 로그인 연결 기록과 회원별 삭제 함수 |
+| `frontend/src/features/auth/mocks/socialLoginMockHandlers.js` | LINKED 시나리오는 연결 기록으로 계정을 찾고, 없으면 '처음 연결' |
+
+## DB·API 변경
+- DB: 없음. DDL v0.3.2 `APP_USER`(ACCOUNT_STATUS_CODE·WITHDRAWN_AT·CK_APU_PII_BY_STATUS)와 `USER_SOCIAL_ACCOUNT`를 따른다.
+- API(mock, 🟡 제안 경로)
+
+| 요청 | 본문 | 응답 | 오류 |
+|------|------|------|------|
+| `DELETE /api/members/me` | `{ password }` | `{}` | 400 `fieldErrors [{ field: 'password', message }]` |
+
+- 탈퇴한 토큰으로 부르는 모든 회원 API: 401 `{ code: 'UNAUTHORIZED' }`
+- 영향을 받는 기능·팀원
+  - Spring 회원 담당: 탈퇴 처리, 인증 기록 삭제, 소셜 연결 삭제
+  - 커뮤니티 담당: 탈퇴 회원 글·댓글 표시. 이번에는 건드리지 않았다.
+
+## 확인
+- 확인함: `npm run lint` 통과, `npm run build` 통과
+- 확인함: Node 스크립트로 mock 처리 함수를 직접 불러 30개 항목 통과
+  1. 빈 비밀번호·틀린 비밀번호면 400 fieldErrors이고 계정이 유지된다.
+  2. 탈퇴 → 같은 토큰으로 회원 API 6개 모두 401 UNAUTHORIZED
+  3. 대안 데이터 삭제, 동의 이력 유지(철회 시각 채움)
+  4. 옛 아이디·`wd_` 아이디로 로그인 실패(일반 문구)
+  5. 세 제공자 모두 간편 로그인이 '처음 연결'로 가고, 탈퇴 계정에는 소셜 연결 불가
+  6. 같은 아이디·이메일로 다시 가입하면 새 userId·새 토큰, 옛 데이터와 섞이지 않음, 옛 토큰은 계속 401
+  7. 다른 계정은 영향 없음
+- 확인함: FP-85 점검 72개를 다시 돌려 모두 통과
+- 확인 못 함
+  - 브라우저에서 탈퇴 → 로그인 화면 토스트 → 옛 아이디 로그인 → 다시 가입 → 간편 로그인을 직접 눌러 보는 확인. `npm run dev`(VITE_USE_MOCK=true)로 확인해야 한다.
+  - `client.js`의 401 → 로그아웃 처리는 Node에서 불러오지 못해(`import.meta.env`) 코드로만 확인했다.
+
+## [2026-11-14 · JWC / Claude Code] Spring 탈퇴 API(MEM-07) 구현 — 브랜치 `feature-A/FP-85-86-93-bundle`
+- **무엇:** 위 mock과 같은 동작을 Spring에 만들었다. `DELETE /api/members/me`에 `{ password }`를 보내면 `{}`를 돌려준다.
+  - 비밀번호가 틀리거나 비면 400 `{ code: 'INVALID_PASSWORD', message: '비밀번호가 올바르지 않습니다.', fieldErrors: [{ field: 'password', … }] }`이다.
+  - 간편 로그인 전용 계정(PASSWORD_HASH NULL)은 비밀번호 확인을 건너뛴다.
+- **처리 (`WithdrawalService`, 한 트랜잭션)**
+  1. 계정을 읽고, 이메일·휴대폰 HMAC을 덮어쓰기 전에 들고 있는다.
+  2. 대안 데이터 동의를 모두 돈다(`ConsentService.withdrawAllForLeave`).
+     - 그 동의로 불러온 IMPORTED 행을 6표에서 지운다. INP-06의 `deleteImportedRows`를 같이 쓴다.
+     - 아직 철회하지 않은 동의(만료 포함)에 WITHDRAWN_AT을 채운다. 동의 행 자체는 남긴다.
+  3. `USER_SOCIAL_ACCOUNT`를 삭제한다.
+  4. `VERIFICATION_CODE`를 삭제한다. 대상은 `USER_ID = 회원 OR TARGET_HMAC = 이메일 HMAC [OR = 휴대폰 HMAC]`이고, USER_ID가 NULL인 가입 인증 기록도 포함한다(decisions.md 회원 탈퇴 줄, N-04-7).
+  5. `APP_USER`를 `CK_APU_PII_BY_STATUS` 식 그대로 덮어쓴다(`updateWithdrawn`).
+     - 상태 값: ACCOUNT_STATUS_CODE='WITHDRAWN', WITHDRAWN_AT=서버 서울 시각
+     - 표시값: LOGIN_ID='wd_'‖USER_ID, NICKNAME='탈퇴'‖USER_ID, NAME_ENC·EMAIL_ENC='WITHDRAWN', EMAIL_HMAC='WITHDRAWN:'‖USER_ID
+     - NULL로 비우는 칸: 휴대폰·비밀번호
+  - 진단 내역(ASSESSMENT)과 직접 입력 데이터, 가입 동의, 게시글은 건드리지 않는다.
+- **탈퇴 후:** 같은 토큰은 기존 JWT 필터가 WITHDRAWN을 보고 인증하지 않아 모든 `/api/members/me/**`가 401이다. 원래 아이디·이메일·닉네임으로 바로 다시 가입할 수 있다.
+- **바뀐 파일**
+
+  | 파일 | 변경 내용 (1줄) |
+  |------|-----------------|
+  | `user/controller/MyPageController.java` | `@DeleteMapping` MEM-07 |
+  | `user/dto/MyPageDtos.java` | `Withdraw(password)` 요청 |
+  | `user/service/WithdrawalService.java` | 새 파일. 탈퇴 처리(위 순서) |
+  | `user/service/ConsentService.java` | `withdrawAllForLeave` 추가 |
+  | `user/mapper/UserAccountMapper.java`·`.xml` | `updateWithdrawn` |
+  | `user/mapper/UserSocialAccountMapper.java`·`.xml` | `deleteByUserId` |
+  | `user/mapper/VerificationCodeMapper.java`·`.xml` | `deleteForWithdrawal` |
+  | 테스트 `WithdrawalServiceTest`(9)·`WithdrawalApiTest`(2) | 새 파일 |
+
+- **DB:** DDL 변경은 없다. 쓰는 표는 APP_USER(UPDATE), USER_CONSENT(UPDATE), 대안 데이터 6표·USER_SOCIAL_ACCOUNT·VERIFICATION_CODE(DELETE)다.
+- **확인함**
+  - `./mvnw test` 143개 통과
+    - `WithdrawalServiceTest` 9개: 틀린·빈 비밀번호, 간편 로그인 전용, 처리 순서와 덮어쓰기 전 HMAC, 휴대폰 없음, 동의 3종(유효·이미 철회·만료)
+    - SQL 문 확인: updateWithdrawn의 CK 값, 가입 인증 기록(USER_ID NULL·같은 이메일 HMAC)이 OR 조건으로 지워짐, ASSESSMENT를 건드리지 않음
+    - `WithdrawalApiTest` 2개: 틀린 비밀번호 400, 탈퇴 → 같은 토큰으로 회원 API·로그아웃 401, 탈퇴 전에는 같은 아이디 가입 409였다가 탈퇴 후 200
+  - `npm run lint`·`npm run build` 통과. 프론트 코드는 바꾸지 않았다.
+  - `VITE_USE_MOCK=false` 화면을 Playwright로 확인했다. Spring 응답은 page.route로 위 계약대로 흉내 냈다.
+    - 틀린 비밀번호는 칸 옆에 오류가 뜬다.
+    - 탈퇴하면 로그아웃 요청이 401을 받아도 로그인 화면에 '탈퇴를 마쳤습니다.'가 뜨고, 토큰이 지워진다.
+- **확인 못 함:** 실제 Oracle에서의 확인은 작업 3에서 한다(CK 통과, UNIQUE, 삭제 행 수, 실제 Spring과 화면 연결).
+- **보고 목록**
+  - 탈퇴 폼은 비밀번호 칸이 비면 막는다. 그래서 간편 로그인 전용 계정은 아무 글자나 넣어야 탈퇴된다(서버는 통과). 안내·칸 숨김은 프론트 담당이 정한다.
+  - mock의 비밀번호 오류에는 code가 없고, Spring은 MEM-02와 같은 `INVALID_PASSWORD`를 준다. 화면은 fieldErrors만 본다.
+
+## 다음 사람이 알아야 할 것
+- 일반 로그인 실패 문구 `LOGIN_FAILED_MESSAGE`를 작업 지시서대로 "아이디 또는 비밀번호가 맞지 않습니다."로 바꿨다(예전: "…올바르지 않습니다."). 같은 상수를 쓰는 로그인 화면과 소셜 기존 계정 연결 실패 문구도 함께 바뀐다.
+  - `common/mocks/mockHandlers.js`의 기본 로그인 응답에도 예전 문구가 남아 있다. 이 응답은 auth mock이 같은 키로 덮어써서 화면에 나오지 않는다. 공통 파일이라 고치지 않았다.
+- 데모 계정은 비밀번호가 없어(null) 비어 있지 않은 값이면 통과한다. 틀린 비밀번호 확인은 새로 가입한 계정이나 비밀번호를 바꾼 계정으로 해야 한다.
+- 공개 메인 화면(N-10)이 없고 로그아웃 상태의 `/`는 로그인 화면으로 가므로, "메인으로 보낸다"를 로그인 화면으로 보내는 것으로 처리했다.
+- 탈퇴는 되돌릴 수 없다. mock은 메모리에만 있어 새로고침하면 데모 계정이 되살아난다.
+- 탈퇴 회원의 평가를 통계(N-13·N-25·N-26)에 넣을지는 팀 결정이 남아 있다(D-28).
+- 새로 붙인 클래스: `withdrawal-card`, `withdrawal-card__open`, `withdrawal-form`, `withdrawal-form__notice`. 폼 버튼은 기존 `account-form__*`를 다시 썼다. 스타일은 넣지 않았다.
+
+## 추가 반영 (2026-11-13) — 탈퇴 뒤 로그인 화면 알림이 사라지는 문제
+- **발견:** 기능 단위 모의 테스트에서 탈퇴 뒤 로그인 화면에 "탈퇴를 마쳤습니다."가 뜨지 않았다. 실제 App을 jsdom에 그려 클릭으로 진행한 테스트다.
+- **원인**
+  - `logout()`이 로그인 상태를 비우면 화면이 다시 그려진다. 이때 아직 `/mypage`에 있는 라우트 가드(RouteGuard)가 `{ from: '/mypage' }`만 담아 로그인 화면으로 보낸다.
+  - 탈퇴 카드의 `navigate(..., { state: { notice } })`와 가드의 이동 중 어느 쪽이 나중일지 정해져 있지 않다. react-router 7의 BrowserRouter는 주소 이동을 `startTransition`으로 처리한다.
+  - 가드가 나중에 실행되면 notice가 사라진다. 테스트에서 실제로 가드가 나중이었다.
+- **바꾼 방법**(팀원 결정): 알림 문구를 로그인 상태 관리(AuthProvider)에 한 번만 쓰는 값으로 맡긴다.
+  - `common/auth/AuthProvider.jsx` (공유 파일)
+    - `notice` 상태와 `clearNotice()`를 추가했다.
+    - `logout({ notice })`는 로그아웃 상태와 알림을 같은 렌더에 반영한다. 인자 없는 기존 `logout()`은 그대로 동작한다(헤더 [로그아웃]).
+    - context의 기존 키는 그대로 두었다.
+  - `common/auth/useAuth.js`: 사용법 주석만 바꿨다.
+  - `WithdrawalCard.jsx`: `logout({ notice: '탈퇴를 마쳤습니다.' })` 뒤에 로그인 화면으로 보낸다. 화면 이동 state는 더 넘기지 않는다.
+  - `LoginPage.jsx`
+    - 들어올 때 맡아 둔 알림을 화면 상태로 옮겨 토스트로 보여 주고, 곧바로 `clearNotice()`로 비운다.
+    - 예전의 `location.state.notice` 방식은 이 방식으로 바꿨다. 다른 곳에서는 쓰지 않았다.
+    - 마크업과 className은 그대로다.
+- **확인함**
+  - `npm run lint`·`npm run build` 통과. mock 점검 30개(FP-93)·72개(FP-85) 통과.
+  - 기능 테스트(FP-93)
+    - 탈퇴 뒤 로그인 화면에 "탈퇴를 마쳤습니다."가 보인다. employee 탈퇴 포함 2곳에서 확인했다.
+    - 같은 화면에서 다른 계정으로 로그인했다가 헤더 [로그아웃]을 하면 알림이 다시 뜨지 않는다.
+    - 새로고침한 로그인 화면에도 알림이 없다.
+  - 이 브랜치 단독에서는 "직군 없는 새 계정의 마이페이지" 1건이 실패한다.
+    - 이 브랜치가 PR #45 수정 전의 FP-199 위에 있기 때문이다(마이페이지가 직군 가드 안에 있음).
+    - PR #45·FP-85·FP-86·FP-87과 합친 상태에서는 통과한다.
+- **팀 확인:** 공유 파일인 AuthProvider에 `notice`·`clearNotice`·`logout({ notice })`가 생겼다. 다른 기능도 로그아웃 뒤 로그인 화면에 알림을 띄울 때 같은 방법을 쓸 수 있다.
+
+## [2026-11-14 · JWC / Claude Code] PR #52 리뷰 반영 — 간편 로그인 전용 계정 탈퇴 재인증, 회원 행 잠금
+- **팀 결정(리뷰 7):** 비밀번호가 없는 간편 로그인 전용 계정은 비밀번호 대신 최근 로그인을 확인한다.
+  - 기준: 이 요청 JWT의 발급 시각(iat)이 10분 이내여야 탈퇴된다.
+  - 10분이 지났거나 iat를 모르면 403 `RECENT_LOGIN_REQUIRED` + `fieldErrors[{ field: 'password', message: '보안을 위해 간편 로그인으로 다시 로그인한 뒤 10분 안에 탈퇴해 주세요.' }]`
+  - 비밀번호가 있는 계정은 지금처럼 비밀번호를 확인한다.
+  - 10분은 `WithdrawalService.RECENT_LOGIN_WINDOW` 상수로 두었다. `TODO(2차: 간편 로그인 재인증 화면)`
+- **바뀐 파일**
+  - `MyPageController`: 요청 토큰의 iat를 읽어 넘긴다.
+  - `JwtTokenProvider.issuedAt(token)` 추가: 공유 보안 파일이지만 새 메서드만 더했고, 기존 `parse`는 그대로다.
+  - `WithdrawalService`: 맨 앞에서 `lockUser`를 부르고 최근 로그인을 확인한다.
+- **확인:** `WithdrawalServiceTest` 11개 통과
+  - iat 9분 성공, 11분·iat 없음 403, 비밀번호 계정은 iat와 상관없음, 잠금이 첫 단계
+- **화면:** 고치지 않았다. 403은 로그아웃을 일으키지 않고, 탈퇴 카드가 password 칸 오류로 보여 준다.
+  - 화면이 빈 비밀번호 칸을 막으므로, 간편 로그인 전용 계정은 아무 글자나 넣어야 서버까지 간다(기존 보고와 같음).
+
+## 검수
+> 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
+
+| 이름 | 역할 | 날짜 | 의견 |
+|------|------|------|------|
+| | | | |

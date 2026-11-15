@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-80 N-27 계정·권한 관리 (APP_USER, DDL v0.3.2). 이름은 암호문이라 검색하지 않는다(아이디·닉네임만). -->
+<mapper namespace="com.baeksuescape.admin.mapper.AdminAccountMapper">
+
+    <!-- 계정 한 줄: 최근 대안 점수(가장 늦은 평가의 ALT_SCORE, 없으면 NULL), 그 회원이 쓴 글·댓글에 들어온 신고 건수 -->
+    <sql id="userColumns">
+        u.USER_ID AS userId, u.LOGIN_ID AS loginId, u.NAME_ENC AS nameEnc, u.ROLE_CODE AS roleCode, u.WORKER_TYPE_CODE AS workerTypeCode,
+        (SELECT MAX(a.ALT_SCORE) KEEP (DENSE_RANK LAST ORDER BY a.ASSESSED_AT, a.ASSESSMENT_ID)
+           FROM ASSESSMENT a WHERE a.USER_ID = u.USER_ID) AS latestAltScore,
+        u.ACCOUNT_STATUS_CODE AS accountStatusCode,
+        (SELECT COUNT(*) FROM CONTENT_REPORT r
+          WHERE r.POST_ID IN (SELECT p.POST_ID FROM BOARD_POST p WHERE p.USER_ID = u.USER_ID)
+             OR r.COMMENT_ID IN (SELECT c.COMMENT_ID FROM BOARD_COMMENT c WHERE c.USER_ID = u.USER_ID)) AS reportedPostCount,
+        u.CREATED_AT AS createdAt, u.LAST_LOGIN_AT AS lastLoginAt
+    </sql>
+
+    <sql id="userFilter">
+        <where>
+            <if test="qLike != null">
+                (LOWER(u.LOGIN_ID) LIKE LOWER(#{qLike}) ESCAPE '\' OR LOWER(u.NICKNAME) LIKE LOWER(#{qLike}) ESCAPE '\')
+            </if>
+            <if test="role != null">AND u.ROLE_CODE = #{role}</if>
+            <if test="status != null">AND u.ACCOUNT_STATUS_CODE = #{status}</if>
+            <if test="status == null and !includeWithdrawn">AND u.ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'</if>
+        </where>
+    </sql>
+
+    <!-- ADM-05 최근 가입 순, page·size로 자른다 -->
+    <select id="selectUsers" resultType="com.baeksuescape.admin.dto.AdminRows$UserData">
+        SELECT <include refid="userColumns"/>
+          FROM APP_USER u
+        <include refid="userFilter"/>
+         ORDER BY u.USER_ID DESC
+        OFFSET #{offset} ROWS FETCH NEXT #{size} ROWS ONLY
+    </select>
+
+    <select id="countUsers" resultType="long">
+        SELECT COUNT(*) FROM APP_USER u
+        <include refid="userFilter"/>
+    </select>
+
+    <select id="selectUser" resultType="com.baeksuescape.admin.dto.AdminRows$UserData">
+        SELECT <include refid="userColumns"/>
+          FROM APP_USER u
+         WHERE u.USER_ID = #{userId}
+    </select>
+
+    <!-- ADM-06 잠금·해제. 탈퇴 계정은 바꾸지 않는다. -->
+    <update id="updateLocked">
+        UPDATE APP_USER
+           SET ACCOUNT_STATUS_CODE = 'LOCKED', LOCK_REASON = #{reason}, LOCKED_AT = #{now}, UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+           AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
+    </update>
+
+    <update id="updateUnlocked">
+        UPDATE APP_USER
+           SET ACCOUNT_STATUS_CODE = 'ACTIVE', LOGIN_FAIL_COUNT = 0, LOCK_REASON = NULL, LOCKED_AT = NULL, UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+           AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
+    </update>
+
+    <!-- ADM-07 관리자 추가: CK_APU_USER_FIELDS가 관리자의 출생연도 NULL을 허용한다. 직군·휴대폰도 NULL. -->
+    <insert id="insertAdmin" useGeneratedKeys="true" keyProperty="userId" keyColumn="USER_ID">
+        INSERT INTO APP_USER (
+            LOGIN_ID, PASSWORD_HASH, NICKNAME, NAME_ENC, EMAIL_ENC, EMAIL_HMAC, ROLE_CODE, ACCOUNT_STATUS_CODE,
+            LOGIN_FAIL_COUNT, PASSWORD_CHANGE_REQUIRED_YN, CREATED_AT
+        ) VALUES (
+            #{loginId}, #{passwordHash}, #{nickname}, #{nameEnc}, #{emailEnc}, #{emailHmac}, 'ROLE_ADMIN', 'ACTIVE',
+            0, 'Y', #{createdAt}
+        )
+    </insert>
+
+    <!-- 임시 비밀번호 재발급: 관리자만, 탈퇴 제외. 잠겼으면 푼다. -->
+    <update id="updateTemporaryPassword">
+        UPDATE APP_USER
+           SET PASSWORD_HASH = #{passwordHash}, PASSWORD_CHANGE_REQUIRED_YN = 'Y', ACCOUNT_STATUS_CODE = 'ACTIVE',
+               LOGIN_FAIL_COUNT = 0, LOCK_REASON = NULL, LOCKED_AT = NULL, UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+           AND ROLE_CODE = 'ROLE_ADMIN'
+           AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
+    </update>
+
+    <update id="updatePasswordChanged">
+        UPDATE APP_USER
+           SET PASSWORD_HASH = #{passwordHash}, PASSWORD_CHANGE_REQUIRED_YN = 'N', UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+           AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
+    </update>
+
+    <select id="selectPasswordChangeRequired" resultType="string">
+        SELECT PASSWORD_CHANGE_REQUIRED_YN FROM APP_USER WHERE USER_ID = #{userId}
+    </select>
+</mapper>

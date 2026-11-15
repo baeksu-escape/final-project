@@ -11,8 +11,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.baeksuescape.admin.service.AdminAuthService;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
+import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.global.security.JwtTokenProvider;
 import com.baeksuescape.global.util.PiiCrypto;
 import com.baeksuescape.global.util.PiiHmac;
@@ -29,6 +31,7 @@ import com.baeksuescape.user.service.social.DevSocialStore;
 public class AuthService {
 
     static final int MAX_LOGIN_FAILURES = 5;
+    static final String LOG_SOURCE = "auth-service";
 
     private final UserAccountMapper userMapper;
     private final UserConsentMapper consentMapper;
@@ -41,10 +44,12 @@ public class AuthService {
     private final PiiCrypto crypto;
     private final PiiHmac hmac;
     private final Clock clock;
+    private final AdminAuthService adminAuth;
+    private final SystemLogService systemLog;
 
     public AuthService(UserAccountMapper userMapper, UserConsentMapper consentMapper, UserSocialAccountMapper socialMapper,
             EmailVerificationService emailVerification, DevSocialStore socialStore, UserViewFactory userViews, JwtTokenProvider tokenProvider,
-            PasswordEncoder passwordEncoder, PiiCrypto crypto, PiiHmac hmac, Clock clock) {
+            PasswordEncoder passwordEncoder, PiiCrypto crypto, PiiHmac hmac, Clock clock, AdminAuthService adminAuth, SystemLogService systemLog) {
         this.userMapper = userMapper;
         this.consentMapper = consentMapper;
         this.socialMapper = socialMapper;
@@ -56,15 +61,17 @@ public class AuthService {
         this.crypto = crypto;
         this.hmac = hmac;
         this.clock = clock;
+        this.adminAuth = adminAuth;
+        this.systemLog = systemLog;
     }
 
-    // AUTH-01 로그인. 관리자는 2단계 인증(AUTH-11)이 준비될 때까지 비밀번호가 맞아도 토큰을 주지 않는다.
+    // AUTH-01 로그인. 일반 사용자는 토큰을 준다(응답 그대로).
+    // FP-80 관리자는 비밀번호가 맞아도 토큰을 주지 않고, 업무 이메일로 6자리 번호를 보낸 뒤 2단계 인증 대기 응답을 준다(AUTH-11로 이어짐).
     @Transactional(noRollbackFor = ApiException.class)
-    public AuthResponses.Login login(AuthRequests.Login request) {
+    public AuthResponses.LoginResult login(AuthRequests.Login request) {
         UserAccount account = authenticate(request.loginId(), request.password());
         if (account.isAdmin()) {
-            // TODO(작업 7) 관리자 로그인 2단계 인증(AUTH-11 /api/auth/admin/verify-code)을 만들면 여기서 인증번호 단계로 넘긴다.
-            throw new ApiException(HttpStatus.CONFLICT, "ADMIN_2FA_NOT_READY", "관리자 로그인은 2단계 인증을 준비하고 있어 아직 쓸 수 없습니다.");
+            return adminAuth.startLogin(account);
         }
         return loginResponse(account);
     }
@@ -81,7 +88,15 @@ public class AuthService {
                 int failures = account.getLoginFailCount() + 1;
                 boolean lock = failures >= MAX_LOGIN_FAILURES;
                 userMapper.updateLoginFailure(account.getUserId(), failures, lock, LocalDateTime.now(clock));
-                if (lock) throw AuthErrors.accountLocked();
+                // FP-80 N-28-1 로그인 실패 n/5회, 5회째 자동 잠금(WARN). 아이디는 가린 값만 남긴다.
+                String masked = SystemLogService.maskLoginId(account.getLoginId());
+                systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 실패 " + failures + "/" + MAX_LOGIN_FAILURES + "회 (" + masked + ")",
+                        account.getUserId());
+                if (lock) {
+                    systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 " + MAX_LOGIN_FAILURES + "회 실패로 계정 자동 잠금 (" + masked + ")",
+                            account.getUserId());
+                    throw AuthErrors.accountLocked();
+                }
             }
             throw AuthErrors.loginFailed();
         }
@@ -92,6 +107,8 @@ public class AuthService {
     // 로그인 성공 처리(실패 횟수 0, 마지막 로그인 시각)와 응답. 간편 로그인도 쓴다.
     public AuthResponses.Login loginResponse(UserAccount account) {
         userMapper.updateLoginSuccess(account.getUserId(), LocalDateTime.now(clock));
+        systemLog.record(SystemLogService.Type.AUTH, LOG_SOURCE, "로그인 성공 (" + SystemLogService.maskLoginId(account.getLoginId()) + ")",
+                account.getUserId());
         return new AuthResponses.Login(tokenProvider.issue(account.getUserId(), account.getRoleCode()), userViews.of(account));
     }
 
@@ -204,6 +221,7 @@ public class AuthService {
     }
 
     // AUTH-10 비밀번호 재설정 — 이메일 인증 토큰(재설정 목적, 확인 때 찾은 계정)을 한 번 쓰고 새 비밀번호로 바꾼다. 잠긴 계정은 풀린다.
+    // FP-80 관리자는 쓸 수 없다: 조회가 일반 회원만 찾으므로(selectUserByLoginIdAndEmailHmac) 관리자 아이디는 "없는 계정"과 같은 404가 된다.
     @Transactional
     public void resetPassword(AuthRequests.PasswordReset request) {
         if (!AccountRules.isValidPassword(request.newPassword())) {

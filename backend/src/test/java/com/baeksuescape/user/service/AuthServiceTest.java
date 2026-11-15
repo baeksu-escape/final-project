@@ -29,9 +29,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.transaction.support.TransactionOperations;
 
+import com.baeksuescape.admin.service.AdminAuthService;
 import com.baeksuescape.global.TestKeys;
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.global.log.SystemLogMapper;
+import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.global.security.JwtTokenProvider;
 import com.baeksuescape.user.dto.AuthRequests;
 import com.baeksuescape.user.dto.AuthResponses;
@@ -54,6 +58,10 @@ class AuthServiceTest {
     private UserSocialAccountMapper socialMapper;
     @Mock
     private EmailVerificationService emailVerification;
+    @Mock
+    private AdminAuthService adminAuth;
+    @Mock
+    private SystemLogMapper systemLogMapper;
 
     private final JwtTokenProvider tokenProvider = new JwtTokenProvider(TestKeys.properties());
     private final DevSocialStore socialStore = new DevSocialStore(CLOCK);
@@ -62,7 +70,8 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         service = new AuthService(userMapper, consentMapper, socialMapper, emailVerification, socialStore,
-                new UserViewFactory(userMapper, CRYPTO), tokenProvider, ENCODER, CRYPTO, HMAC, CLOCK);
+                new UserViewFactory(userMapper, CRYPTO), tokenProvider, ENCODER, CRYPTO, HMAC, CLOCK, adminAuth,
+                new SystemLogService(systemLogMapper, TransactionOperations.withoutTransaction(), CLOCK));
     }
 
     private static String codeOf(Runnable action) {
@@ -83,7 +92,7 @@ class AuthServiceTest {
         given(userMapper.selectByLoginId("employee")).willReturn(account);
         given(userMapper.countScoredAssessments(7L)).willReturn(1);
 
-        AuthResponses.Login result = service.login(new AuthRequests.Login("employee", PASSWORD));
+        AuthResponses.Login result = (AuthResponses.Login) service.login(new AuthRequests.Login("employee", PASSWORD));
 
         assertThat(tokenProvider.parse(result.accessToken())).isPresent();
         assertThat(result.user()).isEqualTo(new AuthResponses.UserView(7L, "홍*동", "ROLE_USER", "EMPLOYEE", true));
@@ -116,11 +125,43 @@ class AuthServiceTest {
         verify(userMapper, never()).updateLoginSuccess(anyLong(), any());
     }
 
+    // FP-80 관리자는 비밀번호가 맞아도 토큰을 주지 않고 2단계 인증 대기 응답(AdminAuthService.startLogin)으로 넘어간다.
     @Test
-    void 관리자는_비밀번호가_맞아도_토큰_없이_409() {
-        given(userMapper.selectByLoginId("admin")).willReturn(UserFixtures.account(1L, "admin", UserAccount.ROLE_ADMIN, UserAccount.ACTIVE));
-        assertThat(codeOf(() -> service.login(new AuthRequests.Login("admin", PASSWORD)))).isEqualTo("409 ADMIN_2FA_NOT_READY");
+    void 관리자는_비밀번호가_맞아도_토큰_없이_2단계_인증으로_넘어간다() {
+        UserAccount admin = UserFixtures.account(1L, "admin", UserAccount.ROLE_ADMIN, UserAccount.ACTIVE);
+        given(userMapper.selectByLoginId("admin")).willReturn(admin);
+        given(adminAuth.startLogin(admin)).willReturn(new AuthResponses.AdminChallenge(true, "challenge-1", "ad***@example.com"));
+
+        AuthResponses.LoginResult result = service.login(new AuthRequests.Login("admin", PASSWORD));
+
+        assertThat(result).isEqualTo(new AuthResponses.AdminChallenge(true, "challenge-1", "ad***@example.com"));
         verify(userMapper, never()).updateLoginSuccess(anyLong(), any());
+    }
+
+    // FP-80 N-28-1 로그인 성공(AUTH)·실패 n/5회(WARN)·자동 잠금(WARN)을 남긴다. 아이디는 앞 2자 + *** 만.
+    @Test
+    void 로그인_성공_실패_자동_잠금을_시스템_로그에_가린_아이디로_남긴다() {
+        UserAccount account = UserFixtures.user(7L, "employee");
+        given(userMapper.selectByLoginId("employee")).willReturn(account);
+        service.login(new AuthRequests.Login("employee", PASSWORD));
+        verify(systemLogMapper).insertLog(eq("AUTH"), eq("auth-service"), eq("로그인 성공 (em***)"), eq(7L), any());
+
+        account.setLoginFailCount(4);
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))).isEqualTo("423 ACCOUNT_LOCKED");
+        verify(systemLogMapper).insertLog(eq("WARN"), eq("auth-service"), eq("로그인 실패 5/5회 (em***)"), eq(7L), any());
+        verify(systemLogMapper).insertLog(eq("WARN"), eq("auth-service"), eq("로그인 5회 실패로 계정 자동 잠금 (em***)"), eq(7L), any());
+    }
+
+    // FP-80 시스템 로그 저장이 실패해도 로그인은 성공한다(별도 트랜잭션, 예외를 삼키고 앱 로그에 경고만).
+    @Test
+    void 시스템_로그_저장이_실패해도_로그인은_성공한다() {
+        given(userMapper.selectByLoginId("employee")).willReturn(UserFixtures.user(7L, "employee"));
+        given(systemLogMapper.insertLog(anyString(), anyString(), anyString(), any(), any())).willThrow(new IllegalStateException("db down"));
+
+        AuthResponses.Login result = (AuthResponses.Login) service.login(new AuthRequests.Login("employee", PASSWORD));
+
+        assertThat(result.accessToken()).isNotBlank();
+        verify(userMapper).updateLoginSuccess(eq(7L), any());
     }
 
     @Test
@@ -266,5 +307,23 @@ class AuthServiceTest {
                 .isEqualTo("404 ACCOUNT_NOT_FOUND");
         assertThatThrownBy(() -> service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "short")))
                 .isInstanceOf(ApiException.class);
+    }
+
+    // FP-80 관리자는 공개 비밀번호 찾기(AUTH-10)·아이디 찾기(AUTH-09)를 쓸 수 없다 — 조회가 일반 회원만 찾으므로 "없는 계정"과 같은 응답이다.
+    @Test
+    void 관리자_아이디로_비밀번호_찾기를_하면_없는_계정과_같은_응답() throws java.io.IOException {
+        // 매퍼 SQL이 일반 회원(ROLE_USER)만 찾는다 → 관리자 아이디면 조회 결과가 없다(mock은 기본 null).
+        String xml = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/mapper/user/UserAccountMapper.xml"));
+        for (String id : new String[] { "selectUserByLoginIdAndEmailHmac", "selectUsersByPhoneHmac" }) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("<select id=\"" + id + "\"[^>]*>(.*?)</select>", java.util.regex.Pattern.DOTALL)
+                    .matcher(xml);
+            assertThat(m.find()).isTrue();
+            assertThat(m.group(1)).contains("ROLE_CODE = 'ROLE_USER'");
+        }
+
+        String admin = codeOf(() -> service.resetPassword(new AuthRequests.PasswordReset("admin01", "admin01@example.com", "token", "newpass99")));
+        String unknown = codeOf(() -> service.resetPassword(new AuthRequests.PasswordReset("nobody", "nobody@example.com", "token", "newpass99")));
+        assertThat(admin).isEqualTo(unknown).isEqualTo("404 ACCOUNT_NOT_FOUND");
+        verify(emailVerification, never()).consume(anyString(), any(), anyString(), anyLong());
     }
 }

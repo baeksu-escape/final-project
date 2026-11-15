@@ -11,12 +11,14 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
 import com.baeksuescape.global.exception.ErrorResponse;
+import com.baeksuescape.user.service.AuthErrors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 // FP-87 보안 필터 단계의 401·403을 공통 오류 모양 JSON으로 보낸다. 401 → UNAUTHORIZED(로그인 필요·토큰 만료·탈퇴 회원), 403 → FORBIDDEN(역할이 다름).
+// FP-80 잠긴 계정의 토큰이면 401 code를 ACCOUNT_LOCKED로 보낸다(문구는 로그인 423과 같다).
 @Component
 public class JsonErrorWriter implements AuthenticationEntryPoint, AccessDeniedHandler {
 
@@ -28,6 +30,10 @@ public class JsonErrorWriter implements AuthenticationEntryPoint, AccessDeniedHa
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException e) throws IOException {
+        if (Boolean.TRUE.equals(request.getAttribute(JwtAuthenticationFilter.ACCOUNT_LOCKED_ATTRIBUTE))) {
+            write(response, HttpServletResponse.SC_UNAUTHORIZED, ErrorResponse.of("ACCOUNT_LOCKED", AuthErrors.ACCOUNT_LOCKED_MESSAGE));
+            return;
+        }
         write(response, HttpServletResponse.SC_UNAUTHORIZED, ErrorResponse.of("UNAUTHORIZED", "로그인이 필요합니다."));
     }
 

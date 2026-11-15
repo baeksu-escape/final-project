@@ -7,6 +7,10 @@ import ForbiddenPage from '../pages/ForbiddenPage.jsx'
 import HomeRedirect from '../pages/HomeRedirect.jsx'
 import NotFoundPage from '../pages/NotFoundPage.jsx'
 import PlaceholderPage from '../pages/PlaceholderPage.jsx'
+import { ADMIN_PATHS } from '../../features/admin/adminConstants.js'
+import AdminAccountsPage from '../../features/admin/pages/AdminAccountsPage.jsx'
+import AdminAuditLogsPage from '../../features/admin/pages/AdminAuditLogsPage.jsx'
+import AdminPasswordPage from '../../features/admin/pages/AdminPasswordPage.jsx'
 import { AUTH_PATHS } from '../../features/auth/authPaths.js'
 import GuestOnlyRoute from '../../features/auth/components/GuestOnlyRoute.jsx'
 import FindIdPage from '../../features/auth/pages/FindIdPage.jsx'
@@ -74,9 +78,11 @@ export default function AppRoutes() {
           <Route element={<RouteGuard requiredRole={ROLES.ADMIN} />}>
             <Route path={PATHS.ADMIN_MODEL} element={<PlaceholderPage title="모형 성능 비교" nId="N-25" />} />
             <Route path={PATHS.ADMIN_STATS} element={<PlaceholderPage title="직군·연령별 통계" nId="N-26" />} />
-            <Route path={PATHS.ADMIN_ACCOUNTS} element={<PlaceholderPage title="계정·권한 관리" nId="N-27" />} />
+            <Route path={PATHS.ADMIN_ACCOUNTS} element={<AdminAccountsPage />} />
             <Route path={PATHS.ADMIN_REPORTS} element={<AdminReportsPage />} />
-            <Route path={PATHS.ADMIN_AUDIT} element={<PlaceholderPage title="접근·감사 로그" nId="N-28·N-35" />} />
+            <Route path={PATHS.ADMIN_AUDIT} element={<AdminAuditLogsPage />} />
+            {/* FP-80 관리자 비밀번호 변경 — 탭이 아니라 헤더의 [비밀번호 변경]으로 들어온다 */}
+            <Route path={ADMIN_PATHS.PASSWORD} element={<AdminPasswordPage />} />
           </Route>
         </Route>
       </Route>

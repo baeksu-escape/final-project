@@ -1,0 +1,1 @@
+{"member_id": "MEM000001", "provider": "dummy_utility_api", "is_dummy": true, "status": "OK", "bills": [{"bill_month": "2025-09", "billed_amount_krw": 26400, "due_date": "2025-09-20", "paid_date": "2025-09-11", "payment_status": "on_time"}]}

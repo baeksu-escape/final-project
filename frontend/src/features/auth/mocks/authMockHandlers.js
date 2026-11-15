@@ -11,6 +11,7 @@ import {
   MOCK_EMAIL_CODE_TTL_SECONDS,
 } from './authMockData.js'
 import { mockLinkKeys } from './socialLoginMockData.js'
+import { startAdminLoginChallenge } from '../../admin/mocks/adminLoginChallenges.js'
 
 // N-01~N-03 mock 계정 목록 — 메모리에만 있어 새로고침하면 가입자는 사라진다. password가 null이면 비밀번호를 비교하지 않는다(데모 계정).
 const accounts = [
@@ -24,16 +25,43 @@ let sequence = 0
 // 아이디·비밀번호 찾기에서 계정이 없을 때 쓰는 문구. 어느 항목이 틀렸는지는 알려 주지 않는다.
 const NO_MATCH_MESSAGE = '입력한 정보와 일치하는 계정이 없습니다.'
 
-// 토큰으로 계정을 찾는다. 없으면 401. N-04 마이페이지 mock도 이 계정 목록을 함께 쓴다.
+// N-04-7 탈퇴 계정 상태 값(DDL v0.3.2 APP_USER.ACCOUNT_STATUS_CODE)과, 탈퇴 계정 토큰으로 부를 때의 401 코드.
+const WITHDRAWN_STATUS = 'WITHDRAWN'
+const UNAUTHORIZED_CODE = 'UNAUTHORIZED'
+
+// 탈퇴한 계정인지 본다. 탈퇴해도 계정 행은 남으므로(W1) 로그인·토큰 확인·소셜 연결에서 따로 걸러 낸다.
+function isWithdrawn(account) {
+  return account.accountStatus === WITHDRAWN_STATUS
+}
+
+// 토큰으로 계정을 찾는다. 없거나 탈퇴한 계정이면 401 { code: 'UNAUTHORIZED' }(client.js가 받아서 로그아웃시킨다).
+// N-04 마이페이지·N-05 데이터 입력 등 /api/members/me/** mock도 이 함수를 거친다.
 export function requireAccountByToken(token) {
-  const account = accounts.find((item) => toMockToken(item.user.userId) === token)
-  if (!account) throw new ApiError(401, '로그인이 필요합니다.')
+  const account = accounts.find((item) => !isWithdrawn(item) && toMockToken(item.user.userId) === token)
+  if (!account) throw new ApiError(401, '로그인이 필요합니다.', { code: UNAUTHORIZED_CODE })
   return account
 }
 
-// N-01-6 소셜 로그인 mock이 아이디로 계정을 찾을 때 쓴다. 없으면 undefined.
+// N-01-6 소셜 로그인 mock이 아이디로 계정을 찾을 때 쓴다. 없거나 탈퇴한 계정이면 undefined.
 export function findMockAccount(loginId) {
-  return accounts.find((item) => item.loginId === loginId)
+  return accounts.find((item) => !isWithdrawn(item) && item.loginId === loginId)
+}
+
+// N-01-6 소셜 연결 기록(제공자 → userId)으로 계정을 찾을 때 쓴다. 없거나 탈퇴한 계정이면 undefined.
+export function findMockAccountByUserId(userId) {
+  return accounts.find((item) => !isWithdrawn(item) && item.user.userId === userId)
+}
+
+// FP-80 관리자 계정 관리 mock(ADM-05~08)이 전체 계정(탈퇴 포함)을 볼 때 쓴다. 잠금처럼 값을 바꾸면 로그인 mock에도 그대로 반영된다.
+export function listMockAccounts() {
+  return accounts
+}
+
+// FP-80 관리자 계정 추가(ADM-07)·관리자 mock 시연 계정이 새 계정을 넣을 때 쓴다. userId는 여기서 정하고, 넣은 계정을 돌려준다.
+export function addMockAccount({ user, ...rest }) {
+  const account = { locked: false, ...rest, user: { ...user, userId: createMockUserId(rest.loginId) } }
+  accounts.push(account)
+  return account
 }
 
 // N-04-3 이메일 변경 mock이 다른 계정이 이미 쓰는 이메일인지 볼 때 쓴다.
@@ -47,6 +75,39 @@ export function patchMockAccountUser(token, patch = {}) {
   const account = requireAccountByToken(token)
   Object.assign(account.user, patch)
   return structuredClone(account.user)
+}
+
+// N-04-7 회원 탈퇴 — 계정 행은 지우지 않고 상태를 WITHDRAWN으로 바꾼 뒤 개인정보 칸을 표시값으로 덮어쓴다(DDL v0.3.2 W1, CK_APU_PII_BY_STATUS).
+// 원래 아이디·이메일은 비게 되므로 바로 다시 가입할 수 있다. 그 이메일로 보낸 인증코드·인증 토큰도 지운다(N-04-7 인증 기록 삭제).
+// 동의로 불러온 대안 데이터·간편 로그인 연결은 부르는 쪽(myPageMockHandlers.js)이 따로 지운다.
+export function withdrawMockAccount(account) {
+  const { userId } = account.user
+  const { email } = account
+  sentCodes.forEach((_, key) => {
+    if (key.endsWith(`:${email}`)) sentCodes.delete(key)
+  })
+  verifications.forEach((saved, key) => {
+    if (saved.email === email) verifications.delete(key)
+  })
+  Object.assign(account, {
+    accountStatus: WITHDRAWN_STATUS,
+    withdrawnAt: new Date().toISOString(),
+    loginId: `wd_${userId}`,
+    nickname: `탈퇴${userId}`,
+    email: 'WITHDRAWN',
+    phone: null,
+    password: null,
+  })
+  account.user.name = 'WITHDRAWN'
+}
+
+// 새 가입자의 mock userId — 'u-아이디'. 탈퇴한 계정이 그 값을 이미 쓰고 있으면 뒤에 번호를 붙인다.
+// 탈퇴해도 계정 행과 userId는 남으므로, 같은 아이디로 다시 가입한 계정이 옛 토큰·mock 데이터와 섞이지 않게 한다.
+function createMockUserId(loginId) {
+  const base = `u-${loginId}`
+  let userId = base
+  for (let number = 2; accounts.some((item) => item.user.userId === userId); number += 1) userId = `${base}-${number}`
+  return userId
 }
 
 // 아이디 앞부분만 남기고 나머지를 *로 가린다. 예) jwc1226 → jwc****
@@ -65,14 +126,16 @@ export function consumeVerification(token, { purpose, email, loginId }) {
 }
 
 registerMockHandlers({
-  // N-01 로그인 — 아이디·비밀번호가 틀리면 같은 문구로 401, 잠긴 계정이면 423.
+  // N-01 로그인 — 아이디·비밀번호가 틀리면 같은 문구로 401, 잠긴 계정이면 423. 탈퇴한 계정은 없는 계정과 같게 401이다.
+  // FP-80 관리자는 토큰 대신 2단계 인증 시작 응답 { twoFactorRequired, challengeToken, maskedEmail }을 받는다(1분 안에 다시 부르면 429).
   'POST /api/auth/login': ({ body }) => {
     if (!body?.loginId || !body?.password) throw new ApiError(400, '아이디와 비밀번호를 입력해 주세요.')
-    const account = accounts.find((item) => item.loginId === body.loginId)
+    const account = findMockAccount(body.loginId)
     if (!account || (account.password !== null && account.password !== body.password)) {
       throw new ApiError(401, LOGIN_FAILED_MESSAGE)
     }
     if (account.locked) throw new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ACCOUNT_LOCKED })
+    if (account.user.role === ROLES.ADMIN) return startAdminLoginChallenge(account)
     return { accessToken: toMockToken(account.user.userId), user: structuredClone(account.user) }
   },
 
@@ -135,7 +198,7 @@ registerMockHandlers({
     }
     consumeVerification(body.emailVerificationToken, { purpose: EMAIL_PURPOSES.SIGNUP, email: body.email })
     mockLinkKeys.delete(body.socialLinkKey)
-    const userId = `u-${body.loginId}`
+    const userId = createMockUserId(body.loginId)
     accounts.push({
       loginId: body.loginId,
       password: body.password,
