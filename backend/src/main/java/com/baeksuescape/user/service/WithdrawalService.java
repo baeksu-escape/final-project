@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
+import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.user.dto.MyPageDtos;
 import com.baeksuescape.user.dto.UserAccount;
 import com.baeksuescape.user.mapper.UserAccountMapper;
@@ -38,15 +39,17 @@ public class WithdrawalService {
     private final ConsentService consentService;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+    private final SystemLogService systemLog;
 
     public WithdrawalService(UserAccountMapper userMapper, UserSocialAccountMapper socialMapper, VerificationCodeMapper verificationMapper,
-            ConsentService consentService, PasswordEncoder passwordEncoder, Clock clock) {
+            ConsentService consentService, PasswordEncoder passwordEncoder, Clock clock, SystemLogService systemLog) {
         this.userMapper = userMapper;
         this.socialMapper = socialMapper;
         this.verificationMapper = verificationMapper;
         this.consentService = consentService;
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
+        this.systemLog = systemLog;
     }
 
     // MEM-07 탈퇴 — 비밀번호가 있는 계정은 비밀번호를 확인한다.
@@ -76,6 +79,8 @@ public class WithdrawalService {
         socialMapper.deleteByUserId(userId);
         verificationMapper.deleteForWithdrawal(userId, emailHmac, phoneHmac);
         if (userMapper.updateWithdrawn(userId, now) == 0) throw unauthorized();
+        // FP-80 N-28-1 회원 탈퇴 기록(INFO). 아이디는 덮어쓰기 전 값을 가려서 남긴다.
+        systemLog.record(SystemLogService.Type.INFO, "member-service", "회원 탈퇴 (" + SystemLogService.maskLoginId(account.getLoginId()) + ")", userId);
     }
 
     // 토큰 발급 후 RECENT_LOGIN_WINDOW 안이면 최근 로그인으로 본다. 발급 시각을 모르면 아니라고 본다.

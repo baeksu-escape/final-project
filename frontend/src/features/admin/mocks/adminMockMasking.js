@@ -15,10 +15,17 @@ export function maskLoginId(loginId) {
   return text.slice(0, visible) + '*'.repeat(text.length - visible)
 }
 
-// 이메일 아이디 부분의 앞 2자만 남긴다. 예) admin@example.com → ad***@example.com
+// 이메일 아이디 부분의 앞 2자만 남기고 나머지 글자 수만큼 가린다(백엔드 PiiMasking.email과 같음). 예) admin01@example.com → ad*****@example.com
 export function maskEmail(email) {
   const [local = '', domain = ''] = String(email ?? '').split('@')
-  return `${local.slice(0, 2)}***@${domain}`
+  const visible = Math.max(0, Math.min(2, local.length - 1))
+  return `${local.slice(0, visible)}${'*'.repeat(local.length - visible)}@${domain}`
+}
+
+// 시스템 로그용 아이디 — 앞 2자 + '***'(백엔드 SystemLogService.maskLoginId와 같음). 예) admin01 → ad***
+export function maskLogLoginId(loginId) {
+  const text = String(loginId ?? '')
+  return text ? `${text.slice(0, 2)}***` : '***'
 }
 
 // 휴대폰 가운데를 가린다(숫자만 받는다). 예) 01012345678 → 010-****-5678. 없으면 null.

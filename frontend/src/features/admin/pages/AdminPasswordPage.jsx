@@ -3,7 +3,7 @@ import { Button, Card, TextInput, Toast } from '../../../common/components/index
 import PasswordRuleList from '../../auth/components/PasswordRuleList.jsx'
 import { validateNewPassword } from '../../auth/validation.js'
 import { changeAdminPassword } from '../api/adminAuthApi.js'
-import { ADMIN_ERROR_CODES } from '../adminConstants.js'
+import { ADMIN_ERROR_CODES, adminErrorMessage } from '../adminConstants.js'
 import StepUpModal from '../components/StepUpModal.jsx'
 import { useAdminErrorHandler } from '../useAdminErrorHandler.js'
 
@@ -45,8 +45,9 @@ export default function AdminPasswordPage() {
       const code = saveError.data?.code
       if (code === 'INVALID_PASSWORD') setErrors({ currentPassword: saveError.message })
       else if (code === ADMIN_ERROR_CODES.INVALID_INPUT) setErrors({ password: saveError.message })
+      else if (code === ADMIN_ERROR_CODES.SAME_PASSWORD) setErrors({ password: adminErrorMessage(saveError) })
       else if (code === ADMIN_ERROR_CODES.STEP_UP_REQUIRED) setFormError('재확인 시간이 지났습니다. 다시 시도해 주세요.')
-      else setFormError(saveError.message)
+      else setFormError(adminErrorMessage(saveError))
     } finally {
       setPending(false)
     }

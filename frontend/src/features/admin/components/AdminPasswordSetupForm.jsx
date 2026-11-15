@@ -3,7 +3,7 @@ import { Button, Notice, TextInput } from '../../../common/components/index.js'
 import PasswordRuleList from '../../auth/components/PasswordRuleList.jsx'
 import { validateNewPassword } from '../../auth/validation.js'
 import { setupAdminPassword } from '../api/adminAuthApi.js'
-import { ADMIN_ERROR_CODES } from '../adminConstants.js'
+import { ADMIN_ERROR_CODES, adminErrorMessage } from '../adminConstants.js'
 
 // 설정 토큰이 만료·사용됐을 때 보여 줄 안내.
 const SETUP_EXPIRED_MESSAGE = '비밀번호 설정 시간이 지났습니다. 처음부터 다시 로그인해 주세요.'
@@ -34,8 +34,9 @@ export default function AdminPasswordSetupForm({ passwordSetupToken, onDone, onR
     } catch (saveError) {
       setPending(false)
       if (saveError.data?.code === ADMIN_ERROR_CODES.INVALID_INPUT) setErrors({ password: saveError.message })
+      else if (saveError.data?.code === ADMIN_ERROR_CODES.SAME_PASSWORD) setErrors({ password: adminErrorMessage(saveError) })
       else if (saveError.status === 400 || saveError.status === 401) setExpired(true)
-      else setFormError(saveError.message)
+      else setFormError(adminErrorMessage(saveError))
     }
   }
 

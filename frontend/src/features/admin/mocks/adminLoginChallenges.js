@@ -15,7 +15,7 @@ export function startAdminLoginChallenge(account) {
   const now = Date.now()
   const last = lastSentAt.get(account.loginId)
   if (last && now - last < RESEND_WAIT_SECONDS * 1000) {
-    throw new ApiError(429, '인증번호는 1분에 한 번만 보낼 수 있습니다. 잠시 뒤에 다시 시도해 주세요.', { code: 'TOO_MANY_REQUESTS' })
+    throw new ApiError(429, '인증번호는 1분에 한 번만 받을 수 있습니다. 잠시 후 다시 시도해 주세요.', { code: 'CODE_RESEND_TOO_SOON' })
   }
   lastSentAt.set(account.loginId, now)
   challenges.forEach((saved, key) => {
@@ -27,11 +27,18 @@ export function startAdminLoginChallenge(account) {
   return { twoFactorRequired: true, challengeToken, maskedEmail: maskEmail(account.email) }
 }
 
-// AUTH-11 — 번호가 맞으면 challengeToken을 지우고(한 번만 사용) 계정을 돌려준다. 틀리거나 만료되면 400.
+// AUTH-11 — 번호가 맞으면 challengeToken을 지우고(한 번만 사용) 계정을 돌려준다(작업 7 백엔드와 같은 code).
+//   대기 토큰이 없거나 사용됨 → 400 ADMIN_CHALLENGE_INVALID, 만료 → 400 VERIFICATION_CODE_EXPIRED, 번호 틀림 → 400 INVALID_VERIFICATION_CODE
 export function consumeAdminLoginChallenge(challengeToken, code) {
   const saved = challenges.get(challengeToken)
-  if (!saved || saved.expiresAt < Date.now() || code !== MOCK_EMAIL_CODE) {
-    throw new ApiError(400, '인증번호가 올바르지 않거나 만료되었습니다.', { code: 'INVALID_VERIFICATION_CODE' })
+  if (!saved) {
+    throw new ApiError(400, '인증 시간이 지났거나 이미 사용한 요청입니다. 다시 로그인해 주세요.', { code: 'ADMIN_CHALLENGE_INVALID' })
+  }
+  if (saved.expiresAt < Date.now()) {
+    throw new ApiError(400, '인증번호가 만료되었습니다. 인증번호를 다시 받아 주세요.', { code: 'VERIFICATION_CODE_EXPIRED' })
+  }
+  if (code !== MOCK_EMAIL_CODE) {
+    throw new ApiError(400, '인증번호가 올바르지 않습니다.', { code: 'INVALID_VERIFICATION_CODE' })
   }
   challenges.delete(challengeToken)
   return saved.account

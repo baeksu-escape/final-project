@@ -30,7 +30,7 @@ export const ADMIN_VIEW_EXTRAS = Object.freeze({
     lastLoginAt: '2026-11-14T09:20:00',
     reportedPostCount: 0,
     assessment: { requestId: '7d1f3c2a-6b4e-4f8a-9c10-2e5d7a9b1c01', tradScore: 642, altScore: 709, altGradeBandCode: 'STANDARD', assessedAt: '2026-11-10T14:30:00' },
-    creditProfile: { delinqCount12m: 0, cashAdvanceMonths: 0, newLoanCount3m: 1, privateLenderLoanBalanceAmt: 0, cardLimitAmt: 5000000, cardMonthlySpendAmt: 1200000 },
+    creditProfile: { baseDate: '2026-10-31', delinquencyCount12m: 0, cashAdvanceMonths: 0, newLoanCount3m: 1, privateLenderLoanBalanceAmount: 0, cardLimitAmount: 5000000, cardMonthlySpendAmount: 1200000 },
     altDataSummary: { telecom: 12, utility: 12, easypay: 6, nationalPension: 24, healthInsurance: 24 },
   },
   admin: { createdAt: '2026-06-01T09:00:00', lastLoginAt: '2026-11-15T08:55:00', reportedPostCount: 0 },
@@ -39,21 +39,21 @@ export const ADMIN_VIEW_EXTRAS = Object.freeze({
     lastLoginAt: '2026-11-13T21:02:00',
     reportedPostCount: 0,
     assessment: { requestId: '0b8e2f41-93c7-4d2a-8e55-6f1a2c3d4e02', tradScore: 598, altScore: 684, altGradeBandCode: 'STANDARD', assessedAt: '2026-11-08T10:05:00' },
-    creditProfile: { delinqCount12m: 1, cashAdvanceMonths: 2, newLoanCount3m: 0, privateLenderLoanBalanceAmt: 0, cardLimitAmt: 3000000, cardMonthlySpendAmt: 900000 },
+    creditProfile: { baseDate: '2026-10-31', delinquencyCount12m: 1, cashAdvanceMonths: 2, newLoanCount3m: 0, privateLenderLoanBalanceAmount: 0, cardLimitAmount: 3000000, cardMonthlySpendAmount: 900000 },
     altDataSummary: { telecom: 12, utility: 6, easypay: 12, nationalPension: 10, healthInsurance: 18 },
   },
   le_sujin: {
     lastLoginAt: '2026-11-12T07:45:00',
     reportedPostCount: 0,
     assessment: { requestId: '5c3a9e10-2d7b-4b61-a0f4-8e9d0c1b2a03', tradScore: 701, altScore: 731, altGradeBandCode: 'STANDARD', assessedAt: '2026-11-05T19:40:00' },
-    creditProfile: { delinqCount12m: 0, cashAdvanceMonths: 0, newLoanCount3m: 0, privateLenderLoanBalanceAmt: 0, cardLimitAmt: 8000000, cardMonthlySpendAmt: 1500000 },
+    creditProfile: { baseDate: '2026-10-31', delinquencyCount12m: 0, cashAdvanceMonths: 0, newLoanCount3m: 0, privateLenderLoanBalanceAmount: 0, cardLimitAmount: 8000000, cardMonthlySpendAmount: 1500000 },
     altDataSummary: { telecom: 24, utility: 24, easypay: 12, nationalPension: 36, healthInsurance: 36 },
   },
   ch_hoyoung: {
     lastLoginAt: '2026-11-11T12:30:00',
     reportedPostCount: 0,
     assessment: { requestId: 'a41d7c5e-8f20-4e9b-b3c6-1d2e3f4a5b04', tradScore: 680, altScore: 655, altGradeBandCode: 'CAUTION', assessedAt: '2026-11-03T16:20:00' },
-    creditProfile: { delinqCount12m: 2, cashAdvanceMonths: 3, newLoanCount3m: 2, privateLenderLoanBalanceAmt: 3000000, cardLimitAmt: 4000000, cardMonthlySpendAmt: 2100000 },
+    creditProfile: { baseDate: '2026-10-31', delinquencyCount12m: 2, cashAdvanceMonths: 3, newLoanCount3m: 2, privateLenderLoanBalanceAmount: 3000000, cardLimitAmount: 4000000, cardMonthlySpendAmount: 2100000 },
     altDataSummary: { telecom: 12, utility: 12, easypay: 18, nationalPension: 8, healthInsurance: 12 },
   },
   ne_jiwon01: { lastLoginAt: '2026-11-09T22:10:00', reportedPostCount: 2 },
@@ -66,19 +66,19 @@ export const EMPTY_ALT_DATA_SUMMARY = Object.freeze({ telecom: 0, utility: 0, ea
 
 // 시스템 로그 초기값(N-28). 내용에는 이름·연락처 원문을 넣지 않는다(DDL W6).
 export const SEED_SYSTEM_LOGS = Object.freeze([
-  { createdAt: '2026-11-03T21:12:05', type: 'WARN', source: 'auth-service', message: '사용자 spam_9921 로그인 5회 실패 · 계정 잠금' },
-  { createdAt: '2026-11-03T09:02:44', type: 'AUTH', source: 'auth-service', message: '관리자 admin 로그인 · 2단계 인증 통과' },
+  { createdAt: '2026-11-03T21:12:05', type: 'WARN', source: 'auth-service', message: '로그인 5회 실패로 계정 자동 잠금 (sp***)' },
+  { createdAt: '2026-11-03T09:02:44', type: 'AUTH', source: 'auth-service', message: '관리자 2단계 인증 통과 (ad***)' },
   { createdAt: '2026-11-03T03:00:44', type: 'INFO', source: 'scoring-batch', message: '야간 배치 점수 산출 완료 · 12,000명 · 4분 12초' },
   { createdAt: '2026-11-03T02:00:03', type: 'INFO', source: 'etl', message: '상권 데이터 갱신 완료' },
-  { createdAt: '2026-11-02T18:24:50', type: 'AUTH', source: 'auth-service', message: '관리자 admin_lee 로그아웃' },
+  { createdAt: '2026-11-02T18:24:50', type: 'AUTH', source: 'auth-service', message: '로그인 성공 (ad***)' },
   { createdAt: '2026-11-02T16:03:17', type: 'WARN', source: 'scoring-api', message: '점수 산출 API 응답 지연 · 2.8초' },
   { createdAt: '2026-10-31T23:02:11', type: 'WARN', source: 'board', message: '게시글 자동 숨김 · 신고 누적 5건 (R-1029)' },
   { createdAt: '2026-10-30T20:15:40', type: 'WARN', source: 'board', message: '댓글 자동 숨김 · 신고 누적 5건 (R-1031)' },
-  { createdAt: '2026-10-30T09:10:00', type: 'AUTH', source: 'auth-service', message: '사용자 employee 로그인' },
+  { createdAt: '2026-10-30T09:10:00', type: 'AUTH', source: 'auth-service', message: '로그인 성공 (em***)' },
 ])
 
 // 열람 감사 로그 초기값(N-35-2). 대상 회원은 가린 이름·아이디로만 남긴다.
 export const SEED_ACCESS_LOGS = Object.freeze([
-  { accessedAt: '2026-11-04T10:15:00', viewerLoginId: 'admin', targetLabel: '최*영 (ch_*******)', reason: '점수 이의 문의 응대', resource: 'CREDIT_DATA' },
-  { accessedAt: '2026-11-01T14:02:00', viewerLoginId: 'admin_lee', targetLabel: '김*수 (ki_*****)', reason: '모형 검증용 표본 점검', resource: 'CREDIT_DATA' },
+  { accessedAt: '2026-11-04T10:15:00', viewerLoginId: 'admin', targetLabel: '최*영 (ch_*******)', reason: '점수 이의 문의 응대', resource: 'MEMBER_DETAIL' },
+  { accessedAt: '2026-11-01T14:02:00', viewerLoginId: 'admin_lee', targetLabel: '김*수 (ki_*****)', reason: '모형 검증용 표본 점검', resource: 'MEMBER_DETAIL' },
 ])

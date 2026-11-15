@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, TextInput } from '../../../common/components/index.js'
 import { USE_MOCK } from '../../../common/config/env.js'
 import { verifyAdminLoginCode } from '../../admin/api/adminAuthApi.js'
-import { CODE_LENGTH, RESEND_WAIT_SECONDS } from '../../admin/adminConstants.js'
+import { CODE_LENGTH, RESEND_WAIT_SECONDS, adminErrorMessage } from '../../admin/adminConstants.js'
 import { MOCK_EMAIL_CODE } from '../mocks/authMockData.js'
 
 // N-01-1 관리자 로그인 2단계 인증 — 업무 이메일로 받은 6자리 번호를 넣는다(로그인 화면 안의 단계).
@@ -32,7 +32,7 @@ export default function AdminTwoFactorStep({ challenge, onVerified, onResend, on
       const result = await verifyAdminLoginCode(challenge.challengeToken, code)
       onVerified(result)
     } catch (verifyError) {
-      setError(verifyError.message)
+      setError(adminErrorMessage(verifyError))
       setPending(false)
     }
   }
@@ -43,7 +43,7 @@ export default function AdminTwoFactorStep({ challenge, onVerified, onResend, on
     try {
       await onResend()
     } catch (resendError) {
-      setError(resendError.message)
+      setError(adminErrorMessage(resendError))
       setPending(false)
     }
   }

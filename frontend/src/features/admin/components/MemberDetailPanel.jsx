@@ -4,14 +4,16 @@ import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { ACCOUNT_STATUS_LABELS } from '../adminConstants.js'
 import { EMPTY_TEXT, formatAmount, formatCount, formatDate, formatDateTime } from '../adminFormat.js'
 
-// ADM-08 creditProfile 6개 값의 이름과 표시 방법(DDL USER_CREDIT_PROFILE, API 정의서 2-3 creditProfile 짝).
+// ADM-08 creditProfile 값의 이름과 표시 방법 — 이름은 작업 7 백엔드 응답(데이터 입력 화면 creditProfile 섹션과 같은 이름)을 따른다.
+// baseDate는 그 값의 기준일(USER_CREDIT_PROFILE.BASE_DATE)이다.
 const CREDIT_PROFILE_FIELDS = [
-  { key: 'delinqCount12m', label: '최근 12개월 연체(30일 이상)', format: (value) => formatCount(value, '회') },
+  { key: 'baseDate', label: '기준일', format: formatDate },
+  { key: 'delinquencyCount12m', label: '최근 12개월 연체(30일 이상)', format: (value) => formatCount(value, '회') },
   { key: 'cashAdvanceMonths', label: '현금서비스 이용 개월 수', format: (value) => formatCount(value, '개월') },
   { key: 'newLoanCount3m', label: '최근 3개월 신규 대출', format: (value) => formatCount(value, '건') },
-  { key: 'privateLenderLoanBalanceAmt', label: '대부업 대출 잔액', format: formatAmount },
-  { key: 'cardLimitAmt', label: '카드 한도', format: formatAmount },
-  { key: 'cardMonthlySpendAmt', label: '카드 월 이용액', format: formatAmount },
+  { key: 'privateLenderLoanBalanceAmount', label: '대부업 대출 잔액', format: formatAmount },
+  { key: 'cardLimitAmount', label: '카드 한도', format: formatAmount },
+  { key: 'cardMonthlySpendAmount', label: '카드 월 이용액', format: formatAmount },
 ]
 
 // ADM-08 altDataSummary — 불러온 대안 데이터 개월 수.
@@ -53,7 +55,7 @@ export default function MemberDetailPanel({ detail, onClose }) {
           ['휴대폰', profile.maskedPhone ?? '등록 안 됨'],
           ['직군', JOB_TYPE_LABELS[profile.workerTypeCode] ?? EMPTY_TEXT],
           ['상태', ACCOUNT_STATUS_LABELS[profile.status] ?? profile.status],
-          ['가입일', formatDate(profile.createdAt)],
+          ['가입일', formatDate(profile.joinedAt)],
         ]}
       />
 

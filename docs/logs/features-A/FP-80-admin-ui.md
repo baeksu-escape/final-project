@@ -78,6 +78,23 @@
   - `admin_park`: 첫 로그인 비밀번호 설정 흐름 확인용.
   - 관리자 화면에서 새로 만든 관리자도 임시 비밀번호로 로그인된다(새로고침하면 사라짐).
 
+## [2026-11-15 · JWC / Claude Code] 작업 9 — 작업 7 백엔드와 계약 맞추기 (브랜치 `feature-A/FP-80-admin`, merge dce775d 뒤)
+- **화면을 백엔드 응답에 맞춘 곳**
+  - `MemberDetailPanel`: creditProfile 키를 `cardLimitAmount`·`cardMonthlySpendAmount`·`delinquencyCount12m`·`privateLenderLoanBalanceAmount`로 바꿨다. `baseDate`(기준일) 줄을 더하고, 가입일은 `profile.joinedAt`으로 읽는다.
+  - `AdminAuditLogsPage`: 열람 화면 코드 `MEMBER_DETAIL` 이름을 추가했다.
+- **오류 문구**
+  - `adminConstants.js`에 `ADMIN_ERROR_MESSAGES`(백엔드 code → 화면 문구)와 `adminErrorMessage(error)`를 두었다. 모르는 code는 서버 message를 그대로 쓴다.
+  - 관리자 화면 7곳(2단계 인증·재확인·비밀번호 설정·비밀번호 변경·관리자 추가·계정 목록·감사 로그)이 이 함수로 문구를 보여 준다.
+  - `SAME_PASSWORD`는 새 비밀번호 칸 오류로 보여 준다.
+- **mock을 실제 응답 모양으로 맞춘 곳**
+  - AUTH-11·비밀번호 설정 응답은 `token`이다.
+  - step-up/send 응답은 `{ expiresInSeconds, maskedEmail }`이다.
+  - 오류 code: `ADMIN_CHALLENGE_INVALID`·`VERIFICATION_CODE_EXPIRED`·`PASSWORD_SETUP_INVALID`·`SAME_PASSWORD`·`CODE_RESEND_TOO_SOON`·`CANNOT_CHANGE_SELF`·`ACCOUNT_WITHDRAWN`·`ACCESS_REASON_REQUIRED`
+  - 문구는 백엔드와 같게 했다.
+  - 가린 이메일 규칙, 임시 비밀번호 12자, 시스템 로그 문구(아이디 앞 2자 + ***), 열람 기록 `MEMBER_DETAIL`, 관리자 대상 ADM-08은 404
+- 마크업·className·CSS는 바꾸지 않았다. 상세 목록에 '기준일' 줄 하나(데이터)를 더했다.
+- **확인:** `npm run lint`·`npm run build` 통과. 실제 가동 결과는 `FP-80-admin-api.md` 작업 9 절에 있다.
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

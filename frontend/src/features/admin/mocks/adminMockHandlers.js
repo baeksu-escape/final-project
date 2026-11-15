@@ -5,7 +5,7 @@ import { addMockAccount, listMockAccounts } from '../../auth/mocks/authMockHandl
 import { isValidEmail } from '../../auth/validation.js'
 import { ACCOUNT_STATUS, ADMIN_ERROR_CODES, ADMIN_LOGIN_ID_PATTERN, ADMIN_LOGIN_ID_RULE_TEXT } from '../adminConstants.js'
 import { ADMIN_VIEW_EXTRAS, EMPTY_ALT_DATA_SUMMARY } from './adminMockData.js'
-import { maskEmail, maskLoginId, maskPhone } from './adminMockMasking.js'
+import { maskEmail, maskLogLoginId, maskLoginId, maskPhone } from './adminMockMasking.js'
 import {
   addAccessLog,
   addSystemLog,
@@ -44,13 +44,14 @@ function registerUserHandlers(userId) {
     // N-27-3 ADM-06 잠금·해제 — 본인·탈퇴 계정은 409, 잠글 때 사유가 없으면 400.
     [`PATCH /api/admin/users/${encoded}/lock`]: ({ token, body }) => {
       const admin = requireMockAdmin(token)
-      const account = findAccount(userId)
-      if (account === admin) throw new ApiError(409, '본인 계정은 잠글 수 없습니다.', { code: 'CONFLICT' })
-      if (toStatus(account) === ACCOUNT_STATUS.WITHDRAWN) throw new ApiError(409, '탈퇴한 계정은 잠그거나 풀 수 없습니다.', { code: 'CONFLICT' })
+      // 작업 7 백엔드와 같은 순서·code: 사유 검사(400) → 본인(409 CANNOT_CHANGE_SELF) → 없는 계정(404) → 탈퇴(409 ACCOUNT_WITHDRAWN)
       const locked = body?.locked === true
-      if (locked && !String(body?.reason ?? '').trim()) throw invalidInput('reason', '잠금 사유를 넣어 주세요.')
+      if (locked && !String(body?.reason ?? '').trim()) throw invalidInput('reason', '잠금 사유를 입력해 주세요.')
+      if (userId === admin.user.userId) throw new ApiError(409, '본인 계정은 잠그거나 풀 수 없습니다.', { code: 'CANNOT_CHANGE_SELF' })
+      const account = findAccount(userId)
+      if (toStatus(account) === ACCOUNT_STATUS.WITHDRAWN) throw new ApiError(409, '탈퇴한 계정은 바꿀 수 없습니다.', { code: 'ACCOUNT_WITHDRAWN' })
       account.locked = locked
-      addSystemLog('AUTH', 'admin', `관리자 ${admin.loginId} · ${account.loginId} 계정 ${locked ? '잠금' : '잠금 해제'}`)
+      addSystemLog('AUTH', 'admin-service', `관리자가 ${locked ? '계정 잠금' : '계정 잠금 해제'} (${maskLogLoginId(account.loginId)})`)
       return toAdminRow(account)
     },
 
@@ -58,11 +59,18 @@ function registerUserHandlers(userId) {
     [`POST /api/admin/users/${encoded}/credit-data`]: ({ token, body }) => {
       const admin = requireMockAdmin(token)
       const reason = String(body?.reason ?? '').trim()
-      if (!reason) throw invalidInput('reason', '열람 사유를 넣어 주세요.')
+      if (!reason) {
+        throw new ApiError(400, '열람 사유를 입력해야 볼 수 있습니다.', {
+          code: ADMIN_ERROR_CODES.ACCESS_REASON_REQUIRED,
+          fieldErrors: [{ field: 'reason', message: '열람 사유를 입력해 주세요.' }],
+        })
+      }
       const account = findAccount(userId)
+      // 일반 회원만 열람한다(관리자 계정은 404, 작업 7 백엔드와 같음).
+      if (account.user.role !== ROLES.USER) throw new ApiError(404, '회원을 찾을 수 없습니다.', { code: 'NOT_FOUND' })
       const extras = ADMIN_VIEW_EXTRAS[account.loginId] ?? {}
       const maskedName = toMaskedName(account)
-      addAccessLog({ viewerLoginId: admin.loginId, targetLabel: `${maskedName} (${maskLoginId(account.loginId)})`, reason, resource: 'CREDIT_DATA' })
+      addAccessLog({ viewerLoginId: admin.loginId, targetLabel: `${maskedName} (${maskLoginId(account.loginId)})`, reason, resource: 'MEMBER_DETAIL' })
       const withdrawn = toStatus(account) === ACCOUNT_STATUS.WITHDRAWN
       return {
         profile: {
@@ -72,7 +80,7 @@ function registerUserHandlers(userId) {
           maskedPhone: maskPhone(account.phone),
           workerTypeCode: account.user.jobType ?? null,
           status: toStatus(account),
-          createdAt: toAdminRow(account).createdAt,
+          joinedAt: String(toAdminRow(account).createdAt ?? '').slice(0, 10) || null,
         },
         latestAssessment: extras.assessment ? { ...extras.assessment } : null,
         creditProfile: extras.creditProfile ? { ...extras.creditProfile } : null,
@@ -112,10 +120,10 @@ registerMockHandlers({
       throw new ApiError(409, '이미 사용 중인 아이디입니다.', { code: 'DUPLICATE_LOGIN_ID' })
     }
     if (listMockAccounts().some((account) => account.email === workEmail)) {
-      throw new ApiError(409, '이미 등록된 이메일입니다.', { code: 'DUPLICATE_EMAIL' })
+      throw new ApiError(409, '이미 가입된 이메일입니다.', { code: 'DUPLICATE_EMAIL' })
     }
-    // 영문·숫자가 섞인 9자 임시 비밀번호(N-02 비밀번호 규칙을 지킨다).
-    const temporaryPassword = `Av${String(Math.floor(Math.random() * 1000000)).padStart(6, '0')}k`
+    // 영문·숫자가 섞인 12자 임시 비밀번호(작업 7 백엔드와 같은 길이, N-02 비밀번호 규칙을 지킨다).
+    const temporaryPassword = `Av${String(Math.floor(Math.random() * 1000000000)).padStart(9, '0')}k`
     const account = addMockAccount({
       loginId,
       password: temporaryPassword,
@@ -125,7 +133,7 @@ registerMockHandlers({
       passwordChangeRequired: true,
       user: { name, role: ROLES.ADMIN, jobType: null },
     })
-    addSystemLog('AUTH', 'admin', `관리자 ${admin.loginId} · 관리자 계정 생성 ${loginId}`)
+    addSystemLog('AUTH', 'admin-service', `관리자 계정 추가 (${maskLogLoginId(loginId)})`)
     return { userId: account.user.userId, loginId, temporaryPassword }
   },
 

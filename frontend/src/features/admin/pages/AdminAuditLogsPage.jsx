@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Card, Chip, Notice, SegmentedControl } from '../../../common/components/index.js'
 import { fetchAccessLogs, fetchSystemLogs } from '../api/adminApi.js'
-import { ADMIN_FIRST_PAGE, ADMIN_PAGE_SIZE, LOG_TAB_OPTIONS, LOG_TABS, SYSTEM_LOG_TYPE_OPTIONS } from '../adminConstants.js'
+import { ADMIN_FIRST_PAGE, ADMIN_PAGE_SIZE, LOG_TAB_OPTIONS, LOG_TABS, SYSTEM_LOG_TYPE_OPTIONS, adminErrorMessage } from '../adminConstants.js'
 import { formatDateTime } from '../adminFormat.js'
 import AdminPagination from '../components/AdminPagination.jsx'
 import { useAdminErrorHandler } from '../useAdminErrorHandler.js'
 
 // 열람한 화면·데이터 코드(ACCESS_AUDIT_LOG.ACCESSED_RESOURCE) → 화면 이름. 모르는 코드는 그대로 보여 준다.
-const RESOURCE_LABELS = Object.freeze({ CREDIT_DATA: '회원 신용정보 상세' })
+// 작업 7 백엔드는 ADM-08 열람을 MEMBER_DETAIL로 남긴다. CREDIT_DATA는 이전 mock 기록용으로 남겨 둔다.
+const RESOURCE_LABELS = Object.freeze({ MEMBER_DETAIL: '회원 신용정보 상세', CREDIT_DATA: '회원 신용정보 상세' })
 
 // 로그 목록을 부르는 훅 — fetchLogs({ type, page, size })를 쪽(page)·구분(type)이 바뀔 때마다 다시 부른다. { data, error }를 돌려준다.
 function useAdminLogs(fetchLogs, page, type) {
@@ -22,7 +23,7 @@ function useAdminLogs(fetchLogs, page, type) {
       })
       .catch(async (error) => {
         if (cancelled || (await handleAdminError(error))) return
-        setState((prev) => ({ ...prev, error: error.message }))
+        setState((prev) => ({ ...prev, error: adminErrorMessage(error) }))
       })
     return () => {
       cancelled = true

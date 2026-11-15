@@ -3,7 +3,7 @@ import { Button, Modal, Notice, TextInput } from '../../../common/components/ind
 import { USE_MOCK } from '../../../common/config/env.js'
 import { MOCK_EMAIL_CODE } from '../../auth/mocks/authMockData.js'
 import { sendStepUpCode, verifyStepUpCode } from '../api/adminAuthApi.js'
-import { CODE_LENGTH } from '../adminConstants.js'
+import { CODE_LENGTH, adminErrorMessage } from '../adminConstants.js'
 import { useAdminErrorHandler } from '../useAdminErrorHandler.js'
 
 // FP-80 관리자 재확인(step-up) 모달 — [번호 보내기] → 6자리 입력 → 받은 stepUpToken을 onVerified로 넘긴다.
@@ -36,7 +36,7 @@ function StepUpBody({ purpose, onVerified, onClose }) {
       setCode('')
     } catch (sendError) {
       if (await handleAdminError(sendError)) return
-      setError(sendError.message)
+      setError(adminErrorMessage(sendError))
     } finally {
       setPending(false)
     }
@@ -56,7 +56,7 @@ function StepUpBody({ purpose, onVerified, onClose }) {
       onVerified(stepUpToken)
     } catch (verifyError) {
       if (await handleAdminError(verifyError)) return
-      setError(verifyError.message)
+      setError(adminErrorMessage(verifyError))
       setPending(false)
     }
   }

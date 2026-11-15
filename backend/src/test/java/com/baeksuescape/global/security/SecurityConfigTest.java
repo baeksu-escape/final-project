@@ -21,6 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.baeksuescape.admin.mapper.AdminAccountMapper;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 
 // FP-87 보안 설정 — 401·403 JSON, 역할별 경로, 탈퇴·잠금 계정, 임시 개방 경로, CORS 미리 요청. 실제 DB 없이 계정 상태 조회는 mock으로 대신한다.
@@ -39,6 +40,9 @@ class SecurityConfigTest {
 
     @MockBean
     private UserAccountMapper userAccountMapper;
+    // FP-80 /api/admin/**의 비밀번호 변경 필요 확인(PasswordChangeRequiredInterceptor)이 DB 대신 쓰는 mock. 기본은 null(변경 필요 없음).
+    @MockBean
+    private AdminAccountMapper adminAccountMapper;
 
     @BeforeEach
     void activeByDefault() {

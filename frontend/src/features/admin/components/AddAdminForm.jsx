@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button, TextInput } from '../../../common/components/index.js'
 import { isValidEmail } from '../../auth/validation.js'
 import { createAdminAccount } from '../api/adminApi.js'
-import { ADMIN_ERROR_CODES, ADMIN_LOGIN_ID_PATTERN, ADMIN_LOGIN_ID_RULE_TEXT } from '../adminConstants.js'
+import { ADMIN_ERROR_CODES, ADMIN_LOGIN_ID_PATTERN, ADMIN_LOGIN_ID_RULE_TEXT, adminErrorMessage } from '../adminConstants.js'
 import { useAdminErrorHandler } from '../useAdminErrorHandler.js'
 import StepUpModal from './StepUpModal.jsx'
 import TemporaryPasswordModal from './TemporaryPasswordModal.jsx'
@@ -56,7 +56,7 @@ export default function AddAdminForm({ onCreated }) {
       if (await handleAdminError(saveError)) return
       if (saveError.data?.code === ADMIN_ERROR_CODES.INVALID_INPUT) setErrors(toFieldErrors(saveError.data.fieldErrors))
       else if (saveError.data?.code === ADMIN_ERROR_CODES.STEP_UP_REQUIRED) setFormError('재확인 시간이 지났습니다. 다시 시도해 주세요.')
-      else setFormError(saveError.message)
+      else setFormError(adminErrorMessage(saveError))
     } finally {
       setPending(false)
     }

@@ -44,7 +44,7 @@ export function requireMockAdmin(token) {
   const account = requireAccountByToken(token)
   if (account.user.role !== ROLES.ADMIN) throw new ApiError(403, '접근 권한이 없습니다.', { code: 'FORBIDDEN' })
   if (account.passwordChangeRequired) {
-    throw new ApiError(403, '비밀번호를 새로 정한 뒤에 쓸 수 있습니다. 다시 로그인해 주세요.', { code: ADMIN_ERROR_CODES.PASSWORD_CHANGE_REQUIRED })
+    throw new ApiError(403, '비밀번호를 바꾼 뒤 다시 로그인해 주세요.', { code: ADMIN_ERROR_CODES.PASSWORD_CHANGE_REQUIRED })
   }
   return account
 }
@@ -61,7 +61,7 @@ export function consumeStepUpToken(headers, account) {
   const stepUpToken = headers?.[STEP_UP_HEADER]
   const saved = stepUpTokens.get(stepUpToken)
   if (!saved || saved.userId !== account.user.userId || saved.expiresAt < Date.now()) {
-    throw new ApiError(401, '보안을 위해 재확인이 필요합니다.', { code: ADMIN_ERROR_CODES.STEP_UP_REQUIRED })
+    throw new ApiError(401, '보안을 위해 인증번호를 다시 확인해 주세요.', { code: ADMIN_ERROR_CODES.STEP_UP_REQUIRED })
   }
   stepUpTokens.delete(stepUpToken)
 }

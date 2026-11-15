@@ -11,7 +11,34 @@ export const ADMIN_ERROR_CODES = Object.freeze({
   STEP_UP_REQUIRED: 'STEP_UP_REQUIRED', // 401: 재확인 토큰이 없거나 만료됐다(로그아웃되지 않는다).
   PASSWORD_CHANGE_REQUIRED: 'PASSWORD_CHANGE_REQUIRED', // 403: 첫 비밀번호를 아직 정하지 않았다 → 로그아웃 후 다시 로그인.
   INVALID_INPUT: 'INVALID_INPUT', // 400: 칸별 오류(fieldErrors)가 함께 온다.
+  INVALID_PASSWORD: 'INVALID_PASSWORD', // 400: 현재 비밀번호가 틀림(PUT /api/admin/me/password)
+  SAME_PASSWORD: 'SAME_PASSWORD', // 400: 지금 쓰는 비밀번호와 같다(fieldErrors newPassword).
+  ACCESS_REASON_REQUIRED: 'ACCESS_REASON_REQUIRED', // 400: 열람 사유 없음(ADM-08)
 })
+
+// FP-80 작업 7 백엔드 오류 code → 화면 문구. 화면 상황에 맞춘 안내가 필요한 code만 적고, 없는 code는 서버 message를 그대로 쓴다.
+export const ADMIN_ERROR_MESSAGES = Object.freeze({
+  ADMIN_CHALLENGE_INVALID: '인증 시간이 지났거나 이미 사용한 요청입니다. [처음으로]를 눌러 다시 로그인해 주세요.',
+  INVALID_VERIFICATION_CODE: '인증번호가 올바르지 않습니다. 다시 확인해 주세요.',
+  VERIFICATION_CODE_EXPIRED: '인증번호가 만료되었습니다. 새 번호를 받아 주세요.',
+  VERIFICATION_ATTEMPTS_EXCEEDED: '인증번호를 5회 틀렸습니다. 새 번호를 받아 주세요.',
+  CODE_RESEND_TOO_SOON: '인증번호는 1분에 한 번만 받을 수 있습니다. 잠시 뒤 다시 시도해 주세요.',
+  PASSWORD_SETUP_INVALID: '비밀번호 설정 시간이 지났습니다. [처음으로]를 눌러 다시 로그인해 주세요.',
+  SAME_PASSWORD: '지금 쓰는 비밀번호와 다른 비밀번호를 입력해 주세요.',
+  ACCESS_REASON_REQUIRED: '열람 사유를 입력해야 볼 수 있습니다.',
+  CANNOT_CHANGE_SELF: '본인 계정은 바꿀 수 없습니다.',
+  ACCOUNT_WITHDRAWN: '탈퇴한 계정은 바꿀 수 없습니다.',
+  ADMIN_EMAIL_UNAVAILABLE: '업무 이메일을 확인할 수 없어 인증번호를 보낼 수 없습니다. 다른 관리자에게 문의해 주세요.',
+  ACCOUNT_LOCKED: '잠긴 계정입니다. 관리자에게 문의해 주세요.',
+  STEP_UP_REQUIRED: '재확인 시간이 지났습니다. 다시 시도해 주세요.',
+  PASSWORD_CHANGE_REQUIRED: '비밀번호를 새로 정해야 합니다. 다시 로그인해 주세요.',
+})
+
+// 오류를 화면 문구로 바꾼다 — 아는 code면 위 문구, 모르는 code면 서버 message 그대로.
+// 사용 예: catch (error) { setError(adminErrorMessage(error)) }
+export function adminErrorMessage(error) {
+  return ADMIN_ERROR_MESSAGES[error?.data?.code] ?? error?.message
+}
 
 // 재확인(step-up)으로 받은 1회용 토큰을 붙이는 요청 헤더 이름.
 export const STEP_UP_HEADER = 'X-Step-Up-Token'

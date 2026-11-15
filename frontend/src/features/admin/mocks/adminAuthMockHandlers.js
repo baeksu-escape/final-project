@@ -5,6 +5,7 @@ import { MOCK_EMAIL_CODE } from '../../auth/mocks/authMockData.js'
 import { isValidPassword } from '../../auth/validation.js'
 import { ADMIN_ERROR_CODES } from '../adminConstants.js'
 import { consumeAdminLoginChallenge } from './adminLoginChallenges.js'
+import { maskEmail, maskLogLoginId } from './adminMockMasking.js'
 import {
   addSystemLog,
   consumeStepUpToken,
@@ -21,16 +22,21 @@ const STEP_UP_TOKEN_TTL_SECONDS = 5 * 60
 const setupTokens = new Map() // passwordSetupToken → { account, expiresAt }
 const stepUpCodes = new Map() // userId → 번호 만료 시각
 
-// 로그인 성공 응답 — AUTH-01과 같은 accessToken 이름을 쓴다.
+// 로그인 성공 응답 — 작업 7 백엔드 AUTH-11·비밀번호 설정 응답과 같은 token 이름을 쓴다(일반 AUTH-01은 accessToken).
 function toLoginResponse(account) {
-  return { accessToken: toMockToken(account.user.userId), user: structuredClone(account.user) }
+  return { token: toMockToken(account.user.userId), user: structuredClone(account.user) }
 }
 
-// 새 비밀번호 규칙 위반을 칸별 오류(400 INVALID_INPUT)로 던진다.
-function assertNewPassword(newPassword) {
-  if (isValidPassword(newPassword)) return
-  const message = '비밀번호 규칙을 지켜 주세요.'
-  throw new ApiError(400, message, { code: ADMIN_ERROR_CODES.INVALID_INPUT, fieldErrors: [{ field: 'newPassword', message }] })
+// 새 비밀번호 규칙 위반을 칸별 오류(400 INVALID_INPUT)로, 지금 비밀번호와 같으면 400 SAME_PASSWORD로 던진다(작업 7 백엔드와 같은 순서·code).
+function assertNewPassword(newPassword, currentPassword) {
+  if (!isValidPassword(newPassword)) {
+    const message = '비밀번호 규칙을 지켜 주세요.'
+    throw new ApiError(400, message, { code: ADMIN_ERROR_CODES.INVALID_INPUT, fieldErrors: [{ field: 'newPassword', message }] })
+  }
+  if (currentPassword && newPassword === currentPassword) {
+    const message = '지금 쓰는 비밀번호와 다른 비밀번호를 입력해 주세요.'
+    throw new ApiError(400, message, { code: ADMIN_ERROR_CODES.SAME_PASSWORD, fieldErrors: [{ field: 'newPassword', message }] })
+  }
 }
 
 registerMockHandlers({
@@ -42,7 +48,7 @@ registerMockHandlers({
       setupTokens.set(passwordSetupToken, { account, expiresAt: Date.now() + PASSWORD_SETUP_TTL_MS })
       return { passwordChangeRequired: true, passwordSetupToken }
     }
-    addSystemLog('AUTH', 'auth-service', `관리자 ${account.loginId} 로그인 · 2단계 인증 통과`)
+    addSystemLog('AUTH', 'auth-service', `관리자 2단계 인증 통과 (${maskLogLoginId(account.loginId)})`)
     return { ...toLoginResponse(account), passwordChangeRequired: false }
   },
 
@@ -50,12 +56,12 @@ registerMockHandlers({
   'POST /api/auth/admin/password-setup': ({ body }) => {
     const saved = setupTokens.get(body?.passwordSetupToken)
     if (!saved || saved.expiresAt < Date.now()) {
-      throw new ApiError(400, '비밀번호 설정 시간이 지났습니다. 처음부터 다시 로그인해 주세요.', { code: 'PASSWORD_SETUP_EXPIRED' })
+      throw new ApiError(400, '비밀번호 설정 시간이 지났거나 이미 사용한 요청입니다. 다시 로그인해 주세요.', { code: 'PASSWORD_SETUP_INVALID' })
     }
-    assertNewPassword(body.newPassword)
+    assertNewPassword(body.newPassword, saved.account.password)
     setupTokens.delete(body.passwordSetupToken)
     Object.assign(saved.account, { password: body.newPassword, passwordChangeRequired: false })
-    addSystemLog('AUTH', 'auth-service', `관리자 ${saved.account.loginId} 첫 비밀번호 설정 · 로그인`)
+    addSystemLog('AUTH', 'auth-service', `관리자 첫 비밀번호 설정 (${maskLogLoginId(saved.account.loginId)})`)
     return toLoginResponse(saved.account)
   },
 
@@ -63,7 +69,7 @@ registerMockHandlers({
   'POST /api/admin/me/step-up/send': ({ token }) => {
     const admin = requireMockAdmin(token)
     stepUpCodes.set(admin.user.userId, Date.now() + STEP_UP_CODE_TTL_MS)
-    return {}
+    return { expiresInSeconds: STEP_UP_CODE_TTL_MS / 1000, maskedEmail: maskEmail(admin.email) }
   },
 
   // 재확인 번호 확인 — 맞으면 1회용 stepUpToken을 준다. 틀리거나 만료되면 400.
@@ -71,7 +77,7 @@ registerMockHandlers({
     const admin = requireMockAdmin(token)
     const expiresAt = stepUpCodes.get(admin.user.userId)
     if (!expiresAt || expiresAt < Date.now() || body?.code !== MOCK_EMAIL_CODE) {
-      throw new ApiError(400, '인증번호가 올바르지 않거나 만료되었습니다.', { code: 'INVALID_VERIFICATION_CODE' })
+      throw new ApiError(400, '인증번호가 올바르지 않습니다.', { code: 'INVALID_VERIFICATION_CODE' })
     }
     stepUpCodes.delete(admin.user.userId)
     return { stepUpToken: issueStepUpToken(admin, STEP_UP_TOKEN_TTL_SECONDS), expiresIn: STEP_UP_TOKEN_TTL_SECONDS }
@@ -83,11 +89,14 @@ registerMockHandlers({
     const admin = requireMockAdmin(token)
     consumeStepUpToken(headers, admin)
     if (admin.password !== null && admin.password !== body?.currentPassword) {
-      throw new ApiError(400, '현재 비밀번호가 올바르지 않습니다.', { code: 'INVALID_PASSWORD' })
+      throw new ApiError(400, '현재 비밀번호가 올바르지 않습니다.', {
+        code: ADMIN_ERROR_CODES.INVALID_PASSWORD,
+        fieldErrors: [{ field: 'currentPassword', message: '현재 비밀번호가 올바르지 않습니다.' }],
+      })
     }
-    assertNewPassword(body?.newPassword)
+    assertNewPassword(body?.newPassword, admin.password)
     admin.password = body.newPassword
-    addSystemLog('AUTH', 'auth-service', `관리자 ${admin.loginId} 비밀번호 변경`)
+    addSystemLog('AUTH', 'auth-service', `관리자 비밀번호 변경 (${maskLogLoginId(admin.loginId)})`)
     return {}
   },
 })

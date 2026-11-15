@@ -11,6 +11,7 @@ import {
   ADMIN_PAGE_SIZE,
   ROLE_FILTER_OPTIONS,
   STATUS_FILTER_OPTIONS,
+  adminErrorMessage,
 } from '../adminConstants.js'
 import { EMPTY_TEXT, formatDate } from '../adminFormat.js'
 import AccessReasonForm from '../components/AccessReasonForm.jsx'
@@ -53,7 +54,7 @@ export default function AdminAccountsPage() {
       })
       .catch(async (error) => {
         if (cancelled || (await handleAdminError(error))) return
-        setLoadError(error.message)
+        setLoadError(adminErrorMessage(error))
       })
     return () => {
       cancelled = true
@@ -83,7 +84,7 @@ export default function AdminAccountsPage() {
       setToastMessage('열람 기록을 감사 로그에 남겼습니다.')
     } catch (error) {
       if (await handleAdminError(error)) return
-      setOpenError(error.message)
+      setOpenError(adminErrorMessage(error))
     } finally {
       setOpening(false)
     }
@@ -100,8 +101,8 @@ export default function AdminAccountsPage() {
       setToastMessage(`${row.loginId} 계정을 ${locked ? '잠갔습니다' : '풀었습니다'}.`)
     } catch (error) {
       if (await handleAdminError(error)) return
-      if (locked) setLockError(error.message)
-      else setToastMessage(error.message)
+      if (locked) setLockError(adminErrorMessage(error))
+      else setToastMessage(adminErrorMessage(error))
     } finally {
       setLockPending(false)
     }
