@@ -39,6 +39,11 @@ public class DataInputUsers {
         return user;
     }
 
+    // 같은 회원의 쓰기 트랜잭션 맨 앞에서 회원 행을 잠근다(UserAccountMapper.lockUser). @Transactional 메서드 안에서만 부른다.
+    public void lock(long userId) {
+        userMapper.lockUser(userId);
+    }
+
     // 지금 시각(서울). DB 기본값 SYSTIMESTAMP 대신 이 값을 넣는다.
     public LocalDateTime now() {
         return LocalDateTime.now(clock);

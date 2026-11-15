@@ -1,6 +1,8 @@
 package com.baeksuescape.user.service;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -24,6 +26,11 @@ public class WithdrawalService {
 
     // 프론트 myPageMockHandlers.js의 탈퇴 비밀번호 오류 문구와 같다. code는 MEM-02와 같은 INVALID_PASSWORD.
     static final String WRONG_PASSWORD_MESSAGE = "비밀번호가 올바르지 않습니다.";
+    // 간편 로그인 전용 계정 탈퇴 — 비밀번호 대신 "로그인한 지 10분 이내"를 확인한다(팀 결정, PR #52 리뷰 7).
+    // TODO(2차: 간편 로그인 재인증 화면) 탈퇴 직전에 간편 로그인으로 다시 인증하는 화면이 생기면 그 확인으로 바꾼다.
+    static final Duration RECENT_LOGIN_WINDOW = Duration.ofMinutes(10);
+    static final String RECENT_LOGIN_REQUIRED = "RECENT_LOGIN_REQUIRED";
+    static final String RECENT_LOGIN_MESSAGE = "보안을 위해 간편 로그인으로 다시 로그인한 뒤 10분 안에 탈퇴해 주세요.";
 
     private final UserAccountMapper userMapper;
     private final UserSocialAccountMapper socialMapper;
@@ -42,15 +49,23 @@ public class WithdrawalService {
         this.clock = clock;
     }
 
-    // MEM-07 탈퇴 — 비밀번호가 있는 계정은 비밀번호를 확인한다. 간편 로그인 전용 계정(PASSWORD_HASH NULL)은 확인을 건너뛴다.
-    // 성공하면 같은 토큰은 JWT 필터가 WITHDRAWN을 보고 401로 막는다.
+    // MEM-07 탈퇴 — 비밀번호가 있는 계정은 비밀번호를 확인한다.
+    // 간편 로그인 전용 계정(PASSWORD_HASH NULL)은 비밀번호 대신 최근 로그인을 확인한다: 이 요청 토큰의 발급 시각(issuedAt)이 10분 이내여야 한다(PR #52 리뷰 7).
+    // 맨 앞에서 회원 행을 잠가 같은 회원의 다른 쓰기(불러오기·입력 저장)와 겹치지 않게 한다. 성공하면 같은 토큰은 JWT 필터가 401로 막는다.
     @Transactional
-    public void withdraw(long userId, MyPageDtos.Withdraw request) {
+    public void withdraw(long userId, MyPageDtos.Withdraw request, Instant issuedAt) {
+        userMapper.lockUser(userId);
         UserAccount account = userMapper.selectById(userId);
         if (account == null || account.isWithdrawn()) throw unauthorized();
-        if (account.getPasswordHash() != null && !passwordMatches(account, request == null ? null : request.password())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PASSWORD", WRONG_PASSWORD_MESSAGE,
-                    List.of(new FieldErrorItem("password", WRONG_PASSWORD_MESSAGE)));
+        if (account.getPasswordHash() != null) {
+            if (!passwordMatches(account, request == null ? null : request.password())) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PASSWORD", WRONG_PASSWORD_MESSAGE,
+                        List.of(new FieldErrorItem("password", WRONG_PASSWORD_MESSAGE)));
+            }
+        } else if (!isRecentLogin(issuedAt)) {
+            // 화면은 password 칸 오류로 보여 준다(403은 로그아웃을 일으키지 않는다).
+            throw new ApiException(HttpStatus.FORBIDDEN, RECENT_LOGIN_REQUIRED, RECENT_LOGIN_MESSAGE,
+                    List.of(new FieldErrorItem("password", RECENT_LOGIN_MESSAGE)));
         }
         // 인증 기록을 HMAC으로 찾으려면 덮어쓰기 전의 값이 필요하다 — 위에서 읽은 계정 값을 쓴다.
         String emailHmac = account.getEmailHmac();
@@ -61,6 +76,11 @@ public class WithdrawalService {
         socialMapper.deleteByUserId(userId);
         verificationMapper.deleteForWithdrawal(userId, emailHmac, phoneHmac);
         if (userMapper.updateWithdrawn(userId, now) == 0) throw unauthorized();
+    }
+
+    // 토큰 발급 후 RECENT_LOGIN_WINDOW 안이면 최근 로그인으로 본다. 발급 시각을 모르면 아니라고 본다.
+    private boolean isRecentLogin(Instant issuedAt) {
+        return issuedAt != null && Duration.between(issuedAt, clock.instant()).compareTo(RECENT_LOGIN_WINDOW) <= 0;
     }
 
     private boolean passwordMatches(UserAccount account, String password) {

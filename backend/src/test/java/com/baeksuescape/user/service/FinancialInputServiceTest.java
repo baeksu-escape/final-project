@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -23,10 +24,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
@@ -60,6 +63,8 @@ class FinancialInputServiceTest {
         given(userMapper.selectById(2L)).willReturn(member(2L, "FREELANCER"));
         given(mapper.selectSavedBaseMonths(anyLong())).willReturn(List.of("2026-10"));
         given(altData.completion(anyLong())).willReturn(Map.of());
+        // 같은 기준일에 불러온 행이 없으면 직접 입력 행 1개가 바뀐다.
+        given(mapper.mergeManualCredit(any())).willReturn(1);
     }
 
     private static BigDecimal n(String value) {
@@ -195,6 +200,38 @@ class FinancialInputServiceTest {
                 new FieldErrorItem("creditProfile.cashAdvanceMonths", "12개월 이하로 입력해 주세요."));
     }
 
+    // PR #52 리뷰 1 — 같은 기준일(USER_ID, BASE_DATE)에 불러온(IMPORTED) 신용 행이 있으면 MERGE가 0행을 바꾼다.
+    // 성공으로 응답하지 않고 409 CREDIT_PROFILE_IMPORTED로 실패해야 하며, save는 @Transactional이라 앞서 쓴 소득·대출도 함께 되돌려진다.
+    @Test
+    void importedCreditOnSameBaseDateFailsWith409AndRollsBack() throws NoSuchMethodException {
+        given(mapper.mergeManualCredit(any())).willReturn(0);
+        DataInputDtos.CreditProfile credit = new DataInputDtos.CreditProfile(n("1000000"), n("250000"), n("0"), n("0"), n("1"), null, false);
+
+        ApiException error = catchThrowableOfType(() -> service.save(1L, employee(noLoans(), credit, emptyAssets(), null)), ApiException.class);
+
+        assertThat(error.getStatus().value()).isEqualTo(409);
+        assertThat(error.getCode()).isEqualTo("CREDIT_PROFILE_IMPORTED");
+        assertThat(error.getMessage()).isEqualTo("불러온 신용 정보가 있어 직접 입력을 저장할 수 없습니다.");
+        assertThat(error.getFieldErrors()).isNullOrEmpty();
+        // 실패 뒤 단계(자산·지출)는 실행되지 않고, 앞 단계는 트랜잭션 롤백으로 되돌려진다(런타임 예외 → @Transactional 롤백).
+        verify(mapper, never()).mergeAsset(any());
+        verify(mapper, never()).insertExpense(any());
+        assertThat(FinancialInputService.class.getMethod("save", long.class, DataInputDtos.FinancialInput.class)
+                .isAnnotationPresent(Transactional.class)).isTrue();
+    }
+
+    // PR #52 리뷰 5 — 같은 회원의 동시 저장이 대출·지출 행을 겹쳐 넣지 않도록 맨 앞에서 회원 행을 잠근다.
+    @Test
+    void saveLocksMemberRowFirst() {
+        service.save(1L, employee(new DataInputDtos.Loans(List.of(loan("8.9", "24")), false), null, emptyAssets(), null));
+
+        InOrder order = inOrder(userMapper, mapper);
+        order.verify(userMapper).lockUser(1L);
+        order.verify(userMapper).selectById(1L);
+        order.verify(mapper).deleteManualLoans(1L, "2026-10");
+        order.verify(mapper).insertLoan(any());
+    }
+
     @Test
     void emptyCreditSectionDeletesManualRow() {
         DataInputDtos.CreditProfile empty = new DataInputDtos.CreditProfile(null, null, null, null, null, null, false);
@@ -233,8 +270,10 @@ class FinancialInputServiceTest {
         assertThat(codeOf(() -> service.save(4L, request))).isEqualTo("JOB_TYPE_REQUIRED");
     }
 
+    // PR #52 리뷰 2 — 저장한 기준월의 12개월 구간은 이번 입력이 기준이다(의도한 동작).
+    // 구간 안의 달은 이번 값으로 바꾸고 빈 달은 지운다(다른 기준월에 저장했던 달이어도). 구간 밖의 달(2025-10)은 건드리지 않는다.
     @Test
-    void freelancerIncomeKeepsTwelveMonthWindow() {
+    void freelancerIncomeReplacesWholeWindowAndKeepsMonthsOutside() {
         List<DataInputDtos.IncomeItem> items = new ArrayList<>();
         for (String month : FinancialInputService.incomeWindow("2026-10")) {
             items.add(new DataInputDtos.IncomeItem(month, "2026-05".equals(month) ? null : n("2000000")));
@@ -250,6 +289,8 @@ class FinancialInputServiceTest {
         assertThat(rows.getAllValues()).allMatch(row -> "MONTHLY_INCOME".equals(row.getIncomeKindCode()));
         assertThat(rows.getAllValues().get(0).getBaseMonth()).isEqualTo("2025-11");
         verify(mapper).deleteIncome(2L, "2026-05");
+        verify(mapper, times(1)).deleteIncome(anyLong(), anyString());
+        verify(mapper, never()).deleteIncome(2L, "2025-10");
         verify(mapper).updateWorkPeriod(eq(2L), eq(36), any());
 
         List<DataInputDtos.IncomeItem> outside = List.of(new DataInputDtos.IncomeItem("2025-10", n("1")));
