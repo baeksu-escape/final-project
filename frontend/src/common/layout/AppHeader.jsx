@@ -6,6 +6,7 @@ import Toast from '../components/Toast.jsx'
 import { ADMIN_TABS, PATHS, USER_TABS } from '../config/navigation.js'
 import { ROLE_LABELS, isAdmin } from '../config/roles.js'
 import TabMenu from './TabMenu.jsx'
+import { ADMIN_PATHS } from '../../features/admin/adminConstants.js'
 
 // TODO(D-23) 알림 범위가 정해지기 전까지 [알림]을 누르면 이 안내만 보여 준다.
 const NOTIFICATION_PENDING_MESSAGE = '알림 기능은 준비 중입니다.'
@@ -33,6 +34,12 @@ export default function AppHeader() {
       {canSeeMainMenu(user) && <TabMenu tabs={admin ? ADMIN_TABS : USER_TABS} label={admin ? '관리자 메뉴' : '주 메뉴'} />}
       <div className="app-header__user">
         {admin && <span className="app-header__badge">{ROLE_LABELS[user.role]}</span>}
+        {/* FP-80 관리자 비밀번호 변경 링크 — 새 스타일 없이 [마이 페이지] 링크와 같은 클래스를 쓴다. */}
+        {admin && (
+          <NavLink to={ADMIN_PATHS.PASSWORD} className="app-header__mypage">
+            비밀번호 변경
+          </NavLink>
+        )}
         {!admin && (
           <>
             {/* TODO(D-23) 알림 자리 — 알림 내용과 범위는 팀 결정 전이라 안내만 띄운다. */}

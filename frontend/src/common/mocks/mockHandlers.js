@@ -33,10 +33,11 @@ export function registerMockHandlers(newHandlers) {
 }
 
 // client.js가 VITE_USE_MOCK일 때 fetch 대신 호출한다. 실제 서버처럼 약간 늦게 응답한다.
-export async function handleMockRequest(method, path, body, token) {
+// 처리 함수는 { body, token }과 함께 headers(요청 헤더), query(주소의 ?뒤 값, URLSearchParams)도 받는다(FP-80 관리자 목록·재확인용).
+export async function handleMockRequest(method, path, body, token, headers = {}) {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS))
-  const pathname = path.split('?')[0]
+  const [pathname, search = ''] = path.split('?')
   const handler = handlers[`${method} ${pathname}`]
   if (!handler) throw new ApiError(404, `mock 응답이 없는 요청입니다: ${method} ${pathname}`)
-  return handler({ body, token })
+  return handler({ body, token, headers, query: new URLSearchParams(search) })
 }
