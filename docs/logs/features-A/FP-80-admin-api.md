@@ -109,6 +109,29 @@
   - 시스템 로그에 개인정보 원문 없음(API 전체 조회)
 - **확인:** `./mvnw test` 194개, `npm run lint`·`npm run build` 통과
 
+## [2026-11-15 · JWC / Claude Code] PR #53 검토 반영 — 잠긴 계정의 기존 토큰 차단
+- **시작 상태:** origin/develop(f1a4caa, PR #52 병합)을 merge했다(04f9f0a). 충돌이 없었고 파일 변경도 없다.
+- **무엇을 바꿨나**
+  - 전에는 잠긴 계정(LOCKED)이 새로 로그인만 못 하고, 이미 받은 토큰은 계속 쓸 수 있었다. 이제 탈퇴 계정처럼 기존 토큰도 쓰지 못한다. 일반 회원과 관리자 모두 같은 규칙이다.
+  - `JwtAuthenticationFilter.isUsable`: 상태가 LOCKED면 인증을 세우지 않는다. 그래서 로그인이 필요한 경로는 기존과 같이 401이 된다. 이때 요청 속성(`ACCOUNT_LOCKED_ATTRIBUTE`)을 남긴다. 클래스 주석도 새 동작에 맞게 고쳤다.
+  - `JsonErrorWriter.commence`: 요청에 그 속성이 있으면 401 응답을 `code: ACCOUNT_LOCKED`, `message: "잠긴 계정입니다. 관리자에게 문의해 주세요."`(로그인 423과 같은 문구)로 보낸다. 없으면 기존 `UNAUTHORIZED` 그대로다.
+  - 잠금을 풀면 같은 토큰을 다시 쓸 수 있다. 토큰을 무효로 만드는 게 아니라 요청마다 계정 상태를 보기 때문이다.
+- **API 변경:** 경로·필드는 그대로다. 401 응답에 code 값 `ACCOUNT_LOCKED`가 하나 늘었다.
+  - 화면 `client.js`는 401이면 code와 관계없이 로그아웃한다(`STEP_UP_REQUIRED`만 예외). 그래서 화면 코드는 고치지 않았다.
+- **바뀐 파일:** `global/security/JwtAuthenticationFilter.java`, `global/security/JsonErrorWriter.java`, 테스트 `SecurityConfigTest`(기존 "잠긴 회원은 통과" 테스트를 새 규칙으로 바꿈), `LockedAccountTokenTest`(새 파일)
+- **확인**
+  - `./mvnw test` 199개가 통과했다. 새로 확인한 것:
+    - 잠긴 일반 회원 토큰으로 `/api/members/me/profile` → 401 ACCOUNT_LOCKED
+    - 잠긴 관리자 토큰으로 `/api/admin/users` → 401 ACCOUNT_LOCKED
+    - 잠금 해제 뒤 같은 토큰 → 200
+    - 탈퇴 계정은 401 UNAUTHORIZED 그대로, 사용 중인 계정은 영향 없음
+  - 실제 가동(화면 5173 → Spring 8080 → 로컬 Docker Oracle, Playwright 8단계 통과)
+    - 브라우저 A는 qapc11(일반), B는 qapc12(관리자)로 로그인했다.
+    - B에서 qapc11을 잠갔다. A에서 마이페이지를 새로고침하자 `GET /api/auth/me`가 401 ACCOUNT_LOCKED였고, 토큰이 지워지고 로그인 화면으로 갔다.
+    - A에서 다시 로그인하자 423과 "잠긴 계정입니다. 관리자에게 문의해 주세요."가 나왔다.
+    - B에서 잠금을 풀자 A가 다시 로그인해 마이페이지가 열렸다. 그동안 B의 관리자 화면은 계속 정상이었다.
+- **다음 사람이 알아야 할 것:** 잠긴 관리자를 푸는 것은 다른 관리자만 할 수 있다(본인 잠금·해제는 409). 관리자가 한 명뿐이면 DB에서 직접 풀어야 한다. 이번 변경 전에도 로그인이 막혀 마찬가지였다.
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 
