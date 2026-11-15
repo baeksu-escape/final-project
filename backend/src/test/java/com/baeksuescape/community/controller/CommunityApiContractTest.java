@@ -33,6 +33,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import com.baeksuescape.admin.mapper.AdminAccountMapper;
 import com.baeksuescape.admin.service.AppSettingService;
 import com.baeksuescape.admin.dto.SettingDtos;
 import com.baeksuescape.community.dto.BoardDtos;
@@ -66,6 +67,9 @@ class CommunityApiContractTest {
     private AdminReportService adminReportService;
     @MockBean
     private AppSettingService settingService;
+    // FP-80 /api/admin/** 인터셉터가 '비밀번호 변경 필요' 여부를 이 매퍼로 본다. mock 기본값(null)이라 통과한다.
+    @MockBean
+    private AdminAccountMapper adminAccountMapper;
 
     private static final LocalDateTime AT = LocalDateTime.of(2026, 11, 15, 10, 0);
 
