@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-191 서비스 설정 (APP_SETTING, DDL v0.3.2) -->
+<mapper namespace="com.baeksuescape.admin.setting.AppSettingMapper">
+
+    <select id="selectByKey" resultType="com.baeksuescape.admin.setting.AppSettingRow">
+        SELECT SETTING_KEY AS settingKey, SETTING_VALUE AS settingValue, DESCRIPTION AS description
+          FROM APP_SETTING
+         WHERE SETTING_KEY = #{settingKey}
+    </select>
+
+    <update id="updateValue">
+        UPDATE APP_SETTING
+           SET SETTING_VALUE = #{settingValue}, UPDATED_BY = #{updatedBy}, UPDATED_AT = #{now}
+         WHERE SETTING_KEY = #{settingKey}
+    </update>
+</mapper>
