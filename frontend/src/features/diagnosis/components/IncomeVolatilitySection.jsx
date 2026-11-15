@@ -1,5 +1,7 @@
-import { Card } from '../../../common/components/index.js'
-import { calculateIncomeDeficitMonths, calculateIncomeStats } from '../utils/incomeStats.js'
+import { useEffect, useState } from 'react'
+import { useAuth } from '../../../common/auth/useAuth.js'
+import { Button, Card } from '../../../common/components/index.js'
+import { getIncomeVolatility } from '../api/incomeVolatilityApi.js'
 import '../styles/incomeVolatility.css'
 
 const VOLATILITY_WARNING_PCT = 12
@@ -21,25 +23,49 @@ function formatMonth(value) {
   return `${year}년 ${Number(month)}월`
 }
 
-// N-22 NULL 또는 형식 오류를 0원 소득으로 오해하지 않게 안내 문구를 고른다.
-function getIncomeUnavailableMessage(months) {
-  if (!Array.isArray(months) || months.length !== 12) return '최근 12개월 소득 자료를 확인할 수 없습니다.'
-  if (months.some((item) => item?.incomeAmount === null)) return '월 소득이 미입력된 달이 있어 소득 지표를 계산할 수 없습니다.'
+// N-22 NULL 또는 형식 오류를 0원 소득으로 오해하지 않게 안내 문구를 고른다(응답의 사유 코드 기준).
+function getIncomeUnavailableMessage(reason) {
+  if (reason === 'INCOME_MISSING') return '월 소득이 미입력된 달이 있어 소득 지표를 계산할 수 없습니다.'
   return '월 소득 자료를 확인할 수 없어 지표를 계산할 수 없습니다.'
 }
 
-// N-22-3·4·5·6 변동성 요약 — 최근 12개월 소득 지표와 월 고정지출 기준의 부족 달을 표시한다.
+// N-22-1 지표 조회 상태 — 회원·직군·기준 자료가 바뀌거나 화면을 떠나면 늦은 응답을 버리고, 실패하면 다시 시도할 수 있다.
+function useIncomeVolatility(userId, workerTypeCode, baseline) {
+  const [revision, setRevision] = useState(0)
+  const [state, setState] = useState({ scope: null, result: null, error: '' })
+  const sameScope = (other) => other && other.userId === userId && other.workerTypeCode === workerTypeCode
+    && other.baseline === baseline && other.revision === revision
+
+  useEffect(() => {
+    let active = true
+    const current = { userId, workerTypeCode, baseline, revision }
+    getIncomeVolatility({ userId, baseline }).then(
+      (result) => { if (active) setState({ scope: current, result, error: '' }) },
+      (error) => { if (active) setState({ scope: current, result: null, error: error.message }) },
+    )
+    return () => { active = false }
+  }, [userId, workerTypeCode, baseline, revision])
+
+  const ready = sameScope(state.scope)
+  return { loading: !ready, result: ready ? state.result : null, error: ready ? state.error : '', retry: () => setRevision((value) => value + 1) }
+}
+
+// N-22-3·4·5·6 변동성 요약 — API(지금은 mock 임시 계산) 결과만 받아 최근 12개월 소득 지표와 월 고정지출 기준의 부족 달을 표시한다.
+// data는 현금흐름 화면이 이미 받은 기준 자료(getCashFlowData 응답)이며, 이 컴포넌트는 직접 계산하지 않는다.
 export default function IncomeVolatilitySection({ data }) {
-  const months = data?.months
-  const stats = calculateIncomeStats(months)
-  const fixedExpenseAmount = data?.fixedExpenseAmount
-  const deficits = calculateIncomeDeficitMonths(months, fixedExpenseAmount)
+  const { user } = useAuth()
+  const query = useIncomeVolatility(user?.userId, user?.jobType, data)
+  const response = query.result
+  const stats = response?.stats ?? null
+  const fixedExpenseAmount = response?.fixedExpenseAmount ?? null
+  const deficits = response?.deficits ?? null
   const hasIncomeStats = Boolean(stats)
   const validFixedExpense = Number.isSafeInteger(fixedExpenseAmount) && fixedExpenseAmount >= 0
+  // 12% 초과 강조는 화면 표시 기준(시연 설정 상수)이다.
   const highVolatility = stats?.coefficientOfVariationPct != null
     && stats.coefficientOfVariationPct > VOLATILITY_WARNING_PCT
   const recentDirection = stats?.recentThreeVsAnnualAverageAmount
-  const lowMonthMargin = hasIncomeStats && validFixedExpense ? stats.lowestMonth.incomeAmount - fixedExpenseAmount : null
+  const lowMonthMargin = response?.lowestMonthVsFixedExpenseAmount ?? null
   let volatilityLabel = '소득 자료를 확인해 주세요.'
   if (stats) {
     if (stats.coefficientOfVariationPct == null) volatilityLabel = '평균 소득이 0원이라 계산할 수 없습니다.'
@@ -55,7 +81,9 @@ export default function IncomeVolatilitySection({ data }) {
   return (
     <section className="iv-section" aria-labelledby="iv-title">
       <h2 className="iv-title" id="iv-title">소득 변동성 요약</h2>
-      {!hasIncomeStats && <p className="iv-unavailable" role="status">{getIncomeUnavailableMessage(months)}</p>}
+      {query.loading && <p className="iv-unavailable" role="status">소득 변동성 지표를 불러오는 중입니다.</p>}
+      {query.error && <p className="iv-unavailable" role="status">{query.error} <Button size="sm" onClick={query.retry}>다시 시도</Button></p>}
+      {response && !hasIncomeStats && <p className="iv-unavailable" role="status">{getIncomeUnavailableMessage(response.unavailableReason)}</p>}
 
       <div className="iv-kpis">
         <article className="iv-kpi">
@@ -100,8 +128,10 @@ export default function IncomeVolatilitySection({ data }) {
       )}
 
       <Card title="소득 부족 달 미리 보기" className="iv-deficits">
-        {deficits == null ? (
-          <p className="iv-unavailable">{validFixedExpense ? getIncomeUnavailableMessage(months) : '월 고정지출이 미입력되어 부족 달을 확인할 수 없습니다.'}</p>
+        {!response ? (
+          <p className="iv-unavailable">{query.loading ? '불러오는 중입니다.' : '지표를 불러오지 못했습니다.'}</p>
+        ) : deficits == null ? (
+          <p className="iv-unavailable">{validFixedExpense ? getIncomeUnavailableMessage(response.unavailableReason) : '월 고정지출이 미입력되어 부족 달을 확인할 수 없습니다.'}</p>
         ) : deficits.length === 0 ? (
           <p>최근 12개월 중 월 고정지출보다 소득이 적은 달이 없습니다.</p>
         ) : (

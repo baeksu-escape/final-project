@@ -45,3 +45,13 @@ UI 원본은 `5unyCwrGcxS3WrWFUk9qid`의 `1794641606-4f83` 버전으로 앞선 F
 후속 요청(평균 색 대비·500ms 자동 예측·고정 상태 공간)과 기준값 guard 보완 완료 코드로 Codex1이 `npm.cmd run lint`·`npm.cmd run build`를 각 1회 실행해 통과했다(Vite 183 modules). 추적 파일과 미추적 신규 파일 전체의 공백 검사도 통과했다. Claude는 건전성·공유 데이터를, Codex1·Codex2는 현금흐름을 읽기 교차 검토했다. 급여소득자의 고정 월급 등 시연 자료값은 바꾸지 않았다.
 
 브라우저 동작·반응형·실제 서버 연결과 사용자 최종검수는 미실시다. 화면 동작은 `npm.cmd run dev`로 직접 확인해야 한다. 프론트 테스트 파일은 추가하지 않았다.
+
+## N-22 소득 변동성 (FP-96 후속: mock 임시 계산 분리)
+
+- 정식 재무 계산은 광희 FP-203 백엔드 API 담당이다. 프론트는 계산하지 않고 API 함수 결과만 표시한다. FP-203 연동은 대기 중이며 경로·응답 계약은 미정이다.
+- `api/incomeVolatilityApi.js` `getIncomeVolatility({ userId, baseline })`: baseline은 현금흐름 화면이 이미 받은 `getCashFlowData` 응답을 그대로 넘긴다(중복 조회 없음). `VITE_USE_MOCK=false`면 미연결 오류이며 mock 자동 대체는 없다.
+- 임시 응답 모양(FP-203 확정 시 adapter에서 맞춤): `{ stats|null, deficits|null, fixedExpenseAmount, lowestMonthVsFixedExpenseAmount, unavailableReason: 'INCOME_MISSING'|'INCOME_INVALID'|null, source }`. `stats`는 평균·중앙값·표준편차·변동계수(%)·0원 달 수·가장 적은 달·최근 3개월 평균과 차이·소득 격차, `deficits`는 부족 달·부족액·다음 도래월·남은 개월이다. 응답은 `adapters/incomeVolatilityAdapter.js`가 검사한다.
+- 계산식은 `mocks/incomeVolatilityMock.js` 한 벌에만 있다. `utils/incomeStats.js`는 기존 이름(`calculateIncomeGap`·`calculateIncomeStats`·`calculateIncomeDeficitMonths`) 호환을 위한 전달만 하며 정식 프론트 계산이 아니다.
+- `IncomeVolatilitySection`은 기존 `data` prop(현금흐름 기준 자료)을 받고, 회원·직군·기준 자료 변경과 화면 이탈 시 늦은 응답을 버린다. 로딩·오류(다시 시도)를 표시하고 NULL 소득은 0으로 바꾸지 않는다. 변동계수 12% 초과 강조는 화면 표시 기준이다.
+- FP-202 페이지 연결은 이번에도 하지 않았다(섹션은 아직 어느 화면에도 붙어 있지 않다).
+
