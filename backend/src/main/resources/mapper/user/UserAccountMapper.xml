@@ -123,4 +123,28 @@
          WHERE USER_ID = #{userId}
            AND WORKER_TYPE_CODE IS NULL
     </update>
+
+    <!-- 회원 단위 쓰기 잠금: 같은 회원의 쓰기 트랜잭션 맨 앞에서 부른다. 다른 트랜잭션은 커밋·롤백까지 여기서 기다린다. -->
+    <select id="lockUser" resultType="java.lang.Long">
+        SELECT USER_ID FROM APP_USER WHERE USER_ID = #{userId} FOR UPDATE
+    </select>
+
+    <!-- N-04-7 회원 탈퇴(DDL v0.3.2 W1): 행은 지우지 않고 상태만 바꾼다. 표시값은 CK_APU_PII_BY_STATUS 식과 똑같이 쓴다.
+         회원 번호를 붙여 UNIQUE(아이디·닉네임·이메일 HMAC)를 지키고, 원래 값은 비워져 바로 다시 가입할 수 있다. -->
+    <update id="updateWithdrawn">
+        UPDATE APP_USER
+           SET ACCOUNT_STATUS_CODE = 'WITHDRAWN',
+               WITHDRAWN_AT = #{now},
+               LOGIN_ID = 'wd_' || TO_CHAR(USER_ID),
+               NICKNAME = '탈퇴' || TO_CHAR(USER_ID),
+               NAME_ENC = 'WITHDRAWN',
+               EMAIL_ENC = 'WITHDRAWN',
+               EMAIL_HMAC = 'WITHDRAWN:' || TO_CHAR(USER_ID),
+               PHONE_ENC = NULL,
+               PHONE_HMAC = NULL,
+               PASSWORD_HASH = NULL,
+               UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+           AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
+    </update>
 </mapper>

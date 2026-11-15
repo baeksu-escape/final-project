@@ -49,4 +49,14 @@
            AND VERIFIED_AT IS NOT NULL
            AND EXPIRES_AT &gt; #{now}
     </update>
+
+    <!-- N-04-7 회원 탈퇴: 회원 번호 또는 이메일·휴대폰 HMAC이 같은 인증 기록을 지운다(가입 전 인증은 USER_ID가 NULL이라 HMAC으로 찾는다). -->
+    <delete id="deleteForWithdrawal">
+        DELETE FROM VERIFICATION_CODE
+         WHERE USER_ID = #{userId}
+            OR TARGET_HMAC = #{emailHmac}
+        <if test="phoneHmac != null">
+            OR TARGET_HMAC = #{phoneHmac}
+        </if>
+    </delete>
 </mapper>

@@ -2,8 +2,10 @@ import { ApiError } from '../../../common/api/ApiError.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { AUTH_ERROR_CODES, EMAIL_PURPOSES } from '../authConstants.js'
 import { isValidEmail, isValidPassword } from '../validation.js'
-import { consumeVerification, isMockEmailInUse, requireAccountByToken } from './authMockHandlers.js'
+import { withdrawAllAltDataOfUser } from '../../dataInput/mocks/altDataMockStore.js'
+import { consumeVerification, isMockEmailInUse, requireAccountByToken, withdrawMockAccount } from './authMockHandlers.js'
 import { MY_PAGE_DEMO_PROFILES } from './myPageMockData.js'
+import { deleteMockSocialLinksOfUser } from './socialLoginMockData.js'
 
 // 아래 네 함수는 값이 없으면(null·빈 값) 오류 없이 null을 돌려준다. 휴대폰은 DDL에서 null일 수 있다(PHONE_ENC nullable).
 
@@ -86,6 +88,21 @@ registerMockHandlers({
     if (!matchesPassword(account, body?.currentPassword)) throw new ApiError(400, '현재 비밀번호가 올바르지 않습니다.')
     if (!isValidPassword(body.newPassword)) throw new ApiError(400, '비밀번호 규칙을 지켜 주세요.')
     account.password = body.newPassword
+    return {}
+  },
+
+  // N-04-7 회원 탈퇴(MEM-07, 🟡 제안 경로) — 비밀번호를 확인한 뒤 계정 행은 남기고 상태만 탈퇴로 바꾼다(DDL v0.3.2 W1).
+  // 동의로 불러온 대안 데이터를 지우고 동의 이력에 철회 시각을 채운다(FP-85 저장소). 간편 로그인 연결도 지운다.
+  // 진단 내역은 서비스 기록으로 보관한다(탈퇴한 토큰으로는 401이라 조회만 막힌다). 401은 로그아웃을 일으키므로 비밀번호 오류는 400을 쓴다.
+  'DELETE /api/members/me': ({ body, token }) => {
+    const account = requireAccountByToken(token)
+    if (!matchesPassword(account, body?.password)) {
+      const message = '비밀번호가 올바르지 않습니다.'
+      throw new ApiError(400, message, { fieldErrors: [{ field: 'password', message }] })
+    }
+    withdrawAllAltDataOfUser(account.user.userId)
+    deleteMockSocialLinksOfUser(account.user.userId)
+    withdrawMockAccount(account)
     return {}
   },
 })
