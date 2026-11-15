@@ -1,0 +1,38 @@
+/* N-17 시나리오 테스트 화면 전용 스타일. 클래스 접두어 sc-, 기존 테마 토큰만 쓴다. */
+.sc-page { display: grid; gap: 20px; }
+.sc-heading h1 { margin: 0 0 8px; }
+.sc-heading p, .sc-hint { color: var(--mut); }
+.sc-hint { font-size: 12.5px; }
+.sc-neg { color: var(--bad); }
+.sc-pos { color: var(--mint); }
+.sc-warn { color: var(--warn); }
+.sc-num { font-variant-numeric: tabular-nums; text-align: right; }
+.sc-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 18px; align-items: start; }
+.sc-controls .card__body { display: grid; gap: 10px; }
+.sc-group { display: grid; gap: 6px; }
+.sc-preset-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sc-group__title { font-size: 12.5px; font-weight: 600; }
+.sc-preset { min-height: 36px; padding: 4px 12px; border-radius: 10px; border: 1px solid var(--line2); background: var(--inp); color: var(--fg2); text-align: left; cursor: pointer; font-size: 13px; }
+.sc-preset:hover { border-color: var(--vio); }
+.sc-preset[aria-pressed="true"] { background: var(--pri); border-color: var(--pri); color: var(--pri-fg, #fff); font-weight: 600; }
+.sc-field { display: grid; gap: 4px; padding-top: 6px; }
+/* 입력 안내 줄 — 높이를 고정해 문구가 바뀌어도 오른쪽 결과가 움직이지 않게 한다. 넘치면 스크롤로 읽는다. */
+.sc-status { block-size: 3.2em; overflow: auto; margin: 0; font-size: 13px; line-height: 1.5; color: var(--mut); }
+.sc-status--warn { color: var(--warn); }
+.sc-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.sc-kpi { display: grid; gap: 2px; padding: 14px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; }
+.sc-big { font: 700 24px/1.2 var(--f-d); font-variant-numeric: tabular-nums; }
+.sc-bars { display: grid; gap: 12px; margin-top: 16px; }
+.sc-bar-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 110px; gap: 4px 8px; align-items: center; font-size: 12.5px; }
+.sc-bar-row__title { grid-column: 1 / -1; font-size: 12.5px; font-weight: 500; color: var(--mut); }
+.sc-track { position: relative; display: block; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.sc-fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.sc-fill--current { background: var(--info); }
+.sc-fill--changed { background: var(--vio); }
+.sc-fill--pos { background: var(--mint); }
+.sc-fill--neg { background: var(--bad); }
+.sc-box { margin: 16px 0 8px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line2); font-size: 13px; }
+.sc-box--warn { border-color: var(--warn-line); background: var(--warn-bg); color: var(--warn-fg); }
+.sc-box--ok { border-color: var(--ok-line); background: var(--ok-bg); color: var(--ok-fg); }
+@media (max-width: 960px) { .sc-layout, .sc-kpis { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .sc-preset-groups { grid-template-columns: 1fr; } }

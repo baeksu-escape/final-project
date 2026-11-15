@@ -27,6 +27,7 @@ import SimulationPage from '../../features/simulation/pages/SimulationPage.jsx'
 import MarketPage from '../../features/market/pages/MarketPage.jsx'
 import AssetDebtPage from '../../features/diagnosis/pages/AssetDebtPage.jsx'
 import CashFlowPage from '../../features/diagnosis/pages/CashFlowPage.jsx'
+import ScenarioPage from '../../features/scenario/pages/ScenarioPage.jsx'
 
 // 앱 전체 라우트. 다른 팀은 자기 화면의 element 한 줄만 바꾼다(가드·경로 구조는 그대로 둔다).
 export default function AppRoutes() {
@@ -57,7 +58,7 @@ export default function AppRoutes() {
             <Route element={<RouteGuard requireScore />}>
               <Route path={PATHS.REPORT} element={<CreditReportPage />} />
               <Route path={PATHS.ASSET_DEBT} element={<AssetDebtPage />} />
-              <Route path={PATHS.SCENARIO} element={<PlaceholderPage title="시나리오 테스트" nId="N-17" />} />
+              <Route path={PATHS.SCENARIO} element={<ScenarioPage />} />
               <Route path={PATHS.CASH_FLOW} element={<CashFlowPage />} />
               <Route path={PATHS.MARKET} element={<MarketPage />} />
               <Route path={PATHS.SIMULATOR} element={<SimulationPage />} />
