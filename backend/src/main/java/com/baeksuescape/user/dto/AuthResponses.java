@@ -13,13 +13,21 @@ public final class AuthResponses {
     public record UserView(Long userId, String name, String role, String jobType, Boolean hasScore) {
     }
 
+    // FP-80 AUTH-01 응답 종류 — 일반 사용자는 Login(토큰), 관리자는 AdminChallenge(2단계 인증 대기).
+    public interface LoginResult {
+    }
+
     // AUTH-01 로그인, AUTH-05 간편 로그인 연결
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record Login(String accessToken, UserView user, Boolean devMode) {
+    public record Login(String accessToken, UserView user, Boolean devMode) implements LoginResult {
 
         public Login(String accessToken, UserView user) {
             this(accessToken, user, null);
         }
+    }
+
+    // FP-80 AUTH-01 관리자 — 비밀번호가 맞으면 토큰 대신 이 응답을 준다. 업무 이메일로 6자리 번호를 보냈고, AUTH-11에 challengeToken과 번호를 보낸다.
+    public record AdminChallenge(boolean twoFactorRequired, String challengeToken, String maskedEmail) implements LoginResult {
     }
 
     // AUTH-03 내 정보, MEM-05 직군 저장

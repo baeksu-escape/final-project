@@ -15,7 +15,8 @@
         USER_ID AS userId, LOGIN_ID AS loginId, PASSWORD_HASH AS passwordHash, NICKNAME AS nickname,
         NAME_ENC AS nameEnc, PHONE_ENC AS phoneEnc, PHONE_HMAC AS phoneHmac, EMAIL_ENC AS emailEnc, EMAIL_HMAC AS emailHmac,
         BIRTH_YEAR AS birthYear, WORKER_TYPE_CODE AS workerTypeCode, ROLE_CODE AS roleCode,
-        ACCOUNT_STATUS_CODE AS accountStatusCode, LOGIN_FAIL_COUNT AS loginFailCount, CREATED_AT AS createdAt
+        ACCOUNT_STATUS_CODE AS accountStatusCode, LOGIN_FAIL_COUNT AS loginFailCount,
+        PASSWORD_CHANGE_REQUIRED_YN AS passwordChangeRequiredYn, LAST_LOGIN_AT AS lastLoginAt, CREATED_AT AS createdAt
     </sql>
 
     <select id="selectById" resultType="com.baeksuescape.user.dto.UserAccount">

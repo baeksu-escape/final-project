@@ -30,6 +30,9 @@ public class UserAccount {
     private String roleCode;
     private String accountStatusCode;
     private int loginFailCount;
+    // FP-80 관리자 첫 로그인·임시 비밀번호 재발급 뒤 'Y'(비밀번호를 바꿔야 ACCESS 토큰을 받는다)
+    private String passwordChangeRequiredYn;
+    private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
 
     public boolean isAdmin() {
@@ -38,6 +41,10 @@ public class UserAccount {
 
     public boolean isLocked() {
         return LOCKED.equals(accountStatusCode);
+    }
+
+    public boolean isPasswordChangeRequired() {
+        return "Y".equals(passwordChangeRequiredYn);
     }
 
     public boolean isWithdrawn() {

@@ -21,6 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.baeksuescape.admin.mapper.AdminAccountMapper;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 
 // FP-87 보안 설정 — 401·403 JSON, 역할별 경로, 탈퇴·잠금 계정, 임시 개방 경로, CORS 미리 요청. 실제 DB 없이 계정 상태 조회는 mock으로 대신한다.
@@ -39,6 +40,9 @@ class SecurityConfigTest {
 
     @MockBean
     private UserAccountMapper userAccountMapper;
+    // FP-80 /api/admin/**의 비밀번호 변경 필요 확인(PasswordChangeRequiredInterceptor)이 DB 대신 쓰는 mock. 기본은 null(변경 필요 없음).
+    @MockBean
+    private AdminAccountMapper adminAccountMapper;
 
     @BeforeEach
     void activeByDefault() {
@@ -98,13 +102,25 @@ class SecurityConfigTest {
     }
 
     @Test
-    void 없는_회원은_401_잠긴_회원은_통과() throws Exception {
+    void 없는_회원은_401() throws Exception {
         given(userAccountMapper.selectAccountStatus(10L)).willReturn(null);
-        given(userAccountMapper.selectAccountStatus(11L)).willReturn("LOCKED");
         mvc.perform(get("/api/members/me/__test/ping").header(HttpHeaders.AUTHORIZATION, bearer(10L, "ROLE_USER")))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    // FP-80 잠긴 계정의 기존 토큰도 쓰지 못한다. 401 code는 ACCOUNT_LOCKED로 구분한다.
+    @Test
+    void 잠긴_회원과_관리자는_토큰이_있어도_401_ACCOUNT_LOCKED() throws Exception {
+        given(userAccountMapper.selectAccountStatus(11L)).willReturn("LOCKED");
+        given(userAccountMapper.selectAccountStatus(12L)).willReturn("LOCKED");
         mvc.perform(get("/api/members/me/__test/ping").header(HttpHeaders.AUTHORIZATION, bearer(11L, "ROLE_USER")))
-                .andExpect(status().isOk());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"))
+                .andExpect(jsonPath("$.message").value("잠긴 계정입니다. 관리자에게 문의해 주세요."));
+        mvc.perform(get("/api/admin/__test/ping").header(HttpHeaders.AUTHORIZATION, bearer(12L, "ROLE_ADMIN")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"));
     }
 
     @Test

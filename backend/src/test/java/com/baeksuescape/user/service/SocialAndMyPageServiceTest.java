@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -20,8 +21,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.transaction.support.TransactionOperations;
 
 import com.baeksuescape.global.TestKeys;
+import com.baeksuescape.global.log.SystemLogMapper;
+import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.global.config.AvenueProperties;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.security.JwtTokenProvider;
@@ -59,7 +63,8 @@ class SocialAndMyPageServiceTest {
     void setUp() {
         UserViewFactory views = new UserViewFactory(userMapper, CRYPTO);
         AuthService auth = new AuthService(userMapper, consentMapper, socialMapper, emailVerification, store, views, tokenProvider,
-                ENCODER, CRYPTO, HMAC, CLOCK);
+                ENCODER, CRYPTO, HMAC, CLOCK, null,
+                new SystemLogService(mock(SystemLogMapper.class), TransactionOperations.withoutTransaction(), CLOCK));
         social = new SocialLoginService(properties, store, socialMapper, userMapper, auth);
         myPage = new MyPageService(userMapper, emailVerification, views, ENCODER, CRYPTO, HMAC, CLOCK);
     }

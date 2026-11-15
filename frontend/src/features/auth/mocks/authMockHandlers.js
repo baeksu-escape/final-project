@@ -11,6 +11,7 @@ import {
   MOCK_EMAIL_CODE_TTL_SECONDS,
 } from './authMockData.js'
 import { mockLinkKeys } from './socialLoginMockData.js'
+import { startAdminLoginChallenge } from '../../admin/mocks/adminLoginChallenges.js'
 
 // N-01~N-03 mock 계정 목록 — 메모리에만 있어 새로고침하면 가입자는 사라진다. password가 null이면 비밀번호를 비교하지 않는다(데모 계정).
 const accounts = [
@@ -49,6 +50,18 @@ export function findMockAccount(loginId) {
 // N-01-6 소셜 연결 기록(제공자 → userId)으로 계정을 찾을 때 쓴다. 없거나 탈퇴한 계정이면 undefined.
 export function findMockAccountByUserId(userId) {
   return accounts.find((item) => !isWithdrawn(item) && item.user.userId === userId)
+}
+
+// FP-80 관리자 계정 관리 mock(ADM-05~08)이 전체 계정(탈퇴 포함)을 볼 때 쓴다. 잠금처럼 값을 바꾸면 로그인 mock에도 그대로 반영된다.
+export function listMockAccounts() {
+  return accounts
+}
+
+// FP-80 관리자 계정 추가(ADM-07)·관리자 mock 시연 계정이 새 계정을 넣을 때 쓴다. userId는 여기서 정하고, 넣은 계정을 돌려준다.
+export function addMockAccount({ user, ...rest }) {
+  const account = { locked: false, ...rest, user: { ...user, userId: createMockUserId(rest.loginId) } }
+  accounts.push(account)
+  return account
 }
 
 // N-04-3 이메일 변경 mock이 다른 계정이 이미 쓰는 이메일인지 볼 때 쓴다.
@@ -114,6 +127,7 @@ export function consumeVerification(token, { purpose, email, loginId }) {
 
 registerMockHandlers({
   // N-01 로그인 — 아이디·비밀번호가 틀리면 같은 문구로 401, 잠긴 계정이면 423. 탈퇴한 계정은 없는 계정과 같게 401이다.
+  // FP-80 관리자는 토큰 대신 2단계 인증 시작 응답 { twoFactorRequired, challengeToken, maskedEmail }을 받는다(1분 안에 다시 부르면 429).
   'POST /api/auth/login': ({ body }) => {
     if (!body?.loginId || !body?.password) throw new ApiError(400, '아이디와 비밀번호를 입력해 주세요.')
     const account = findMockAccount(body.loginId)
@@ -121,6 +135,7 @@ registerMockHandlers({
       throw new ApiError(401, LOGIN_FAILED_MESSAGE)
     }
     if (account.locked) throw new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ACCOUNT_LOCKED })
+    if (account.user.role === ROLES.ADMIN) return startAdminLoginChallenge(account)
     return { accessToken: toMockToken(account.user.userId), user: structuredClone(account.user) }
   },
 

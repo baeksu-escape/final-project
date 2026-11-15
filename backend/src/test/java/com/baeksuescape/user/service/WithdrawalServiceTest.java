@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -30,8 +31,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.transaction.support.TransactionOperations;
 
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.global.log.SystemLogMapper;
+import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.user.dto.DataInputRows.ConsentRow;
 import com.baeksuescape.user.dto.MyPageDtos;
 import com.baeksuescape.user.dto.UserAccount;
@@ -62,6 +66,8 @@ class WithdrawalServiceTest {
     private UserConsentMapper consentMapper;
     @Mock
     private AltDataMapper altDataMapper;
+    @Mock
+    private SystemLogMapper systemLogMapper;
 
     private WithdrawalService service;
     private UserAccount account;
@@ -69,7 +75,8 @@ class WithdrawalServiceTest {
     @BeforeEach
     void setUp() {
         ConsentService consentService = new ConsentService(consentMapper, altDataMapper, new DataInputUsers(userMapper, UserFixtures.CLOCK));
-        service = new WithdrawalService(userMapper, socialMapper, verificationMapper, consentService, UserFixtures.ENCODER, UserFixtures.CLOCK);
+        service = new WithdrawalService(userMapper, socialMapper, verificationMapper, consentService, UserFixtures.ENCODER, UserFixtures.CLOCK,
+                new SystemLogService(systemLogMapper, TransactionOperations.withoutTransaction(), UserFixtures.CLOCK));
         account = UserFixtures.user(7L, "employee");
         given(userMapper.selectById(7L)).willReturn(account);
         given(userMapper.updateWithdrawn(anyLong(), any())).willReturn(1);
@@ -163,6 +170,15 @@ class WithdrawalServiceTest {
         order.verify(userMapper).updateWithdrawn(7L, NOW);
         // ASSESSMENT 등 딸린 데이터는 보관한다 — 회원 표는 잠금·읽기·탈퇴 표시 외에는 건드리지 않는다.
         verifyNoMoreInteractions(userMapper, socialMapper, verificationMapper);
+    }
+
+    // FP-80 N-28-1 회원 탈퇴를 시스템 로그(INFO)에 남긴다 — 아이디는 덮어쓰기 전 값을 가려서.
+    @Test
+    void withdrawalIsRecordedInSystemLogWithMaskedLoginId() {
+        service.withdraw(7L, password(UserFixtures.PASSWORD), JUST_NOW);
+
+        verify(systemLogMapper).insertLog(eq("INFO"), eq("member-service"),
+                eq("회원 탈퇴 (em***)"), eq(7L), any());
     }
 
     @Test
