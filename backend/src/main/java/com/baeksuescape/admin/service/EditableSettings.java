@@ -1,4 +1,4 @@
-package com.baeksuescape.admin.setting;
+package com.baeksuescape.admin.service;
 
 import java.util.List;
 

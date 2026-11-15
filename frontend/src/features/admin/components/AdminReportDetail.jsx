@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Notice, ProgressBar, TextInput } from '../../../common/components/index.js'
-import { fetchAdminReport, processReport } from '../api/reportApi.js'
-import { DETAIL_MAX, formatDateTime, labelOf, REPORT_REASONS, REPORT_RESULTS } from '../config/communityCodes.js'
+import { fetchAdminReport, processReport } from '../api/adminReportApi.js'
+import { DETAIL_MAX, formatDateTime, labelOf, REPORT_REASONS, REPORT_RESULTS } from '../../community/config/communityCodes.js'
 import { StatusChip } from './AdminReportList.jsx'
 
 const OPEN = ['RECEIVED', 'IN_REVIEW']

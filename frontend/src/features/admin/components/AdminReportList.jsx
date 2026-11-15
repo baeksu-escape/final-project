@@ -1,4 +1,4 @@
-import { formatDateTime, labelOf, REPORT_STATUSES } from '../config/communityCodes.js'
+import { formatDateTime, labelOf, REPORT_STATUSES } from '../../community/config/communityCodes.js'
 
 const OPEN = ['RECEIVED', 'IN_REVIEW']
 

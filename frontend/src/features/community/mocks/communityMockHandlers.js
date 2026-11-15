@@ -44,8 +44,6 @@ function requireAdmin(token) {
   if (!currentUser(token).isAdmin) fail(403, 'FORBIDDEN', '권한이 없습니다.')
 }
 
-const queryOf = (path) => new URL(path, 'http://mock.local').searchParams
-
 /* ---------- 글·댓글 (COMM-01~06) ---------- */
 
 function findPost(postId) {
@@ -240,9 +238,8 @@ function registerReportRoutes(reportId) {
 
 registerMockHandlers({
   // N-06-1 글 목록 — 삭제 글은 빼고, 검색은 보이는 글에서만. 최신순.
-  'GET /api/board/posts': ({ token, path }) => {
+  'GET /api/board/posts': ({ token, query }) => {
     const { loginId } = currentUser(token)
-    const query = queryOf(path)
     const page = Math.max(1, Number(query.get('page')) || 1)
     const size = Math.min(50, Math.max(1, Number(query.get('size')) || 10))
     const keyword = (query.get('keyword') ?? '').trim()
@@ -318,9 +315,8 @@ registerMockHandlers({
   },
 
   // N-34-1 신고 목록 — 조건에 맞는 신고를 대상별로 묶고, 숨김 대상을 먼저, 그다음 최근 신고 순
-  'GET /api/admin/reports': ({ token, path }) => {
+  'GET /api/admin/reports': ({ token, query }) => {
     requireAdmin(token)
-    const query = queryOf(path)
     const status = query.get('status')
     const reason = query.get('reason')
     const from = query.get('from')

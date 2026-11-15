@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Button, Notice, NumberInput, Select, Toast } from '../../../common/components/index.js'
-import { fetchAdminReports, fetchSettings, updateSetting } from '../api/reportApi.js'
+import { fetchAdminReports, fetchSettings, updateSetting } from '../api/adminReportApi.js'
 import AdminReportDetail from '../components/AdminReportDetail.jsx'
 import AdminReportList from '../components/AdminReportList.jsx'
-import { AUTO_HIDE_KEY, labelOf, REPORT_PERIODS, REPORT_RESULTS, REPORT_REASONS, REPORT_STATUSES } from '../config/communityCodes.js'
-import '../community.css'
+import { AUTO_HIDE_KEY, labelOf, REPORT_PERIODS, REPORT_RESULTS, REPORT_REASONS, REPORT_STATUSES } from '../../community/config/communityCodes.js'
+import '../../community/community.css'
 
 // 오늘에서 days일 전 날짜 'YYYY-MM-DD' (내 컴퓨터 날짜 기준)
 function dateBefore(days) {

@@ -33,8 +33,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-import com.baeksuescape.admin.setting.AppSettingService;
-import com.baeksuescape.admin.setting.SettingDtos;
+import com.baeksuescape.admin.service.AppSettingService;
+import com.baeksuescape.admin.dto.SettingDtos;
 import com.baeksuescape.community.dto.BoardDtos;
 import com.baeksuescape.community.dto.ReportDtos;
 import com.baeksuescape.community.service.AdminReportService;

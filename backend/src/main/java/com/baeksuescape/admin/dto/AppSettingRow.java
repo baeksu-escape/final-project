@@ -1,4 +1,4 @@
-package com.baeksuescape.admin.setting;
+package com.baeksuescape.admin.dto;
 
 import lombok.Getter;
 import lombok.Setter;

@@ -26,7 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import com.baeksuescape.admin.setting.AppSettingService;
+import com.baeksuescape.admin.service.AppSettingService;
 import com.baeksuescape.community.dto.CommentRow;
 import com.baeksuescape.community.dto.ReportDtos;
 import com.baeksuescape.community.dto.ReportRow;

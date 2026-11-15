@@ -21,7 +21,7 @@ import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import DataInputPage from '../../features/dataInput/pages/DataInputPage.jsx'
 import JobSelectPage from '../../features/dataInput/pages/JobSelectPage.jsx'
 import MarketPage from '../../features/market/pages/MarketPage.jsx'
-import AdminReportsPage from '../../features/community/pages/AdminReportsPage.jsx'
+import AdminReportsPage from '../../features/admin/pages/AdminReportsPage.jsx'
 import LoungePage from '../../features/community/pages/LoungePage.jsx'
 
 // 앱 전체 라우트. 다른 팀은 자기 화면의 element 한 줄만 바꾼다(가드·경로 구조는 그대로 둔다).

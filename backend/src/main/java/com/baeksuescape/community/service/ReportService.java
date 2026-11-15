@@ -16,8 +16,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.baeksuescape.admin.setting.AppSettingService;
-import com.baeksuescape.admin.setting.EditableSettings;
+import com.baeksuescape.admin.service.AppSettingService;
+import com.baeksuescape.admin.service.EditableSettings;
 import com.baeksuescape.community.dto.ContentTarget;
 import com.baeksuescape.community.dto.NewReport;
 import com.baeksuescape.community.dto.ReportDtos;

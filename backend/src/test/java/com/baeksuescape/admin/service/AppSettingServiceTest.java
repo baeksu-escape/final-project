@@ -1,4 +1,4 @@
-package com.baeksuescape.admin.setting;
+package com.baeksuescape.admin.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,6 +22,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import com.baeksuescape.admin.dto.AppSettingRow;
+import com.baeksuescape.admin.dto.SettingDtos;
+import com.baeksuescape.admin.mapper.AppSettingMapper;
 import com.baeksuescape.global.exception.ApiException;
 
 // FP-191 ADM-14 설정 — 허용 목록에 있는 키만, 정해진 범위 안에서만 바꾼다(신고 자동 숨김 기준 3~10건, N-34-1).
