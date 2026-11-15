@@ -1,0 +1,564 @@
+/* N-06·N-33·N-34 신용 라운지·신고 접수 화면 전용 스타일 — 'Avenue 기능 데모 v2'의 게시판 표·페이저·신고 창·신고 목록 기준.
+   색·글꼴은 모두 tokens.css 변수를 써서 화이트·블랙 테마를 같이 따른다. */
+
+/* ---------- 페이지 틀 ---------- */
+.lounge-page,
+.report-admin-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  max-width: 1320px;
+}
+
+.lounge-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lounge-page__title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.lounge-page__lead {
+  margin: 4px 0 0;
+  max-width: 70ch;
+  color: var(--mut);
+  font-size: 14px;
+}
+
+.lounge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.lounge-loading {
+  margin: 0;
+  color: var(--mut2);
+  font-size: 13px;
+}
+
+.lounge-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  color: var(--mut);
+  font-size: 12px;
+}
+
+.lounge-meta b {
+  color: var(--fg);
+}
+
+/* 화면 낭독기에만 읽히는 라벨 */
+.lounge-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.lounge-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 160px;
+  padding: 9px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--inp);
+  color: var(--fg);
+  font: inherit;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.lounge-textarea--short {
+  min-height: 90px;
+}
+
+.lounge-textarea:focus {
+  outline: none;
+  border-color: var(--vio);
+}
+
+.lounge-textarea::placeholder {
+  color: var(--mut2);
+}
+
+/* ---------- 글 목록 (데모 .btbl · .pager) ---------- */
+.lounge-list__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lounge-count {
+  margin-left: 4px;
+  color: var(--mut2);
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.lounge-search {
+  display: flex;
+  gap: 8px;
+  width: min(100%, 320px);
+}
+
+.lounge-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.lounge-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.lounge-table th {
+  padding: 8px;
+  border-bottom: 1px solid var(--line2);
+  color: var(--mut2);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.lounge-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.lounge-table__no {
+  width: 56px;
+  color: var(--mut2);
+  text-align: right;
+  font-family: var(--f-d);
+}
+
+.lounge-table__num {
+  text-align: right !important;
+  font-family: var(--f-d);
+  font-variant-numeric: tabular-nums;
+}
+
+.lounge-table__muted,
+.lounge-table__row--hidden td,
+.lounge-table__empty {
+  color: var(--mut2);
+}
+
+.lounge-table__empty {
+  padding: 24px !important;
+  text-align: center;
+}
+
+.lounge-table__title {
+  margin-right: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lounge-table__title:hover {
+  text-decoration: underline;
+}
+
+.lounge-pager {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.lounge-pager button {
+  min-width: 36px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--mut);
+  font: 500 14px var(--f-d);
+  cursor: pointer;
+}
+
+.lounge-pager button[aria-current='page'] {
+  color: var(--fg);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.lounge-pager button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ---------- 글 상세·댓글 ---------- */
+.lounge-detail__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lounge-detail__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lounge-detail__body {
+  margin: 0;
+  color: var(--fg2);
+  font-size: 14.5px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.lounge-comments {
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.lounge-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.lounge-comment--hidden {
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+.lounge-comment__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lounge-comment__body {
+  margin: 0;
+  color: var(--fg2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.lounge-comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------- 신고 창·처리 결과 라디오 (데모 .opt) ---------- */
+.report-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.report-modal__reasons,
+.report-process__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.report-modal__reasons legend,
+.report-process__options legend {
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.report-modal__hint {
+  margin: 0;
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+.report-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.report-option input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--vio);
+}
+
+.report-option:has(input:checked) {
+  border-color: var(--vio);
+  background: var(--note-bg);
+}
+
+.report-option__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.report-option__text b {
+  font-size: 13.5px;
+}
+
+.report-option__text span {
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+/* ---------- 관리자 신고 접수 ---------- */
+.report-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .report-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.report-filters__threshold {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.report-filters__pending {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--panel2);
+  font-weight: 700;
+  font-family: var(--f-d);
+}
+
+.report-admin-page__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: start;
+  gap: 18px;
+}
+
+@media (max-width: 960px) {
+  .report-admin-page__cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.report-admin-page__list {
+  padding: 8px;
+}
+
+.report-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.report-list__empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--mut2);
+}
+
+.report-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.report-list__item:hover {
+  background: var(--panel2);
+}
+
+.report-list__item[aria-pressed='true'] {
+  background: var(--sel);
+}
+
+.report-list__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.report-list__title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.report-status {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  color: var(--mut);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.report-status--received {
+  border-color: var(--info);
+  color: var(--info);
+}
+
+.report-status--in_review {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.report-status--done {
+  border-color: var(--mint);
+  color: var(--mint);
+}
+
+.report-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.report-detail__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.report-detail__tag {
+  margin: 0 0 2px;
+  color: var(--mut2);
+  font: 600 11px var(--f-d);
+  letter-spacing: 0.08em;
+}
+
+.report-detail__origin {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel2);
+}
+
+.report-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+}
+
+.report-detail__block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-reason-row {
+  display: grid;
+  grid-template-columns: 96px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.report-reason-row b {
+  text-align: right;
+  font-family: var(--f-d);
+}
+
+.report-reporters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.report-reporters li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+
+.report-reporters__detail {
+  flex-basis: 100%;
+  color: var(--fg2);
+  font-size: 12.5px;
+}
+
+.report-process {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.report-detail__done {
+  margin: 0;
+  color: var(--mut2);
+  font-size: 13px;
+}

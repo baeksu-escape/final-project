@@ -38,5 +38,6 @@ export async function handleMockRequest(method, path, body, token) {
   const pathname = path.split('?')[0]
   const handler = handlers[`${method} ${pathname}`]
   if (!handler) throw new ApiError(404, `mock 응답이 없는 요청입니다: ${method} ${pathname}`)
-  return handler({ body, token })
+  // path는 쿼리(?page=2 등)까지 포함한 원래 주소다. 쿼리가 필요한 처리 함수만 꺼내 쓴다.
+  return handler({ body, token, path })
 }
