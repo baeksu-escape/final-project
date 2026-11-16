@@ -35,6 +35,6 @@ SELECT USER FROM DUAL;
 ## 다른 상황
 
 - 이미 테이블이 있고 시드 대상이 비어 있는 경우: DDL을 다시 실행하지 말고 `dummy_db/run_seed_only.sql`만 사용한다.
-- 기존 DB의 구조 변경: 해당 변경 SQL만 검토한다. [dummy_db README](dummy_db/README.md)에 변경 파일 안내가 있다.
+- 기존 DB의 구조 변경: 해당 변경 SQL만 검토한다. 산출 불가 사유 코드 `ALT_DATA_EMPTY` 추가는 [add_not_scorable_reason_alt_data_empty.sql](add_not_scorable_reason_alt_data_empty.sql)을 사용하고, 그 밖의 변경 파일은 [dummy_db README](dummy_db/README.md)를 참고한다.
 - `dummy_db/run_all.sql`: 테이블을 삭제한 뒤 다시 만드는 실험용 파일이다. **기존 데이터가 삭제되므로 버려도 되는 별도 스키마에서만 실행한다.**
 - 모델 학습 CSV: Oracle에 넣지 않는다. 위치와 사용법은 [학습 데이터 README](../../../fastapi_server/data/README.md)를 참고한다.
