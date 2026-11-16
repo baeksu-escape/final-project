@@ -324,6 +324,24 @@ class ScoreEndpointRuleTest(unittest.TestCase):
             score(ScoreRequest(**sample_request(requestId=REQUEST_ID.upper())), None)
         self.assertEqual(e.exception.status, 422)
 
+    def test_empty_telecom_or_utility_422(self):
+        """정의서 8-5 (다): 통신비 또는 공과금이 빈 목록이면 점수를 내지 않는다(Spring이 먼저 ALT_DATA_EMPTY로 막는다)."""
+        for name in ("telecom", "utility"):
+            body = sample_request()
+            body["alternativeData"][name] = []
+            with self.assertRaises(ApiError) as e:
+                score(ScoreRequest(**body), None)
+            self.assertEqual((e.exception.status, e.exception.code), (422, "INVALID_INPUT"))
+            self.assertEqual(e.exception.field_errors[0]["field"], f"alternativeData.{name}")
+
+    def test_empty_easypay_and_insurance_still_scored(self):
+        """간편결제 0건·보험 기록 없음은 학습에도 있는 경우라 막지 않는다(정의서 8-5)."""
+        body = sample_request()
+        body["alternativeData"]["easypay"] = []
+        body["alternativeData"]["socialInsurance"] = []
+        r = score(ScoreRequest(**body), None)
+        self.assertTrue(0 <= r["alternative"]["score"] <= 1000)
+
     def test_mock_scenarios(self):
         for scenario, status in (("MODEL_ERROR", 500), ("NOT_READY", 503)):
             with self.assertRaises(ApiError) as e:

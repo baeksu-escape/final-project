@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 // FP-142 RPT-01 N-12-2 기존·대안 점수·3등급 계산·저장 — B팀 명세서 2장 판정 흐름을 그대로 따른다.
 //   requestId 확인 → 같은 요청이면 처음 결과 → 직군(409) → 입력·동의 완료(409 INPUT_INCOMPLETE, O-13)
 //   → 입력 최신성(APP_SETTING.INPUT_MAX_AGE_MONTHS, 넘으면 NOT_SCORABLE STALE_INPUT 저장)
+//   → 소득 개월(409) → 통신비·공과금 빈 목록(NOT_SCORABLE ALT_DATA_EMPTY 저장, 피처 정의서 8-5 (다))
 //   → FastAPI ML-03(실패하면 1번 다시, 그래도 실패면 NOT_SCORABLE MODEL_ERROR 저장) → ASSESSMENT 1행 + ASSESSMENT_FACTOR를 한 트랜잭션으로 저장.
 @Service
 public class ScoreCalculationService {
@@ -44,6 +45,7 @@ public class ScoreCalculationService {
     static final String NOT_SCORABLE = "NOT_SCORABLE";
     static final String STALE_INPUT = "STALE_INPUT";
     static final String MODEL_ERROR = "MODEL_ERROR";
+    static final String ALT_DATA_EMPTY = "ALT_DATA_EMPTY";
     static final String INPUT_MAX_AGE_KEY = "INPUT_MAX_AGE_MONTHS";
     // DB 설정이 없을 때만 쓰는 기본값 (DDL APP_SETTING 기준 데이터와 같은 6개월 — 11/16 범영, 12월 시연 대비 3→6)
     static final int DEFAULT_INPUT_MAX_AGE_MONTHS = 6;
@@ -101,6 +103,9 @@ public class ScoreCalculationService {
 
         Map<String, Object> request = assembler.build(requestId, modelVersion, user, baseMonth, age);
         checkIncomeMonths(request);   // FastAPI 422(입력 오류)가 "모델 오류"로 쌓이지 않게 부르기 전에 막는다(재욱 검토 1번)
+        if (isBillDataEmpty(request)) {
+            return save(notScorable(row, ALT_DATA_EMPTY), List.of());
+        }
         // 한계: 회원 잠금을 잡은 트랜잭션 안에서 FastAPI를 부른다(최대 연결 1초 + 응답 3초, 재시도 포함 약 8초 동안 DB 연결 사용).
         // 시연 규모에서는 문제없다. 사용자가 늘면 호출을 트랜잭션 밖으로 빼는 것을 검토한다(재욱 검토 4번).
         Map<String, Object> result;
@@ -123,6 +128,19 @@ public class ScoreCalculationService {
         if (!(required instanceof Integer months) || incomes.size() != months || distinct != months) {
             throw new ApiException(HttpStatus.CONFLICT, "INPUT_INCOMPLETE", "소득을 필요한 개월 수만큼 입력해 주세요.");
         }
+    }
+
+    // N-12-2 피처 정의서 8-5·D-30 (다) — 통신비 또는 공과금을 불러왔는데 기관 기록이 0건이면 점수를 내지 않는다.
+    // 학습 데이터에는 이 기록이 없는 사람이 없어 엉뚱한 점수가 나오기 때문이다. 간편결제·보험은 0건도 학습에 있어 그대로 둔다.
+    @SuppressWarnings("unchecked")
+    static boolean isBillDataEmpty(Map<String, Object> request) {
+        Map<String, Object> alt = (Map<String, Object>) request.get("alternativeData");
+        if (alt == null) {
+            return true;
+        }
+        List<Object> telecom = (List<Object>) alt.get("telecom");
+        List<Object> utility = (List<Object>) alt.get("utility");
+        return telecom == null || telecom.isEmpty() || utility == null || utility.isEmpty();
     }
 
     // 같은 requestId — 같은 회원이면 처음 결과, 다른 회원이면 409.
