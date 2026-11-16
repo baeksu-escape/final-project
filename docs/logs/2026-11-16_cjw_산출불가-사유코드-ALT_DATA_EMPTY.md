@@ -17,6 +17,8 @@
 | `docs/spec/sql/avenue_ddl.sql` | `DIM_NOT_SCORABLE_REASON` INSERT 1행, 테이블 COMMENT에 코드 설명 추가 |
 | `docs/spec/sql/dummy_db/01_create_tables.sql` | 위 DDL의 바이트 동일 사본에 같은 수정 |
 | `docs/spec/sql/dummy_db/99_check.sql` | 사유 코드 행 수 기대값 4 → 5 |
+| `docs/spec/sql/dummy_db/seed_report.json` | `ddl_sha256`을 새 DDL 해시로, `DIM_NOT_SCORABLE_REASON` 행 수를 4 → 5로 (두 값만, DB 담당 검토 반영) |
+| `docs/spec/sql/dummy_db/tools/tests/test_build_db.py`, `test_market_schema.py` | 기본 INSERT 행 수 기대값 25 → 26 |
 | `docs/spec/sql/add_not_scorable_reason_alt_data_empty.sql` | 기존 DB용 변경 SQL 신규(없을 때만 넣는 MERGE, 재실행 가능) |
 | `docs/spec/sql/README.md` | 경로 표에 변경 SQL 한 줄 추가 |
 | `docs/spec/feature_definition.md` | 8-5 필요한 일 1번에 확정한 코드 이름 기록 |
@@ -28,7 +30,9 @@
 
 ## 확인
 - 확인함: `cmp`로 `avenue_ddl.sql`과 `dummy_db/01_create_tables.sql`이 수정 후에도 바이트까지 같음을 확인. `git diff --stat`으로 의도한 줄만 바뀐 것을 확인. 다른 파일에서 `DIM_NOT_SCORABLE_REASON` 행 수를 세는 곳은 `99_check.sql`뿐임을 `grep`으로 확인.
-- 확인 못 함: Oracle에서 DDL과 변경 SQL을 실행하지 못했다(DB 접속 환경 없음). 변경 SQL의 `MERGE`와 `COMMENT` 문은 실행 전이다. Spring 코드(`ScoreCalculationService`)가 새 코드를 쓰는 부분과 테스트는 아직 없다.
+- 확인함(DB 담당 검토 반영 후): `dummy_db/tools/tests` 51개 실행, 통과(`OK`). 3개는 환경 변수 `AVENUE_TEST_SERVICE_DUMMY`(별도 재생성한 서비스 더미 경로)가 없어 건너뜀. 이 3개는 시드 재생성(팀 키 파일 필요)이 필요해 이번에는 돌리지 않았고, 사유 코드 추가와 맞는지는 DB 담당의 재생성 환경에서 확인이 필요하다. 임시 가상환경에 `cryptography`, `pandas`, `bcrypt`만 설치해 실행했다(저장소·`requirements.txt` 변경 없음). DDL 해시는 `a835211b…1026`로 `seed_report.json`과 일치.
+- 확인함(로컬 Oracle, SQL Developer, 이미 테이블이 있는 스키마): `add_not_scorable_reason_alt_data_empty.sql`을 실행한 뒤 `DIM_NOT_SCORABLE_REASON`이 5행이고 마지막 행이 `ALT_DATA_EMPTY / 통신비·공과금 기관 기록 없음 / 5`임, 테이블 COMMENT에 `ALT_DATA_EMPTY` 설명이 들어간 것을 확인. 같은 파일을 두 번 실행한 뒤에도 5행(중복 없음)이며 한글이 깨지지 않음.
+- 확인 못 함: 비어 있는 스키마에서 `avenue_ddl.sql` 전체를 실행하는 것은 하지 않았다(DDL 쪽 수정은 INSERT 1줄과 COMMENT뿐이라 위험이 작다고 보고 병합을 진행하며, 새 DB를 만드는 분이 이 PR 병합 후 실행해 보면 확인된다). Spring 코드(`ScoreCalculationService`)가 새 코드를 쓰는 부분과 테스트는 아직 없다.
 
 ## 다음 사람이 알아야 할 것
 - 이 PR은 사유 코드만 만든다. Spring 선검사, FastAPI 422, 화면 안내 문구는 각 담당 확인 후 진행한다(`feature_definition.md` 8-5).
