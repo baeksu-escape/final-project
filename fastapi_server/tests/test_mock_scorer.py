@@ -133,7 +133,7 @@ class FeatureBuilderTest(unittest.TestCase):
 
 
 class OutlierAndMissingRuleTest(unittest.TestCase):
-    """이상치 고정 상한(정의서 C8)과 (가)안 — 잘못된 값과 그 값으로 계산하는 피처를 함께 결측으로 둔다."""
+    """이상치 고정 상한(정의서 C8)과 7장 3번 서비스 구현 — 잘못된 값과 그 값으로 계산하는 피처를 함께 결측으로 둔다."""
 
     def test_income_over_limit_makes_income_based_features_missing(self):
         body = sample_request()

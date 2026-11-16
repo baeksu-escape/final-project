@@ -13,7 +13,7 @@ SEGMENT_BY_WORKER_TYPE = {"EMPLOYEE": "wage", "SELF_EMPLOYED": "selfemp", "FREEL
 # 납부 의무가 있는 달로 세는 상태 (NOT_DUE·NOT_APPLICABLE·UNKNOWN은 대상 아님, 정의서 3-7 ③)
 DUE_STATUSES = {"ON_TIME", "LATE", "PARTIAL", "UNPAID"}
 
-# 이상치 고정 상한 (정의서 9장·C8, 11/16 임시 결정) — 넘으면 그 값과 그 값으로 계산하는 피처를 결측으로 둔다(11/16 범영·재욱 (가)안).
+# 이상치 고정 상한 (정의서 9장·C8, 11/16 임시 결정) — 넘으면 그 값과 그 값으로 계산하는 피처를 결측으로 둔다(정의서 C8·7장 3번 서비스 구현: 걸러진 값과 그 값으로 만드는 피처를 모두 결측).
 # TODO(C8) Spring 담당의 업무상 상한이 정해지면 이 값을 바꾼다. 학습 전처리도 같은 상수를 써야 한다.
 INCOME_SUM_MAX_KRW = 2_000_000_000      # 12개월 소득 합계 20억 원 초과
 EXPENSE_AVG_MAX_KRW = 200_000_000       # 평균 월 지출 2억 원 초과
@@ -36,7 +36,7 @@ def monthly_incomes(req: ScoreRequest) -> list[int]:
 
 
 def _income_expense_features(req: ScoreRequest) -> dict:
-    """3-1 소득·지출·상환 9개. 이상치(C8)인 값은 결측으로 두고, 그 값으로 계산하는 피처도 결측으로 둔다((가)안)."""
+    """3-1 소득·지출·상환 9개. 이상치(C8)인 값은 결측으로 두고, 그 값으로 계산하는 피처도 결측으로 둔다(정의서 C8·7장 3번 서비스 구현)."""
     incomes = monthly_incomes(req)
     income_sum = sum(incomes)
     expense = sum(e.monthlyAmt for e in req.expenses)          # 평균 월 지출 = 월 지출 항목 합
