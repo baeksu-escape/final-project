@@ -30,12 +30,14 @@
 | 새 개발 스키마에 서비스 테이블과 더미 회원 데이터를 처음 준비 | `avenue_ddl.sql` → `dummy_db/run_seed_only.sql` | 같은 스키마에서 실행한다. DDL 내장 기준 데이터는 유지하고 시드 대상 테이블은 비어 있어야 한다 |
 | 테이블은 이미 최신 DDL로 만들어졌고 시드 대상 테이블이 비어 있음 | `dummy_db/run_seed_only.sql` | 원본 DDL을 다시 실행하지 않는다. 대상 테이블이 없거나 한 곳이라도 데이터가 있으면 시드 실행 전에 중단한다 |
 | 데이터가 있는 기존 DB에 이번 자산·대출 상태 변경만 적용 | [alter_user_asset_snapshot_no_loan.sql](alter_user_asset_snapshot_no_loan.sql) | 테이블·데이터를 유지한다. 기존 행의 새 `NO_LOAN_YN`은 NULL이며 Y/N 보정은 하지 않는다 |
+| 데이터가 있는 기존 DB에 대출 상품 문구 보강만 적용 | [update_loan_product_copy.sql](update_loan_product_copy.sql) | LP001~LP017의 ID·코드 대응을 확인한 뒤 지정 문구와 상품 특징만 갱신한다. 자동 실행 묶음에는 연결하지 않는다 |
+| 데이터가 있는 기존 DB에 산출 불가 사유 `ALT_DATA_EMPTY` 1행만 추가 | [add_not_scorable_reason_alt_data_empty.sql](add_not_scorable_reason_alt_data_empty.sql) | 이미 있으면 넣지 않으므로 다시 실행해도 된다. 새로 DDL을 실행하는 DB에는 필요 없다 |
 | 옛 DDL로 만든 DB에서 미사용 상권 테이블 5개 제거 | [drop_unused_market_tables.sql](drop_unused_market_tables.sql) | N-24의 JSON 전환에 따라 상권 전용 표·데이터만 제거한다. 공공통계 표는 유지한다 |
 | 버려도 되는 별도 실험용 스키마를 완전히 초기화 | `dummy_db/run_all.sql` | **대상 테이블을 삭제하고 재생성한 뒤 시드를 적재한다. 기존 데이터가 삭제된다** |
 | 기존 회원 데이터나 시드를 일부 수정·보정 | 담당자와 별도 변경 SQL 검토 | `run_seed_only.sql`은 병합·갱신·재적재 도구가 아니다. `run_all.sql`로 해결하지 않는다 |
 | 모델 학습용 데이터만 받거나 다시 생성 | 학습 데이터·생성 패키지 README | 위 DB 초기화·적재 SQL을 실행할 필요가 없다 |
 
-`00_drop_all.sql`, `01_create_tables.sql`, 개별 `10_seed_*.sql`~`24_seed_*.sql`은 묶음의 구성 파일이다. 일반적인 최초 적재는 `run_seed_only.sql`, 전체 초기화는 `run_all.sql`을 사용한다. `init_schema.sql`은 현재 비어 있어 실행 입구로 사용하지 않는다.
+`00_drop_all.sql`, `01_create_tables.sql`, 개별 `10_seed_*.sql`~`25_seed_*.sql`은 묶음의 구성 파일이다. 일반적인 최초 적재는 `run_seed_only.sql`, 전체 초기화는 `run_all.sql`을 사용한다. `init_schema.sql`은 현재 비어 있어 실행 입구로 사용하지 않는다.
 
 ## 일반적인 최초 준비 순서
 
@@ -43,9 +45,9 @@
 2. 빈 스키마에서 원본 `avenue_ddl.sql`을 실행한다. 테이블과 DDL에 내장된 기준 데이터가 생성된다. 최신 구조가 이미 있다면 생략한다.
 3. 같은 스키마에서 `dummy_db/run_seed_only.sql`을 실행한다. SQL Developer의 스크립트 실행(F5) 또는 SQL*Plus에서 해당 파일을 실행하며, 함께 제공된 시드 파일의 상대 위치를 유지한다.
 4. 마지막에 실행되는 `99_check.sql`의 기대·실제 테이블 수와 행 수를 직접 확인한다. 이는 결과 출력이며 모든 불일치를 자동 오류로 바꾸는 검사는 아니다. 생성 당시 기준은 `seed_report.json`에서 확인한다.
-5. 점수·SHAP 저장에 필요한 피처 사전은 아래 별도 절차를 확인하고, 서비스 연동을 진행한다.
+5. 피처 사전 FS-DRAFT 39개는 `run_seed_only.sql`에서 회원·상품 시드 뒤, `99_check.sql` 전에 자동 적재된다. 전체 초기화 `run_all.sql`에도 같은 순서로 포함된다.
 
-**현재 피처 사전 시드는 별도 적용한다.** [seed/avenue_seed_dim_feature_fs_draft.sql](seed/avenue_seed_dim_feature_fs_draft.sql)은 `DIM_FEATURE`에 FS-DRAFT 39개를 넣지만 현재 `run_all.sql`·`run_seed_only.sql`에는 연결되지 않았다. 최초 시드 검사 후, 첫 점수·SHAP 저장 전에 같은 스키마에서 이 파일을 별도로 실행하고 파일 끝의 확인 조회를 본다. 현재 `99_check.sql`의 `DIM_FEATURE` 기대값은 0이므로, 이 피처 시드 적용 뒤에는 실제 39행과 차이가 난다. 자동 연결 예정 기록은 [FP-123 작업 로그](../../logs/2026-11-13_obm_DIM_FEATURE-FS-DRAFT-시드.md)에 있으나 생성기 반영은 별도 작업이다. 해당 피처를 참조하는 평가 요인 데이터가 이미 있으면 앞의 DELETE가 FK 오류를 낼 수 있으므로 재실행하지 않는다.
+생성기는 [seed/avenue_seed_dim_feature_fs_draft.sql](seed/avenue_seed_dim_feature_fs_draft.sql)을 변경 없이 `25_seed_dim_feature_fs_draft.sql`로 실행 묶음에 포함한다. 사전 검사는 `DIM_FEATURE`도 비어 있는지 확인하므로 기존 피처 행이나 이를 참조하는 평가 요인이 있으면 `run_seed_only.sql`은 중단된다. 평가 요인이 생긴 뒤에는 피처 시드의 DELETE가 FK 오류를 낼 수 있어 시드를 재실행하지 않는다. `99_check.sql`과 `seed_report.json`은 DIM_FEATURE 기대 행 수 39를 표시한다.
 
 Oracle DDL과 시드의 중간 COMMIT·IDENTITY 변경은 전체 롤백할 수 없다. `run_seed_only.sql`의 사전 검사도 동시 쓰기를 잠그지 않으므로 적재 중 같은 대상 테이블에 다른 작업이 쓰지 않게 한다. 실패한 경우 무작정 재실행하거나 초기화하지 말고, 어디까지 적용됐는지 먼저 확인한다.
 

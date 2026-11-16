@@ -1,4 +1,4 @@
-# FP-142 예측 서버(FastAPI) 컨테이너 — 어느 PC에서든 같은 Python·라이브러리로 ML-01~04를 켠다.
+# FP-142 예측 서버(FastAPI) 컨테이너 — 2차 개발 후보(11/16 결정). 1차 개발·시연에서는 쓰지 않고 가상환경으로 켠다(README 「실행」). 빌드 확인 안 됨.
 # 만들기: (저장소 맨 위에서) docker build -t avenue-fastapi fastapi_server
 # 켜기:   docker run -d -p 8000:8000 --name fastapi avenue-fastapi   → http://localhost:8000/docs
 FROM python:3.11-slim
