@@ -30,7 +30,7 @@
 
 ## 확인
 - 확인함: `cmp`로 `avenue_ddl.sql`과 `dummy_db/01_create_tables.sql`이 수정 후에도 바이트까지 같음을 확인. `git diff --stat`으로 의도한 줄만 바뀐 것을 확인. 다른 파일에서 `DIM_NOT_SCORABLE_REASON` 행 수를 세는 곳은 `99_check.sql`뿐임을 `grep`으로 확인.
-- 확인함(DB 담당 검토 반영 후): `dummy_db/tools/tests` 51개 중 `bcrypt` 모듈이 없어 나는 오류 1개만 남음(이 PC에 `bcrypt` 없음, 원래 있던 문제). 임시 가상환경에 `cryptography`, `pandas`만 설치해 실행했다. DDL 해시는 `a835211b…1026`로 `seed_report.json`과 일치.
+- 확인함(DB 담당 검토 반영 후): `dummy_db/tools/tests` 51개 실행, 통과(`OK`). 3개는 환경 변수 `AVENUE_TEST_SERVICE_DUMMY`(별도 재생성한 서비스 더미 경로)가 없어 건너뜀. 이 3개는 시드 재생성(팀 키 파일 필요)이 필요해 이번에는 돌리지 않았고, 사유 코드 추가와 맞는지는 DB 담당의 재생성 환경에서 확인이 필요하다. 임시 가상환경에 `cryptography`, `pandas`, `bcrypt`만 설치해 실행했다(저장소·`requirements.txt` 변경 없음). DDL 해시는 `a835211b…1026`로 `seed_report.json`과 일치.
 - 확인 못 함: Oracle에서 DDL과 변경 SQL을 실행하지 못했다(DB 접속 환경 없음). 변경 SQL의 `MERGE`와 `COMMENT` 문은 실행 전이다. Spring 코드(`ScoreCalculationService`)가 새 코드를 쓰는 부분과 테스트는 아직 없다.
 
 ## 다음 사람이 알아야 할 것
