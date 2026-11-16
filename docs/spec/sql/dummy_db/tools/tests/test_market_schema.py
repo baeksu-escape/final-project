@@ -47,7 +47,7 @@ class MarketSchemaTests(unittest.TestCase):
         self.assertEqual(report['ddl_sha256'], hashlib.sha256(self.ddl.replace(b'\r\n', b'\n')).hexdigest())
         self.assertEqual(report['table_count'], 47)
         self.assertEqual(set(report['rows']), set(self.tables))
-        self.assertEqual(sum(map(len, self.base_rows.values())), 25)
+        self.assertEqual(sum(map(len, self.base_rows.values())), 26)
         self.assertEqual(report['rows']['DIM_FEATURE'], 39)
 
     def test_published_cleanup_and_checks_match_schema(self):

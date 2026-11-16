@@ -1,11 +1,11 @@
 {
-  "ddl_sha256": "9c027b13b378b740e694110f6c8967417c7c36a16ccc52098d85121e991c7d15",
+  "ddl_sha256": "ebe47d23ce25aaf24ed3e7d067a2f34354a4ab6bb3af3f9e07aa6e8163ba109a",
   "table_count": 47,
   "rows": {
     "DIM_WORKER_TYPE": 3,
     "DIM_ROLE": 2,
     "DIM_LOAN_TYPE": 6,
-    "DIM_NOT_SCORABLE_REASON": 4,
+    "DIM_NOT_SCORABLE_REASON": 5,
     "APP_USER": 401,
     "USER_SOCIAL_ACCOUNT": 0,
     "USER_CONSENT": 4000,
