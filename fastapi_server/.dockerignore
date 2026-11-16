@@ -1,0 +1,9 @@
+# FP-142 컨테이너에 넣지 않는 것 — 학습 데이터(용량 큼, Git 제외), 생성 코드, 테스트, 캐시, 비밀값 파일
+data/
+data_generation/
+tests/
+**/__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
