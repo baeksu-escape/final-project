@@ -17,6 +17,8 @@
 | `docs/spec/sql/avenue_ddl.sql` | `DIM_NOT_SCORABLE_REASON` INSERT 1행, 테이블 COMMENT에 코드 설명 추가 |
 | `docs/spec/sql/dummy_db/01_create_tables.sql` | 위 DDL의 바이트 동일 사본에 같은 수정 |
 | `docs/spec/sql/dummy_db/99_check.sql` | 사유 코드 행 수 기대값 4 → 5 |
+| `docs/spec/sql/dummy_db/seed_report.json` | `ddl_sha256`을 새 DDL 해시로, `DIM_NOT_SCORABLE_REASON` 행 수를 4 → 5로 (두 값만, DB 담당 검토 반영) |
+| `docs/spec/sql/dummy_db/tools/tests/test_build_db.py`, `test_market_schema.py` | 기본 INSERT 행 수 기대값 25 → 26 |
 | `docs/spec/sql/add_not_scorable_reason_alt_data_empty.sql` | 기존 DB용 변경 SQL 신규(없을 때만 넣는 MERGE, 재실행 가능) |
 | `docs/spec/sql/README.md` | 경로 표에 변경 SQL 한 줄 추가 |
 | `docs/spec/feature_definition.md` | 8-5 필요한 일 1번에 확정한 코드 이름 기록 |
@@ -28,6 +30,7 @@
 
 ## 확인
 - 확인함: `cmp`로 `avenue_ddl.sql`과 `dummy_db/01_create_tables.sql`이 수정 후에도 바이트까지 같음을 확인. `git diff --stat`으로 의도한 줄만 바뀐 것을 확인. 다른 파일에서 `DIM_NOT_SCORABLE_REASON` 행 수를 세는 곳은 `99_check.sql`뿐임을 `grep`으로 확인.
+- 확인함(DB 담당 검토 반영 후): `dummy_db/tools/tests` 51개 중 `bcrypt` 모듈이 없어 나는 오류 1개만 남음(이 PC에 `bcrypt` 없음, 원래 있던 문제). 임시 가상환경에 `cryptography`, `pandas`만 설치해 실행했다. DDL 해시는 `a835211b…1026`로 `seed_report.json`과 일치.
 - 확인 못 함: Oracle에서 DDL과 변경 SQL을 실행하지 못했다(DB 접속 환경 없음). 변경 SQL의 `MERGE`와 `COMMENT` 문은 실행 전이다. Spring 코드(`ScoreCalculationService`)가 새 코드를 쓰는 부분과 테스트는 아직 없다.
 
 ## 다음 사람이 알아야 할 것

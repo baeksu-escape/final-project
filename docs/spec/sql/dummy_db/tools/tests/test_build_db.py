@@ -288,7 +288,7 @@ class SchemaTests(unittest.TestCase):
 
     def test_received_ddl_and_base_inserts(self):
         """기준 INSERT 25행과 선택 기능 세 개가 실제 DDL에 있는지 확인한다."""
-        self.assertEqual(len(self.tables),47);self.assertIn('SYSTEM_LOG',self.tables);self.assertIn('USER_UTILITY_PAYMENT',self.tables);self.assertEqual(sum(map(len,self.base.values())),25)
+        self.assertEqual(len(self.tables),47);self.assertIn('SYSTEM_LOG',self.tables);self.assertIn('USER_UTILITY_PAYMENT',self.tables);self.assertEqual(sum(map(len,self.base.values())),26)
         db.validate_rows(self.tables,self.base)
         self.assertIn('LOAN_PRODUCT_FEATURE',self.tables)
         self.assertIn('TERM_TEXT',self.tables['LOAN_PRODUCT']['columns'])
