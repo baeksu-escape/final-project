@@ -24,12 +24,11 @@ registerMockHandlers({
     if (Object.hasOwn(reasons, scenario)) {
       report.gradeStatusCode = 'NOT_SCORABLE'
       report.notScorableReasonCode = reasons[scenario]
-      report.traditional = null
-      report.alternative = null
-      report.comparison = null
+      report.traditional = { scorableYn: 'N', score: null, gradeBandCode: null, defaultProb: null }
+      report.alternative = { scorableYn: 'N', score: null, gradeBandCode: null, defaultProb: null }
+      report.comparison = { scoreDiff: null, gradeChanged: null }
       report.gradeBands = null
       report.shap = null
-      delete report.modelFeatures
     }
     if (scenario === 'traditionalUnavailable') {
       report.traditional = { scorableYn: 'N', score: null, gradeBandCode: null, defaultProb: null }
