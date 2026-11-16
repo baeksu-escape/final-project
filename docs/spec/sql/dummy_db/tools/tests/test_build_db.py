@@ -201,7 +201,8 @@ class RunAllRuleTests(unittest.TestCase):
         self.assertIn('RAISE_APPLICATION_ERROR(-20002',script)
         self.assertIn('RAISE_APPLICATION_ERROR(-20003',script)
         for name in seeds:
-            self.assertIn("'"+name.split('_seed_',1)[1][:-4].upper()+"'",script)
+            table = 'DIM_FEATURE' if name == '25_seed_dim_feature_fs_draft.sql' else name.split('_seed_',1)[1][:-4].upper()
+            self.assertIn("'"+table+"'",script)
 
 
 class PrivacyTests(unittest.TestCase):
@@ -287,8 +288,9 @@ class SchemaTests(unittest.TestCase):
         self.tables,self.base=db.parse_ddl(DDL.read_text(encoding='utf-8-sig'))
 
     def test_received_ddl_and_base_inserts(self):
-        """기준 INSERT 25행과 선택 기능 세 개가 실제 DDL에 있는지 확인한다."""
-        self.assertEqual(len(self.tables),47);self.assertIn('SYSTEM_LOG',self.tables);self.assertIn('USER_UTILITY_PAYMENT',self.tables);self.assertEqual(sum(map(len,self.base.values())),26)
+        """DDL의 기준 INSERT와 선택 기능 세 개가 실제 파서에 반영됐는지 확인한다."""
+        ddl_insert_count=sum(line.lstrip().upper().startswith('INSERT INTO ') for line in DDL.read_text(encoding='utf-8-sig').splitlines())
+        self.assertEqual(len(self.tables),47);self.assertIn('SYSTEM_LOG',self.tables);self.assertIn('USER_UTILITY_PAYMENT',self.tables);self.assertEqual(sum(map(len,self.base.values())),ddl_insert_count)
         db.validate_rows(self.tables,self.base)
         self.assertIn('LOAN_PRODUCT_FEATURE',self.tables)
         self.assertIn('TERM_TEXT',self.tables['LOAN_PRODUCT']['columns'])

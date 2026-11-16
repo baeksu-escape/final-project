@@ -19,4 +19,5 @@ WHENEVER OSERROR EXIT FAILURE ROLLBACK
 @@22_seed_loan_product.sql
 @@23_seed_loan_product_worker_type.sql
 @@24_seed_loan_product_feature.sql
+@@25_seed_dim_feature_fs_draft.sql
 @@99_check.sql
