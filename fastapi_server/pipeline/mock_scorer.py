@@ -53,13 +53,16 @@ NUMERIC_WEIGHTS = {
     "si_arrears_any": (0.15, 0, 0.15),
 }
 
-# 코드형 피처: 값 → 기여. 표에 없는 값은 0.
+# 코드형 피처: 값 → 기여. 표에 없는 값은 0(영향 없음).
+# - household(건강보험 피부양 세대): 학습 데이터에 있는 값이고, Mock에서는 일부러 중립 0으로 둔다.
+# - voluntary(임의가입), coverage unknown: 학습 데이터에 한 번도 없는 값이다(정의서 3-7 ②). 처리 방식은 정의서 9장 미정이라
+#   Mock에서는 0으로 두고 진짜 모델에서 정한다. TODO(정의서 9장 "학습에 없는 코드값 처리")
 CODE_WEIGHTS = {
     "segment": {"wage": -0.05, "selfemp": 0.08, "freelance": 0.10},
-    "np_coverage_status": {"covered": 0.0, "not_covered": 0.15, "exempt": 0.10, "unknown": 0.05},
-    "hi_coverage_status": {"covered": 0.0, "not_covered": 0.15, "dependent": 0.0, "unknown": 0.05},
-    "np_payer_type": {"workplace": -0.05, "regional": 0.05, "unknown": 0.05},
-    "hi_payer_type": {"workplace": -0.05, "regional": 0.05, "unknown": 0.05},
+    "np_coverage_status": {"covered": 0.0, "not_covered": 0.15, "exempt": 0.10, "unknown": 0.0},
+    "hi_coverage_status": {"covered": 0.0, "not_covered": 0.15, "dependent": 0.0, "unknown": 0.0},
+    "np_payer_type": {"workplace": -0.05, "regional": 0.05, "voluntary": 0.0, "household": 0.0, "unknown": 0.05},
+    "hi_payer_type": {"workplace": -0.05, "regional": 0.05, "voluntary": 0.0, "household": 0.0, "unknown": 0.05},
 }
 
 

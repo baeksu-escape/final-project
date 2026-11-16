@@ -31,12 +31,27 @@ BEST_VALUES = {
 }
 
 
+CARD_KEYS = ("CARD_LIMIT_AMT", "CARD_MONTHLY_SPEND_AMT")
+# 받는 키 10개 (B팀 명세서 4-4). 이 밖의 키는 오타일 수 있어 422로 알려 준다(조용히 무시하지 않는다).
+ALLOWED_CHANGE_KEYS = frozenset(DIRECT_CHANGES) | {"EASYPAY_MONTHLY_COUNT", *CARD_KEYS}
+
+
 def _as_int(value):
     return None if value is None else int(value)
 
 
+def validate_changes(changes: dict) -> list[dict]:
+    """ML-04 changes 검사 — 문제가 있으면 [{field, message}] 목록, 없으면 빈 목록 (라우터가 422로 돌려준다)."""
+    errors = [{"field": f"changes.{key}", "message": "모르는 항목입니다."} for key in sorted(changes) if key not in ALLOWED_CHANGE_KEYS]
+    limit, spend = changes.get(CARD_KEYS[0]), changes.get(CARD_KEYS[1])
+    if (limit is None) != (spend is None):
+        # 저장된 피처값에는 사용률만 있고 원래 한도·사용액이 없어서, 하나만으로는 사용률을 다시 계산할 수 없다
+        errors.append({"field": "changes.CARD_LIMIT_AMT", "message": "카드 한도와 월 카드 사용액은 함께 보내야 합니다."})
+    return errors
+
+
 def apply_changes(snapshot: dict, changes: dict) -> dict:
-    """저장된 피처값에 바꾼 값을 덮어쓴 새 피처값. 값이 없는(null) 키는 바꾸지 않는다."""
+    """저장된 피처값에 바꾼 값을 덮어쓴 새 피처값. 값이 없는(null) 키는 바꾸지 않는다. validate_changes를 먼저 통과해야 한다."""
     features = dict(snapshot)
     for key, code in DIRECT_CHANGES.items():
         if changes.get(key) is not None:
@@ -44,10 +59,10 @@ def apply_changes(snapshot: dict, changes: dict) -> dict:
     # TODO(정의서 9장) 간편결제 월 건수 ↔ 12개월 값 변환 방식 미정 — 지금은 월 값 × 12
     if changes.get("EASYPAY_MONTHLY_COUNT") is not None:
         features["dp_payment_count_12m"] = _as_int(changes["EASYPAY_MONTHLY_COUNT"]) * 12
-    # 카드 한도·월 사용액은 둘 다 왔을 때만 사용률(CL0631905)로 바꾼다.
-    limit, spend = changes.get("CARD_LIMIT_AMT"), changes.get("CARD_MONTHLY_SPEND_AMT")
-    if limit and spend is not None:
-        features["CL0631905"] = round(spend / limit * 100, 1)
+    # 카드 한도·월 사용액 → 사용률(CL0631905). 한도가 0 이하면 점수 계산(feature_builder)과 같은 규칙으로 결측.
+    limit, spend = changes.get(CARD_KEYS[0]), changes.get(CARD_KEYS[1])
+    if limit is not None and spend is not None:
+        features["CL0631905"] = round(spend / limit * 100, 1) if limit > 0 else None
     # TODO(정의서 9장) 통신비 정시 납부를 바꿀 때 telecom_late_months도 같이 바꿀지 미정 — 지금은 그대로 둔다.
     return features
 
