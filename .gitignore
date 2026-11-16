@@ -111,6 +111,8 @@ venv/
 ### Model files (대용량은 공유 드라이브로) ###
 fastapi_server/artifacts/*.pkl
 fastapi_server/artifacts/*.joblib
+# 학습 스크립트(training/)가 모델 옆에 만드는 설명 파일. 학습할 때마다 바뀌는 생성 파일이라 올리지 않는다
+fastapi_server/artifacts/*.meta.json
 fastapi_server/data/*
 !fastapi_server/data/README.md
 fastapi_server/data_generation/data/
