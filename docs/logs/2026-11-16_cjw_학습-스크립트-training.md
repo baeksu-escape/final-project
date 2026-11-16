@@ -28,7 +28,9 @@
 
 ## 확인
 - 확인함: `python -m unittest discover tests` 47개 통과(기존 33 + 새 14). 실제 학습을 `--data-dir C:\Users\user1\Downloads\avenue_training_data_v3_6_1`로 실행: TRAIN 8,400행·VALID 1,800행, 기존 18개 VALID AUC 0.6049 ± 0.0026, 대안 38개 0.6533 ± 0.0051(저장소 밖 실험과 같은 값). `artifacts/`에 `.joblib` 2개와 `*.meta.json` 2개가 생겼고 `git status`에 `.joblib`는 잡히지 않음(설명 파일은 untracked라 커밋하지 않음).
-- 확인 못 함: 다른 PC에서의 재현, 이 PC의 `fastapi_server/data/`(옛 버전) 기본 경로로의 실행, 서비스 연결(FP-141), TEST 평가.
+- 확인함(추가): v3.6.1 내용물을 `fastapi_server/data/training/`에 복사한 뒤 `--data-dir` 없이 기본 경로로 실행해 같은 AUC(기존 0.6049 ± 0.0026, 대안 0.6533 ± 0.0051)를 재현. 학습 표 SHA-256이 원본과 같음. `data/training/`은 Git 제외라 `git status`에 잡히지 않음.
+- 확인함(추가): 최신 `develop`(PR #61)을 병합한 뒤 FastAPI 테스트 47개 통과, DB 생성 도구 테스트 51개 통과(3개 건너뜀).
+- 확인 못 함: 다른 PC에서의 재현, 서비스 연결(FP-141), TEST 평가.
 
 ## 다음 사람이 알아야 할 것
 - 결과는 합성 데이터·튜닝 없음·TEST 미사용 임시 베이스라인이다. 점수 변환(O-3)과 등급 경계(D-01)는 포함하지 않았다.
