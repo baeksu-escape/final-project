@@ -2,7 +2,7 @@
 
 - **날짜:** 2026-11-16
 - **작성자:** 최재욱(B팀 정의서 담당) / Claude Code
-- **브랜치:** `feature-B/FP-132-reason-alt-data-empty`
+- **브랜치:** `feature-B/FP-132-feature-definition-fix3` (같은 작업의 문서 변경 C17~C19와 한 PR)
 - **관련 N-ID:** N-12 (점수 산출 불가 처리)
 - **관련 결정:** `feature_definition.md` 8-5 (다) 1차 확정, 10장 C14·C16, `decisions.md` D-30
 
