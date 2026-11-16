@@ -63,7 +63,9 @@ def _income_expense_features(req: ScoreRequest) -> dict:
 
 
 def _bill_features(req: ScoreRequest) -> dict:
-    """3-2 통신·공과금 3개. 미납 달 = LATE + UNPAID (DDL U2)."""
+    """3-2 통신·공과금 3개. 미납 달 = LATE + UNPAID (DDL U2, 통신비·공과금에는 PARTIAL 상태가 없다).
+    TODO(피처 정의서 9장) 기관 기록이 없어 빈 목록([])으로 불러온 경우(A팀 불러오기 EMPTY) 연속 정시 납부가 0이 된다.
+    학습 데이터 중앙값은 12라 의미가 다르다. 처리 규칙은 피처 정의서에 없어 재욱 님께 보완 요청(11/16)."""
     telecom = sorted(req.alternativeData.telecom, key=lambda r: r.billMonth, reverse=True)
     streak = 0
     for row in telecom:  # 최근 달부터 거꾸로 센 연속 정시 납부
