@@ -44,10 +44,11 @@ class MarketSchemaTests(unittest.TestCase):
         """DDL 사본·해시·보고서의 테이블 목록과 기존 기준 INSERT를 대조한다."""
         self.assertEqual(self.ddl, (DB_DIR / '01_create_tables.sql').read_bytes())
         report = json.loads((DB_DIR / 'seed_report.json').read_text(encoding='utf-8'))
-        self.assertEqual(report['ddl_sha256'], hashlib.sha256(self.ddl).hexdigest())
+        self.assertEqual(report['ddl_sha256'], hashlib.sha256(self.ddl.replace(b'\r\n', b'\n')).hexdigest())
         self.assertEqual(report['table_count'], 47)
         self.assertEqual(set(report['rows']), set(self.tables))
         self.assertEqual(sum(map(len, self.base_rows.values())), 25)
+        self.assertEqual(report['rows']['DIM_FEATURE'], 39)
 
     def test_published_cleanup_and_checks_match_schema(self):
         """배포된 정리·검사 SQL이 제거된 표를 참조하지 않고 47개 표를 다룬다."""
@@ -68,7 +69,18 @@ class MarketSchemaTests(unittest.TestCase):
         empty = {name: [] for name in self.tables}
         files, report = db.bundle_files(self.ddl, self.tables, empty, empty, [])
         self.assertEqual(report['table_count'], 47)
+        _, lf_report = db.bundle_files(self.ddl.replace(b'\r\n', b'\n'), self.tables, empty, empty, [])
+        self.assertEqual(report['ddl_sha256'], lf_report['ddl_sha256'])
         self.assertEqual(files['01_create_tables.sql'], self.ddl)
+        self.assertEqual(files['25_seed_dim_feature_fs_draft.sql'],
+                         (SQL_DIR / 'seed' / 'avenue_seed_dim_feature_fs_draft.sql').read_bytes())
+        self.assertEqual(report['rows']['DIM_FEATURE'], 39)
+        self.assertEqual([line[2:] for line in files['run_all.sql'].decode('utf-8').splitlines() if line.startswith('@@')],
+                         ['00_drop_all.sql', '01_create_tables.sql', '25_seed_dim_feature_fs_draft.sql', '99_check.sql'])
+        seed_only = files['run_seed_only.sql'].decode('utf-8')
+        self.assertEqual([line[2:] for line in seed_only.splitlines() if line.startswith('@@')],
+                         ['25_seed_dim_feature_fs_draft.sql', '99_check.sql'])
+        self.assertIn("'DIM_FEATURE'", seed_only)
         self.assertEqual(files['00_drop_all.sql'].decode('utf-8'),
                          (DB_DIR / '00_drop_all.sql').read_text(encoding='utf-8'))
         for name in MARKET_TABLES:
@@ -81,7 +93,7 @@ class MarketSchemaTests(unittest.TestCase):
         targets = re.findall(r"(?:SELECT \d+ AS step_no, |UNION ALL SELECT \d+, )'(\w+)'", script)
         self.assertEqual(targets, ['FACT_DONG_LIVING_POP', 'FACT_DONG_STORE', 'FACT_DONG_SALES',
                                    'DIM_SERVICE_CATEGORY', 'DIM_ADM_DONG'])
-        self.assertIn('ORDER BY step_no', script)
+        self.assertIn('ORDER BY 1', script)
         self.assertIn('SQLCODE != -942', script)
         self.assertNotRegex(script, r"'DROP TABLE [^']*CASCADE")
         for name in ('run_all.sql', 'run_seed_only.sql'):

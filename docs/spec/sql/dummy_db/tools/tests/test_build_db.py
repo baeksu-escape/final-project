@@ -201,7 +201,8 @@ class RunAllRuleTests(unittest.TestCase):
         self.assertIn('RAISE_APPLICATION_ERROR(-20002',script)
         self.assertIn('RAISE_APPLICATION_ERROR(-20003',script)
         for name in seeds:
-            self.assertIn("'"+name.split('_seed_',1)[1][:-4].upper()+"'",script)
+            table = 'DIM_FEATURE' if name == '25_seed_dim_feature_fs_draft.sql' else name.split('_seed_',1)[1][:-4].upper()
+            self.assertIn("'"+table+"'",script)
 
 
 class PrivacyTests(unittest.TestCase):
