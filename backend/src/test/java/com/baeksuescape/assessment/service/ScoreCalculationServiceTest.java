@@ -71,12 +71,25 @@ class ScoreCalculationServiceTest {
         lenient().when(users.requireUserWithJob(USER_ID)).thenReturn(user());
         lenient().when(mapper.selectActiveModelVersion()).thenReturn("DEV-DUMMY");
         lenient().when(mapper.selectSetting("INPUT_MAX_AGE_MONTHS")).thenReturn("3");
-        lenient().when(assembler.build(anyString(), anyString(), any(), anyString(), anyInt())).thenReturn(Map.of("requestId", REQUEST_ID));
+        lenient().when(assembler.build(anyString(), anyString(), any(), anyString(), anyInt())).thenReturn(mlRequest(12, 12));
         // 저장하면 DB가 ASSESSMENT_ID를 채워 준다
         lenient().doAnswer(inv -> {
             ((AssessmentRow) inv.getArgument(0)).setAssessmentId(100L);
             return 1;
         }).when(mapper).insertAssessment(any());
+    }
+
+    // ML-03 요청 본문 중 소득 검사에 쓰는 부분 — 필요한 개월 수와 실제로 담긴 서로 다른 달 수
+    private static Map<String, Object> mlRequest(int required, int months) {
+        List<Map<String, Object>> incomes = new ArrayList<>();
+        for (int i = 0; i < months; i++) {
+            incomes.add(Map.of("baseMonth", String.format("2026-%02d", (i % 12) + 1), "incomeAmt", 1_000_000));
+        }
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("requestId", REQUEST_ID);
+        request.put("applicant", Map.of("workerTypeCode", "SELF_EMPLOYED", "requiredIncomeMonths", required));
+        request.put("incomeMonths", incomes);
+        return request;
     }
 
     private static UserAccount user() {
@@ -187,6 +200,16 @@ class ScoreCalculationServiceTest {
     }
 
     @Test
+    void withoutDbSettingDefaultIsSixMonths() {
+        // APP_SETTING 값이 없으면 DDL 기준값과 같은 6개월(11/16 3→6) — 6개월 전은 허용
+        when(mapper.selectSetting("INPUT_MAX_AGE_MONTHS")).thenReturn(null);
+        inputs(true, "2026-05");
+        when(prediction.score(any())).thenReturn(fastApiResult(2));
+
+        assertThat(service.calculate(USER_ID, REQUEST_ID).gradeStatusCode()).isEqualTo("SCORED");
+    }
+
+    @Test
     void threeMonthsOldIsStillScorable() {
         inputs(true, "2026-08");   // 정확히 3개월 전은 허용
         when(prediction.score(any())).thenReturn(fastApiResult(2));
@@ -197,7 +220,7 @@ class ScoreCalculationServiceTest {
     @Test
     void modelFailsTwiceSavesModelError() {
         inputs(true, "2026-10");
-        when(prediction.score(any())).thenThrow(new PredictionFailedException("timeout"));
+        when(prediction.score(any())).thenThrow(new PredictionFailedException("timeout", true));
 
         ScoreDtos.ScoreResponse response = service.calculate(USER_ID, REQUEST_ID);
 
@@ -207,9 +230,44 @@ class ScoreCalculationServiceTest {
     }
 
     @Test
+    void modelRejectsInputIsNotRetriedAndSavesModelError() {
+        // FastAPI 4xx(422 입력 오류)는 다시 보내도 같아서 재시도하지 않는다 (B팀 명세서 4-3, 재욱 검토 1번)
+        inputs(true, "2026-10");
+        when(prediction.score(any())).thenThrow(new PredictionFailedException("HTTP 422", false));
+
+        assertThat(service.calculate(USER_ID, REQUEST_ID).notScorableReasonCode()).isEqualTo("MODEL_ERROR");
+        verify(prediction, times(1)).score(any());
+    }
+
+    @Test
+    void incomeMonthsShortIs409BeforeCallingModel() {
+        // 자영업자인데 소득이 3개월치뿐이면 FastAPI를 부르지 않고 409 (재욱 검토 1번)
+        inputs(true, "2026-10");
+        when(assembler.build(anyString(), anyString(), any(), anyString(), anyInt())).thenReturn(mlRequest(12, 3));
+
+        assertThatThrownBy(() -> service.calculate(USER_ID, REQUEST_ID))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("INPUT_INCOMPLETE"));
+        verify(prediction, never()).score(any());
+        verify(mapper, never()).insertAssessment(any());
+    }
+
+    @Test
+    void missingBirthYearIs409NotAgeZero() {
+        // 출생연도가 없으면 0살·20대로 저장하지 않고 409 (재욱 검토 2번)
+        inputs(true, "2026-10");
+        UserAccount noBirth = user();
+        noBirth.setBirthYear(null);
+        when(users.requireUserWithJob(USER_ID)).thenReturn(noBirth);
+
+        assertThatThrownBy(() -> service.calculate(USER_ID, REQUEST_ID))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("INPUT_INCOMPLETE"));
+        verify(mapper, never()).insertAssessment(any());
+    }
+
+    @Test
     void modelFailsOnceThenSucceeds() {
         inputs(true, "2026-10");
-        when(prediction.score(any())).thenThrow(new PredictionFailedException("timeout")).thenReturn(fastApiResult(2));
+        when(prediction.score(any())).thenThrow(new PredictionFailedException("timeout", true)).thenReturn(fastApiResult(2));
 
         assertThat(service.calculate(USER_ID, REQUEST_ID).gradeStatusCode()).isEqualTo("SCORED");
     }

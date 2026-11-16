@@ -45,8 +45,8 @@ public class ScoreCalculationService {
     static final String STALE_INPUT = "STALE_INPUT";
     static final String MODEL_ERROR = "MODEL_ERROR";
     static final String INPUT_MAX_AGE_KEY = "INPUT_MAX_AGE_MONTHS";
-    // DB 설정이 없을 때만 쓰는 기본값 (DDL APP_SETTING 기준 데이터와 같은 3개월, 임시값·팀 결정 전)
-    static final int DEFAULT_INPUT_MAX_AGE_MONTHS = 3;
+    // DB 설정이 없을 때만 쓰는 기본값 (DDL APP_SETTING 기준 데이터와 같은 6개월 — 11/16 범영, 12월 시연 대비 3→6)
+    static final int DEFAULT_INPUT_MAX_AGE_MONTHS = 6;
 
     private final AssessmentMapper mapper;
     private final ScoreInputAssembler assembler;
@@ -82,10 +82,16 @@ public class ScoreCalculationService {
         if (!isComplete(input.status()) || input.savedBaseMonths().isEmpty()) {
             throw new ApiException(HttpStatus.CONFLICT, "INPUT_INCOMPLETE", "입력 완료 현황 6개 항목을 모두 채워 주세요.");
         }
+        // 연령대(AGE_BAND_CODE)가 필수라 출생연도 없이는 산출·저장할 수 없다. 0살로 조용히 보내지 않는다(재욱 검토 2번, 11/16 범영).
+        // DB 규칙상 일반 회원은 출생연도가 있어야 해서(CK_APU_USER_FIELDS) 실제로는 거의 생기지 않는다.
+        if (user.getBirthYear() == null) {
+            throw new ApiException(HttpStatus.CONFLICT, "INPUT_INCOMPLETE", "출생연도 정보가 없어 점수를 산출할 수 없습니다.");
+        }
         String baseMonth = input.savedBaseMonths().get(input.savedBaseMonths().size() - 1);
         // DB TIMESTAMP는 소수점 6자리라, 처음 응답과 다시 보냈을 때(DB에서 읽은 값)의 시각이 같도록 미리 맞춘다.
         LocalDateTime now = users.now().truncatedTo(ChronoUnit.MICROS);
-        int age = user.getBirthYear() == null ? 0 : now.getYear() - user.getBirthYear();
+        // TODO(피처 정의서 9장 나이 표현) 지금은 연 나이(올해 − 출생연도)다. 연 나이·만 나이가 정해지면 맞춘다.
+        int age = now.getYear() - user.getBirthYear();
         String modelVersion = mapper.selectActiveModelVersion();
 
         AssessmentRow row = baseRow(requestId, user, baseMonth, age, modelVersion, now);
@@ -94,6 +100,9 @@ public class ScoreCalculationService {
         }
 
         Map<String, Object> request = assembler.build(requestId, modelVersion, user, baseMonth, age);
+        checkIncomeMonths(request);   // FastAPI 422(입력 오류)가 "모델 오류"로 쌓이지 않게 부르기 전에 막는다(재욱 검토 1번)
+        // 한계: 회원 잠금을 잡은 트랜잭션 안에서 FastAPI를 부른다(최대 연결 1초 + 응답 3초, 재시도 포함 약 8초 동안 DB 연결 사용).
+        // 시연 규모에서는 문제없다. 사용자가 늘면 호출을 트랜잭션 밖으로 빼는 것을 검토한다(재욱 검토 4번).
         Map<String, Object> result;
         try {
             result = callWithOneRetry(request);
@@ -101,6 +110,19 @@ public class ScoreCalculationService {
             return save(notScorable(row, MODEL_ERROR), List.of());
         }
         return save(scored(row, result), factors(result));
+    }
+
+    // 소득이 직군에 필요한 개월 수(DIM_WORKER_TYPE: 12/12/1)만큼, 서로 다른 달로 있는지 — 아니면 409 INPUT_INCOMPLETE.
+    // 입력 완료 현황(A팀)이 이미 보장하지만, FastAPI의 같은 검사(ML-03 422)와 어긋나지 않게 한 번 더 본다.
+    @SuppressWarnings("unchecked")
+    static void checkIncomeMonths(Map<String, Object> request) {
+        Map<String, Object> applicant = (Map<String, Object>) request.get("applicant");
+        List<Map<String, Object>> incomes = (List<Map<String, Object>>) request.get("incomeMonths");
+        Object required = applicant == null ? null : applicant.get("requiredIncomeMonths");
+        long distinct = incomes == null ? 0 : incomes.stream().map(m -> m.get("baseMonth")).distinct().count();
+        if (!(required instanceof Integer months) || incomes.size() != months || distinct != months) {
+            throw new ApiException(HttpStatus.CONFLICT, "INPUT_INCOMPLETE", "소득을 필요한 개월 수만큼 입력해 주세요.");
+        }
     }
 
     // 같은 requestId — 같은 회원이면 처음 결과, 다른 회원이면 409.
@@ -136,11 +158,16 @@ public class ScoreCalculationService {
         }
     }
 
-    // 실패하면 같은 requestId로 1번만 다시 부른다(명세서 6장).
+    // 연결 실패·시간 초과·5xx면 같은 requestId로 1번만 다시 부른다. 4xx(422·409)는 다시 불러도 같으므로 바로 MODEL_ERROR로 간다
+    // (B팀 명세서 4-3 오류 표: 422는 버그로 보고 로그를 남기고 MODEL_ERROR 저장, 재시도는 503·500·시간 초과만).
     private Map<String, Object> callWithOneRetry(Map<String, Object> request) {
         try {
             return prediction.score(request);
         } catch (PredictionFailedException first) {
+            if (!first.isRetryable()) {
+                log.warn("ML-03 입력 거절(재시도 안 함) requestId={} — Spring 요청 조립을 확인해야 한다", request.get("requestId"));
+                throw first;
+            }
             return prediction.score(request);
         }
     }
@@ -250,7 +277,7 @@ public class ScoreCalculationService {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
-            throw new PredictionFailedException("featureSnapshot");
+            throw new PredictionFailedException("featureSnapshot", false);
         }
     }
 

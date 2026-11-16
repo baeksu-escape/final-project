@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -41,19 +42,31 @@ public class PredictionClient {
                     .retrieve()
                     .body(Map.class);
             if (body == null) {
-                throw new PredictionFailedException("빈 응답");
+                throw new PredictionFailedException("빈 응답", true);
             }
             return body;
+        } catch (HttpClientErrorException e) {
+            // 4xx(422 입력 오류·409 버전 불일치) — 다시 보내도 결과가 같아 재시도하지 않는다
+            log.warn("ML-03 요청 거절 requestId={} status={}", request.get("requestId"), e.getStatusCode().value());
+            throw new PredictionFailedException("HTTP " + e.getStatusCode().value(), false);
         } catch (RestClientException e) {
+            // 연결 실패·시간 초과·5xx — 한 번 다시 시도할 수 있다
             log.warn("ML-03 호출 실패 requestId={} type={}", request.get("requestId"), e.getClass().getSimpleName());
-            throw new PredictionFailedException(e.getClass().getSimpleName());
+            throw new PredictionFailedException(e.getClass().getSimpleName(), true);
         }
     }
 
-    // FastAPI 호출 실패 — 서비스가 한 번 다시 시도한 뒤 MODEL_ERROR로 저장한다.
+    // FastAPI 호출 실패 — retryable이면 서비스가 한 번 다시 시도하고, 그래도 실패하거나 retryable이 아니면 MODEL_ERROR로 저장한다.
     public static class PredictionFailedException extends RuntimeException {
-        public PredictionFailedException(String reason) {
+        private final boolean retryable;
+
+        public PredictionFailedException(String reason, boolean retryable) {
             super(reason);
+            this.retryable = retryable;
+        }
+
+        public boolean isRetryable() {
+            return retryable;
         }
     }
 }
