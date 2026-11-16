@@ -47,7 +47,7 @@ class MarketSchemaTests(unittest.TestCase):
         self.assertEqual(report['ddl_sha256'], hashlib.sha256(self.ddl).hexdigest())
         self.assertEqual(report['table_count'], 47)
         self.assertEqual(set(report['rows']), set(self.tables))
-        self.assertEqual(sum(map(len, self.base_rows.values())), 25)
+        self.assertEqual(sum(map(len, self.base_rows.values())), 26)
 
     def test_published_cleanup_and_checks_match_schema(self):
         """배포된 정리·검사 SQL이 제거된 표를 참조하지 않고 47개 표를 다룬다."""
