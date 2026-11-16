@@ -23,6 +23,19 @@ uvicorn main:app --port 8000
 | ML-03 | `POST /v1/assessments/score` | 기존·대안 점수, 등급, 부도 확률, SHAP 39개, 피처값 |
 | ML-04 | `POST /v1/assessments/simulate` | 바꾼 값으로 다시 계산(저장 안 함), 감점 요인 3개 |
 
+## Docker로 켜기 (FP-142, Python 설치 없이)
+
+Docker Desktop이 켜져 있어야 한다. 저장소 맨 위(`final-project`)에서:
+
+```
+docker build -t avenue-fastapi fastapi_server              # 처음 한 번, 코드가 바뀌면 다시
+docker run -d -p 8000:8000 --name fastapi avenue-fastapi    # 켜기 → http://localhost:8000/docs
+docker stop fastapi / docker start fastapi                  # 끄기 / 다시 켜기
+```
+
+- Spring은 기본값 `avenue.prediction.base-url`(비어 있으면 `http://localhost:8000`)로 이 서버를 부른다.
+- 8000번을 이미 쓰고 있으면(`uvicorn`으로 켠 서버 등) 그걸 끄거나 `-p 8001:8000`처럼 다른 번호를 쓰고 Spring 설정도 맞춘다.
+
 ## 테스트 방법
 
 **1. 자동 검사 (Python 내장 unittest, 설치할 것 없음)**
