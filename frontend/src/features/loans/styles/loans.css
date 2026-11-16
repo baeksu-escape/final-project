@@ -13,6 +13,7 @@
 .loan-ribbon { float: right; font-size: 12px; border: 1px solid currentColor; border-radius: 20px; padding: 2px 7px; }
 .loan-card__body { display: grid; gap: 12px; padding: 16px; }
 .loan-card__body p { margin: 0; line-height: 1.65; }
+.loan-card__body > p:first-child, .loan-detail-banner p, .loan-detail-description p { white-space: pre-line; }
 .loan-card__numbers { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; }
 .loan-card__numbers span { display: grid; gap: 5px; }
 .loan-hint { font-size: 13px; }

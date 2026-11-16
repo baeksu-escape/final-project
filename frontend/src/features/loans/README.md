@@ -11,27 +11,27 @@
 - 공용 카드: `loans/components/LoanProductCard.jsx`, props `product`, `score`, `workerTypeCode`.
 - `loans/api/loanCatalog.js`: `getLoanProducts()` 비동기 카탈로그, `matchesLoanScore(product, score)`, `useLoanFavorites(userId)`.
 - 즐겨찾기 훅은 `{ favorites, toggleFavorite, available }`을 반환한다. 목록·상세·추천이 같은 저장소를 구독한다.
-- mock 즐겨찾기 키는 회원 ID와 `ui-v2-1794641606-4f83` 버전으로 격리한다. sessionStorage 사용 불가 시 현재 탭 메모리에서 유지한다. DB 이전 데이터로 취급하지 않는다.
+- mock 즐겨찾기 키는 회원 ID와 `seed-v1-17` 버전으로 격리한다. sessionStorage 사용 불가 시 현재 탭 메모리에서 유지한다. DB 이전 데이터로 취급하지 않는다.
 - `VITE_USE_MOCK=false`에서 상품 API 미연결을 오류로 표시한다. 실제 서버 경로를 새로 확정하거나 실패 후 mock으로 전환하지 않는다.
 
-## UI와 서비스 카탈로그 차이
+## 서비스 시드 카탈로그
 
-DDL에는 상품 INSERT가 없다. 현재 `docs/spec/sql/dummy_db/22_seed_loan_product.sql`은 **17종**(LP001~LP017), 23번 직군 연결은 43행, 24번 특징은 17행이다. UI의 **9종**(L01~L09)과 상품명·사업자·금리·한도·기간·상환·직군·최소점수가 다르다. root에 보고하고 승인받은 UI9종만 사용하며 서비스 시드 수치를 혼합하지 않는다.
+화면은 `docs/spec/sql/dummy_db/22_seed_loan_product.sql`의 **17종**(LP001~LP017)을 쓴다. 23번 직군 연결은 43행, 24번 특징은 34행이다. 임시 UI 9종(L01~L09)은 더 이상 쓰지 않는다.
 
-UI `L01`(든든 사업자 우대 대출, 에비뉴은행 예시, 4.9~6.1%, 5천만원, 자영업자)과 서비스 `LP001`은 같은 상품이 아니다. 순서나 숫자 접미사로 자동 매핑하지 않는다. 모든 UI 상품은 `idSource='ui-mock'`, `catalogVersion='ui-v2-1794641606-4f83'`, `dbProductId=null`이다. `productId=L01~L09`는 화면 전용 문자열이며 DB PRODUCT_ID로 전송하지 않는다.
+모든 상품은 `idSource='seed'`, `catalogVersion='seed-v1-17'`이다. `productId`와 `dbProductId`는 DB PRODUCT_ID(숫자 1~17), `productCode`는 PRODUCT_CODE(LP001~LP017)다. 상세 주소의 `:productId`는 문자열이라 `String(productId)`로 비교한다.
 
 | 화면 전용 필드 | 기존 DB 필드 대조 기록 | 제약 |
 |---|---|---|
-| productId / dbProductId | PRODUCT_ID / PRODUCT_CODE | 현재 매핑 없음 |
-| name / providerName / description | PRODUCT_NAME / PROVIDER_NAME / DESCRIPTION | UI와 서비스 값 다름 |
+| productId / dbProductId / productCode | PRODUCT_ID / PRODUCT_ID / PRODUCT_CODE | 시드 17종과 1:1 |
+| name / providerName / description | PRODUCT_NAME / PROVIDER_NAME / DESCRIPTION | 시드 값 그대로 |
 | rateMinPct / rateMaxPct | RATE_MIN_PCT / RATE_MAX_PCT | interestRate는 같은 값의 배열 별칭 |
-| limitAmount | LIMIT_MAX_AMT | 원 단위, UI 원본 만원 값만 환산 |
+| limitAmount | LIMIT_MAX_AMT | 원 단위 그대로 |
 | minScore / maxScore | MIN_ALT_SCORE / 점수 상한 | UI 상한 1000, 승인 조건 아님 |
 | termText / termMonths | TERM_TEXT / TERM_MIN_MONTHS·TERM_MAX_MONTHS | termMonths는 현재 NULL, 텍스트 임의 수치화 금지 |
 | repaymentMethod / eligibility | REPAYMENT_METHOD / ELIGIBILITY_TEXT | 원문 차이 유지 |
 | workerTypeCodes | LOAN_PRODUCT_WORKER_TYPE.WORKER_TYPE_CODE | 직군 코드 배열, 단수 별칭 없음 |
 | providerTheme | UI 전용 사업자 배너 테마 | mock adapter에서 정규화, DB 필드 아님 |
-| features / requiredDocuments | LOAN_PRODUCT_FEATURE / REQUIRED_DOCUMENTS | 서비스 응답 배열 형식 미정 |
+| features / requiredDocuments | LOAN_PRODUCT_FEATURE / REQUIRED_DOCUMENTS | REQUIRED_DOCUMENTS는 '·'로 나눈 배열, 특징은 24번 행 순서 |
 
 ## mock 동작과 제약
 
@@ -52,7 +52,7 @@ UI `L01`(든든 사업자 우대 대출, 에비뉴은행 예시, 4.9~6.1%, 5천�
 - `simulation/pages/SimulationPage.jsx`, `api/useSimulation.js`, `api/simulationApi.js`, `adapters/simulationAdapter.js`, 전용 components·mocks·CSS로 나눈다. 6개 슬라이더와 원 단위 금액 4개를 전달하며 NULL을 0으로 채우지 않는다.
 - 슬라이더·직접 숫자/금액 입력·예시값 넣기는 같은 change 경로를 사용한다. 이전 타이머와 응답 순번을 무효화하고 입력이 500ms 멈추면 최신 유효값으로 한 번 계산한다. 현재점수와 10개 입력이 유효할 때만 요청한다.
 - 첫 로드·마지막 계산값(계산 전에는 실제 값)과 같은 입력·되돌리기는 요청하지 않는다. 회원 전환·reload·되돌리기·unmount 시 타이머와 늦은 응답을 무효화한다. 계산 버튼은 없고 실패 시에만 다시 계산한다. 계산 결과를 저장하거나 기존 평가를 덮어쓰지 않는다.
-- 추천은 공용 UI9 카탈로그에서 직군·점수 조건을 적용하고 최소 점수 내림차순, 최저 금리 오름차순으로 최대 3개를 고른다. 카드 표시 점수도 추천 기준과 일치시킨다.
+- 추천은 공용 시드 17종 카탈로그에서 직군·점수 조건을 적용하고 최소 점수 내림차순, 최저 금리 오름차순으로 최대 3개를 고른다. 카드 표시 점수도 추천 기준과 일치시킨다.
 - 현재값/재계산 함수의 입력 필드는 화면용 임시 계약이다. 실제 모드에서는 미연결 오류를 표시하며 mock으로 전환하지 않는다. 옛 원격 9입력 payload로 자동 변환하거나 서버 경로를 새로 확정하지 않는다.
 - 시연 점수식은 원본 UI 식에서 10개 입력의 기준값 대비 차이를 현재점수에 더한다. 무변경은 변화·영향 0이다. 카드 한도 0 처리 등은 시연 규칙이며 실제 모델 규칙이 아니다.
 - 점수·금리·한도·부도 확률·등급 경계(780/665)는 UI 시연식이며 실제 모델·score_band_offer 조회가 아니다. 시뮬레이터 확률(701점 약 0.85%)과 리포트 mock 확률(약 9.2%)은 다르며 서로 실제 값처럼 합치지 않는다.
