@@ -8,7 +8,7 @@ from pathlib import Path
 from pipeline import feature_catalog as catalog
 from pipeline.feature_builder import build_features
 from pipeline.mock_scorer import score_features
-from pipeline.simulation import simulate
+from pipeline.simulation import apply_changes, simulate, validate_changes
 from routers.assessment import ApiError, score
 from schemas.assessment import ScoreRequest
 
@@ -74,10 +74,14 @@ class FeatureCatalogTest(unittest.TestCase):
         self.assertEqual(len(ours), 39)
         self.assertEqual(sorted(ours), sorted(seed))
 
-    def test_same_codes_as_feature_definition(self):
+    def test_feature_definition_codes_are_all_in_fs_draft(self):
+        """정의서 11장(FS-V1 제안, 지금 38개)의 코드는 모두 FS-DRAFT(39개)에 있어야 한다.
+        차이는 C9(11/16)로 모델에서 뺀 LRZ021201 하나뿐이다 — FS-DRAFT는 유지하고 확정 때 FS-V1을 새로 넣는다(O-17, ①A안)."""
         section = FEATURE_DEFINITION.read_text(encoding="utf-8").split("## 11. DIM_FEATURE")[1]
-        codes = re.findall(r"^\| \d+ \| `([^`]+)` \|", section, re.M)
-        self.assertEqual(sorted(codes), sorted(f.code for f in catalog.FEATURES))
+        codes = set(re.findall(r"^\| \d+ \| `([^`]+)` \|", section, re.M))
+        ours = {f.code for f in catalog.FEATURES}
+        self.assertTrue(codes <= ours, sorted(codes - ours))
+        self.assertTrue(ours - codes <= {"LRZ021201"}, sorted(ours - codes))
 
     def test_model_feature_counts(self):
         self.assertEqual(len(catalog.TRADITIONAL_CODES), 19)
@@ -126,6 +130,56 @@ class FeatureBuilderTest(unittest.TestCase):
         self.assertEqual(f["hi_due_months"], 0)
         self.assertIsNone(f["DQ1200001"])
         self.assertIsNone(f["CL0631905"])
+
+
+class OutlierAndMissingRuleTest(unittest.TestCase):
+    """이상치 고정 상한(정의서 C8)과 (가)안 — 잘못된 값과 그 값으로 계산하는 피처를 함께 결측으로 둔다."""
+
+    def test_income_over_limit_makes_income_based_features_missing(self):
+        body = sample_request()
+        body["incomeMonths"][0]["incomeAmt"] = 2_000_000_001   # 합계 20억 초과
+        f = build_features(ScoreRequest(**body))
+        for code in ("income_svc_12m_krw", "income_cv_svc_12m", "expense_ratio_svc_12m", "dsr_svc_12m",
+                     "deficit_months_svc_12m", "worst_month_net_cash_svc_12m_krw"):
+            self.assertIsNone(f[code], code)
+        self.assertIsNotNone(f["expense_avg_month_krw"])      # 지출·상환 자체는 정상값이라 남는다
+        self.assertIsNotNone(f["debt_service_current_krw"])
+        self.assertEqual(f["zero_income_months_svc_12m"], 0)
+
+    def test_expense_over_limit(self):
+        body = sample_request(expenses=[{"expenseGroupCode": "FIXED", "monthlyAmt": 200_000_001}])
+        f = build_features(ScoreRequest(**body))
+        for code in ("expense_avg_month_krw", "expense_ratio_svc_12m", "deficit_months_svc_12m", "worst_month_net_cash_svc_12m_krw"):
+            self.assertIsNone(f[code], code)
+        self.assertIsNotNone(f["dsr_svc_12m"])
+
+    def test_negative_debt_service(self):
+        body = sample_request()
+        body["loans"][0]["monthlyPaymentAmt"] = -1
+        f = build_features(ScoreRequest(**body))
+        for code in ("debt_service_current_krw", "dsr_svc_12m", "LRZ021201", "deficit_months_svc_12m"):
+            self.assertIsNone(f[code], code)
+
+    def test_zero_income_sum_makes_ratios_missing(self):
+        body = sample_request()
+        for month in body["incomeMonths"]:
+            month["incomeAmt"] = 0
+        f = build_features(ScoreRequest(**body))
+        self.assertIsNone(f["income_cv_svc_12m"])
+        self.assertIsNone(f["expense_ratio_svc_12m"])
+        self.assertIsNone(f["dsr_svc_12m"])
+        self.assertEqual(f["zero_income_months_svc_12m"], 12)
+
+    def test_card_limit_zero_means_no_utilization(self):
+        body = sample_request()
+        body["creditProfile"]["cardLimitAmt"] = 0
+        self.assertIsNone(build_features(ScoreRequest(**body))["CL0631905"])
+
+    def test_outlier_still_scores_in_range(self):
+        body = sample_request()
+        body["incomeMonths"][0]["incomeAmt"] = 9_000_000_000
+        r = score_features(build_features(ScoreRequest(**body)))
+        self.assertTrue(0 <= r["alternative"]["score"] <= 1000)
 
 
 class MockScorerTest(unittest.TestCase):
@@ -201,6 +255,19 @@ class SimulationTest(unittest.TestCase):
         self.assertEqual(d["total"], r["after"]["score"] - r["before"]["score"])
         self.assertGreater(d["total"], 0)
 
+    def test_unknown_key_and_half_card_input_are_rejected(self):
+        """오타 키·카드 한도/사용액 한쪽만 → 오류 목록 (라우터가 422로 돌려준다, 재욱 님 PR 검토)."""
+        errors = validate_changes({"DELINQ_COUNT12M": 0, "CARD_LIMIT_AMT": 5_000_000})
+        fields = [e["field"] for e in errors]
+        self.assertIn("changes.DELINQ_COUNT12M", fields)
+        self.assertIn("changes.CARD_LIMIT_AMT", fields)
+        self.assertEqual(validate_changes({"DELINQ_COUNT_12M": 0, "UTILITY_LATE_MONTHS": 1}), [])
+        self.assertEqual(validate_changes({"CARD_LIMIT_AMT": None, "CARD_MONTHLY_SPEND_AMT": None}), [])
+
+    def test_card_limit_zero_in_simulation_makes_utilization_missing(self):
+        after = apply_changes(self.snapshot, {"CARD_LIMIT_AMT": 0, "CARD_MONTHLY_SPEND_AMT": 100_000})
+        self.assertIsNone(after["CL0631905"])
+
     def test_top_reduction_factors_are_simulatable_negatives(self):
         r = simulate(self.snapshot, {})
         self.assertLessEqual(len(r["topReductionFactors"]), 3)
@@ -224,6 +291,26 @@ class ScoreEndpointRuleTest(unittest.TestCase):
         with self.assertRaises(ApiError) as e:
             score(ScoreRequest(**sample_request(expectedModelVersion="OLD")), None)
         self.assertEqual((e.exception.status, e.exception.code), (409, "VERSION_MISMATCH"))
+
+    def test_required_income_months_must_be_sent_and_match_job(self):
+        """requiredIncomeMonths가 없거나 직군과 다르면 422 — 3개월치로 12개월 피처를 만들지 않는다(재욱 님 PR 검토)."""
+        body = sample_request()
+        body["applicant"]["requiredIncomeMonths"] = None
+        body["incomeMonths"] = body["incomeMonths"][:3]
+        with self.assertRaises(ApiError) as e:
+            score(ScoreRequest(**body), None)
+        self.assertEqual(e.exception.field_errors[0]["field"], "applicant.requiredIncomeMonths")
+        body = sample_request()
+        body["applicant"]["requiredIncomeMonths"] = 3
+        with self.assertRaises(ApiError):
+            score(ScoreRequest(**body), None)
+
+    def test_duplicate_income_month_422(self):
+        body = sample_request()
+        body["incomeMonths"][1]["baseMonth"] = body["incomeMonths"][0]["baseMonth"]
+        with self.assertRaises(ApiError) as e:
+            score(ScoreRequest(**body), None)
+        self.assertEqual(e.exception.status, 422)
 
     def test_income_count_422(self):
         body = sample_request()

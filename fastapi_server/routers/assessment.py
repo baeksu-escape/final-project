@@ -11,7 +11,7 @@ from pipeline.feature_catalog import (
     CUTOFF_VERSION, FEATURE_SET_VERSION, FEATURES, GRADE_BANDS, MODEL_VERSION,
 )
 from pipeline.mock_scorer import score_features
-from pipeline.simulation import simulate
+from pipeline.simulation import simulate, validate_changes
 from schemas.assessment import ScoreRequest, SimulateRequest
 
 router = APIRouter(prefix="/v1")
@@ -44,6 +44,25 @@ def _check_request_id(request_id: str):
     if not REQUEST_ID_PATTERN.match(request_id):
         raise ApiError(422, "INVALID_INPUT", "입력값을 확인해 주세요.",
                        [{"field": "requestId", "message": "소문자 UUID여야 합니다."}], request_id)
+
+
+# 직군별 필요한 소득 개월 수 — DB DIM_WORKER_TYPE.REQUIRED_INCOME_MONTHS(12/12/1)와 같다.
+INCOME_MONTHS_BY_WORKER_TYPE = {"EMPLOYEE": 1, "SELF_EMPLOYED": 12, "FREELANCER": 12}
+
+
+def _check_income_months(req: ScoreRequest):
+    """소득 개월 수를 FastAPI에서도 확인한다 — Spring이 빠뜨려도 3개월치로 12개월 피처를 만들지 않게(명세서 4-3)."""
+    required = req.applicant.requiredIncomeMonths
+    expected = INCOME_MONTHS_BY_WORKER_TYPE.get(req.applicant.workerTypeCode)
+    if expected is None:
+        raise ApiError(422, "INVALID_INPUT", "입력값을 확인해 주세요.",
+                       [{"field": "applicant.workerTypeCode", "message": "알 수 없는 직군입니다."}], req.requestId)
+    if required is None or required != expected:
+        raise ApiError(422, "INVALID_INPUT", "입력값을 확인해 주세요.",
+                       [{"field": "applicant.requiredIncomeMonths", "message": f"이 직군은 {expected}개월이어야 합니다."}], req.requestId)
+    if len({m.baseMonth for m in req.incomeMonths}) != required or len(req.incomeMonths) != required:
+        raise ApiError(422, "INVALID_INPUT", "입력값을 확인해 주세요.",
+                       [{"field": "incomeMonths", "message": f"소득은 서로 다른 {required}개월이어야 합니다."}], req.requestId)
 
 
 def _check_model_version(version: str | None, field: str, request_id: str):
@@ -81,10 +100,7 @@ def score(req: ScoreRequest, x_mock_scenario: str | None = Header(default=None))
     _check_scenario(x_mock_scenario, req.requestId)
     _check_model_version(req.expectedModelVersion, "expectedModelVersion", req.requestId)
 
-    required = req.applicant.requiredIncomeMonths
-    if required is not None and len(req.incomeMonths) != required:
-        raise ApiError(422, "INVALID_INPUT", "입력값을 확인해 주세요.",
-                       [{"field": "incomeMonths", "message": f"소득은 {required}개월이어야 합니다."}], req.requestId)
+    _check_income_months(req)
 
     features = build_features(req)
     result = score_features(features)
@@ -112,6 +128,9 @@ def simulate_score(req: SimulateRequest, x_mock_scenario: str | None = Header(de
         raise ApiError(422, "INVALID_INPUT", "입력값을 확인해 주세요.",
                        [{"field": "baseAssessment.featureSnapshot", "message": f"피처 {len(missing)}개가 없습니다."}],
                        req.requestId)
+    change_errors = validate_changes(req.changes)   # 모르는 키·카드 한도/사용액 한쪽만 → 422 (조용히 무시하지 않는다)
+    if change_errors:
+        raise ApiError(422, "INVALID_INPUT", "입력값을 확인해 주세요.", change_errors, req.requestId)
 
     result = simulate(req.baseAssessment.featureSnapshot, req.changes)
     log.info("simulate requestId=%s elapsedMs=%d", req.requestId, (time.perf_counter() - started) * 1000)
