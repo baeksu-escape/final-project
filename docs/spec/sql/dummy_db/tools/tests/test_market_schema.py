@@ -47,8 +47,13 @@ class MarketSchemaTests(unittest.TestCase):
         self.assertEqual(report['ddl_sha256'], hashlib.sha256(self.ddl.replace(b'\r\n', b'\n')).hexdigest())
         self.assertEqual(report['table_count'], 47)
         self.assertEqual(set(report['rows']), set(self.tables))
-        self.assertEqual(sum(map(len, self.base_rows.values())), 25)
+        ddl_insert_count = sum(
+            line.lstrip().upper().startswith('INSERT INTO ')
+            for line in self.ddl.decode('utf-8-sig').splitlines()
+        )
+        self.assertEqual(sum(map(len, self.base_rows.values())), ddl_insert_count)
         self.assertEqual(report['rows']['DIM_FEATURE'], 39)
+        self.assertEqual(report['rows']['LOAN_PRODUCT_FEATURE'], 34)
 
     def test_published_cleanup_and_checks_match_schema(self):
         """배포된 정리·검사 SQL이 제거된 표를 참조하지 않고 47개 표를 다룬다."""

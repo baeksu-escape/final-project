@@ -31,6 +31,7 @@
 | 테이블은 이미 최신 DDL로 만들어졌고 시드 대상 테이블이 비어 있음 | `dummy_db/run_seed_only.sql` | 원본 DDL을 다시 실행하지 않는다. 대상 테이블이 없거나 한 곳이라도 데이터가 있으면 시드 실행 전에 중단한다 |
 | 데이터가 있는 기존 DB에 이번 자산·대출 상태 변경만 적용 | [alter_user_asset_snapshot_no_loan.sql](alter_user_asset_snapshot_no_loan.sql) | 테이블·데이터를 유지한다. 기존 행의 새 `NO_LOAN_YN`은 NULL이며 Y/N 보정은 하지 않는다 |
 | 데이터가 있는 기존 DB에 대출 상품 문구 보강만 적용 | [update_loan_product_copy.sql](update_loan_product_copy.sql) | LP001~LP017의 ID·코드 대응을 확인한 뒤 지정 문구와 상품 특징만 갱신한다. 자동 실행 묶음에는 연결하지 않는다 |
+| 데이터가 있는 기존 DB에 산출 불가 사유 `ALT_DATA_EMPTY` 1행만 추가 | [add_not_scorable_reason_alt_data_empty.sql](add_not_scorable_reason_alt_data_empty.sql) | 이미 있으면 넣지 않으므로 다시 실행해도 된다. 새로 DDL을 실행하는 DB에는 필요 없다 |
 | 옛 DDL로 만든 DB에서 미사용 상권 테이블 5개 제거 | [drop_unused_market_tables.sql](drop_unused_market_tables.sql) | N-24의 JSON 전환에 따라 상권 전용 표·데이터만 제거한다. 공공통계 표는 유지한다 |
 | 버려도 되는 별도 실험용 스키마를 완전히 초기화 | `dummy_db/run_all.sql` | **대상 테이블을 삭제하고 재생성한 뒤 시드를 적재한다. 기존 데이터가 삭제된다** |
 | 기존 회원 데이터나 시드를 일부 수정·보정 | 담당자와 별도 변경 SQL 검토 | `run_seed_only.sql`은 병합·갱신·재적재 도구가 아니다. `run_all.sql`로 해결하지 않는다 |
