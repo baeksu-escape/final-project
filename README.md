@@ -20,6 +20,26 @@
 - `column_dictionary_207.csv`가 두 곳에 있다. `data_generation/reference/`는 기존 집단(12,000명) 원본 사전, `data/training/3_reference/thinfile/`은 씬파일 집단(2,400명) 사전이다. 이름은 생성 도구가 정한 것이라 바꾸지 않는다.
 - `.csv`·`.xlsx`·`.pkl`·`.joblib`는 Git에 올리지 않고 드라이브로 공유한다. 예외는 `data_generation/`의 정의서·통계 원자료 7개(약 480KB)뿐이다(`.gitignore` 참고).
 
+### 대안 데이터 원천 폴더 (backend·fastapi_server 공통)
+대안 데이터(통신비·공과금·간편결제·국민연금·건강보험·금융) 원천은 아래 세 곳에 나뉘어 있다. **시연·개발에 꼭 필요한 것은 1번뿐이고, 1번은 저장소에 들어 있어 따로 받을 것이 없다.**
+
+| # | 위치 | Git | 쓰는 곳 | 내용 |
+|---|------|-----|---------|------|
+| 1 | [docs/spec/sql/dummy_db/external_api/](docs/spec/sql/dummy_db/external_api/README.md) | **포함** | backend (데이터 입력의 [불러오기], N-05-6) | 가상 기관 응답 `*_responses.jsonl` 6개, 더미 회원 400명분(데이터 v3.6.1) |
+| 2 | `fastapi_server/data_generation/service_dummy/` | 없음 (생성하면 생김) | fastapi_server의 생성 도구만 | 1번과 DB 시드를 만드는 원본. `data_generation/README.md`의 생성 명령으로 만든다. **시드를 다시 만들 때만 필요**하며, 결과는 1번 폴더와 시드 SQL로 옮겨 커밋한다 |
+| 3 | `fastapi_server/data/training/` | 제외 (공유 드라이브) | fastapi_server 모델 학습 | 학습용 CSV. 받는 법은 위 「데이터 위치」 표와 `fastapi_server/data/README.md` |
+
+**backend 설정:** 1번 폴더를 Spring이 자동으로 찾지 않는다. `backend/src/main/resources/application.properties`의 `avenue.altdata.source-dir`에 **내 PC의 절대 경로**를 적는다. 실행 위치에 따라 상대 경로가 달라지므로 절대 경로를 쓴다.
+
+```properties
+# 예: 저장소를 C:\workspace\final-project에 받은 경우 (역슬래시 대신 / 를 쓴다)
+avenue.altdata.source-dir=C:/workspace/final-project/docs/spec/sql/dummy_db/external_api
+```
+
+- 비워 두거나 경로가 틀려도 서버는 켜진다. 대신 시작할 때 콘솔에 `대안 데이터 원천 폴더가 없어 불러오기를 쓸 수 없습니다(avenue.altdata.source-dir)`가 찍히고, 데이터 입력의 [불러오기]가 503 오류로 실패한다. 이 문구가 보이면 이 줄부터 확인한다.
+- 시연 중 새로 가입한 계정은 1번 파일에 자료가 없다. 이때의 동작은 `avenue.altdata.missing-member-mode`로 정한다(`EMPTY` 빈 결과 / `BORROW` 다른 더미 회원 자료를 빌려 씀).
+- fastapi_server의 점수 계산 서버(`uvicorn main:app`)는 이 폴더를 읽지 않는다. 점수에 필요한 값은 Spring이 DB에서 꺼내 보낸다.
+
 처음이라면 `docs/guide/`의 가이드 PDF 앞쪽 **한 장 요약**부터 읽어 주세요.
 
 ---
