@@ -12,6 +12,8 @@ export const NOT_SCORABLE_REASON_MESSAGES = Object.freeze({
   STALE_INPUT: '입력한 자료가 오래되었습니다. 최근 자료로 다시 저장해 주세요.',
   MODEL_ERROR: '지금은 점수를 계산할 수 없습니다. 잠시 후 다시 시도해 주세요.',
   INPUT_INCOMPLETE: '입력하지 않은 항목이 있습니다.',
+  // D-30 빈 목록 처리(PR #62) — 통신비 또는 공과금을 불러왔는데 기관 기록이 하나도 없을 때
+  ALT_DATA_EMPTY: '통신비·공과금 기관 기록이 없어 점수를 산출할 수 없습니다.',
 })
 
 // 사유 코드로 안내 문구를 찾는다. 모르는 코드면 기본 문구를 쓴다.

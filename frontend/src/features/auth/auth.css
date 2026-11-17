@@ -1,0 +1,534 @@
+/* N-01~N-04 로그인·회원가입·계정 찾기·소셜 연결·마이 페이지 화면 스타일 — 'Avenue 기능 데모 v2'의 로그인(.auth)·가입·찾기·마이 페이지 기준.
+   기존 className에만 입힌다. 색은 tokens.css 변수를 쓰고, 소셜 로그인 버튼만 각 회사의 브랜드 색을 쓴다. */
+
+/* ===== 로그인 전 화면 공통 ===== */
+
+/* 가운데 한 열 — 로그인은 420px, 가입·찾기·연결은 조금 넓게 */
+.auth-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding-block: 24px 8px;
+}
+
+.signup-page,
+.find-id-page,
+.find-password-page,
+.social-link-page {
+  max-width: 600px;
+}
+
+.auth-page__title {
+  font-size: clamp(26px, 4vw, 34px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.auth-page__message {
+  color: var(--mut);
+  text-align: center;
+}
+
+/* 완료 화면의 [로그인하러 가기] — 데모 기본 버튼(.btn-p) */
+.auth-page__primary-link,
+.auth-form__submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--pri);
+  border-radius: 10px;
+  background: var(--pri);
+  color: var(--pri-fg);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.auth-page__primary-link {
+  align-self: center;
+}
+
+.auth-page__primary-link:hover,
+.auth-form__submit:hover {
+  border-color: var(--pri2);
+  background: var(--pri2);
+  color: var(--pri-fg);
+}
+
+.auth-form__submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 입력 묶음 = 데모 카드(.panel) */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.auth-form > p {
+  color: var(--fg2);
+  font-size: 13.5px;
+}
+
+.auth-form__error,
+.login-page__social-message {
+  color: var(--bad);
+  font-size: 12.5px;
+}
+
+/* 아이디·비밀번호 찾기·회원가입 링크 줄 */
+.auth-links__list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  list-style: none;
+}
+
+.auth-links__link {
+  color: var(--link);
+}
+
+/* 소셜 로그인 — 데모 .social 상자 안에 제공자 버튼 */
+.social-login {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel2);
+}
+
+.social-login__button {
+  flex: 1 1 110px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  background: var(--inp);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.social-login__button--google {
+  background: #ffffff;
+  color: #3c4043;
+}
+
+.social-login__button--kakao {
+  border-color: #fee500;
+  background: #fee500;
+  color: #191600;
+}
+
+.social-login__button--naver {
+  border-color: #03c75a;
+  background: #03c75a;
+  color: #ffffff;
+}
+
+.social-callback__message {
+  padding: 48px 16px;
+  color: var(--mut);
+  text-align: center;
+}
+
+/* 이메일 인증 — [인증번호 받기]·[확인]은 보조 버튼 */
+.email-verification {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.email-verification > * {
+  min-width: 0;
+}
+
+.email-verification .form-field {
+  flex: 1 1 200px;
+}
+
+.email-verification__send,
+.email-verification__verify {
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--inp);
+  color: var(--fg2);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.email-verification__send:hover,
+.email-verification__verify:hover {
+  border-color: var(--acc);
+  color: var(--fg);
+}
+
+.email-verification__send:disabled,
+.email-verification__verify:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.email-verification__notice,
+.email-verification__mock-hint {
+  flex-basis: 100%;
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+.email-verification__done {
+  flex-basis: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--ok-line);
+  border-radius: 10px;
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+  font-size: 13px;
+}
+
+/* 비밀번호 규칙 — 지킨 규칙은 초록 */
+.password-rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: -6px 0 0;
+  padding: 0;
+  color: var(--mut2);
+  font-size: 12.5px;
+  list-style: none;
+}
+
+.password-rules__item::before {
+  content: '○ ';
+}
+
+.password-rules__item--met {
+  color: var(--mint);
+}
+
+.password-rules__item--met::before {
+  content: '● ';
+}
+
+/* 아이디 찾기 결과 — 데모 .okbox */
+.find-id-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--ok-line);
+  border-radius: 10px;
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+}
+
+.find-id-result__login-id {
+  font-family: var(--f-d);
+  font-size: 18px;
+}
+
+.find-id-result .auth-page__primary-link {
+  align-self: flex-start;
+}
+
+/* 소셜 첫 연결 — 기존 계정 연결 / 새로 가입 선택 */
+.social-link-page__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 12px;
+}
+
+.social-link-page__choice {
+  min-height: 56px;
+  padding: 12px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.social-link-page__choice:hover {
+  border-color: var(--vio);
+}
+
+/* ===== 마이 페이지 (N-04) — 내 정보(넓게) + 계정 관리, 아래로 진단 내역·탈퇴 ===== */
+
+.my-page {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.my-page > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.my-page > .my-profile-card {
+  grid-column: span 2;
+}
+
+.my-page > .account-manage-card {
+  grid-column: span 1;
+}
+
+@media (max-width: 960px) {
+  .my-page > .my-profile-card,
+  .my-page > .account-manage-card {
+    grid-column: 1 / -1;
+  }
+}
+
+.my-page__title {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.my-page__error {
+  color: var(--bad);
+  font-size: 13px;
+}
+
+.my-page__loading {
+  padding: 48px 16px;
+  color: var(--mut);
+  text-align: center;
+}
+
+/* 내 정보 — 항목을 칸으로 나열(데모 dl.g2) */
+.my-profile-card__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.my-profile-card__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.my-profile-card__label {
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+.my-profile-card__value {
+  margin: 0;
+  font-family: var(--f-d);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.my-profile-card__unmasked {
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+.my-profile-card__unmask-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel2);
+}
+
+/* 마이 페이지·계정 관리 보조 버튼들 — 데모 .btn.btn-s */
+.my-profile-card__unmask,
+.my-profile-card__unmask-submit,
+.my-profile-card__unmask-cancel,
+.account-manage-card__email,
+.account-manage-card__password,
+.account-manage-card__data-input,
+.account-form__submit,
+.account-form__cancel,
+.withdrawal-card__open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--inp);
+  color: var(--fg2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.my-profile-card__unmask:hover,
+.my-profile-card__unmask-cancel:hover,
+.account-manage-card__email:hover,
+.account-manage-card__password:hover,
+.account-manage-card__data-input:hover,
+.account-form__cancel:hover {
+  border-color: var(--acc);
+  color: var(--fg);
+}
+
+.my-profile-card__unmask {
+  align-self: flex-start;
+}
+
+.my-profile-card__unmask-submit,
+.account-form__submit {
+  border-color: var(--pri);
+  background: var(--pri);
+  color: var(--pri-fg);
+  font-weight: 600;
+}
+
+.my-profile-card__unmask-submit:hover,
+.account-form__submit:hover {
+  border-color: var(--pri2);
+  background: var(--pri2);
+}
+
+.account-form__submit:disabled,
+.my-profile-card__unmask-submit:disabled,
+.account-form__cancel:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.account-manage-card__actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 8px;
+}
+
+.account-manage-card__result {
+  padding: 12px 14px;
+  border: 1px solid var(--ok-line);
+  border-radius: 10px;
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+  font-size: 13px;
+}
+
+/* 이메일·비밀번호 바꾸기, 탈퇴 입력 묶음 — 카드 안의 낮은 상자 */
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel2);
+}
+
+.account-form__error {
+  color: var(--bad);
+  font-size: 12.5px;
+}
+
+/* 회원 탈퇴 — 데모 .warnbox, 탈퇴 버튼은 위험 색 */
+.withdrawal-form {
+  border-color: var(--warn-line);
+  background: var(--warn-bg);
+}
+
+.withdrawal-form__notice {
+  color: var(--warn-fg);
+  font-size: 13px;
+}
+
+.withdrawal-card__open,
+.withdrawal-form .account-form__submit {
+  align-self: flex-start;
+  border-color: var(--bad);
+  background: var(--inp);
+  color: var(--bad);
+}
+
+.withdrawal-card__open:hover,
+.withdrawal-form .account-form__submit:hover {
+  border-color: var(--bad);
+  background: var(--inp);
+  color: var(--bad);
+}
+
+/* 진단 내역 표 — 데모 .tbl */
+.my-page-history-card .card__body {
+  overflow-x: auto;
+}
+
+.diagnosis-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.diagnosis-history-table__caption {
+  padding-bottom: 8px;
+  color: var(--mut2);
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.diagnosis-history-table th {
+  padding: 8px;
+  border-bottom: 1px solid var(--line2);
+  color: var(--mut2);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.diagnosis-history-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--f-d);
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnosis-history__empty,
+.diagnosis-history__loading {
+  color: var(--mut2);
+  font-size: 13px;
+}
+
+.diagnosis-history__error {
+  color: var(--bad);
+  font-size: 13px;
+}
