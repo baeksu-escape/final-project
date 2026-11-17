@@ -33,3 +33,70 @@ python -m training.train --data-dir <학습 데이터 폴더>
 - SHAP 결과를 "원인"처럼 설명하지 않는다. 모델이 쓴 기여도이다.
 - 학습에 없는 코드값(`voluntary`, 가입 상태 `unknown`) 처리는 정의서 9장 미정이다. 지금은 -1(결측)로 두며 `TODO`가 `config.py`에 있다.
 - 점수(0~1000)와 등급 변환은 하지 않는다. 변환식은 명세서 O-3, 등급 경계는 D-01(미정)이다.
+
+## 두 모델의 AUC 비교 (FP-130)
+
+기존 모델은 `label_any_delinquency_12m`, 대안 모델은 `label_nonfin_effect_12m`이 정답이라 서로 다른 라벨의 AUC를 그대로 빼지 않는다. `python -m training.compare_labels`가 두 모델을 두 라벨에서 각각 평가해 같은 라벨끼리 비교한다. 해석과 한계는 정의서 2-1, 10장 C20.
+
+## 모델 입력·출력 규격 (FP-135)
+
+서비스(FP-141)가 모델을 부를 때 지킬 규격이다. 원본은 이 표와 `config.py`이며(`*.meta.json`은 Git 제외), 같은 규격을 `interface.py`의 `to_model_input(feature_dict, model_name)`이 구현한다. 시험은 `tests/test_training_interface.py`.
+
+- **입력**: 한 행 표(DataFrame). 열 이름과 **열 순서는 아래 표와 같다**. 기존 모델(`legacy`)은 "기존 모델" 칸이 ○인 18개, 대안 모델(`alternative`)은 38개 전부다. 서비스 `build_features`가 만드는 `LRZ021201`은 모델에 쓰지 않으므로 넣지 않는다(C9).
+- **결측**: 값이 없으면 NaN으로 둔다. **0으로 채우지 않는다**(0과 결측은 다르다, 정의서 7장 1번). 서비스의 `None`은 NaN이 되고, 이상치로 걸러진 값(C8)과 그 파생 열도 같다.
+- **숫자 열**: float. **범주형 5개**: 서비스가 보내는 소문자 문자열을 아래 부호표의 정수(int32)로 바꾼다. 표에 없는 값(`voluntary`, 가입 상태 `unknown`)과 결측은 -1이다(정의서 9장 "학습에 없는 코드값 처리"가 미정이라 임시 동작).
+- **출력**: `model.predict_proba(X)[:, 1]` = 불량(양성) 확률(0~1). 기존 모델은 연체 경험, 대안 모델은 비금융 효과 라벨의 양성 확률이다. 점수 0~1000 변환(명세서 O-3: 700점 = 우량:불량 20:1, 40점마다 오즈 2배)과 등급 매기기는 모델 밖 서비스의 일이다.
+- **모델 파일**: `artifacts/legacy.joblib`, `artifacts/alternative.joblib`(Git 제외). 서비스는 LightGBM 4.6.0 같은 버전으로 불러온다(`requirements.txt`).
+
+| 순번 | 피처 | 기존 모델 | 타입 |
+|---:|---|:---:|---|
+| 1 | `income_svc_12m_krw` | ○ | 숫자(float) |
+| 2 | `income_cv_svc_12m` | ○ | 숫자(float) |
+| 3 | `zero_income_months_svc_12m` | ○ | 숫자(float) |
+| 4 | `expense_avg_month_krw` | ○ | 숫자(float) |
+| 5 | `debt_service_current_krw` | ○ | 숫자(float) |
+| 6 | `expense_ratio_svc_12m` | ○ | 숫자(float) |
+| 7 | `dsr_svc_12m` | ○ | 숫자(float) |
+| 8 | `deficit_months_svc_12m` | ○ | 숫자(float) |
+| 9 | `worst_month_net_cash_svc_12m_krw` | ○ | 숫자(float) |
+| 10 | `debt_balance_krw` | ○ | 숫자(float) |
+| 11 | `L00000001` | ○ | 숫자(float) |
+| 12 | `DQ1200001` | ○ | 숫자(float) |
+| 13 | `L22000900` | ○ | 숫자(float) |
+| 14 | `LA0099212` | ○ | 숫자(float) |
+| 15 | `CF1231605` | ○ | 숫자(float) |
+| 16 | `CL0631905` | ○ | 숫자(float) |
+| 17 | `segment` | ○ | 범주형 정수 부호 |
+| 18 | `age` | ○ | 숫자(float) |
+| 19 | `telecom_late_months` |  | 숫자(float) |
+| 20 | `telecom_on_time_streak` |  | 숫자(float) |
+| 21 | `utility_late_months` |  | 숫자(float) |
+| 22 | `dp_ever_used` |  | 숫자(float) |
+| 23 | `dp_active_months` |  | 숫자(float) |
+| 24 | `dp_payment_count_12m` |  | 숫자(float) |
+| 25 | `dp_payment_amount_12m_krw` |  | 숫자(float) |
+| 26 | `np_coverage_status` |  | 범주형 정수 부호 |
+| 27 | `np_payer_type` |  | 범주형 정수 부호 |
+| 28 | `np_due_months` |  | 숫자(float) |
+| 29 | `np_on_time_months` |  | 숫자(float) |
+| 30 | `np_arrears_months` |  | 숫자(float) |
+| 31 | `np_on_time_rate` |  | 숫자(float) |
+| 32 | `hi_coverage_status` |  | 범주형 정수 부호 |
+| 33 | `hi_payer_type` |  | 범주형 정수 부호 |
+| 34 | `hi_due_months` |  | 숫자(float) |
+| 35 | `hi_on_time_months` |  | 숫자(float) |
+| 36 | `hi_arrears_months` |  | 숫자(float) |
+| 37 | `hi_on_time_rate` |  | 숫자(float) |
+| 38 | `si_arrears_any` |  | 숫자(float) |
+
+범주형 부호표(`config.CATEGORY_CODES`):
+
+| 열 | 부호 |
+|---|---|
+| `segment` | freelance=0, selfemp=1, wage=2 |
+| `np_coverage_status` | covered=0, exempt=1, not_covered=2 |
+| `np_payer_type` | regional=0, unknown=1, workplace=2 |
+| `hi_coverage_status` | covered=0, dependent=1, not_covered=2 |
+| `hi_payer_type` | household=0, regional=1, unknown=2, workplace=3 |
+
+이 부호표나 열 순서를 바꾸면 이미 저장한 모델의 입력이 어긋난다. 바꿀 때는 모델을 다시 학습하고 서비스 담당에게 알린다.

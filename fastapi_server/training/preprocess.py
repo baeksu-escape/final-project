@@ -10,6 +10,8 @@ def encode_categories(df: pd.DataFrame) -> pd.DataFrame:
     """범주형 5개를 고정 부호표(config.CATEGORY_CODES)의 번호로 바꾼다. 표에 없는 값·결측은 -1이다(LightGBM이 결측으로 본다)."""
     out = df.copy()
     for column, values in config.CATEGORY_CODES.items():
+        if column not in out.columns:    # 기존 모델 입력처럼 일부 범주형이 없는 표도 받는다
+            continue
         out[column] = out[column].map({v: i for i, v in enumerate(values)}).fillna(-1).astype("int32")
     return out
 
