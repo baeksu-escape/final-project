@@ -1,16 +1,17 @@
-# FP-140 예측 Mock — 실제 모델 아님.
-# Spring → FastAPI 내부 API ML-01~04 (B팀 API 명세서 4장). FastAPI는 DB를 읽거나 쓰지 않는다. 저장은 Spring이 한다.
+# FP-140·FP-141 Spring → FastAPI 내부 API ML-01~04 (B팀 API 명세서 4장). FastAPI는 DB를 읽거나 쓰지 않는다. 저장은 Spring이 한다.
+# 모델 버전이 계산기를 고른다: DB ACTIVE가 DEV-DUMMY면 Mock, LGBM-BASE-0.1이면 실제 모델(FP-141). 그래서 DB 전환이 곧 스위치다.
 import logging
 import re
 import time
 
 from fastapi import APIRouter, Header
 
+from pipeline import mock_scorer, model_scorer
 from pipeline.feature_builder import build_features
 from pipeline.feature_catalog import (
     CUTOFF_VERSION, FEATURE_SET_VERSION, FEATURES, GRADE_BANDS, MODEL_VERSION,
+    REAL_FEATURE_SET_VERSION, REAL_MODEL_VERSION,
 )
-from pipeline.mock_scorer import score_features
 from pipeline.simulation import simulate, validate_changes
 from schemas.assessment import ScoreRequest, SimulateRequest
 
@@ -76,29 +77,49 @@ def _check_bill_data(req: ScoreRequest):
                         for n in empty], req.requestId)
 
 
-def _check_model_version(version: str | None, field: str, request_id: str):
-    if version is not None and version != MODEL_VERSION:
-        raise ApiError(409, "VERSION_MISMATCH", "요청한 모델 버전과 지금 모델 버전이 다릅니다.",
-                       [{"field": field, "message": f"지금 모델은 {MODEL_VERSION}입니다."}], request_id)
+SUPPORTED_MODEL_VERSIONS = (MODEL_VERSION, REAL_MODEL_VERSION)
 
 
-# ML-01 서버 상태 확인
+def _pick_scorer(version: str | None, field: str, request_id: str):
+    """N-12-2 요청한 모델 버전으로 계산기를 고른다 → (score_features 함수, 모델 버전, 피처 세트).
+    DEV-DUMMY(또는 버전 없음)는 Mock, LGBM-BASE-0.1은 실제 모델. 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503."""
+    if version is None or version == MODEL_VERSION:
+        return mock_scorer.score_features, MODEL_VERSION, FEATURE_SET_VERSION
+    if version == REAL_MODEL_VERSION:
+        scorer = model_scorer.get_scorer()
+        if not scorer.ready:
+            raise ApiError(503, "MODEL_NOT_READY", "모델을 아직 불러오지 못했습니다.", request_id=request_id)
+        return scorer.score_features, REAL_MODEL_VERSION, REAL_FEATURE_SET_VERSION
+    raise ApiError(409, "VERSION_MISMATCH", "요청한 모델 버전을 이 서버가 계산할 수 없습니다.",
+                   [{"field": field, "message": f"받는 모델 버전: {', '.join(SUPPORTED_MODEL_VERSIONS)}"}], request_id)
+
+
+# ML-01 서버 상태 확인 — modelLoaded는 실제 모델(LGBM-BASE-0.1) 파일을 불러왔는지다. Mock은 항상 쓸 수 있다.
 @router.get("/health")
 def health():
-    return {"status": "UP", "modelLoaded": True, "modelVersion": MODEL_VERSION}
+    loaded = model_scorer.get_scorer().ready
+    return {"status": "UP", "modelLoaded": loaded, "modelVersion": REAL_MODEL_VERSION if loaded else MODEL_VERSION,
+            "supportedModelVersions": list(SUPPORTED_MODEL_VERSIONS)}
 
 
-# ML-02 모델·피처셋·등급 구간 버전과 피처 목록 — Spring이 시작할 때 DB 값과 맞는지 확인한다.
+# ML-02 모델·피처셋·등급 구간 버전과 피처 목록. 실제 모델을 불러왔으면 그 정보(피처 38개), 아니면 Mock 정보(39개).
 @router.get("/model-info")
 def model_info():
+    if model_scorer.get_scorer().ready:
+        from training.config import MODELS   # 실제 모델 피처 순서의 기준
+        codes = set(MODELS["alternative"]["features"])
+        model_version, feature_set, features = REAL_MODEL_VERSION, REAL_FEATURE_SET_VERSION, [f for f in FEATURES if f.code in codes]
+    else:
+        model_version, feature_set, features = MODEL_VERSION, FEATURE_SET_VERSION, FEATURES
     return {
-        "modelVersion": MODEL_VERSION,
-        "featureSetVersion": FEATURE_SET_VERSION,
+        "modelVersion": model_version,
+        "featureSetVersion": feature_set,
         "cutoffVersion": CUTOFF_VERSION,
         "gradeBands": GRADE_BANDS,
+        "supportedModelVersions": list(SUPPORTED_MODEL_VERSIONS),
         "features": [
             {"featureCode": f.code, "alternativeYn": f.alternative_yn, "simulatableYn": f.simulatable_yn}
-            for f in FEATURES
+            for f in features
         ],
     }
 
@@ -109,18 +130,18 @@ def score(req: ScoreRequest, x_mock_scenario: str | None = Header(default=None))
     started = time.perf_counter()
     _check_request_id(req.requestId)
     _check_scenario(x_mock_scenario, req.requestId)
-    _check_model_version(req.expectedModelVersion, "expectedModelVersion", req.requestId)
+    score_features, model_version, feature_set = _pick_scorer(req.expectedModelVersion, "expectedModelVersion", req.requestId)
 
     _check_income_months(req)
     _check_bill_data(req)
 
     features = build_features(req)
     result = score_features(features)
-    log.info("score requestId=%s elapsedMs=%d", req.requestId, (time.perf_counter() - started) * 1000)
+    log.info("score requestId=%s model=%s elapsedMs=%d", req.requestId, model_version, (time.perf_counter() - started) * 1000)
     return {
         "requestId": req.requestId,
-        "modelVersion": MODEL_VERSION,
-        "featureSetVersion": FEATURE_SET_VERSION,
+        "modelVersion": model_version,
+        "featureSetVersion": feature_set,
         "cutoffVersion": CUTOFF_VERSION,
         **result,
         "featureSnapshot": features,
@@ -133,7 +154,7 @@ def simulate_score(req: SimulateRequest, x_mock_scenario: str | None = Header(de
     started = time.perf_counter()
     _check_request_id(req.requestId)
     _check_scenario(x_mock_scenario, req.requestId)
-    _check_model_version(req.baseAssessment.modelVersion, "baseAssessment.modelVersion", req.requestId)
+    score_features, model_version, _ = _pick_scorer(req.baseAssessment.modelVersion, "baseAssessment.modelVersion", req.requestId)
 
     missing = [f.code for f in FEATURES if f.code not in req.baseAssessment.featureSnapshot]
     if missing:
@@ -144,6 +165,6 @@ def simulate_score(req: SimulateRequest, x_mock_scenario: str | None = Header(de
     if change_errors:
         raise ApiError(422, "INVALID_INPUT", "입력값을 확인해 주세요.", change_errors, req.requestId)
 
-    result = simulate(req.baseAssessment.featureSnapshot, req.changes)
-    log.info("simulate requestId=%s elapsedMs=%d", req.requestId, (time.perf_counter() - started) * 1000)
-    return {"requestId": req.requestId, "modelVersion": MODEL_VERSION, "cutoffVersion": CUTOFF_VERSION, **result}
+    result = simulate(req.baseAssessment.featureSnapshot, req.changes, score_features)
+    log.info("simulate requestId=%s model=%s elapsedMs=%d", req.requestId, model_version, (time.perf_counter() - started) * 1000)
+    return {"requestId": req.requestId, "modelVersion": model_version, "cutoffVersion": CUTOFF_VERSION, **result}
