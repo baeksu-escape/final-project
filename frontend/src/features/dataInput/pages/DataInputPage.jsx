@@ -13,6 +13,7 @@ import SectionList from '../components/SectionList.jsx'
 import { isInputComplete } from '../config/completionItems.js'
 import { BASE_MONTH_FIELD, getSectionsForJob } from '../config/inputSections.js'
 import { buildPayload, createEmptyValues, toValues, withFixedMonthRows } from '../utils/inputValues.js'
+import { createRequestId } from '../utils/requestId.js'
 import { monthRule } from '../validation/inputRules.js'
 import { errorKeyOf, getInputNotices, validateFinancialInput } from '../validation/inputValidation.js'
 import { SCORE_ERROR_CODES, fromServerFieldErrors } from '../validation/serverErrors.js'
@@ -165,8 +166,8 @@ export default function DataInputPage() {
     calculatingRef.current = true
     setCalculating(true)
     setCalculateError('')
-    if (!requestIdRef.current) requestIdRef.current = crypto.randomUUID()
     try {
+      if (!requestIdRef.current) requestIdRef.current = createRequestId()
       const result = await requestScoreCalculation(requestIdRef.current)
       requestIdRef.current = null
       if (result.gradeStatusCode === GRADE_STATUS.SCORED) {
@@ -189,7 +190,7 @@ export default function DataInputPage() {
         return
       }
       if (code === SCORE_ERROR_CODES.REQUEST_ID_CONFLICT) {
-        requestIdRef.current = crypto.randomUUID()
+        requestIdRef.current = createRequestId()
         setCalculateError('다시 시도해 주세요.')
         return
       }
