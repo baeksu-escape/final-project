@@ -1,0 +1,410 @@
+/* N-05 직군 선택·데이터 입력·대안 데이터 불러오기 화면 스타일 — 'Avenue 기능 데모 v2'의 직군 선택(vJob)·데이터 입력(vInput) 기준.
+   기존 className에만 입힌다. 색은 tokens.css 변수만 쓴다. */
+
+/* ===== 공통: 화면 제목·버튼 ===== */
+.job-select-page__title,
+.data-input-page__title {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.job-select-page__message,
+.data-input-page__job {
+  color: var(--mut);
+}
+
+/* 기본 버튼(데모 .btn-p) */
+.job-select-form__submit,
+.data-input-form__submit,
+.data-input-page__calculate,
+.alt-data-source__import {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--pri);
+  border-radius: 10px;
+  background: var(--pri);
+  color: var(--pri-fg);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.job-select-form__submit:hover,
+.data-input-form__submit:hover,
+.data-input-page__calculate:hover,
+.alt-data-source__import:hover {
+  border-color: var(--pri2);
+  background: var(--pri2);
+}
+
+.job-select-form__submit:disabled,
+.data-input-form__submit:disabled,
+.data-input-page__calculate:disabled,
+.alt-data-source__import:disabled,
+.alt-data-source__disconnect:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 보조 버튼·링크(데모 .btn) */
+.alt-data-source__disconnect,
+.data-input-page__next-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--inp);
+  color: var(--fg2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.alt-data-source__disconnect:hover,
+.data-input-page__next-link:hover {
+  border-color: var(--acc);
+  color: var(--fg);
+}
+
+.alt-data-source__import,
+.alt-data-source__disconnect {
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+/* ===== 직군 선택 (N-05-1) — 직군 3개를 큰 카드로 ===== */
+.job-select-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.job-select-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.job-select-form__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 18px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.job-select-form__legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--mut);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.job-select-form__option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 88px;
+  padding: 20px;
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.job-select-form__option:hover {
+  border-color: var(--vio);
+}
+
+.job-select-form__option:has(input:checked) {
+  border-color: var(--vio);
+  background: var(--sel);
+}
+
+.job-select-form__option input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--vio);
+}
+
+/* ===== 데이터 입력 (N-05) — 왼쪽 입력 카드, 오른쪽 입력 현황(따라옴), 아래 점수 산출 ===== */
+.data-input-page {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.data-input-page > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.data-input-page > .data-input-form,
+.data-input-page > .alt-data {
+  grid-column: 1;
+}
+
+.data-input-page > .input-status {
+  grid-column: 2;
+  grid-row: span 2;
+  position: sticky;
+  top: 12px;
+}
+
+.data-input-page__calculate,
+.data-input-page__next-link {
+  justify-self: start;
+}
+
+@media (max-width: 960px) {
+  .data-input-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .data-input-page > .data-input-form,
+  .data-input-page > .alt-data,
+  .data-input-page > .input-status {
+    grid-column: 1;
+    grid-row: auto;
+    position: static;
+  }
+}
+
+.data-input-page__loading {
+  padding: 48px 16px;
+  color: var(--mut);
+  text-align: center;
+}
+
+.data-input-page__error,
+.data-input-page__calculate-error,
+.data-input-form__error {
+  color: var(--bad);
+  font-size: 13px;
+}
+
+/* 입력 카드 묶음 */
+.data-input-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+}
+
+.data-input-form__submit {
+  align-self: flex-start;
+}
+
+/* 고칠 항목 개수 · 덮어쓰기 안내 — 데모 .warnbox */
+.data-input-form__error-summary,
+.data-input-form__overwrite-notice {
+  padding: 12px 14px;
+  border: 1px solid var(--warn-line);
+  border-radius: 10px;
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  font-size: 13px;
+}
+
+/* 저장됨 — 데모 .okbox */
+.data-input-form__saved {
+  padding: 12px 14px;
+  border: 1px solid var(--ok-line);
+  border-radius: 10px;
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+  font-size: 13px;
+}
+
+.input-section__description,
+.input-section__summary {
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+.input-section__summary {
+  font-family: var(--f-d);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 월별 소득 12칸 — 좁으면 칸 수가 줄어든다(데모 .g2 --min 120px) */
+.input-section__month-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.input-section__month-row {
+  min-width: 0;
+}
+
+/* 입력 완료 현황 — 항목마다 완료/입력 필요 칩 */
+.input-status__saved-at {
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+.input-status__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.input-status__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-left: 22px;
+  position: relative;
+  color: var(--fg2);
+}
+
+.input-status__item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border: 1.5px solid var(--warn);
+  border-radius: 50%;
+}
+
+.input-status__item--done::before {
+  border-color: var(--mint);
+  background: var(--mint);
+}
+
+.input-status__hint {
+  color: var(--warn);
+  font-size: 12px;
+}
+
+/* ===== 대안 데이터 불러오기 (N-05-6·N-05-9) — 5종을 카드로 나란히 ===== */
+.alt-data {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.alt-data > :not(.alt-data-source) {
+  grid-column: 1 / -1;
+}
+
+.alt-data__title {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.alt-data__notice {
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+/* 카드 안의 낮은 상자처럼(데모 .sunk) */
+.alt-data .alt-data-source {
+  gap: 8px;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--panel2);
+}
+
+.alt-data-source .card__title {
+  font-size: 14px;
+}
+
+.alt-data-source .card__body {
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.alt-data-source__consent-date {
+  color: var(--mut2);
+  font-size: 12px;
+}
+
+.alt-data-source__result {
+  color: var(--mint);
+  font-size: 12.5px;
+}
+
+.alt-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.alt-data-table th {
+  padding: 6px;
+  border-bottom: 1px solid var(--line2);
+  color: var(--mut2);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.alt-data-table td {
+  padding: 6px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--f-d);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 정보 제공 동의 창 */
+.alt-data-consent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alt-data-consent__terms {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.alt-data-consent__terms dt {
+  color: var(--mut);
+}
+
+.alt-data-consent__terms dd {
+  margin: 0;
+}

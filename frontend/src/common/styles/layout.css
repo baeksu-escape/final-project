@@ -1,0 +1,558 @@
+/* 공통 레이아웃·화면 배치 스타일 — 'Avenue 기능 데모 v2'의 .wrap·.top·.brand·.nav·.panel·.cols 등을 옮겼다. 색은 tokens.css 변수만 쓴다.
+   1) 화면 틀(AppLayout·PublicLayout·AppHeader·TabMenu·AppFooter·ThemeToggle)  2) 화면 배치 공통 클래스(page-head·l-*·data-table 등) */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+}
+
+a {
+  color: var(--link);
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+/* ===== 1) 화면 틀 ===== */
+
+/* 앱 한 열 — 최대 1320px, 헤더·본문·푸터가 같은 폭을 쓴다(데모 .wrap) */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100vh;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding-top: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+.app-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding-bottom: 56px;
+}
+
+/* 헤더 — 1줄: 로고 | 버튼, 2줄: 주 메뉴. TabMenu가 header 안에 있어도 자리만 아래 줄로 옮긴다(데모 .top + .nav) */
+.app-header {
+  --acc: var(--mint);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'brand user'
+    'nav nav';
+  gap: 12px 20px;
+  align-items: center;
+}
+
+.app-header--admin {
+  --acc: var(--vio);
+}
+
+.app-header__brand {
+  grid-area: brand;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-self: start;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.app-header__brand:hover {
+  color: var(--fg);
+}
+
+.app-header__logo {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1.5px solid var(--acc);
+  border-radius: 50%;
+  color: var(--acc);
+  font: 700 13px var(--f-d);
+}
+
+.app-header__name {
+  display: block;
+  font: 700 18px var(--f-d);
+}
+
+.app-header__tagline {
+  display: block;
+  color: var(--mut2);
+  font: 500 11px var(--f-d);
+  letter-spacing: 0.14em;
+}
+
+.app-header__user {
+  grid-area: user;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* 헤더 버튼·링크 — 데모 .btn.btn-s */
+.app-header__notification,
+.app-header__mypage,
+.app-header__logout,
+.app-header__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--inp);
+  color: var(--fg2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.app-header__notification:hover,
+.app-header__mypage:hover,
+.app-header__logout:hover,
+.app-header__link:hover {
+  border-color: var(--acc);
+  color: var(--fg);
+}
+
+.app-header__mypage.active,
+.app-header__link.active {
+  border-color: var(--acc);
+  color: var(--fg);
+}
+
+.app-header__link--primary {
+  border-color: var(--pri);
+  background: var(--pri);
+  color: var(--pri-fg);
+  font-weight: 600;
+}
+
+.app-header__link--primary:hover {
+  border-color: var(--pri2);
+  background: var(--pri2);
+  color: var(--pri-fg);
+}
+
+/* 관리자 칩 */
+.app-header__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--vio);
+  border-radius: 999px;
+  color: var(--vio2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 주 메뉴·관리자 탭 — 밑줄 탭, 넘치면 가로 스크롤(데모 .nav) */
+.tab-menu {
+  grid-area: nav;
+  min-width: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab-menu__list {
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tab-menu__link {
+  display: block;
+  padding: 12px 14px;
+  border-bottom: 2px solid transparent;
+  color: var(--mut);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tab-menu__link:hover {
+  color: var(--fg);
+}
+
+.tab-menu__link[aria-current='page'] {
+  border-bottom-color: var(--acc);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'brand'
+      'user'
+      'nav';
+  }
+
+  .app-header__user {
+    justify-content: flex-start;
+  }
+}
+
+/* 푸터 — 교육용 고지 한 줄 */
+.app-footer {
+  padding: 14px 0 calc(24px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  color: var(--mut2);
+  font-size: 12px;
+}
+
+/* 테마 전환 버튼 — 오른쪽 아래 고정(데모 .themefab) */
+.theme-toggle {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+.theme-toggle:hover {
+  border-color: var(--acc);
+}
+
+/* 로그인 정보 확인 중 */
+.route-guard__loading {
+  padding: 48px 16px;
+  color: var(--mut);
+  text-align: center;
+}
+
+/* 클래스 없이 쓴 기본 태그(관리자 화면 등)에도 데모 모양을 입힌다. :where()로 우선순위를 0으로 두어 화면별 클래스가 늘 이긴다. */
+:where(.app-main) :where(section:not([class])) {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+:where(.app-main) :where(section:not([class]) > h1:not([class])) {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+:where(.app-main) :where(section:not([class]) > p:not([class])) {
+  max-width: 70ch;
+  color: var(--mut);
+}
+
+:where(.app-main) :where(h3:not([class])) {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+:where(.app-main) :where(p[role='alert']:not([class])) {
+  color: var(--bad);
+  font-size: 13px;
+}
+
+/* 폼 — 칸을 가로로 채우고 좁으면 줄바꿈. 칸은 위쪽에 맞춰 도움말이 긴 칸이 있어도 입력칸 줄이 어긋나지 않게 한다.
+   버튼은 라벨 높이(12.5px × 줄 높이 1.55 + 간격 5px)만큼 내려 입력칸과 같은 줄에 둔다. */
+:where(.app-main) :where(form:not([class])) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+:where(.app-main) :where(form:not([class]) > button, form:not([class]) > .button) {
+  justify-self: start;
+  margin-top: calc(12.5px * 1.55 + 5px);
+}
+
+/* 폼 안의 오류·안내 문장은 한 줄 전체를 쓴다 */
+:where(.app-main) :where(form:not([class]) > p) {
+  grid-column: 1 / -1;
+}
+
+/* 표 — 데모 .tbl, 카드 안에서 넘치면 가로 스크롤 */
+.card__body:has(> table) {
+  overflow-x: auto;
+}
+
+:where(.app-main) :where(table:not([class])) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+:where(.app-main) :where(table:not([class]) th) {
+  padding: 8px;
+  border-bottom: 1px solid var(--line2);
+  color: var(--mut2);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+:where(.app-main) :where(table:not([class]) td) {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+/* 이름·값 목록 — 칸으로 나열 */
+:where(.app-main) :where(dl:not([class])) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+:where(.app-main) :where(dl:not([class]) dt) {
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+:where(.app-main) :where(dl:not([class]) dd) {
+  margin: 0;
+  font-family: var(--f-d);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* 검색 폼이 든 카드 — 검색칸·선택칸·개수 칩을 가로 한 줄로(데모 필터 패널) */
+.card__body:has(> form[role='search']) {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.card__body:has(> form[role='search']) > form {
+  flex: 2 1 280px;
+}
+
+.card__body:has(> form[role='search']) > .form-field {
+  flex: 1 1 150px;
+}
+
+/* 쪽 넘기기 등 클래스 없는 nav — 가운데 한 줄 */
+:where(.app-main) :where(nav:not([class])) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ===== 2) 화면 배치 공통 클래스 — 새 화면은 이 클래스를 가져다 쓴다 ===== */
+
+/* 페이지 제목 줄: <div class="page-head"><div><span class="page-head__tag">…</span><h1 class="page-head__title">…</h1><p class="page-head__lead">…</p></div>오른쪽 버튼</div> */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-head__tag,
+.tag {
+  color: var(--mut2);
+  font: 600 11px var(--f-d);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-head__title {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.page-head__lead {
+  max-width: 70ch;
+  margin-top: 4px;
+  color: var(--mut);
+  font-size: 14px;
+}
+
+/* 카드 = 공통 Card 컴포넌트(.card). 카드 안의 한 단계 낮은 상자 */
+.panel-sunk {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel2);
+}
+
+/* 배치: 2:1(왼쪽 넓게) — 960px 아래에서 한 열 */
+.l-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.l-cols > * {
+  min-width: 0;
+}
+
+.l-cols > .l-cols__main {
+  grid-column: span 2;
+}
+
+/* 배치: 3열 같은 폭 */
+.l-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.l-grid3 > * {
+  min-width: 0;
+}
+
+/* 배치: 숫자 타일 4개 한 줄 */
+.l-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 960px) {
+  .l-cols,
+  .l-grid3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .l-cols > .l-cols__main {
+    grid-column: auto;
+  }
+
+  .l-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 배치: 칸 수 자동(최소 폭 --min, 기본 200px) */
+.l-g2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--min, 200px)), 1fr));
+  gap: 12px;
+}
+
+/* 세로 쌓기 */
+.l-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 가로 줄(넘치면 줄바꿈) */
+.l-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 표 — 넓으면 바깥 .data-table-wrap이 가로 스크롤 */
+.data-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table caption {
+  padding-bottom: 8px;
+  color: var(--mut);
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.data-table th {
+  padding: 8px;
+  border-bottom: 1px solid var(--line2);
+  color: var(--mut2);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.data-table .is-num {
+  text-align: right;
+}
+
+/* 글자 */
+.hint {
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+.num {
+  font-family: var(--f-d);
+  font-variant-numeric: tabular-nums;
+}
+
+.text-error {
+  color: var(--bad);
+  font-size: 12.5px;
+}
+
+/* 화면에는 숨기고 화면 낭독기에만 읽히게 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

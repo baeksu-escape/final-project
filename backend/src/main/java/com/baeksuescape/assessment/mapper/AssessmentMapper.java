@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 
 import com.baeksuescape.assessment.dto.AssessmentRows.AssessmentRow;
 import com.baeksuescape.assessment.dto.AssessmentRows.FactorRow;
+import com.baeksuescape.assessment.dto.AssessmentRows.FeatureRow;
 import com.baeksuescape.assessment.dto.AssessmentRows.GradeBandRow;
 import com.baeksuescape.user.dto.DataInputRows.BillRow;
 import com.baeksuescape.user.dto.DataInputRows.EasypayRow;
@@ -58,4 +59,8 @@ public interface AssessmentMapper {
     List<FactorRow> selectFactors(@Param("assessmentId") long assessmentId);
 
     List<GradeBandRow> selectGradeBands(@Param("cutoffVersion") String cutoffVersion);
+
+    // N-12-6 그 평가의 피처 사전 전체(DISPLAY_ORDER 순). 피처 세트가 없으면(NOT_SCORABLE) 모델 버전의 피처 세트를 쓴다.
+    List<FeatureRow> selectModelFeatures(@Param("featureSetVersion") String featureSetVersion,
+            @Param("modelVersion") String modelVersion);
 }

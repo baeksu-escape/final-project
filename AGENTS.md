@@ -34,6 +34,11 @@
 - 요청 없이 `*.css`, `*.scss`, `styles/`, 색상·폰트·간격 값, `className`, 인라인 `style`, 레이아웃 구조, 테마 전환(화이트·블랙)과 카드 접기 로직을 만들거나 고치거나 지우지 않는다.
 - 로직 작업 중에도 기존 마크업과 클래스명을 그대로 둔다. 새 스타일이 필요하면 코드 대신 "이런 스타일이 필요하다"고 제안만 한다.
 - 프론트 담당자가 직접 요청한 경우에만, 요청한 범위 안에서 고친다.
+- 새 화면은 아래 공통 재료로 모양을 맞춘다. 이미 있는 클래스·컴포넌트를 쓰는 것이므로 요청 없이 해도 된다(기준 UI: 데모 v2).
+  - 컴포넌트: `common/components`(Card·Button·Chip·Notice·Modal·Toast·입력류·차트 4종)
+  - 배치 클래스(`common/styles/layout.css`): 제목 줄 `page-head`(`__tag`·`__title`·`__lead`), 2:1 `l-cols`(+`l-cols__main`), 3열 `l-grid3`, 숫자 타일 `l-kpis`, 자동 칸 `l-g2`, 표 `data-table`(+`data-table-wrap`), 안쪽 상자 `panel-sunk`, 글자 `hint`·`num`
+  - 색·간격은 `tokens.css` 변수만 쓰고 색 코드를 직접 쓰지 않는다.
+- 위 재료로 안 되는 모양이 필요하면 기능 폴더에 `<기능>.css`를 만들기 전에 프론트 담당에게 먼저 알린다. 공통 CSS(`tokens.css`·`forms.css`·`components.css`·`layout.css`)는 프론트 담당만 고친다.
 
 ### 3-3. 주석
 - 새로 만들거나 크게 바꾼 함수·클래스·컴포넌트·엔드포인트·SQL에는 무엇인지 **한국어 1~2문장** 주석을 단다.

@@ -5,6 +5,7 @@ import { requestFindId } from '../api/authFeatureApi.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
 import { isValidPhone, normalizePhone } from '../validation.js'
+import '../auth.css'
 
 // N-03 아이디 찾기 화면 — 가입할 때 입력한 이름·휴대폰으로 계정을 찾아 일부를 가린 아이디를 보여 준다.
 export default function FindIdPage() {

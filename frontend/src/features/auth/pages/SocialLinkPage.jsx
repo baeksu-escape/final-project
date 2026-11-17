@@ -6,6 +6,7 @@ import { linkSocialAccount } from '../api/socialLoginApi.js'
 import { LOGIN_FAILED_MESSAGE } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import { SOCIAL_PROVIDERS, toSocialErrorMessage } from '../socialLoginConfig.js'
+import '../auth.css'
 
 // N-01-6 처음 연결하는 소셜 계정 — 기존 계정에 연결하거나, 제공자에게 받은 이름·이메일을 채운 가입 화면으로 보낸다.
 // 값은 화면 이동 상태로만 받으며, 이동 상태 없이 들어오면 로그인 화면으로 보낸다.

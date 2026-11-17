@@ -1,3 +1,4 @@
+import './pages.css'
 // 다른 팀이 만들 화면의 빈 자리. 담당 팀은 AppRoutes.jsx에서 이 컴포넌트를 자기 화면으로 바꾼다.
 // 사용 예: <PlaceholderPage title="신용 리포트" nId="N-12" />
 //   headingLevel: 다른 화면 안에 들어가면 2로 준다(기본 1).

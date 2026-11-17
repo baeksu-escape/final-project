@@ -89,11 +89,12 @@ frontend/
    │  ├─ auth/             로그인 상태, 라우트 가드(역할·직군·점수 여부)
    │  ├─ components/       공통 컴포넌트(버튼·입력·카드·모달) + 차트 4종(CompareBar·TrendLineChart·BarChart·HeatmapGrid)
    │  ├─ config/           환경 변수, 메뉴 경로, 역할·직군·등급 코드
-   │  ├─ layout/           헤더·메뉴 등 화면 틀
+   │  ├─ layout/           화면 틀 — AppLayout(로그인 후)·PublicLayout(로그인 전)·AppHeader·TabMenu·AppFooter
    │  ├─ mocks/            mock 응답 등록·처리, mock 계정
-   │  ├─ pages/            403·404·첫 화면 이동·준비 중 화면
+   │  ├─ pages/            메인(홍보) 페이지·403·404·준비 중 화면
    │  ├─ routes/           AppRoutes.jsx — 전체 라우트
-   │  └─ styles/           tokens.css(색·간격) / forms.css / components.css
+   │  ├─ styles/           tokens.css(색·간격) / forms.css / components.css / layout.css(화면 틀·배치 클래스)
+   │  └─ utils/            theme.js(화이트·블랙 테마 저장·적용) 등
    └─ features/<기능>/     기능별 폴더: api · components · pages · mocks · config
       admin · auth · community · dataInput · market (만들어진 기능)
 ```
@@ -101,9 +102,11 @@ frontend/
 ### 새 기능을 붙일 때
 - 화면은 `features/<기능>/pages/`에 만들고, `AppRoutes.jsx`에서 해당 경로의 `element` 한 줄만 바꾼다(가드·경로 구조는 그대로). `AppRoutes.jsx`·`client.js`는 공유 파일이라 고치기 전에 팀에 알린다.
 - API는 `features/<기능>/api/`에서 `common/api/client.js`를 통해 부른다. mock은 같은 기능의 `mocks/`에 실제 응답과 같은 모양으로 만들어 `registerMockHandlers`로 등록한다.
-- 스타일·`className`·레이아웃은 프론트(공통) 담당 영역이다. 색·간격 값은 `tokens.css`의 변수를 쓴다.
+- 화면 모양은 공통 재료로 맞춘다(기준 UI: 데모 v2). 컴포넌트는 `common/components`(Card·Button·Chip·Notice·Modal·Toast·입력류·차트), 배치는 `layout.css` 클래스를 쓴다.
+  - 제목 줄 `page-head`(`__tag`·`__title`·`__lead`), 2:1 `l-cols`(+`l-cols__main`), 3열 `l-grid3`, 숫자 타일 `l-kpis`, 자동 칸 `l-g2`, 표 `data-table`(+`data-table-wrap`), 안쪽 상자 `panel-sunk`, 글자 `hint`·`num`
+  - 색·간격은 `tokens.css` 변수만 쓴다. 이 재료로 안 되는 모양이 필요하면 기능 폴더에 `<기능>.css`를 만들기 전에 프론트 담당에게 알린다. 공통 CSS 4개(`tokens`·`forms`·`components`·`layout.css`)는 프론트 담당만 고친다(AGENTS.md 3-2).
 
-## 5. 현재 상태 (2026-11-16)
+## 5. 현재 상태 (2026-11-17)
 
 | 메뉴 | 상태 |
 |---|---|
@@ -113,4 +116,5 @@ frontend/
 | 관리자 계정·권한, 접근·감사 로그, 비밀번호 변경 | 실서버 연결 |
 | 신용 리포트, 자산·부채 건전성, 시나리오, 현금흐름, 시뮬레이터, 대출 상품, 비교 분석, 모형 성능 비교, 직군·연령별 통계 | 준비 중 화면(PlaceholderPage) |
 
-메인(홍보) 페이지(N-10, P3)는 아직 없어서 `/`로 들어오면 로그인 화면이 먼저 나온다.
+- `/`는 메인(홍보) 페이지(N-10)다. 로그인한 사람은 자기 첫 화면(관리자는 모형 성능 비교, 직군 없으면 직군 선택, 점수 없으면 데이터 입력, 그 외 신용 리포트)으로 바로 간다. 로그아웃하면 메인으로 돌아온다.
+- 모든 화면 아래에 교육용 고지 푸터가, 오른쪽 아래에 화이트·블랙 테마 버튼이 있다(선택은 이 브라우저에만 저장).

@@ -28,7 +28,7 @@
 
 | 설정 | 쓰는 곳 | 값 | 공유 |
 |---|---|---|---|
-| `avenue.altdata.source-dir` | backend | `<본인 저장소 경로>/docs/spec/sql/dummy_db/external_api` (예: `C:/workspace/final-project/docs/spec/sql/dummy_db/external_api`) | 각자 저장소 위치에 맞춤 |
+| `avenue.altdata.source-dir` | backend | `application.properties`에 **절대 경로**로 적는다: `<본인 저장소 경로>/docs/spec/sql/dummy_db/external_api` (예: `C:/workspace/final-project/docs/spec/sql/dummy_db/external_api`). 윈도 경로도 `\` 대신 `/`를 쓴다(`.properties`에서 `\`는 특수 문자) | 각자 저장소 위치에 맞춤 |
 | `avenue.altdata.missing-member-mode` | backend | `EMPTY`(기본) / `BORROW` — 직접 가입한 계정처럼 더미 응답에 자료가 없는 회원도 시연하려면 `BORROW` | 각자 |
 | `AVENUE_DEV_AES_KEY`, `AVENUE_DEV_HMAC_KEY` | backend, 시드 생성기 | 개인정보 암호화 키. 설명은 [backend/README.md](backend/README.md), [dummy_db/README.md](docs/spec/sql/dummy_db/README.md) | **팀 공통** (env 파일로 별도 전달, 새로 만들지 않는다) |
 | `AVENUE_JWT_SECRET` | backend | Base64, 32바이트 이상 — 아래 명령으로 만든다 | 각자 생성 |
