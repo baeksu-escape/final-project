@@ -10,6 +10,7 @@ import {
   SIMULATION_CARD,
   SIMULATION_DEFAULT_PROB,
   SIMULATION_FEATURES,
+  SIMULATION_MAX_VALUES,
 } from './simulationMockData.js'
 
 // N-18-7 같은 점수대 금리·한도·추천 대출 상품 조회 (3종 추천) — GET은 쿼리스트링, POST는 본문에서 값을 읽는다.
@@ -66,15 +67,21 @@ function penaltyOf(value, best, pointPerUnit) {
   return -Math.abs(value - best) * pointPerUnit
 }
 
-// ML-04 validate_changes와 같은 검사 — 모르는 키, 숫자가 아닌 값, 카드 한도·사용액 한쪽만 보낸 경우를 fieldErrors로 모은다. null은 "바꾸지 않음"이다.
+// SIM-02 입력 검사 — ML-04 규칙(모르는 키, 카드 한도·사용액 한쪽만)에 더해, ML-04가 하지 않는 범위 검사(0 이상 정수, 상한)를 먼저 한다.
+// null은 키를 뺀 것과 같이 "바꾸지 않음"이다(B조 11/17).
 function validateSimulationChanges(changes) {
   const fieldErrors = Object.keys(changes)
     .sort()
     .filter((key) => !SIMULATION_CHANGE_KEYS.has(key))
     .map((key) => ({ field: `changes.${key}`, message: '모르는 항목입니다.' }))
   Object.entries(changes).forEach(([key, value]) => {
-    if (SIMULATION_CHANGE_KEYS.has(key) && value !== null && !Number.isFinite(Number(value))) {
-      fieldErrors.push({ field: `changes.${key}`, message: '숫자를 입력해 주세요.' })
+    if (!SIMULATION_CHANGE_KEYS.has(key) || value === null) return
+    const number = Number(value)
+    const max = SIMULATION_MAX_VALUES[key]
+    if (value === '' || !Number.isInteger(number) || number < 0) {
+      fieldErrors.push({ field: `changes.${key}`, message: '0 이상의 정수를 입력해 주세요.' })
+    } else if (max !== undefined && number > max) {
+      fieldErrors.push({ field: `changes.${key}`, message: `0~${max} 사이로 입력해 주세요.` })
     }
   })
   const hasLimit = changes[SIMULATION_CARD.limitKey] != null

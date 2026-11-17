@@ -310,9 +310,19 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 ```json
 { "changes": { "TELECOM_ON_TIME_MONTHS": 12, "CARD_LIMIT_AMT": 5000000, "CARD_MONTHLY_SPEND_AMT": 1000000 } }
 ```
-- 키 10개(ML-04와 같음): `TELECOM_ON_TIME_MONTHS`, `DELINQ_COUNT_12M`, `CASH_ADVANCE_MONTHS`, `NEW_LOAN_COUNT_3M`, `LOAN_BALANCE_AMT`, `PRIVATE_LENDER_LOAN_BALANCE_AMT`, `UTILITY_LATE_MONTHS`(🟡 A-22 제안), `EASYPAY_MONTHLY_COUNT`, `CARD_LIMIT_AMT`, `CARD_MONTHLY_SPEND_AMT`
-- 값이 `null`이거나 키가 없으면 바꾸지 않는다.
+- 키 10개(ML-04와 같음): `TELECOM_ON_TIME_MONTHS`, `DELINQ_COUNT_12M`, `CASH_ADVANCE_MONTHS`, `NEW_LOAN_COUNT_3M`, `LOAN_BALANCE_AMT`, `PRIVATE_LENDER_LOAN_BALANCE_AMT`, `UTILITY_LATE_MONTHS`(11/17 확정, 피처 정의서 C21), `EASYPAY_MONTHLY_COUNT`, `CARD_LIMIT_AMT`, `CARD_MONTHLY_SPEND_AMT`
+- 값이 `null`이면 키를 뺀 것과 같다(바꾸지 않음). 단 카드 한도·월 사용액은 한쪽만 값이 있고 다른 쪽이 `null`·없음이면 400이다.
 - 카드 한도·월 사용액은 함께 보낸다. 한도가 0이면 오류가 아니라 카드 사용률을 결측으로 계산한다.
+
+입력 범위 (B조 11/17: FastAPI ML-04는 범위를 검사하지 않고 소수는 정수로 잘라 계산하므로, **Spring이 먼저 막는다**):
+
+| 키 | 허용 값 | 근거 |
+|---|---|---|
+| `TELECOM_ON_TIME_MONTHS` | 0~12 정수 | 🟡 임시. 정의서 8-2에서 0–12 대 18·24개월 확인 중(TODO) |
+| `UTILITY_LATE_MONTHS` | 0~12 정수 | 확정(정의서 8-2, 학습 데이터 기준) |
+| 나머지 8개 (연체·현금서비스·신규 대출·간편결제 월 건수·대출 잔액·대부업 잔액·카드 한도·월 카드 사용액) | 0 이상 정수 | 상한은 UI 슬라이더 범위가 정해지면 추가(TODO) |
+
+- 범위가 정해지면 FastAPI에도 422 검사를 넣을지 B조와 함께 정한다.
 
 응답 200: ML-04 응답에서 `requestId`·`shap`을 빼고, 감점 요인에 `featureName`(DIM_FEATURE)을 더한다.
 ```json
@@ -330,6 +340,11 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 - `delta.total = financialEffect + alternativeEffect` (N-18-5 "금융 이력 영향"과 "대안 데이터 영향").
 - `defaultProb`는 그대로 내려준다. 화면 표시 여부는 N-18-6 미정(D2)이다.
 
-오류 400 `INVALID_INPUT`: 모르는 키는 `changes.<키>` "모르는 항목입니다.", 카드 한쪽만 보내면 `changes.CARD_LIMIT_AMT`. ML-04의 422를 Spring이 공통 형식(400)으로 바꾼다.
+오류 400 `INVALID_INPUT` (`fieldErrors[].field`는 `changes.<키>`):
+- 모르는 키 → "모르는 항목입니다."
+- 음수·소수·숫자가 아닌 값 → "0 이상의 정수를 입력해 주세요."
+- 상한 초과 → "0~12 사이로 입력해 주세요."
+- 카드 한쪽만 → `changes.CARD_LIMIT_AMT` "카드 한도와 월 카드 사용액은 함께 보내야 합니다."
+- ML-04가 422를 주면 Spring이 같은 공통 형식(400)으로 바꾼다.
 
 프론트: `features/simulation/api/simulationApi.js`의 `recalculateCreditCare({ changes })`. mock은 588점 예시에서 간단한 규칙으로 계산한다(진짜 모델 아님).
