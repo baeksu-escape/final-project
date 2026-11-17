@@ -34,6 +34,10 @@ python -m training.train --data-dir <학습 데이터 폴더>
 - 학습에 없는 코드값(`voluntary`, 가입 상태 `unknown`) 처리는 정의서 9장 미정이다. 지금은 -1(결측)로 두며 `TODO`가 `config.py`에 있다.
 - 점수(0~1000)와 등급 변환은 하지 않는다. 변환식은 명세서 O-3, 등급 경계는 D-01(미정)이다.
 
+## 학습 데이터 기본 통계 보고서 (FP-131)
+
+`python -m training.data_report`가 분할별 행 수, 라벨 양성 비율, 결측, C8 상한 초과 행 수, 숫자 피처 요약, 범주 분포, 서비스 피처 사전과의 일치를 `docs/spec/training_data_report.md`에 만든다. 생성 파일이라 직접 고치지 않고 다시 실행해 갱신한다. **TEST는 행 수만 센다.** `--out`으로 다른 파일에 쓸 수 있다.
+
 ## 두 모델의 AUC 비교 (FP-130)
 
 기존 모델은 `label_any_delinquency_12m`, 대안 모델은 `label_nonfin_effect_12m`이 정답이라 서로 다른 라벨의 AUC를 그대로 빼지 않는다. `python -m training.compare_labels`가 두 모델을 두 라벨에서 각각 평가해 같은 라벨끼리 비교한다. 해석과 한계는 정의서 2-1, 10장 C20.
