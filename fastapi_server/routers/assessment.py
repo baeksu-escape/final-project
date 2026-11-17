@@ -65,6 +65,17 @@ def _check_income_months(req: ScoreRequest):
                        [{"field": "incomeMonths", "message": f"소득은 서로 다른 {required}개월이어야 합니다."}], req.requestId)
 
 
+def _check_bill_data(req: ScoreRequest):
+    """N-12-2 피처 정의서 8-5 (다) — 통신비 또는 공과금이 빈 목록이면 422. Spring이 먼저 ALT_DATA_EMPTY로 막고, 이건 안전장치다.
+    기록 없음은 학습에 없는 입력이라 점수를 내면 안 된다. 간편결제·보험 빈 목록은 학습에도 있어 그대로 받는다."""
+    empty = [name for name in ("telecom", "utility") if not getattr(req.alternativeData, name)]
+    if empty:
+        label = {"telecom": "통신비", "utility": "공과금"}
+        raise ApiError(422, "INVALID_INPUT", "입력값을 확인해 주세요.",
+                       [{"field": f"alternativeData.{n}", "message": f"{label[n]} 기관 기록이 없어 점수를 낼 수 없습니다(정의서 8-5)."}
+                        for n in empty], req.requestId)
+
+
 def _check_model_version(version: str | None, field: str, request_id: str):
     if version is not None and version != MODEL_VERSION:
         raise ApiError(409, "VERSION_MISMATCH", "요청한 모델 버전과 지금 모델 버전이 다릅니다.",
@@ -101,6 +112,7 @@ def score(req: ScoreRequest, x_mock_scenario: str | None = Header(default=None))
     _check_model_version(req.expectedModelVersion, "expectedModelVersion", req.requestId)
 
     _check_income_months(req)
+    _check_bill_data(req)
 
     features = build_features(req)
     result = score_features(features)

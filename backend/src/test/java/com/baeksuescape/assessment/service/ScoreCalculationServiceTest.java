@@ -79,8 +79,18 @@ class ScoreCalculationServiceTest {
         }).when(mapper).insertAssessment(any());
     }
 
-    // ML-03 요청 본문 중 소득 검사에 쓰는 부분 — 필요한 개월 수와 실제로 담긴 서로 다른 달 수
+    // ML-03 요청 본문 중 소득·대안 데이터 검사에 쓰는 부분 — 통신비·공과금은 1달씩 있다(빈 목록 검사에 걸리지 않게)
     private static Map<String, Object> mlRequest(int required, int months) {
+        return mlRequest(required, months, List.of(bill()), List.of(bill()), List.of(), List.of());
+    }
+
+    private static Map<String, Object> bill() {
+        return Map.of("billMonth", "2026-10", "paymentStatusCode", "ON_TIME");
+    }
+
+    // 대안 데이터 4종(통신비·공과금·간편결제·보험) 목록을 직접 정한 요청
+    private static Map<String, Object> mlRequest(int required, int months, List<Object> telecom, List<Object> utility,
+            List<Object> easypay, List<Object> socialInsurance) {
         List<Map<String, Object>> incomes = new ArrayList<>();
         for (int i = 0; i < months; i++) {
             incomes.add(Map.of("baseMonth", String.format("2026-%02d", (i % 12) + 1), "incomeAmt", 1_000_000));
@@ -89,6 +99,12 @@ class ScoreCalculationServiceTest {
         request.put("requestId", REQUEST_ID);
         request.put("applicant", Map.of("workerTypeCode", "SELF_EMPLOYED", "requiredIncomeMonths", required));
         request.put("incomeMonths", incomes);
+        Map<String, Object> alt = new LinkedHashMap<>();
+        alt.put("telecom", telecom);
+        alt.put("utility", utility);
+        alt.put("easypay", easypay);
+        alt.put("socialInsurance", socialInsurance);
+        request.put("alternativeData", alt);
         return request;
     }
 
@@ -249,6 +265,43 @@ class ScoreCalculationServiceTest {
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("INPUT_INCOMPLETE"));
         verify(prediction, never()).score(any());
         verify(mapper, never()).insertAssessment(any());
+    }
+
+    @Test
+    void emptyTelecomSavesAltDataEmptyWithoutCallingModel() {
+        // 피처 정의서 8-5 (다): 통신비 기관 기록이 0건이면 점수를 내지 않고 ALT_DATA_EMPTY로 저장한다
+        inputs(true, "2026-10");
+        when(assembler.build(anyString(), anyString(), any(), anyString(), anyInt()))
+                .thenReturn(mlRequest(12, 12, List.of(), List.of(bill()), List.of(), List.of()));
+
+        ScoreDtos.ScoreResponse response = service.calculate(USER_ID, REQUEST_ID);
+
+        assertThat(response.gradeStatusCode()).isEqualTo("NOT_SCORABLE");
+        assertThat(response.notScorableReasonCode()).isEqualTo("ALT_DATA_EMPTY");
+        verify(prediction, never()).score(any());
+        verify(mapper).insertAssessment(any());
+        verify(mapper, never()).insertFactor(any());
+    }
+
+    @Test
+    void emptyUtilitySavesAltDataEmpty() {
+        inputs(true, "2026-10");
+        when(assembler.build(anyString(), anyString(), any(), anyString(), anyInt()))
+                .thenReturn(mlRequest(12, 12, List.of(bill()), List.of(), List.of(), List.of()));
+
+        assertThat(service.calculate(USER_ID, REQUEST_ID).notScorableReasonCode()).isEqualTo("ALT_DATA_EMPTY");
+        verify(prediction, never()).score(any());
+    }
+
+    @Test
+    void emptyEasypayAndInsuranceStillScored() {
+        // 간편결제 0건·보험 기록 없음은 학습에도 있는 경우라 막지 않는다(8-5)
+        inputs(true, "2026-10");
+        when(assembler.build(anyString(), anyString(), any(), anyString(), anyInt()))
+                .thenReturn(mlRequest(12, 12, List.of(bill()), List.of(bill()), List.of(), List.of()));
+        when(prediction.score(any())).thenReturn(fastApiResult(2));
+
+        assertThat(service.calculate(USER_ID, REQUEST_ID).gradeStatusCode()).isEqualTo("SCORED");
     }
 
     @Test

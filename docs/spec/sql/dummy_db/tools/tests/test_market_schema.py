@@ -53,6 +53,7 @@ class MarketSchemaTests(unittest.TestCase):
         )
         self.assertEqual(sum(map(len, self.base_rows.values())), ddl_insert_count)
         self.assertEqual(report['rows']['DIM_FEATURE'], 39)
+        self.assertEqual(report['rows']['LOAN_PRODUCT_FEATURE'], 34)
 
     def test_published_cleanup_and_checks_match_schema(self):
         """배포된 정리·검사 SQL이 제거된 표를 참조하지 않고 47개 표를 다룬다."""
