@@ -17,6 +17,19 @@ export const MONEY_FIELDS = [
 ]
 export const INPUT_KEYS = [...SLIDER_FIELDS, ...MONEY_FIELDS].map((field) => field.key)
 
+const API_CHANGE_KEYS = {
+  telecomOnTimeMonths: 'TELECOM_ON_TIME_MONTHS',
+  delinquencyCount: 'DELINQ_COUNT_12M',
+  cashAdvanceMonths: 'CASH_ADVANCE_MONTHS',
+  newLoanCount: 'NEW_LOAN_COUNT_3M',
+  easyPayMonthlyCount: 'EASYPAY_MONTHLY_COUNT',
+  utilityUnpaidMonths: 'UTILITY_LATE_MONTHS',
+  cardLimitAmount: 'CARD_LIMIT_AMT',
+  cardMonthlyUsage: 'CARD_MONTHLY_SPEND_AMT',
+  loanBalance: 'LOAN_BALANCE_AMT',
+  privateLenderBalance: 'PRIVATE_LENDER_LOAN_BALANCE_AMT',
+}
+
 export const GRADE_LABELS = { GOOD: 'Good', STANDARD: 'Standard', CAUTION: 'Caution' }
 
 // 부호를 붙여 보여 준다(0은 ±0).
@@ -53,6 +66,12 @@ export function adaptSimulationInputs(raw) {
   const deductions = (raw.deductions ?? []).slice(0, 3)
   if (deductions.some((item) => !item?.featureCode || !item.label || !Number.isFinite(item.shapScore))) throw malformed('deductions')
   return { currentScore: score ?? null, inputs, deductions }
+}
+
+// N-18-5 화면의 camelCase 입력 10개를 FastAPI 재계산 changes 키로 바꾼다.
+export function toSimulationChanges(values) {
+  if (!values || typeof values !== 'object') throw new Error('시뮬레이션 입력값이 올바르지 않습니다.')
+  return Object.fromEntries(INPUT_KEYS.map((key) => [API_CHANGE_KEYS[key], values[key]]))
 }
 
 // 계산 요청 전에 10개 값이 모두 입력됐는지 확인한다. 문제가 있으면 안내 문구를, 없으면 빈 문자열을 돌려준다.
