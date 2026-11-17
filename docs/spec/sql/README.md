@@ -37,4 +37,4 @@ SELECT USER FROM DUAL;
 
 ## 참고
 
-DDL을 변경할 때는 확인 명령을 포함한 [DDL 변경 체크리스트](REFERENCE.md#ddl을-고칠-때-같이-고칠-것-체크리스트)를 따른다. DB 구성과 합성 데이터의 용도, 상권·알림 테이블 결정 및 생성 코드 보존 이유도 [DB 구성 참고](REFERENCE.md)에 정리되어 있다.
+DDL을 변경할 때는 확인 명령을 포함한 [DDL 변경 체크리스트](REFERENCE.md#ddl-변경-체크리스트-pr-64)를 따른다. 상권·알림 테이블 결정과 생성 코드 보존 이유는 [DB 참고](REFERENCE.md)에 정리되어 있다.
