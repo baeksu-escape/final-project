@@ -40,7 +40,7 @@ import com.baeksuescape.community.dto.BoardDtos;
 import com.baeksuescape.community.dto.ReportDtos;
 import com.baeksuescape.community.service.AdminReportService;
 import com.baeksuescape.community.service.BoardService;
-import com.baeksuescape.community.service.ReportService;
+import com.baeksuescape.community.service.CommunityReportService;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.security.JwtTokenProvider;
 import com.baeksuescape.user.mapper.UserAccountMapper;
@@ -62,7 +62,7 @@ class CommunityApiContractTest {
     @MockBean
     private BoardService boardService;
     @MockBean
-    private ReportService reportService;
+    private CommunityReportService reportService;
     @MockBean
     private AdminReportService adminReportService;
     @MockBean

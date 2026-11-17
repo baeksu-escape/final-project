@@ -6,18 +6,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.baeksuescape.community.dto.ReportDtos;
-import com.baeksuescape.community.service.ReportService;
+import com.baeksuescape.community.service.CommunityReportService;
 import com.baeksuescape.global.security.AuthUser;
 
 import jakarta.validation.Valid;
 
 // FP-193 N-33 글·댓글 신고 API (API 정의서 v0.2 COMM-07). 로그인한 사용자만 신고할 수 있다.
 @RestController
-public class ReportController {
+public class CommunityReportController {
 
-    private final ReportService reportService;
+    private final CommunityReportService reportService;
 
-    public ReportController(ReportService reportService) {
+    public CommunityReportController(CommunityReportService reportService) {
         this.reportService = reportService;
     }
 

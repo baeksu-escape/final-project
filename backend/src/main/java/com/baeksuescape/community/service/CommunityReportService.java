@@ -27,7 +27,7 @@ import com.baeksuescape.global.exception.ApiException;
 // FP-193 N-33 글·댓글 신고 — 신고 접수(N-33-1)와 기준 건수 자동 숨김(N-33-2).
 // 작성자가 아니라 글·댓글 자체를 신고한다. 기준·하루 횟수는 APP_SETTING 값을 읽는다.
 @Service
-public class ReportService {
+public class CommunityReportService {
 
     // APP_SETTING에 값이 없을 때 쓰는 기본값(DDL 시드 값과 같다)
     public static final int DEFAULT_AUTO_HIDE_COUNT = 5;
@@ -38,7 +38,7 @@ public class ReportService {
     private final AppSettingService settings;
     private final Clock clock;
 
-    public ReportService(ReportMapper reportMapper, ContentStatusService contentStatus, AppSettingService settings, Clock clock) {
+    public CommunityReportService(ReportMapper reportMapper, ContentStatusService contentStatus, AppSettingService settings, Clock clock) {
         this.reportMapper = reportMapper;
         this.contentStatus = contentStatus;
         this.settings = settings;

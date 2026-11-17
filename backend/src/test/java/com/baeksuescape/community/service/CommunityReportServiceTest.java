@@ -38,7 +38,7 @@ import com.baeksuescape.global.exception.ApiException;
 // FP-193 N-33 신고 규칙 — 신고 접수(N-33-1: 본인 글·중복·하루 3번·기타만 상세)와 기준 건수 자동 숨김(N-33-2: 기준 5건, 글·댓글 각각).
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class ReportServiceTest {
+class CommunityReportServiceTest {
 
     @Mock
     private BoardMapper boardMapper;
@@ -47,11 +47,11 @@ class ReportServiceTest {
     @Mock
     private AppSettingService settings;
 
-    private ReportService service;
+    private CommunityReportService service;
 
     @BeforeEach
     void setUp() {
-        service = new ReportService(reportMapper, new ContentStatusService(boardMapper), settings, CLOCK);
+        service = new CommunityReportService(reportMapper, new ContentStatusService(boardMapper), settings, CLOCK);
         given(settings.intValue("REPORT_DAILY_LIMIT", 3)).willReturn(3);
         given(settings.intValue("REPORT_AUTO_HIDE_COUNT", 5)).willReturn(5);
         given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "VISIBLE"));

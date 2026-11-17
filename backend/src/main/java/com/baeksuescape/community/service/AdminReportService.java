@@ -69,7 +69,7 @@ public class AdminReportService {
                 .sorted(Comparator.comparing((ReportDtos.ReportGroup group) -> !HIDDEN.equals(group.targetStatus()))
                         .thenComparing(ReportDtos.ReportGroup::lastReportedAt, Comparator.reverseOrder()))
                 .toList();
-        int autoHideCount = settings.intValue(EditableSettings.REPORT_AUTO_HIDE_COUNT, ReportService.DEFAULT_AUTO_HIDE_COUNT);
+        int autoHideCount = settings.intValue(EditableSettings.REPORT_AUTO_HIDE_COUNT, CommunityReportService.DEFAULT_AUTO_HIDE_COUNT);
         return new ReportDtos.ReportList(reportMapper.countOpenTargets(), autoHideCount, items);
     }
 
