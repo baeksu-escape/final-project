@@ -5,6 +5,7 @@ import AccountManageCard from '../components/AccountManageCard.jsx'
 import DiagnosisHistoryTable from '../components/DiagnosisHistoryTable.jsx'
 import MyProfileCard from '../components/MyProfileCard.jsx'
 import WithdrawalCard from '../components/WithdrawalCard.jsx'
+import '../auth.css'
 
 // N-04 마이페이지 — 내 정보(N-04-1·N-04-2), 계정 관리(N-04-3) 카드와 진단 내역(FP-92) 자리, 맨 아래 회원 탈퇴(N-04-7)를 보여 준다.
 // 가림 해제한 원래 값은 이 화면의 상태에만 두므로, 다른 화면으로 가면 사라지고 다시 들어오면 가린 값부터 보인다.

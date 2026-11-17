@@ -1,0 +1,118 @@
+/* 공통 화면(준비 중·403·404·재무 진단 묶음) 스타일 — 가운데 정렬 카드, 서브탭은 데모 v2의 .sub(알약 모양 탭). 색은 tokens.css 변수만 쓴다. */
+
+/* 준비 중·403·404 — 가운데 카드 하나 */
+.placeholder-page,
+.forbidden-page,
+.not-found-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 560px;
+  margin: 24px auto 0;
+  padding: 32px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  text-align: center;
+}
+
+.placeholder-page__title,
+.forbidden-page__title,
+.not-found-page__title {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.placeholder-page__nid {
+  padding: 3px 10px;
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  color: var(--mut);
+  font-family: var(--f-d);
+  font-size: 12px;
+}
+
+.placeholder-page__message,
+.forbidden-page__message {
+  color: var(--mut);
+}
+
+.forbidden-page__home-link,
+.not-found-page__home-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 8px 16px;
+  border: 1px solid var(--pri);
+  border-radius: 10px;
+  background: var(--pri);
+  color: var(--pri-fg);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.forbidden-page__home-link:hover,
+.not-found-page__home-link:hover {
+  border-color: var(--pri2);
+  background: var(--pri2);
+  color: var(--pri-fg);
+}
+
+/* 재무 진단 묶음 화면 — 제목, 알약 모양 서브탭, 내용 */
+.diagnosis-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.diagnosis-page__title {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.diagnosis-page__empty {
+  color: var(--mut);
+}
+
+.diagnosis-page__content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.sub-tab-menu__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sub-tab-menu__link {
+  display: inline-block;
+  padding: 7px 14px;
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  color: var(--mut);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.sub-tab-menu__link:hover {
+  color: var(--fg);
+}
+
+.sub-tab-menu__link[aria-current='page'] {
+  border-color: var(--acc);
+  background: var(--pri);
+  color: var(--pri-fg);
+  font-weight: 600;
+}

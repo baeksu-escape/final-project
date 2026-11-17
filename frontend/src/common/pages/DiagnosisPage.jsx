@@ -3,6 +3,7 @@ import { Navigate, NavLink, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth.js'
 import { getVisibleDiagnosisTabs } from '../config/diagnosisTabs.js'
 import { PATHS } from '../config/navigation.js'
+import './pages.css'
 
 // N-08 직군별 재무 진단 — 내 직군에서 보이는 서브탭만 보여 주고, 숨김 대상 탭 주소로 들어오면 첫 서브탭으로 보낸다.
 // contents: { [서브탭 key]: 화면 요소 } — AppRoutes.jsx에서 넘긴다.

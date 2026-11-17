@@ -11,6 +11,7 @@ import '../api/authFeatureApi.js'
 import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, LOGIN_FAILED_MESSAGE } from '../authConstants.js'
 import AuthLinks from '../components/AuthLinks.jsx'
 import SocialLoginButtons from '../components/SocialLoginButtons.jsx'
+import '../auth.css'
 
 // 로그인 실패 원인을 화면 문구로 바꾼다. 아이디·비밀번호 중 무엇이 틀렸는지는 알려 주지 않는다.
 function toLoginErrorMessage(error) {

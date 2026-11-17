@@ -8,6 +8,7 @@ import AuthLinks from '../components/AuthLinks.jsx'
 import EmailVerification from '../components/EmailVerification.jsx'
 import PasswordRuleList from '../components/PasswordRuleList.jsx'
 import { LOGIN_ID_RULE_TEXT, MIN_SIGNUP_AGE, NICKNAME_MAX, getMaxBirthYear, normalizePhone, validateSignup } from '../validation.js'
+import '../auth.css'
 
 // 가입 화면 입력값의 처음 상태. N-02-1 연령대 선택 대신 출생연도(4자리 숫자 글자)를 받는다.
 const EMPTY_FORM = {
