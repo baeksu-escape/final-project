@@ -1,0 +1,72 @@
+# N-12-2 기존·대안 모델 학습 설정 — 피처 목록, 범주 부호표, 라벨, 고정 하이퍼파라미터.
+# 값의 출처: 피처 정의서 v1.0(docs/spec/feature_definition.md) 3장·10장 C8·C9·C13·C19. 이 파일의 값은 임시 베이스라인 기준이다.
+# 이상치 상한은 서비스(pipeline/feature_builder.py)와 같은 상수를 그대로 가져와 쓴다(학습과 서비스가 갈라지지 않게).
+from pathlib import Path
+
+from pipeline.feature_builder import (  # noqa: F401  (preprocess.py가 이 이름으로 다시 가져간다)
+    DEBT_SERVICE_MIN_KRW,
+    EXPENSE_AVG_MAX_KRW,
+    INCOME_SUM_MAX_KRW,
+)
+
+FASTAPI_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DATA_DIR = FASTAPI_ROOT / "data" / "training"
+DEFAULT_OUT_DIR = FASTAPI_ROOT / "artifacts"
+TABLE_RELATIVE_PATH = Path("1_model") / "legacy_model_table.csv"
+
+# 기존 모델 18개 = 대안 데이터가 아닌 피처. LRZ021201은 C9(11/16 임시 결정)로 뺐다.
+LEGACY_FEATURES = [
+    "income_svc_12m_krw", "income_cv_svc_12m", "zero_income_months_svc_12m",
+    "expense_avg_month_krw", "debt_service_current_krw", "expense_ratio_svc_12m",
+    "dsr_svc_12m", "deficit_months_svc_12m", "worst_month_net_cash_svc_12m_krw",
+    "debt_balance_krw", "L00000001", "DQ1200001", "L22000900",
+    "LA0099212", "CF1231605", "CL0631905", "segment", "age",
+]
+
+# 대안 모델 추가 20개(통신비·공과금·간편결제·국민연금·건강보험).
+ALTERNATIVE_EXTRA_FEATURES = [
+    "telecom_late_months", "telecom_on_time_streak", "utility_late_months",
+    "dp_ever_used", "dp_active_months", "dp_payment_count_12m", "dp_payment_amount_12m_krw",
+    "np_coverage_status", "np_payer_type", "np_due_months", "np_on_time_months",
+    "np_arrears_months", "np_on_time_rate", "hi_coverage_status", "hi_payer_type",
+    "hi_due_months", "hi_on_time_months", "hi_arrears_months", "hi_on_time_rate",
+    "si_arrears_any",
+]
+ALTERNATIVE_FEATURES = LEGACY_FEATURES + ALTERNATIVE_EXTRA_FEATURES
+
+# 입력 열이 이상치·결측이면 같이 결측으로 두는 파생 열(전처리 (나), C19). 서비스 feature_builder와 같은 규칙이다.
+DERIVED_FROM_INCOME = ["income_cv_svc_12m", "expense_ratio_svc_12m", "dsr_svc_12m"]
+DERIVED_FROM_EXPENSE = ["expense_ratio_svc_12m"]
+DERIVED_FROM_DEBT = ["dsr_svc_12m"]
+DERIVED_FROM_ANY_INPUT = ["deficit_months_svc_12m", "worst_month_net_cash_svc_12m_krw"]
+
+# 범주형 5개의 고정 부호표. 알파벳 자동 부호(cat.codes)는 학습 데이터가 바뀌면 번호가 달라지므로 쓰지 않는다.
+# 서비스(feature_builder.py)가 보내는 소문자 문자열과 같은 값이며, 이 표에 없는 값은 -1(결측)로 둔다.
+# TODO(정의서 9장 "학습에 없는 코드값 처리") voluntary·가입 상태 unknown은 학습에 없는 값이라 처리 방식이 미정이다.
+CATEGORY_CODES = {
+    "segment": ["freelance", "selfemp", "wage"],
+    "np_coverage_status": ["covered", "exempt", "not_covered"],
+    "np_payer_type": ["regional", "unknown", "workplace"],
+    "hi_coverage_status": ["covered", "dependent", "not_covered"],
+    "hi_payer_type": ["household", "regional", "unknown", "workplace"],
+}
+CATEGORICAL_FEATURES = list(CATEGORY_CODES)
+
+# 정답 라벨: 기존 모델은 연체 경험, 대안 모델은 비금융 효과 라벨(피처 정의서 9장 확정).
+MODELS = {
+    "legacy": {"features": LEGACY_FEATURES, "label": "label_any_delinquency_12m"},
+    "alternative": {"features": ALTERNATIVE_FEATURES, "label": "label_nonfin_effect_12m"},
+}
+
+SPLIT_COLUMN = "data_split"
+TRAIN_SPLIT = "TRAIN"
+VALID_SPLIT = "VALID"          # TEST는 최종 평가 때만 쓰며, 이 스크립트는 읽은 뒤 바로 버린다.
+
+SEEDS = [11, 22, 33, 44, 55]   # 시드 5개 평균·표준편차로 성능을 본다. 저장하는 모델은 첫 시드 것이다.
+LGBM_PARAMS = {                # 튜닝하지 않은 고정 설정
+    "n_estimators": 300,
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "colsample_bytree": 0.8,
+    "verbose": -1,
+}
