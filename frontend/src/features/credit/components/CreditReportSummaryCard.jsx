@@ -13,15 +13,8 @@ export default function CreditReportSummaryCard({ factors = [] }) {
     .filter((factor) => factor.shapScore < 0)
     .sort((a, b) => a.shapScore - b.shapScore || a.rank - b.rank)
     .slice(0, 3)
-  const shortLabels = {
-    '통신비 정시 납부 기간': '통신비',
-    '가장 어려웠던 달의 남은 돈': '잔액',
-    '건강보험 정시 납부 개월': '건보',
-    '간편결제 이용 개월': '결제개월',
-    '간편결제 이용 금액(12개월)': '결제금액',
-  }
   const chartData = [...positive, ...negative].map((factor) => ({
-    label: shortLabels[factor.featureName] ?? factor.featureName,
+    label: factor.featureName,
     value: factor.shapScore,
     tag: factor.alternativeYn === 'Y' ? '대안' : undefined,
   }))
@@ -39,7 +32,7 @@ export default function CreditReportSummaryCard({ factors = [] }) {
           <span><i className="shap-swatch shap-positive" />점수를 크게 올린 항목</span>
           <span><i className="shap-swatch shap-negative" />점수를 크게 내린 항목</span>
         </div>
-        <BarChart data={chartData} height={240} ariaLabel="점수에 영향을 준 상승·하락 요인 상위 3개" />
+        <BarChart data={chartData} height={280} wrapLabels barGap labelGap={12} ariaLabel="점수에 영향을 준 상승·하락 요인 상위 3개" />
         <div className="credit-summary-card__action panel-sunk">
           <p className="hint">조건을 바꾸면 점수가 어떻게 달라지는지 시뮬레이터에서 미리 확인해 보세요.</p>
           <Link className="button button--primary" to={PATHS.SIMULATOR}>신용케어 시뮬레이터로 가기</Link>
