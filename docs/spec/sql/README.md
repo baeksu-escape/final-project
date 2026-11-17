@@ -1,98 +1,42 @@
-# 서비스 DB 구성과 합성 데이터 사용 안내
+# DB 처음 설정하기
 
-이 문서는 DB 구조, 모델 학습용 합성 데이터, 서비스 시연용 더미 데이터를 구분하고 상황에 맞는 실행 순서를 안내한다. 모든 고객·회원 데이터는 합성 데이터이며 실제 신용평가·대출 심사에 사용하지 않는다.
+이 안내는 **비어 있는 새 개발용 Oracle 스키마**에 합성 시연 데이터를 처음 준비할 때 사용한다. 기존 데이터가 있는 DB에는 초기 설정을 실행하지 않는다.
 
-## 왜 이렇게 나눴나
+## 1. Oracle 계정 준비
 
-전체 서비스 DDL이 나오기 전에는 실험과 화면 개발에 필요한 데이터를 먼저 사용하려고 더미 DB에 테이블 생성과 시드 적재를 함께 묶었다. 현재는 전체 서비스 DDL이 있으므로 **테이블 구조의 기준과 데이터를 채우는 절차를 분리**한다.
+DB 담당자에게 개발 스키마 계정과 접속 정보, 테이블 생성 권한을 요청한다. SQL Developer에서 새 연결을 만들고 `Test`가 성공하면 `Connect`한다. 연결 후 아래 쿼리로 발급받은 스키마 계정인지 확인한다. 접속 정보는 팀에서 안내한 안전한 경로로 받고 문서나 저장소에 적지 않는다.
 
-- **DDL:** 테이블·열·제약을 정의한다. 기준 파일은 [avenue_ddl.sql](avenue_ddl.sql)이다.
-- **시드:** 이미 정의된 테이블에 개발·시연용 데이터를 넣는다. 회원 시드는 [dummy_db/](dummy_db/README.md)에 둔다.
-- **ALTER:** 이미 데이터를 사용 중인 DB의 구조를 필요한 부분만 바꾼다. 해당 변경용 SQL을 별도로 적용한다.
+```sql
+SELECT USER FROM DUAL;
+```
 
-`dummy_db/01_create_tables.sql`은 별도로 설계한 DB가 아니라 원본 DDL의 바이트 동일 사본이다. 생성기가 원본 DDL을 복사해 묶음을 만들며, 사본만 독립적으로 수정하지 않는다. `run_all.sql`은 실험용 DB를 한 번에 초기화하기 위한 편의 경로로 남긴다.
+## 2. 파일을 차례로 실행
 
-## 데이터는 두 용도로 구분한다
+각 파일을 SQL Developer에서 직접 열고 같은 스키마 연결을 선택해 **F5 (스크립트 실행)** 한다.
 
-| 구분 | 모델 학습용 합성 데이터 | 서비스용 더미 회원 데이터 |
-|---|---|---|
-| 목적 | 모델 학습·평가, 합성 규칙과 가정 검증 | 가입·입력·조회·기관 불러오기·점수 산출 흐름 시연 |
-| 사용하는 형태 | CSV 모델 표·상세 원천·열 역할표 | DB 적재용 SQL 시드·기관 응답 JSONL |
-| 위치·사용법 | [fastapi_server/data/README.md](../../../fastapi_server/data/README.md)의 전달 묶음을 받아 `fastapi_server/data/training/`에 둔다 | [dummy_db/README.md](dummy_db/README.md)의 적재 절차를 따른다 |
-| 생성 과정 | [data_generation/README.md](../../../fastapi_server/data_generation/README.md)의 생성·검증·전달 묶음 절차 | 같은 생성 패키지의 `service_dummy/` 원천을 `dummy_db/tools/build_db.py`로 DB 시드에 매핑 |
+1. `avenue_ddl.sql` — 테이블과 기본 코드를 만든다.
+2. `dummy_db/run_seed_only.sql` — 비어 있는 시드 대상 테이블에 회원·상품·FS-DRAFT·FS-V1 피처 데이터를 넣고 검사를 실행한다.
 
-학습용 CSV를 회원 테이블에 적재하는 것이 아니며, 서비스 더미 회원(`MEM…`)은 모델 학습에 쓰지 않는다. 서비스용 더미도 원천에는 CSV 등이 있지만 DB에서 사용할 때 SQL 시드로 바꾼다. [기관 응답 더미](dummy_db/external_api/README.md)는 회원이 동의하고 불러오는 과정을 시연하기 위한 자료다.
+`run_seed_only.sql`은 같은 폴더의 다른 SQL 파일을 상대 경로로 읽는다. 파일을 옮기지 말고 저장소 안의 폴더 구조를 유지한다. SQL*Plus를 쓰면 1번은 SQL 파일 경로에서 `@avenue_ddl.sql`, 2번은 `dummy_db` 폴더에서 `@run_seed_only.sql`로 실행한다.
 
-## 먼저 내 상황에 맞는 경로를 고른다
+## 3. 완료 확인
 
-| 상황 | 사용할 경로 | 주의할 점 |
-|---|---|---|
-| 새 개발 스키마에 서비스 테이블과 더미 회원 데이터를 처음 준비 | `avenue_ddl.sql` → `dummy_db/run_seed_only.sql` | 같은 스키마에서 실행한다. DDL 내장 기준 데이터는 유지하고 시드 대상 테이블은 비어 있어야 한다 |
-| 테이블은 이미 최신 DDL로 만들어졌고 시드 대상 테이블이 비어 있음 | `dummy_db/run_seed_only.sql` | 원본 DDL을 다시 실행하지 않는다. 대상 테이블이 없거나 한 곳이라도 데이터가 있으면 시드 실행 전에 중단한다 |
-| 데이터가 있는 기존 DB에 이번 자산·대출 상태 변경만 적용 | [alter_user_asset_snapshot_no_loan.sql](alter_user_asset_snapshot_no_loan.sql) | 테이블·데이터를 유지한다. 기존 행의 새 `NO_LOAN_YN`은 NULL이며 Y/N 보정은 하지 않는다 |
-| 데이터가 있는 기존 DB에 대출 상품 문구 보강만 적용 | [update_loan_product_copy.sql](update_loan_product_copy.sql) | LP001~LP017의 ID·코드 대응을 확인한 뒤 지정 문구와 상품 특징만 갱신한다. 자동 실행 묶음에는 연결하지 않는다 |
-| 데이터가 있는 기존 DB에 산출 불가 사유 `ALT_DATA_EMPTY` 1행만 추가 | [add_not_scorable_reason_alt_data_empty.sql](add_not_scorable_reason_alt_data_empty.sql) | 이미 있으면 넣지 않으므로 다시 실행해도 된다. 새로 DDL을 실행하는 DB에는 필요 없다 |
-| 데이터가 있는 기존 DB에 피처 세트 `FS-V1`(DRAFT)과 모델 버전 `LGBM-BASE-0.1`(CANDIDATE) 추가 | 1단계 [add_fs_v1_feature_set.sql](add_fs_v1_feature_set.sql), 2단계 [seed/avenue_seed_dim_feature_fs_v1.sql](seed/avenue_seed_dim_feature_fs_v1.sql) | 1단계는 이미 있으면 넣지 않아 다시 실행해도 된다. **2단계 `DIM_FEATURE` 38행은 한 번만** 실행한다(다시 실행하면 PK 중복). 서비스는 바뀌지 않는다(ACTIVE 모델은 그대로, 전환은 DB 담당이 따로). 새로 DDL을 실행하는 DB는 `run_seed_only.sql`이 포함한다 |
-| 서비스 모델을 Mock(`DEV-DUMMY`)에서 실제 모델(`LGBM-BASE-0.1`)로 전환 | [activate_model_lgbm_base_0_1.sql](activate_model_lgbm_base_0_1.sql) | **실행 전 FastAPI `/v1/health`가 `"modelLoaded": true`인지 확인**(모델 파일 없이 바꾸면 모든 점수가 503). FS-V1 기준 데이터(위 행)가 없으면 멈추고 아무것도 바꾸지 않는다. 다시 실행해도 된다. 공용 DB는 DB 담당이 팀에 알린 뒤 실행. 절차: `fastapi_server/README.md` 「공용 DB를 실제 모델로 전환하는 절차」 |
-| 실제 모델 전환 뒤 문제가 생겨 Mock으로 되돌리기 | [rollback_model_to_dev_dummy.sql](rollback_model_to_dev_dummy.sql) | 저장된 평가는 지우지 않는다(평가마다 자기 모델 버전이 남음). 다시 실행해도 된다 |
-| 옛 DDL로 만든 DB에서 미사용 상권 테이블 5개 제거 | [drop_unused_market_tables.sql](drop_unused_market_tables.sql) | N-24의 JSON 전환에 따라 상권 전용 표·데이터만 제거한다. 공공통계 표는 유지한다 |
-| 버려도 되는 별도 실험용 스키마를 완전히 초기화 | `dummy_db/run_all.sql` | **대상 테이블을 삭제하고 재생성한 뒤 시드를 적재한다. 기존 데이터가 삭제된다** |
-| 기존 회원 데이터나 시드를 일부 수정·보정 | 담당자와 별도 변경 SQL 검토 | `run_seed_only.sql`은 병합·갱신·재적재 도구가 아니다. `run_all.sql`로 해결하지 않는다 |
-| 모델 학습용 데이터만 받거나 다시 생성 | 학습 데이터·생성 패키지 README | 위 DB 초기화·적재 SQL을 실행할 필요가 없다 |
+- FS-DRAFT 피처 시드: `TOTAL_CNT=39`, `ALT_CNT=20`, `SIM_CNT=9`; FS-V1 38개를 합친 `DIM_FEATURE`는 77행
+- 테이블 수: 47개, `99_check.sql`의 기대 행 수와 실제 행 수 일치
 
-`00_drop_all.sql`, `01_create_tables.sql`, 개별 `10_seed_*.sql`~`25_seed_*.sql`은 묶음의 구성 파일이다. 일반적인 최초 적재는 `run_seed_only.sql`, 전체 초기화는 `run_all.sql`을 사용한다. `init_schema.sql`은 현재 비어 있어 실행 입구로 사용하지 않는다.
+피처 시드 SQL은 2번 파일이 자동 실행하므로 따로 실행하지 않는다. 오류나 불일치가 있으면 재실행·초기화하지 말고 결과를 DB 담당자에게 전달한다.
 
-## 일반적인 최초 준비 순서
+## 다른 상황
 
-1. 대상 Oracle 개발 스키마와 DDL 버전을 확인한다. 기준은 현재 `avenue_ddl.sql`의 Oracle 21c·47개 테이블이다(상권 5개 표 제거·빈 알림 표 추가 후). 이미 사용 중인 DB라면 위 표의 ALTER·보정 경로를 먼저 검토한다.
-2. 빈 스키마에서 원본 `avenue_ddl.sql`을 실행한다. 테이블과 DDL에 내장된 기준 데이터가 생성된다. 최신 구조가 이미 있다면 생략한다.
-3. 같은 스키마에서 `dummy_db/run_seed_only.sql`을 실행한다. SQL Developer의 스크립트 실행(F5) 또는 SQL*Plus에서 해당 파일을 실행하며, 함께 제공된 시드 파일의 상대 위치를 유지한다.
-4. 마지막에 실행되는 `99_check.sql`의 기대·실제 테이블 수와 행 수를 직접 확인한다. 이는 결과 출력이며 모든 불일치를 자동 오류로 바꾸는 검사는 아니다. 생성 당시 기준은 `seed_report.json`에서 확인한다.
-5. 피처 사전 FS-DRAFT 39개와 FS-V1 38개는 `run_seed_only.sql`에서 회원·상품 시드 뒤, `99_check.sql` 전에 자동 적재된다. 전체 초기화 `run_all.sql`에도 같은 순서로 포함된다.
+- 최신 테이블이 있고 시드 대상이 비어 있으면 DDL을 다시 실행하지 말고 `dummy_db/run_seed_only.sql`만 사용한다.
+- 기존 DB의 구조 변경은 해당 변경 SQL만 검토한다. `ALT_DATA_EMPTY` 추가는 [add_not_scorable_reason_alt_data_empty.sql](add_not_scorable_reason_alt_data_empty.sql)을 사용하고, 그 밖의 변경은 [더미 시드 안내](dummy_db/README.md)를 참고한다.
+- 기존 DB에 FS-V1을 추가할 때는 [피처 세트 추가 SQL](add_fs_v1_feature_set.sql) 실행 후 [FS-V1 피처 시드](seed/avenue_seed_dim_feature_fs_v1.sql) 38행을 한 번만 넣는다. ACTIVE 모델은 바뀌지 않는다.
+- `dummy_db/run_all.sql`은 테이블을 삭제한 뒤 다시 만든다. **기존 데이터가 삭제되므로 버려도 되는 별도 스키마에서만 실행한다.**
+- 모델 학습 CSV는 Oracle에 넣지 않는다. 위치와 사용법은 [학습 데이터 안내](../../../fastapi_server/data/README.md)를 참고한다.
+- 실제 모델 전환·복구는 [FastAPI 안내](../../../fastapi_server/README.md)의 공용 DB 전환 절차를 따른다. 전환 전 `/v1/health`에서 `modelLoaded: true`를 확인하고 DB 담당자와 순서를 맞춘다.
 
-생성기는 [seed/avenue_seed_dim_feature_fs_draft.sql](seed/avenue_seed_dim_feature_fs_draft.sql)을 변경 없이 `25_seed_dim_feature_fs_draft.sql`로, [seed/avenue_seed_dim_feature_fs_v1.sql](seed/avenue_seed_dim_feature_fs_v1.sql)을 `26_seed_dim_feature_fs_v1.sql`로 실행 묶음에 포함한다. 사전 검사는 `DIM_FEATURE`도 비어 있는지 확인하므로 기존 피처 행이나 이를 참조하는 평가 요인이 있으면 `run_seed_only.sql`은 중단된다. 평가 요인이 생긴 뒤에는 피처 시드의 DELETE가 FK 오류를 낼 수 있어 시드를 재실행하지 않는다. `99_check.sql`과 `seed_report.json`은 DIM_FEATURE 기대 행 수 77(FS-DRAFT 39 + FS-V1 38)을 표시한다.
+## DDL 변경 시 확인
 
-Oracle DDL과 시드의 중간 COMMIT·IDENTITY 변경은 전체 롤백할 수 없다. `run_seed_only.sql`의 사전 검사도 동시 쓰기를 잠그지 않으므로 적재 중 같은 대상 테이블에 다른 작업이 쓰지 않게 한다. 실패한 경우 무작정 재실행하거나 초기화하지 말고, 어디까지 적용됐는지 먼저 확인한다.
+DDL을 변경하면 `dummy_db/01_create_tables.sql` 사본과 `seed_report.json`의 LF 기준 DDL 해시를 갱신한다. 기준 INSERT나 피처 시드 행 수가 바뀌면 `99_check.sql`과 `seed_report.json`의 기대 행 수도 맞춘다. 피처 시드는 원본과 실행용 사본을 함께 갱신한다. 회원 시드 구조 변경은 생성기 담당자와 상의해 재생성한다.
 
-## 상권 분석은 DB에 적재하지 않는다 (N-24)
-
-C조 담당자의 결정과 사용자 승인에 따라 상권 분석은 DB·API 없이 `frontend/public/data/market/`의 정적 JSON을 읽는다. 매출·점포·생활인구와 지도용 동 좌표·보로노이 다각형도 파일로 제공하며 신용모델에는 넣지 않는다. 이 경로의 파일은 C조 작업 브랜치에서 제공되고, 현재 작업 브랜치에 병합됐는지는 별도로 확인한다.
-
-기준 DDL에서 `DIM_ADM_DONG`, `DIM_SERVICE_CATEGORY`, `FACT_DONG_SALES`, `FACT_DONG_STORE`, `FACT_DONG_LIVING_POP`과 전용 FK·인덱스를 제거했다. C8 지도 코드 열은 추가하지 않는다. `FACT_HFS_STAT`, `FACT_HFS_WORKER_STAT`, `FACT_INDUSTRY_AGE_INCOME`, `FACT_POLICY_RATE`는 다른 기능용이므로 유지한다.
-
-기존 DB의 상권 표는 DDL 파일을 수정해도 자동으로 사라지지 않는다. 전용 삭제 SQL은 수동 적용용이며 `run_all.sql`·`run_seed_only.sql`에 자동 연결하지 않는다. 최신 초기화 묶음은 47개 표를 대상으로 하므로, 옛 상권 표를 제거하려면 전용 SQL을 별도로 실행해야 한다. 실제 Oracle 삭제 확인은 별도다.
-
-## 생성 코드와 설계 근거를 남기는 이유
-
-교육용 프로젝트의 결과물은 데이터 파일뿐 아니라 **어떤 규칙·가정으로 만들었고 어떻게 검증했는지**도 포함한다. 따라서 모델 학습용 생성 코드·설계 문서·데이터 사전·검증기·실험 코드는 저장소에 보존한다. 시연할 때 생성 코드를 지우지 않는다.
-
-사용 준비와 재생성은 다른 작업이다. 일반적인 시연 준비는 전달된 학습 CSV와 준비된 서비스 시드를 사용하고, 전체 데이터 생성·실험을 매번 실행하지 않는다. 재현이나 규칙 변경이 필요한 경우에만 [생성 패키지 README](../../../fastapi_server/data_generation/README.md)의 순서와 검증 절차를 따른다. 이 안내가 자동 실행 기능을 추가하는 것은 아니다.
-
-학습용 생성 결과의 공유·버전은 [데이터 README](../../../fastapi_server/data/README.md)를 따르고, 서비스 시드 재생성과 개발 키 취급은 [더미 시드 README](dummy_db/README.md)를 따른다. 키·비밀번호·개인 설정 파일은 문서나 저장소에 남기지 않는다. 합성 데이터의 성능은 실제 예측력의 근거로 제시하지 않는다.
-
-## 알림 테이블은 빈 구조만 준비한다
-
-회의 결정에 따라 `USER_NOTIFICATION`은 빈 테이블로만 만든다. 알림 시드·API·생성·발송 로직은 추가하지 않는다. 기존 DB에는 [create_user_notification.sql](create_user_notification.sql)을 한 번 실행한다. `APP_USER`가 먼저 있어야 하며, 테이블이 이미 있으면 재실행하지 않는다. 새 스키마에는 기준 DDL에 포함되어 있으므로 별도 실행하지 않는다. 실제 Oracle 적용은 아직 확인하지 않았다.
-
-## DDL을 고칠 때 같이 고칠 것 (체크리스트)
-
-`avenue_ddl.sql`을 한 글자라도 고치면 아래 짝꿍 파일도 **같은 PR에서** 함께 맞춘다. DB 생성 도구 테스트가 DDL의 지문(해시)·행 수를 고정해 두고 비교하기 때문이다. 저장소에 자동 검사(CI)가 없어서, 이 테스트는 누가 직접 돌려야만 실패가 보인다(11/16 DDL 한 줄 변경 두 건이 이 파일들을 놓쳐 테스트가 깨진 뒤 추가).
-
-1. **사본:** `dummy_db/01_create_tables.sql`을 원본과 바이트까지 같게 맞춘다. 확인: `cmp docs/spec/sql/avenue_ddl.sql docs/spec/sql/dummy_db/01_create_tables.sql` (출력이 없으면 같다)
-2. **DDL 지문:** `dummy_db/seed_report.json`의 `ddl_sha256`을 새 값으로 바꾼다. DDL을 고칠 때마다 해당한다. 줄바꿈을 LF로 바꾼 뒤 계산하므로(생성기·테스트 기준, PR #61) PC의 줄바꿈 설정과 관계없이 같은 값이 나온다. 저장소 맨 위에서 아래 명령으로 구한다.
-   ```
-   python -c "import hashlib,pathlib;print(hashlib.sha256(pathlib.Path('docs/spec/sql/avenue_ddl.sql').read_bytes().replace(b'\r\n',b'\n')).hexdigest())"
-   ```
-3. **기준 데이터 INSERT를 더하거나 뺐을 때:** 아래 두 곳을 같은 숫자로 맞춘다. 도구 테스트의 기본 INSERT 총수는 DDL에서 직접 세므로 고칠 필요가 없다.
-   - `dummy_db/99_check.sql`의 그 표 `EXPECTED` 값
-   - `dummy_db/seed_report.json` `rows`의 그 표 값
-4. **피처 사전 시드(`seed/avenue_seed_dim_feature_fs_draft.sql`)를 고칠 때:** 생성기가 이 파일을 그대로 `dummy_db/25_seed_dim_feature_fs_draft.sql`로 복사해 쓰므로 둘을 바이트까지 같게 맞추고, `99_check.sql`·`seed_report.json`의 `DIM_FEATURE` 값도 맞춘다. 생성기는 이 파일이 39행이 아니면 오류를 낸다. 확정 피처 세트(FS-V1 등)는 이 파일을 고치지 말고 **새 파일로 추가**한다. FS-V1은 `seed/avenue_seed_dim_feature_fs_v1.sql`(38행, 사본 `26_seed_dim_feature_fs_v1.sql`)로 추가했고, 생성기(`build_db.py`의 `feature_seeds` 목록)가 두 파일을 읽는다. FS-V2 같은 새 세트도 같은 방식으로 파일과 목록 한 줄을 더하고 `99_check.sql`·`seed_report.json` 값을 맞춘다.
-5. **시드(회원 데이터) 구조가 바뀔 때:** 손으로 고치지 않고 [dummy_db/README.md](dummy_db/README.md)의 `build_db.py`로 다시 만든다. 팀 키 파일이 필요하고 시드 암호문이 전부 바뀌므로 생성기 담당과 먼저 상의한다. DDL 문구나 기준 데이터만 바뀐 경우에는 위 2·3번 값만 고쳐도 생성기 결과와 같다.
-6. **이미 만든 DB용 변경 SQL:** 데이터가 있는 DB에 적용할 `add_*`·`alter_*`·`update_*` SQL을 만들고, 위 「먼저 내 상황에 맞는 경로를 고른다」 표에 한 행을 추가한다.
-7. **확인:** 저장소 맨 위에서 아래를 실행하고 결과를 PR 「테스트 방법」에 적는다.
-   ```
-   python -B -m unittest discover -s docs/spec/sql/dummy_db/tools/tests
-   ```
-   `No module named 'bcrypt'` 오류 1건은 PC 환경 문제다(`fastapi_server/data_generation/requirements.txt` 설치 시 사라짐). 그 밖의 실패가 없어야 한다.
-8. **작업 로그:** DB 변경이므로 `docs/logs/`에 남긴다(AGENTS.md 3-4).
-9. **공용 DB 적용:** 실제 공용 DB에 변경 SQL을 실행하는 일은 DB 담당에게 알려 순서를 맞춘다.
+저장소 루트에서 `python -B -m unittest discover -s docs/spec/sql/dummy_db/tools/tests`를 실행하고, 기존 DB용 변경 SQL과 작업 로그를 함께 준비한다. 공용 DB 적용은 DB 담당자와 순서를 맞춘다.
