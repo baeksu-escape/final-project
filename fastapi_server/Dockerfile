@@ -19,6 +19,7 @@ COPY main.py .
 COPY routers/ routers/
 COPY schemas/ schemas/
 COPY pipeline/ pipeline/
+COPY training/ training/
 COPY artifacts/ artifacts/
 
 EXPOSE 8000

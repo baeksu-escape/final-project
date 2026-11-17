@@ -113,6 +113,8 @@ fastapi_server/artifacts/*.pkl
 fastapi_server/artifacts/*.joblib
 # 학습 스크립트(training/)가 모델 옆에 만드는 설명 파일. 학습할 때마다 바뀌는 생성 파일이라 올리지 않는다
 fastapi_server/artifacts/*.meta.json
+# 모델 묶음과 함께 받는 해시 목록. 서버가 켜질 때 joblib을 열기 전에 대조한다(FP-141). 묶음이 바뀌면 같이 바뀌어 올리지 않는다
+fastapi_server/artifacts/SHA256SUMS.txt
 fastapi_server/data/*
 !fastapi_server/data/README.md
 fastapi_server/data_generation/data/

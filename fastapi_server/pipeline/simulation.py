@@ -2,6 +2,7 @@
 # N-18 신용케어 시뮬레이터: 저장된 평가의 피처값에서 출발해, 화면에서 바꾼 값만 덮어쓰고 다시 계산한다.
 # 결과는 저장하지 않는다(O-9, 11/16 확정).
 # 화면 입력 → 피처 대응은 피처 정의서 8-2와 B팀 명세서 4-4 "키 ↔ 피처" 표를 따른다.
+from pipeline.feature_builder import round_half_up
 from pipeline.feature_catalog import FEATURE_BY_CODE
 from pipeline.mock_scorer import score_features
 
@@ -13,7 +14,7 @@ DIRECT_CHANGES = {
     "NEW_LOAN_COUNT_3M": "L22000900",
     "LOAN_BALANCE_AMT": "debt_balance_krw",
     "PRIVATE_LENDER_LOAN_BALANCE_AMT": "LA0099212",
-    "UTILITY_LATE_MONTHS": "utility_late_months",  # 🟡 10번째 입력 제안 (A-22)
+    "UTILITY_LATE_MONTHS": "utility_late_months",  # 10번째 입력 확정 (11/17, 정의서 C21)
 }
 
 # O-14 회복 점수(11/16 범영 확정): 그 항목을 시뮬레이터 범위 안 가장 좋은 값으로 바꿨을 때의 점수 차이.
@@ -62,12 +63,12 @@ def apply_changes(snapshot: dict, changes: dict) -> dict:
     # 카드 한도·월 사용액 → 사용률(CL0631905). 한도가 0 이하면 점수 계산(feature_builder)과 같은 규칙으로 결측.
     limit, spend = changes.get(CARD_KEYS[0]), changes.get(CARD_KEYS[1])
     if limit is not None and spend is not None:
-        features["CL0631905"] = round(spend / limit * 100, 1) if limit > 0 else None
+        features["CL0631905"] = round_half_up(spend / limit * 100, 1) if limit > 0 else None
     # TODO(정의서 9장) 통신비 정시 납부를 바꿀 때 telecom_late_months도 같이 바꿀지 미정 — 지금은 그대로 둔다.
     return features
 
 
-def _top_reduction_factors(features: dict, result: dict) -> list[dict]:
+def _top_reduction_factors(features: dict, result: dict, scorer=score_features) -> list[dict]:
     """N-18-8 감점 요인 상위 3개: 시뮬레이터에서 바꿀 수 있는 항목 중 shapScore가 가장 낮은(음수) 3개와 회복 점수."""
     current = result["alternative"]["score"]
     candidates = [f for f in result["shap"]["factors"]
@@ -78,17 +79,18 @@ def _top_reduction_factors(features: dict, result: dict) -> list[dict]:
         code = f["featureCode"]
         improved = dict(features)
         improved[code] = BEST_VALUES.get(code, features.get(code))
-        recover = score_features(improved)["alternative"]["score"] - current
+        recover = scorer(improved)["alternative"]["score"] - current
         top.append({"rank": len(top) + 1, "featureCode": code, "featureValue": f["featureValue"],
                     "shapScore": f["shapScore"], "recoverScore": max(0, recover)})
     return top
 
 
-def simulate(snapshot: dict, changes: dict) -> dict:
-    """바꾸기 전·후 점수와 차이. 차이는 금융 이력 영향 + 대안 데이터 영향 = 전체가 되도록 SHAP 차이로 나눈다."""
-    before = score_features(snapshot)
+def simulate(snapshot: dict, changes: dict, scorer=score_features) -> dict:
+    """바꾸기 전·후 점수와 차이. 차이는 금융 이력 영향 + 대안 데이터 영향 = 전체가 되도록 SHAP 차이로 나눈다.
+    scorer는 저장된 평가의 모델 버전으로 고른 계산기다(Mock 또는 실제 모델, FP-141). 응답 모양은 둘이 같다."""
+    before = scorer(snapshot)
     after_features = apply_changes(snapshot, changes)
-    after = score_features(after_features)
+    after = scorer(after_features)
 
     before_by_code = {f["featureCode"]: f["shapScore"] for f in before["shap"]["factors"]}
     financial = alternative = 0
@@ -108,6 +110,6 @@ def simulate(snapshot: dict, changes: dict) -> dict:
         "after": summary(after),
         "delta": {"total": after["alternative"]["score"] - before["alternative"]["score"],
                   "financialEffect": financial, "alternativeEffect": alternative},
-        "topReductionFactors": _top_reduction_factors(after_features, after),
+        "topReductionFactors": _top_reduction_factors(after_features, after, scorer),
         "shap": after["shap"],
     }
