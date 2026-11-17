@@ -25,3 +25,18 @@
 .credit-feature-title { color: var(--mut); font-size: 0.875rem; }
 .credit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .credit-chip--alternative .chip { color: var(--vio); border-color: var(--vio); background: var(--note-bg); }
+.credit-insights { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 16px; align-items: stretch; }
+.credit-summary-card { display: grid; gap: 12px; }
+.credit-summary-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.credit-summary-card__eyebrow { color: var(--mut); font-size: 0.7rem; letter-spacing: 0.08em; }
+.credit-summary-card__header h2 { margin: 4px 0 0; font-size: 1rem; }
+.credit-summary-card__legend { display: grid; gap: 6px; color: var(--mut); font-size: 0.75rem; }
+.credit-summary-card__swatch { display: inline-block; width: 12px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: middle; }
+.credit-summary-card__swatch--positive { background: var(--mint); }
+.credit-summary-card__swatch--negative { background: var(--bad); }
+.credit-summary-card__action { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel2); }
+.credit-summary-card__action p { margin: 0 0 10px; color: var(--mut); font-size: 0.8rem; }
+.credit-summary-card__action a { display: block; padding: 9px 12px; border-radius: 8px; background: var(--mint); color: var(--bg); font-weight: 700; text-align: center; text-decoration: none; }
+@media (max-width: 900px) {
+  .credit-insights { grid-template-columns: minmax(0, 1fr); }
+}

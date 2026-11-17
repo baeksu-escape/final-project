@@ -28,9 +28,4 @@ export const scoredReport = {
   ] },
   aiSummary: null,
   modelVersion: 'DEV-DUMMY',
-  // TODO(RPT-02 미정) 모델별 전체 피처 목록과 지난 평가 대비 변화의 필드명·제공 방식을 협의한다.
-  modelFeatures: {
-    traditional: [{ name: '대출', alternativeYn: 'N' }, { name: '카드', alternativeYn: 'N' }],
-    alternative: [{ name: '대출', alternativeYn: 'N' }, { name: '카드', alternativeYn: 'N' }, { name: '통신비 납부', alternativeYn: 'Y' }],
-  },
 }
