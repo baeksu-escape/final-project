@@ -1,10 +1,8 @@
 import { USE_MOCK } from '../../../common/config/env.js'
 import { simulationExample } from '../mocks/simulationMock.js'
-import { calculateExampleResult } from '../mocks/simulationExampleCalculator.js'
-import { INPUT_KEYS, validateInputs } from '../adapters/simulationAdapter.js'
+import { INPUT_KEYS, toSimulationChanges, validateInputs } from '../adapters/simulationAdapter.js'
 
-// 실제 API 계약(경로·요청·응답 필드)은 아직 정해지지 않았다. 실제 모드에서는 mock으로 넘어가지 않고 오류를 낸다.
-// TODO(N-18 API 계약): 백엔드 경로가 정해지면 apiGet/apiPost로 바꾸고 응답은 adapters/simulationAdapter.js에서 맞춘다.
+// 현재 입력값 조회 API는 아직 구현되지 않아 실제 모드에서는 오류를 낸다.
 
 // N-18-1 회원의 시뮬레이터 입력 10개 현재값, 현재 대안 점수, 감점 상위 3개를 불러온다.
 export async function getSimulationInputs(userId) {
@@ -24,8 +22,25 @@ export async function recalculateSimulation({ userId, currentScore, baseline, va
   const valuesError = validateInputs(values)
   if (valuesError) throw new Error(valuesError)
   if (!hasExactInputKeys(baseline) || validateInputs(baseline)) throw new Error('저장된 내 실제 값이 비었거나 올바르지 않아 시연 계산을 할 수 없습니다.')
-  await new Promise((resolve) => setTimeout(resolve, 200))
-  return calculateExampleResult({ currentScore, baseline: { ...baseline }, values: { ...values } })
+  const response = await recalculateCreditCare({ changes: toSimulationChanges(values, baseline) })
+  const [beforeOffer, afterOffer] = await Promise.all([
+    getScoreBandOfferInfo(response.before.score),
+    getScoreBandOfferInfo(response.after.score),
+  ])
+  const side = (score, offer) => ({
+    score: score.score,
+    gradeCode: score.gradeBandCode,
+    defaultProbability: score.defaultProb,
+    interestRatePct: offer.expectedAvgRate,
+    limitAmount: offer.expectedLimitAmount,
+  })
+  return {
+    current: side(response.before, beforeOffer),
+    changed: side(response.after, afterOffer),
+    financialImpact: response.delta.financialEffect,
+    alternativeImpact: response.delta.alternativeEffect,
+    source: response.modelVersion,
+  }
 }
 
 // 입력 묶음이 정해진 10개 키만 정확히 가졌는지 본다.

@@ -69,9 +69,13 @@ export function adaptSimulationInputs(raw) {
 }
 
 // N-18-5 화면의 camelCase 입력 10개를 FastAPI 재계산 changes 키로 바꾼다.
-export function toSimulationChanges(values) {
+export function toSimulationChanges(values, baseline) {
   if (!values || typeof values !== 'object') throw new Error('시뮬레이션 입력값이 올바르지 않습니다.')
-  return Object.fromEntries(INPUT_KEYS.map((key) => [API_CHANGE_KEYS[key], values[key]]))
+  const keys = INPUT_KEYS.filter((key) => values[key] !== baseline?.[key])
+  if (keys.includes('cardLimitAmount') || keys.includes('cardMonthlyUsage')) {
+    for (const key of ['cardLimitAmount', 'cardMonthlyUsage']) if (!keys.includes(key)) keys.push(key)
+  }
+  return Object.fromEntries(keys.map((key) => [API_CHANGE_KEYS[key], values[key]]))
 }
 
 // 계산 요청 전에 10개 값이 모두 입력됐는지 확인한다. 문제가 있으면 안내 문구를, 없으면 빈 문자열을 돌려준다.
