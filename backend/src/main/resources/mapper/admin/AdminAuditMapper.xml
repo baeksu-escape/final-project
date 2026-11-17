@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-80 N-35 회원 정보 열람·감사 로그(ACCESS_AUDIT_LOG), N-28 로그 조회(SYSTEM_LOG). 두 로그 표는 수정·삭제 금지라 INSERT·SELECT만 둔다. -->
+<mapper namespace="com.baeksuescape.admin.mapper.AdminAuditMapper">
+
+    <!-- N-35-2 열람 기록. 시각은 서버의 서울 시각을 넣는다. -->
+    <insert id="insertAccessAudit">
+        INSERT INTO ACCESS_AUDIT_LOG (VIEWER_USER_ID, TARGET_USER_ID, ACCESS_REASON, ACCESSED_RESOURCE, CLIENT_IP, ACCESSED_AT)
+        VALUES (#{viewerUserId}, #{targetUserId}, #{reason}, #{resource}, #{clientIp,jdbcType=VARCHAR}, #{now})
+    </insert>
+
+    <select id="selectLatestAssessment" resultType="com.baeksuescape.admin.dto.AdminRows$AssessmentData">
+        SELECT REQUEST_ID AS requestId, TRAD_SCORE AS tradScore, ALT_SCORE AS altScore, ALT_GRADE_BAND_CODE AS altGradeBandCode,
+               ASSESSED_AT AS assessedAt
+          FROM ASSESSMENT
+         WHERE USER_ID = #{userId}
+         ORDER BY ASSESSED_AT DESC, ASSESSMENT_ID DESC
+         FETCH FIRST 1 ROWS ONLY
+    </select>
+
+    <select id="selectLatestCreditProfile" resultType="com.baeksuescape.user.dto.DataInputRows$CreditRow">
+        SELECT USER_ID AS userId, BASE_DATE AS baseDate, CREDIT_HISTORY_DAYS AS creditHistoryDays, DELINQ_COUNT_12M AS delinqCount12m,
+               NEW_LOAN_COUNT_3M AS newLoanCount3m, CARD_LIMIT_AMT AS cardLimitAmt, CARD_MONTHLY_SPEND_AMT AS cardMonthlySpendAmt,
+               CARD_UTIL_PCT AS cardUtilPct, CASH_ADVANCE_MONTHS AS cashAdvanceMonths,
+               PRIVATE_LENDER_LOAN_BALANCE_AMT AS privateLenderLoanBalanceAmt, SOURCE_CODE AS sourceCode
+          FROM USER_CREDIT_PROFILE
+         WHERE USER_ID = #{userId}
+         ORDER BY BASE_DATE DESC, CREDIT_PROFILE_ID DESC
+         FETCH FIRST 1 ROWS ONLY
+    </select>
+
+    <!-- 대안 데이터 종류별 불러온 개월 수(값은 보내지 않고 개월 수만) -->
+    <select id="selectAltMonths" resultType="com.baeksuescape.admin.dto.AdminRows$AltMonths">
+        SELECT (SELECT COUNT(DISTINCT BILL_MONTH) FROM USER_TELECOM_PAYMENT WHERE USER_ID = #{userId}) AS telecom,
+               (SELECT COUNT(DISTINCT BILL_MONTH) FROM USER_UTILITY_PAYMENT WHERE USER_ID = #{userId}) AS utility,
+               (SELECT COUNT(DISTINCT BASE_MONTH) FROM USER_EASYPAY_USAGE WHERE USER_ID = #{userId}) AS easypay,
+               (SELECT COUNT(DISTINCT BASE_MONTH) FROM USER_SOCIAL_INSURANCE_PAYMENT
+                 WHERE USER_ID = #{userId} AND INSURANCE_TYPE_CODE = 'NATIONAL_PENSION') AS nationalPension,
+               (SELECT COUNT(DISTINCT BASE_MONTH) FROM USER_SOCIAL_INSURANCE_PAYMENT
+                 WHERE USER_ID = #{userId} AND INSURANCE_TYPE_CODE = 'HEALTH_INSURANCE') AS healthInsurance
+          FROM DUAL
+    </select>
+
+    <!-- ADM-09 열람 감사 로그: FK가 없어 회원 행이 없을 수도 있으므로 LEFT JOIN. RESOURCE는 Oracle 예약어라 별칭을 accessedResource로 쓴다. -->
+    <select id="selectAccessLogs" resultType="com.baeksuescape.admin.dto.AdminRows$AccessLogData">
+        SELECT l.ACCESSED_AT AS accessedAt, v.LOGIN_ID AS viewerLoginId, l.TARGET_USER_ID AS targetUserId,
+               t.LOGIN_ID AS targetLoginId, t.NAME_ENC AS targetNameEnc, l.ACCESS_REASON AS reason, l.ACCESSED_RESOURCE AS accessedResource
+          FROM ACCESS_AUDIT_LOG l
+          LEFT JOIN APP_USER v ON v.USER_ID = l.VIEWER_USER_ID
+          LEFT JOIN APP_USER t ON t.USER_ID = l.TARGET_USER_ID
+         ORDER BY l.ACCESSED_AT DESC, l.AUDIT_ID DESC
+        OFFSET #{offset} ROWS FETCH NEXT #{size} ROWS ONLY
+    </select>
+
+    <select id="countAccessLogs" resultType="long">
+        SELECT COUNT(*) FROM ACCESS_AUDIT_LOG
+    </select>
+
+    <!-- ADM-10 시스템 로그 -->
+    <select id="selectSystemLogs" resultType="com.baeksuescape.admin.dto.AdminRows$SystemLogData">
+        SELECT CREATED_AT AS createdAt, LOG_TYPE_CODE AS logTypeCode, LOG_SOURCE AS logSource, MESSAGE AS message
+          FROM SYSTEM_LOG
+        <where>
+            <if test="type != null">LOG_TYPE_CODE = #{type}</if>
+        </where>
+         ORDER BY CREATED_AT DESC, SYSTEM_LOG_ID DESC
+        OFFSET #{offset} ROWS FETCH NEXT #{size} ROWS ONLY
+    </select>
+
+    <select id="countSystemLogs" resultType="long">
+        SELECT COUNT(*) FROM SYSTEM_LOG
+        <where>
+            <if test="type != null">LOG_TYPE_CODE = #{type}</if>
+        </where>
+    </select>
+</mapper>

@@ -117,11 +117,12 @@ function handleIncomeVolatility() {
 }
 
 // N-21 저장 데이터 기반 현금흐름 전망 mock — 쿼리의 변화율·기간으로 마지막 입력월 다음 달부터 월별 전망을 만든다.
+// query는 공용 mock이 넘기는 URLSearchParams라 get()으로 읽는다(값이 없으면 null → 0).
 function handleCashFlowForecast({ query }) {
-  const incomeChangePercent = Number(query?.incomeChangePercent ?? 0)
-  const expenseChangePercent = Number(query?.expenseChangePercent ?? 0)
-  const loanPaymentChangePercent = Number(query?.loanPaymentChangePercent ?? 0)
-  const requestedMonths = Number(query?.forecastMonths ?? 0)
+  const incomeChangePercent = Number(query?.get('incomeChangePercent') ?? 0)
+  const expenseChangePercent = Number(query?.get('expenseChangePercent') ?? 0)
+  const loanPaymentChangePercent = Number(query?.get('loanPaymentChangePercent') ?? 0)
+  const requestedMonths = Number(query?.get('forecastMonths') ?? 0)
   const forecastMonths = requestedMonths > 0 ? requestedMonths : 6
 
   const { baseMonthlyIncome, monthlyTotalExpense, monthlyLoanPayment } = SAMPLE_CASH_FLOW_BASE

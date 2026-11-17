@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-85 N-05-6 대안 데이터(DDL v0.3.2). 불러온 행은 SOURCE_CODE='IMPORTED', CONSENT_ID 필수(W3), 동의가 끝나면 CONSENT_ID로 지운다(W1). -->
+<mapper namespace="com.baeksuescape.user.mapper.AltDataMapper">
+
+    <!-- 통신비 -->
+    <delete id="deleteImportedTelecom">
+        DELETE FROM USER_TELECOM_PAYMENT WHERE USER_ID = #{userId} AND SOURCE_CODE = 'IMPORTED'
+    </delete>
+
+    <insert id="insertTelecom">
+        INSERT INTO USER_TELECOM_PAYMENT (USER_ID, BILL_MONTH, BILLED_AMT, DUE_DATE, PAID_DATE, PAYMENT_STATUS_CODE, SOURCE_CODE,
+                                          CONSENT_ID, BASE_DATE, CREATED_AT)
+        VALUES (#{userId}, #{billMonth}, #{billedAmt}, #{dueDate}, #{paidDate,jdbcType=DATE}, #{paymentStatusCode}, 'IMPORTED',
+                #{consentId}, #{baseDate}, #{createdAt})
+    </insert>
+
+    <sql id="billColumns">
+        USER_ID AS userId, BILL_MONTH AS billMonth, BILLED_AMT AS billedAmt, DUE_DATE AS dueDate, PAID_DATE AS paidDate,
+        PAYMENT_STATUS_CODE AS paymentStatusCode, CONSENT_ID AS consentId, BASE_DATE AS baseDate, CREATED_AT AS createdAt
+    </sql>
+
+    <select id="selectTelecomByConsent" resultType="com.baeksuescape.user.dto.DataInputRows$BillRow">
+        SELECT <include refid="billColumns"/> FROM USER_TELECOM_PAYMENT WHERE CONSENT_ID = #{consentId} ORDER BY BILL_MONTH
+    </select>
+
+    <!-- 공과금(전기·가스·수도 합계 월 1건) -->
+    <delete id="deleteImportedUtility">
+        DELETE FROM USER_UTILITY_PAYMENT WHERE USER_ID = #{userId} AND SOURCE_CODE = 'IMPORTED'
+    </delete>
+
+    <insert id="insertUtility">
+        INSERT INTO USER_UTILITY_PAYMENT (USER_ID, BILL_MONTH, BILLED_AMT, DUE_DATE, PAID_DATE, PAYMENT_STATUS_CODE, SOURCE_CODE,
+                                          CONSENT_ID, BASE_DATE, CREATED_AT)
+        VALUES (#{userId}, #{billMonth}, #{billedAmt}, #{dueDate}, #{paidDate,jdbcType=DATE}, #{paymentStatusCode}, 'IMPORTED',
+                #{consentId}, #{baseDate}, #{createdAt})
+    </insert>
+
+    <select id="selectUtilityByConsent" resultType="com.baeksuescape.user.dto.DataInputRows$BillRow">
+        SELECT <include refid="billColumns"/> FROM USER_UTILITY_PAYMENT WHERE CONSENT_ID = #{consentId} ORDER BY BILL_MONTH
+    </select>
+
+    <!-- 간편결제 -->
+    <delete id="deleteImportedEasypay">
+        DELETE FROM USER_EASYPAY_USAGE WHERE USER_ID = #{userId} AND SOURCE_CODE = 'IMPORTED'
+    </delete>
+
+    <insert id="insertEasypay">
+        INSERT INTO USER_EASYPAY_USAGE (USER_ID, BASE_MONTH, OBSERVATION_STATUS_CODE, PAYMENT_COUNT, PAYMENT_AMT, ACTIVE_DAYS,
+                                        SOURCE_CODE, CONSENT_ID, BASE_DATE, CREATED_AT)
+        VALUES (#{userId}, #{baseMonth}, #{observationStatusCode}, #{paymentCount,jdbcType=NUMERIC}, #{paymentAmt,jdbcType=NUMERIC},
+                #{activeDays,jdbcType=NUMERIC}, 'IMPORTED', #{consentId}, #{baseDate}, #{createdAt})
+    </insert>
+
+    <select id="selectEasypayByConsent" resultType="com.baeksuescape.user.dto.DataInputRows$EasypayRow">
+        SELECT USER_ID AS userId, BASE_MONTH AS baseMonth, OBSERVATION_STATUS_CODE AS observationStatusCode, PAYMENT_COUNT AS paymentCount,
+               PAYMENT_AMT AS paymentAmt, ACTIVE_DAYS AS activeDays, CONSENT_ID AS consentId, BASE_DATE AS baseDate, CREATED_AT AS createdAt
+          FROM USER_EASYPAY_USAGE
+         WHERE CONSENT_ID = #{consentId}
+         ORDER BY BASE_MONTH
+    </select>
+
+    <!-- 국민연금·건강보험(보험 종류별로 따로 동의·불러오기) -->
+    <delete id="deleteImportedInsurance">
+        DELETE FROM USER_SOCIAL_INSURANCE_PAYMENT
+         WHERE USER_ID = #{userId} AND INSURANCE_TYPE_CODE = #{insuranceTypeCode} AND SOURCE_CODE = 'IMPORTED'
+    </delete>
+
+    <insert id="insertInsurance">
+        INSERT INTO USER_SOCIAL_INSURANCE_PAYMENT (USER_ID, INSURANCE_TYPE_CODE, BASE_MONTH, COVERAGE_STATUS_CODE, PAYER_TYPE_CODE,
+                                                   BILLED_AMT, INDIVIDUAL_AMT, PAID_AMT, DUE_DATE, PAID_DATE, PAYMENT_STATUS_CODE,
+                                                   SOURCE_CODE, CONSENT_ID, BASE_DATE, CREATED_AT)
+        VALUES (#{userId}, #{insuranceTypeCode}, #{baseMonth}, #{coverageStatusCode}, #{payerTypeCode},
+                #{billedAmt,jdbcType=NUMERIC}, #{individualAmt,jdbcType=NUMERIC}, #{paidAmt,jdbcType=NUMERIC},
+                #{dueDate,jdbcType=DATE}, #{paidDate,jdbcType=DATE}, #{paymentStatusCode},
+                'IMPORTED', #{consentId}, #{baseDate}, #{createdAt})
+    </insert>
+
+    <select id="selectInsuranceByConsent" resultType="com.baeksuescape.user.dto.DataInputRows$InsuranceRow">
+        SELECT USER_ID AS userId, INSURANCE_TYPE_CODE AS insuranceTypeCode, BASE_MONTH AS baseMonth,
+               COVERAGE_STATUS_CODE AS coverageStatusCode, PAYER_TYPE_CODE AS payerTypeCode, BILLED_AMT AS billedAmt,
+               INDIVIDUAL_AMT AS individualAmt, PAID_AMT AS paidAmt, DUE_DATE AS dueDate, PAID_DATE AS paidDate,
+               PAYMENT_STATUS_CODE AS paymentStatusCode, CONSENT_ID AS consentId, BASE_DATE AS baseDate, CREATED_AT AS createdAt
+          FROM USER_SOCIAL_INSURANCE_PAYMENT
+         WHERE CONSENT_ID = #{consentId}
+         ORDER BY BASE_MONTH
+    </select>
+
+    <!-- N-05-9 동의 철회(W1): 그 동의로 불러온 행을 표마다 지운다 -->
+    <delete id="deleteTelecomByConsent">
+        DELETE FROM USER_TELECOM_PAYMENT WHERE CONSENT_ID = #{consentId}
+    </delete>
+
+    <delete id="deleteUtilityByConsent">
+        DELETE FROM USER_UTILITY_PAYMENT WHERE CONSENT_ID = #{consentId}
+    </delete>
+
+    <delete id="deleteEasypayByConsent">
+        DELETE FROM USER_EASYPAY_USAGE WHERE CONSENT_ID = #{consentId}
+    </delete>
+
+    <delete id="deleteInsuranceByConsent">
+        DELETE FROM USER_SOCIAL_INSURANCE_PAYMENT WHERE CONSENT_ID = #{consentId}
+    </delete>
+
+    <delete id="deleteLoanByConsent">
+        DELETE FROM USER_LOAN WHERE CONSENT_ID = #{consentId}
+    </delete>
+
+    <delete id="deleteCreditProfileByConsent">
+        DELETE FROM USER_CREDIT_PROFILE WHERE CONSENT_ID = #{consentId}
+    </delete>
+
+    <!-- BORROW 모드 후보 — 같은 직군의 더미 일반 회원 -->
+    <select id="selectDummyUserIds" resultType="java.lang.Long">
+        SELECT USER_ID
+          FROM APP_USER
+         WHERE DUMMY_YN = 'Y'
+           AND ROLE_CODE = 'ROLE_USER'
+           AND WORKER_TYPE_CODE = #{workerTypeCode}
+         ORDER BY USER_ID
+    </select>
+</mapper>

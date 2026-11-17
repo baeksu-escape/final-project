@@ -9,9 +9,10 @@ import {
 } from './simulationMockData.js'
 
 // N-18-7 같은 점수대 금리·한도·추천 대출 상품 조회 (3종 추천) — GET은 쿼리스트링, POST는 본문에서 값을 읽는다.
+// query는 공용 mock이 넘기는 URLSearchParams라 get()으로 읽는다(값이 없으면 null).
 function handleLoanRecommend({ body, query }) {
-  const score = Number(query?.score ?? body?.score ?? 680)
-  const jobType = query?.jobType ?? body?.jobType ?? 'FREELANCER'
+  const score = Number(query?.get('score') ?? body?.score ?? 680)
+  const jobType = query?.get('jobType') ?? body?.jobType ?? 'FREELANCER'
   const band = getScoreBandOffer(score)
 
   // 해당 직군과 점수대에 맞는 상품을 우선 선별하고 3종을 맞춘다.
@@ -105,8 +106,9 @@ function handleCreditCareRecalculate({ body }) {
 
 // N-18-7 같은 점수대 참고 금리·한도 mock — 백엔드와 같이 점수가 0~1000 밖이면 400을 낸다.
 function handleScoreBandOffer({ query }) {
-  const score = Number(query?.score)
-  if (query?.score === undefined || !Number.isInteger(score) || score < 0 || score > 1000) {
+  const rawScore = query?.get('score') ?? null
+  const score = Number(rawScore)
+  if (rawScore === null || rawScore === '' || !Number.isInteger(score) || score < 0 || score > 1000) {
     throw new ApiError(400, '점수는 0~1000 사이여야 합니다.')
   }
   const band = SCORE_BAND_OFFER_ROWS.find((row) => score >= row.minScore && score <= row.maxScore)

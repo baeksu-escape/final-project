@@ -41,7 +41,7 @@ export default function JobSelectPage() {
     <section className="job-select-page">
       <h1 className="job-select-page__title">직군 선택</h1>
       <p className="job-select-page__message">
-        직군에 따라 입력 항목과 진단 화면이 달라집니다. 지금 소득을 얻는 방식에 가장 가까운 직군을 골라 주세요.
+        직군에 따라 소득 입력 항목이 달라집니다. 지금 소득을 얻는 방식에 가장 가까운 직군을 골라 주세요.
       </p>
       <form className="job-select-form" onSubmit={handleSubmit}>
         <fieldset className="job-select-form__options">

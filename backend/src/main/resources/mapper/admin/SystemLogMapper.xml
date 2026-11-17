@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-80 N-28-1 시스템 로그 저장 (SYSTEM_LOG, DDL v0.3.2 W6). 수정·삭제 금지라 INSERT만 둔다. 시각은 서버의 서울 시각을 넣는다. -->
+<mapper namespace="com.baeksuescape.global.log.SystemLogMapper">
+
+    <insert id="insertLog">
+        INSERT INTO SYSTEM_LOG (LOG_TYPE_CODE, LOG_SOURCE, MESSAGE, ACTOR_USER_ID, CREATED_AT)
+        VALUES (#{type}, #{source}, #{message}, #{actorUserId,jdbcType=NUMERIC}, #{now})
+    </insert>
+</mapper>
