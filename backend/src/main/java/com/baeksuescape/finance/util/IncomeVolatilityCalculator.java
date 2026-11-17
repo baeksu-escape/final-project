@@ -35,8 +35,8 @@ public final class IncomeVolatilityCalculator {
     // N-22-3 변동성 지표 기초 값 (평균·변동계수·소득 0원 달 수)
     // =========================================================================
 
-    /** summarizeIncomes()의 결과: 평균(소수 2자리), 변동계수(%, 소수 2자리), 12% 초과 여부, 소득 0원 달 수 */
-    private record IncomeSummary(BigDecimal mean, BigDecimal cv, boolean highVolatility, int zeroIncomeMonthsCount) {
+    /** summarizeIncomes()의 결과: 평균(소수 2자리), 표준편차(소수 2자리), 변동계수(%, 소수 2자리), 12% 초과 여부, 소득 0원 달 수 */
+    private record IncomeSummary(BigDecimal mean, BigDecimal stdDev, BigDecimal cv, boolean highVolatility, int zeroIncomeMonthsCount) {
     }
 
     /**
@@ -71,7 +71,7 @@ public final class IncomeVolatilityCalculator {
             cv = stdDev.multiply(BigDecimal.valueOf(100)).divide(mean, 2, RoundingMode.HALF_UP);
         }
         boolean highVolatility = cv.compareTo(HIGH_VOLATILITY_THRESHOLD_CV) > 0;
-        return new IncomeSummary(mean, cv, highVolatility, zeroCount);
+        return new IncomeSummary(mean, stdDev, cv, highVolatility, zeroCount);
     }
 
     // =========================================================================
@@ -221,6 +221,7 @@ public final class IncomeVolatilityCalculator {
                 .meanIncome(meanLong)
                 .medianIncome(calculateMedianIncome(sortedList))
                 .incomeCv(summary.cv().doubleValue())
+                .standardDeviation(summary.stdDev().doubleValue())
                 .isHighVolatility(summary.highVolatility())
                 .fixedExpenseToLowestIncomeRatio(fixedExpenseRatio)
                 .zeroIncomeMonthsCount(summary.zeroIncomeMonthsCount())
@@ -289,16 +290,34 @@ public final class IncomeVolatilityCalculator {
             double loanPaymentChangePercent,
             int forecastMonths,
             YearMonth startForecastMonth) {
+        return forecastCashFlow(pastHistory, baseIncome, baseFixedExpense, baseLoanPayment, incomeChangePercent,
+                expenseChangePercent, loanPaymentChangePercent, forecastMonths, startForecastMonth, null);
+    }
+
+    /**
+     * N-21-2 소득 변동 폭을 함께 받는 현금흐름 전망. incomeVariationPct가 있으면 달마다
+     * 전망 소득 = 기준(평균) 소득 + (과거 같은 달 소득 − 기준 소득) × 변동 폭% 로 계절 패턴을 반영한다(0%면 매달 평균, 100%면 과거 패턴 그대로).
+     * null이면 매달 기준 소득을 쓴다. 그 뒤에 소득 변화율(%)을 곱한다.
+     */
+    public static CashFlowForecastResponse forecastCashFlow(
+            List<MonthlyIncomeItem> pastHistory,
+            long baseIncome,
+            long baseFixedExpense,
+            long baseLoanPayment,
+            double incomeChangePercent,
+            double expenseChangePercent,
+            double loanPaymentChangePercent,
+            int forecastMonths,
+            YearMonth startForecastMonth,
+            Integer incomeVariationPct) {
 
         // 1) 과거 12개월 기준 값: 적자 달 수(N-21-6), 성수기·비수기 격차(N-21-7)
         int pastDeficits = countPastDeficitMonths(pastHistory);
         PeakOffPeakResult peakOffPeak = calculatePeakOffPeakGap(pastHistory);
 
-        // 2) 변화율 적용: 예) 소득 -10%면 기준 소득 × 0.9. 원 단위로 반올림한다.
-        long forecastMonthlyIncome = Math.round(baseIncome * (1.0 + incomeChangePercent / 100.0));
+        // 2) 변화율 적용: 예) 지출 +5%면 기준 지출 × 1.05. 원 단위로 반올림한다. 소득은 달마다 3)에서 구한다.
         long forecastMonthlyExpense = Math.round(baseFixedExpense * (1.0 + expenseChangePercent / 100.0));
         long forecastMonthlyLoan = Math.round(baseLoanPayment * (1.0 + loanPaymentChangePercent / 100.0));
-        long monthlyNetCash = forecastMonthlyIncome - (forecastMonthlyExpense + forecastMonthlyLoan);
 
         // 3) 시작월부터 전망 기간만큼 월별 항목을 만들고, 누적 잉여와 가장 빠듯한 달(순현금 최소)을 함께 구한다.
         List<MonthlyForecastItem> forecastItems = new ArrayList<>();
@@ -309,6 +328,9 @@ public final class IncomeVolatilityCalculator {
         for (int i = 0; i < forecastMonths; i++) {
             YearMonth targetMonth = startForecastMonth.plusMonths(i);
             String monthStr = targetMonth.toString();
+            long monthIncome = seasonalIncome(pastHistory, baseIncome, targetMonth, incomeVariationPct);
+            long forecastMonthlyIncome = Math.round(monthIncome * (1.0 + incomeChangePercent / 100.0));
+            long monthlyNetCash = forecastMonthlyIncome - (forecastMonthlyExpense + forecastMonthlyLoan);
             boolean isDeficit = monthlyNetCash < 0;
 
             forecastItems.add(MonthlyForecastItem.builder()
@@ -340,6 +362,23 @@ public final class IncomeVolatilityCalculator {
                 .totalAccumulatedSurplus(totalSurplus)
                 .months(toPastMonths(pastHistory))
                 .build();
+    }
+
+    /**
+     * N-21-2 한 전망 달의 소득. 변동 폭이 없으면 기준 소득, 있으면 기준 + (과거 같은 달(1~12월이 같은 달) 소득 − 기준) × 변동 폭%.
+     * 과거에 같은 달이 없으면 기준 소득을 쓰고, 0원 아래로는 내려가지 않는다(화면 mock과 같은 규칙).
+     */
+    private static long seasonalIncome(List<MonthlyIncomeItem> pastHistory, long baseIncome, YearMonth targetMonth,
+                                       Integer incomeVariationPct) {
+        if (incomeVariationPct == null || pastHistory == null) {
+            return baseIncome;
+        }
+        long sameMonthIncome = pastHistory.stream()
+                .filter(item -> item.toYearMonth().getMonthValue() == targetMonth.getMonthValue())
+                .mapToLong(MonthlyIncomeItem::getIncome)
+                .findFirst()
+                .orElse(baseIncome);
+        return Math.round(Math.max(0, baseIncome + (sameMonthIncome - baseIncome) * incomeVariationPct / 100.0));
     }
 
     /** N-21-9 계산에 쓴 과거 이력을 화면이 이어 그릴 과거 월 실적(오래된 달 → 최근 달)으로 바꾼다. 이력이 없으면 빈 목록이다. */

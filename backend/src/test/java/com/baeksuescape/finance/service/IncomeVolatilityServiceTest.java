@@ -19,6 +19,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -241,6 +243,9 @@ class IncomeVolatilityServiceTest {
         assertEquals(1889548L - 1315514L - 200000L, first.getNetCashFlow());
         assertEquals(3884117L - 1327643L, response.getPeakOffPeakGap(), "N-21-7은 N-22-4와 같은 격차여야 한다.");
 
+        // 고정지출을 따로 보내지 않았으므로 저장된 고정지출(FIXED)은 읽지 않는다.
+        verify(mapper, never()).selectLatestFixedExpense(2L);
+
         // N-21-9 과거 월 실적: 저장된 12개월 소득 그대로, 지출은 월 지출 합계(매달 같은 값)
         assertEquals(12, response.getMonths().size());
         assertEquals("2025-09", response.getMonths().get(0).getBaseMonth());
@@ -248,5 +253,45 @@ class IncomeVolatilityServiceTest {
         assertEquals(1315514L, response.getMonths().get(0).getExpenseAmount());
         assertEquals("2026-08", response.getMonths().get(11).getBaseMonth());
         assertEquals(2061303L, response.getMonths().get(11).getIncomeAmount());
+    }
+
+    @Test
+    @DisplayName("N-21-2 화면 조건: 소득 변동 폭 100%면 과거 같은 달 소득, 고정지출을 보내면 FIXED 자리만 그 값으로 바꾼다")
+    void testForecastSavedCashFlow_screenConditions() {
+        when(mapper.selectRecentIncomeMonths(2L)).thenReturn(freelancerRows());
+        when(mapper.selectLatestTotalExpense(2L)).thenReturn(1500000L);   // 고정 1,315,514 + 기타 184,486
+        when(mapper.selectLatestFixedExpense(2L)).thenReturn(1315514L);
+        when(mapper.selectLatestLoanMonthlyPayment(2L)).thenReturn(200000L);
+
+        CashFlowConditionRequest condition = CashFlowConditionRequest.builder()
+                .forecastMonths(3)
+                .incomeVariationPct(100)
+                .fixedExpenseAmount(1000000L)
+                .paymentStatus("DELAYED")
+                .build();
+        CashFlowForecastResponse response = service.forecastSavedCashFlow(2L, condition);
+
+        // 전망 2026-09·10·11 → 과거 2025-09·10·11 소득 그대로(변동 폭 100%)
+        assertEquals(1933611L, response.getMonthlyForecasts().get(0).getForecastIncome());
+        assertEquals(1341079L, response.getMonthlyForecasts().get(1).getForecastIncome());
+        assertEquals(3884117L, response.getMonthlyForecasts().get(2).getForecastIncome());
+        // 월 지출 = 입력 고정지출 100만 + (지출 합계 150만 − 저장 고정지출 1,315,514) = 1,184,486
+        assertEquals(1184486L, response.getMonthlyForecasts().get(0).getForecastExpense());
+        // 과거 실적의 지출은 저장값(월 지출 합계) 그대로다.
+        assertEquals(1500000L, response.getMonths().get(0).getExpenseAmount());
+    }
+
+    @Test
+    @DisplayName("N-21-2 화면 조건 범위 밖이면 400 INVALID_INPUT이고 DB를 읽기 전에 막는다")
+    void testForecastSavedCashFlow_invalidScreenConditions() {
+        assertInvalid(() -> service.forecastSavedCashFlow(2L,
+                CashFlowConditionRequest.builder().incomeVariationPct(201).build()), "incomeVariationPct");
+        assertInvalid(() -> service.forecastSavedCashFlow(2L,
+                CashFlowConditionRequest.builder().incomeVariationPct(-1).build()), "incomeVariationPct");
+        assertInvalid(() -> service.forecastSavedCashFlow(2L,
+                CashFlowConditionRequest.builder().fixedExpenseAmount(-1L).build()), "fixedExpenseAmount");
+        assertInvalid(() -> service.forecastSavedCashFlow(2L,
+                CashFlowConditionRequest.builder().paymentStatus("LATE").build()), "paymentStatus");
+        verifyNoInteractions(mapper);
     }
 }
