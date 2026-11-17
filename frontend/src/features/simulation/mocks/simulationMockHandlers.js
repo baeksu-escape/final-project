@@ -6,6 +6,10 @@ import {
   getScoreBandOffer,
   SCORE_BAND_OFFER_BASE_DATE,
   SCORE_BAND_OFFER_ROWS,
+  SIMULATION_BASE_ASSESSMENT,
+  SIMULATION_CARD,
+  SIMULATION_DEFAULT_PROB,
+  SIMULATION_FEATURES,
 } from './simulationMockData.js'
 
 // N-18-7 같은 점수대 금리·한도·추천 대출 상품 조회 (3종 추천) — GET은 쿼리스트링, POST는 본문에서 값을 읽는다.
@@ -44,63 +48,124 @@ function handleLoanRecommend({ body, query }) {
   }
 }
 
-// N-18-5 시뮬레이터 행동값 9개 기반 점수 재계산 mock
+// N-18-5·8 ML-04 changes에 쓰는 키 10개. 이 밖의 키는 오타일 수 있어 오류로 알려 준다(ML-04와 같은 규칙).
+const SIMULATION_CHANGE_KEYS = new Set([
+  ...SIMULATION_FEATURES.map((feature) => feature.key),
+  SIMULATION_CARD.limitKey,
+  SIMULATION_CARD.spendKey,
+])
+
+// 점수가 속한 등급(CUT-0.1)과 부도 확률 예시를 ML-04 before·after 모양으로 만든다.
+function summarizeScore(score) {
+  const gradeBandCode = SCORE_BAND_OFFER_ROWS.find((row) => score >= row.minScore && score <= row.maxScore).gradeBand
+  return { score, gradeBandCode, defaultProb: SIMULATION_DEFAULT_PROB[gradeBandCode] }
+}
+
+// 피처 하나의 mock 감점: 가장 좋은 값에서 떨어진 만큼 음수로 깎는다.
+function penaltyOf(value, best, pointPerUnit) {
+  return -Math.abs(value - best) * pointPerUnit
+}
+
+// ML-04 validate_changes와 같은 검사 — 모르는 키, 숫자가 아닌 값, 카드 한도·사용액 한쪽만 보낸 경우를 fieldErrors로 모은다. null은 "바꾸지 않음"이다.
+function validateSimulationChanges(changes) {
+  const fieldErrors = Object.keys(changes)
+    .sort()
+    .filter((key) => !SIMULATION_CHANGE_KEYS.has(key))
+    .map((key) => ({ field: `changes.${key}`, message: '모르는 항목입니다.' }))
+  Object.entries(changes).forEach(([key, value]) => {
+    if (SIMULATION_CHANGE_KEYS.has(key) && value !== null && !Number.isFinite(Number(value))) {
+      fieldErrors.push({ field: `changes.${key}`, message: '숫자를 입력해 주세요.' })
+    }
+  })
+  const hasLimit = changes[SIMULATION_CARD.limitKey] != null
+  const hasSpend = changes[SIMULATION_CARD.spendKey] != null
+  if (hasLimit !== hasSpend) {
+    fieldErrors.push({ field: `changes.${SIMULATION_CARD.limitKey}`, message: '카드 한도와 월 카드 사용액은 함께 보내야 합니다.' })
+  }
+  return fieldErrors
+}
+
+// 카드 한도 사용률(%) = 월 사용액 ÷ 한도 × 100, 소수 첫째 자리. 한도가 0 이하면 결측(null)이다(ML-04와 같은 규칙).
+function cardUtilization(limit, spend) {
+  return limit > 0 ? Math.round((spend / limit) * 1000) / 10 : null
+}
+
+// N-18-5·8 시뮬레이터 점수 재계산 mock (SIM-02, Spring 미구현) — 응답은 ML-04 모양(requestId·shap 제외, featureName 추가)이다.
+// 출발 평가 예시(588점)에 바꾼 값을 덮어써 간단한 규칙으로 점수를 다시 낸다. 진짜 모델 점수가 아니다.
 function handleCreditCareRecalculate({ body }) {
-  const currentScore = Number(body?.currentScore ?? 680)
-  const telecomMonths = Number(body?.telecomPaymentMonths ?? 12)
-  const delinquency1y = Number(body?.delinquencyCount1y ?? 0)
-  const monthlyCardSpend = Number(body?.monthlyCardSpend ?? 1000000)
-  const cardLimit = Number(body?.creditCardLimit ?? 5000000)
+  const changes = body?.changes ?? {}
+  const fieldErrors =
+    typeof changes === 'object' && !Array.isArray(changes)
+      ? validateSimulationChanges(changes)
+      : [{ field: 'changes', message: '바꾼 값 목록이 필요합니다.' }]
+  if (fieldErrors.length > 0) {
+    const message = '입력값을 확인해 주세요.'
+    throw new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors })
+  }
 
-  // 행동 개선에 따른 mock 점수 변동 계산
-  let scoreDiff = 0
-  if (telecomMonths >= 24) scoreDiff += 15
-  else if (telecomMonths >= 12) scoreDiff += 8
+  // 1) 피처마다 바꾸기 전·후 감점을 구한다. 값이 없는(null) 키는 출발 값을 그대로 쓴다.
+  const rows = SIMULATION_FEATURES.map((feature) => {
+    const value = changes[feature.key] != null ? Number(changes[feature.key]) : feature.base
+    return {
+      featureCode: feature.featureCode,
+      featureName: feature.featureName,
+      alternative: feature.alternative,
+      featureValue: value * (feature.featureScale ?? 1),
+      beforePenalty: penaltyOf(feature.base, feature.best, feature.pointPerUnit),
+      afterPenalty: penaltyOf(value, feature.best, feature.pointPerUnit),
+    }
+  })
 
-  if (delinquency1y === 0) scoreDiff += 12
-  else scoreDiff -= delinquency1y * 10
+  // 2) 카드는 한도·사용액 두 값으로 사용률을 다시 계산한다. 사용률이 결측이면 점수 영향은 0으로 둔다.
+  const card = SIMULATION_CARD
+  const baseUtilization = cardUtilization(card.baseLimit, card.baseSpend)
+  const cardChanged = changes[card.limitKey] != null
+  const utilization = cardChanged
+    ? cardUtilization(Number(changes[card.limitKey]), Number(changes[card.spendKey]))
+    : baseUtilization
+  const cardBeforePenalty = penaltyOf(baseUtilization, card.best, card.pointPerUnit)
+  rows.push({
+    featureCode: card.featureCode,
+    featureName: card.featureName,
+    alternative: false,
+    featureValue: utilization,
+    beforePenalty: cardBeforePenalty,
+    afterPenalty: utilization === null ? cardBeforePenalty : penaltyOf(utilization, card.best, card.pointPerUnit),
+  })
 
-  const cardUsageRatio = cardLimit > 0 ? (monthlyCardSpend / cardLimit) * 100 : 50
-  if (cardUsageRatio < 30) scoreDiff += 10
-  else if (cardUsageRatio > 70) scoreDiff -= 15
+  // 3) 점수 차이를 금융 이력 영향과 대안 데이터 영향으로 나눈다(N-18-5). 0~1000을 넘으면 자르고, 두 영향을 같은 비율로 줄인다.
+  const effectOf = (isAlternative) =>
+    rows
+      .filter((row) => row.alternative === isAlternative)
+      .reduce((sum, row) => sum + (row.afterPenalty - row.beforePenalty), 0)
+  const rawFinancial = effectOf(false)
+  const rawTotal = rawFinancial + effectOf(true)
+  const beforeScore = SIMULATION_BASE_ASSESSMENT.score
+  const afterScore = Math.min(1000, Math.max(0, Math.round(beforeScore + rawTotal)))
+  const total = afterScore - beforeScore
+  const financialEffect = rawTotal === 0 ? 0 : Math.round((rawFinancial * total) / rawTotal)
 
-  // 점수 범위 300~900 제한
-  const expectedScore = Math.min(900, Math.max(300, currentScore + scoreDiff))
-  const currentBand = getScoreBandOffer(currentScore).gradeBand
-  const expectedBand = getScoreBandOffer(expectedScore).gradeBand
+  // 4) N-18-8 바꾼 뒤에도 남은 감점이 큰 항목 3개와, 그 항목을 가장 좋은 값으로 바꿨을 때의 회복 점수. 값이 결측인 항목은 뺀다.
+  const topReductionFactors = rows
+    .filter((row) => row.featureValue !== null && Math.round(row.afterPenalty) < 0)
+    .sort((a, b) => a.afterPenalty - b.afterPenalty || a.featureName.localeCompare(b.featureName))
+    .slice(0, 3)
+    .map((row, index) => ({
+      rank: index + 1,
+      featureCode: row.featureCode,
+      featureName: row.featureName,
+      featureValue: row.featureValue,
+      shapScore: Math.round(row.afterPenalty),
+      recoverScore: Math.min(Math.round(-row.afterPenalty), 1000 - afterScore),
+    }))
 
   return {
-    currentScore,
-    currentGradeBand: currentBand,
-    expectedScore,
-    expectedGradeBand: expectedBand,
-    scoreDiff,
-    modelRecalculatedDiff: Math.round(scoreDiff * 0.7),
-    altDataBonusDiff: Math.round(scoreDiff * 0.3),
-    expectedDefaultRate: expectedScore >= 780 ? 0.021 : expectedScore >= 665 ? 0.075 : 0.21,
-    topReductionFactors: [
-      {
-        factorName: '카드 한도 소진율',
-        currentValue: `${Math.round(cardUsageRatio)}%`,
-        reductionScore: cardUsageRatio > 50 ? -15 : -5,
-        actionCondition: '월 카드 사용액을 한도의 30% 이하로 유지',
-        recoverScore: 10,
-      },
-      {
-        factorName: '통신비 연속 납부',
-        currentValue: `${telecomMonths}개월`,
-        reductionScore: telecomMonths < 24 ? -10 : 0,
-        actionCondition: '통신비 12개월 이상 정시 납부 지속',
-        recoverScore: 8,
-      },
-      {
-        factorName: '간편결제 이용 실적',
-        currentValue: `${body?.easypayMonthlyCount ?? 10}건`,
-        reductionScore: -6,
-        actionCondition: '간편결제 월 15건 이상 성실 이용',
-        recoverScore: 6,
-      },
-    ],
+    modelVersion: SIMULATION_BASE_ASSESSMENT.modelVersion,
+    cutoffVersion: SIMULATION_BASE_ASSESSMENT.cutoffVersion,
+    before: summarizeScore(beforeScore),
+    after: summarizeScore(afterScore),
+    delta: { total, financialEffect, alternativeEffect: total - financialEffect },
+    topReductionFactors,
   }
 }
 

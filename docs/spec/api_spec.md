@@ -2,7 +2,8 @@
 
 > 팀이 합의한 API 요청·응답 형식을 기능(N-ID)별로 적는다. 아래 양식은 FP-203을 처음 쓰면서 제안한 것이다. 바꿔도 된다.
 >
-> - **공통 응답 형식(D-20)은 미정이다.** 지금은 응답 본문을 감싸지 않고 그대로 보낸다.
+> - 성공 응답은 본문을 감싸지 않고 그대로 보낸다. **오류 응답은 백엔드 공통 형식 `{ "code", "message", "fieldErrors": [{ "field", "message" }] }`이다**(`global/exception`, `backend/README.md`). decisions.md D-20은 아직 "미정"으로 적혀 있어 문서 담당 확인이 필요하다.
+> - 오류 코드: 입력 오류 `400 INVALID_INPUT`(어느 칸인지 `fieldErrors`에 담는다), 자료 없음 `404 NOT_FOUND`.
 > - 금액은 원 단위 정수, 비율은 % 단위 소수(소수 둘째 자리), 기준월은 `"YYYY-MM"` 문자열이다.
 > - Java DTO의 `boolean isXxx` 필드는 JSON에서 **`is`가 빠진 `xxx`**로 나간다(Lombok·Jackson 규칙). 예: `isHighVolatility` → `highVolatility`.
 
@@ -20,9 +21,9 @@
 - **화면은 GET을 쓴다.** POST는 FP-183에서 만든 계산 전용 경로로, 지우지 않고 남겨 둔다.
 - `userId`는 로그인(JWT)이 생기기 전까지 쓰는 **임시 쿼리**다. 로그인 연동 후에는 토큰에서 회원을 찾으며, 이 값은 없어진다(`TODO(로그인 연동)`).
 - 오류:
-  - 저장된 소득이 없으면 `404`
-  - `userId`가 없거나 숫자가 아니면 `400`
-  - 본문 형식은 Spring 기본값이다(D-20 미정).
+  - 저장된 소득이 없으면 `404 NOT_FOUND`
+  - `userId`가 없거나 숫자가 아니면 `400 INVALID_INPUT`
+  - 본문은 위의 공통 오류 형식이다.
 
 ### 계산에 쓰는 저장 데이터
 
@@ -160,7 +161,7 @@
 - 두 API 모두 **DB를 읽지 않고 받은 값으로 계산만** 한다. 저장 데이터 조회 연결(N-16·N-20 "저장 데이터 조회")은 후속 작업이다.
 - 상환 부담률(N-16-1)과 DSR(N-20-4)은 백엔드 `FinancialHealthCalculator.calculateRepaymentBurdenRatio()` **함수 하나를 함께 쓴다**.
 - 비율은 `금액 ÷ 기준 × 100`이다. BigDecimal로 계산해 소수 둘째 자리에서 반올림(HALF_UP)한다.
-- 오류: 금액이 음수이면 `400`이다. DSR API는 연소득이 0이어도 `400`이다(본문 형식은 D-20 미정).
+- 오류: 금액이 음수이면 `400 INVALID_INPUT`이고 `fieldErrors[0].field`에 그 필드 이름(예: `totalAsset`)이 담긴다. DSR API는 연소득이 0이어도 `400`이다(`field`: `annualIncome`).
 
 ### 위험 단계 기준 (기준 **이상**이면 그 단계, 설정 상수)
 
@@ -260,8 +261,8 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 - 기존 프론트 mock `GET /api/simulation/loans/recommend`(금리·한도 + 상품)는 A조 몫으로 그대로 둔다.
 - 금리·한도는 **더미 데이터**다. 화면에는 "같은 점수대의 참고 정보"로만 보여 준다(`dummyNotice`가 항상 `true`).
 - 오류:
-  - `score`가 없거나 숫자가 아니거나 0~1000 밖이면 `400`
-  - 맞는 점수대·등급 자료가 없으면(시드 미적재 등) `404`
+  - `score`가 없거나 숫자가 아니거나 0~1000 밖이면 `400 INVALID_INPUT`(범위 밖이면 `fieldErrors`에 `score`)
+  - 맞는 점수대·등급 자료가 없으면(시드 미적재 등) `404 NOT_FOUND`
 
 응답 `200`:
 
@@ -296,3 +297,39 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 ```
 
 프론트: `features/simulation/api/simulationApi.js`의 `getScoreBandOfferInfo(score)`. mock은 시드와 같은 3개 점수대 값을 돌려준다.
+
+## N-18-5·8 시뮬레이터 점수 재계산 (SIM-02, 담당 광희) — 🟡 제안, Spring 미구현
+
+> 지금은 프론트 mock만 있다. Spring은 B조 ML-04(`POST /v1/assessments/simulate`, B팀 명세서 4-4)를 불러 이 모양으로 바꿔 돌려줄 예정이다.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| POST | `/api/simulation/credit-care/recalculate` | 로그인 회원의 최근 평가에서 출발해 바꾼 값으로 점수를 다시 구한다(저장 안 함) |
+
+요청: 회원·출발 평가는 Spring이 로그인 정보로 찾는다. 화면은 바꾼 값만 보낸다.
+```json
+{ "changes": { "TELECOM_ON_TIME_MONTHS": 12, "CARD_LIMIT_AMT": 5000000, "CARD_MONTHLY_SPEND_AMT": 1000000 } }
+```
+- 키 10개(ML-04와 같음): `TELECOM_ON_TIME_MONTHS`, `DELINQ_COUNT_12M`, `CASH_ADVANCE_MONTHS`, `NEW_LOAN_COUNT_3M`, `LOAN_BALANCE_AMT`, `PRIVATE_LENDER_LOAN_BALANCE_AMT`, `UTILITY_LATE_MONTHS`(🟡 A-22 제안), `EASYPAY_MONTHLY_COUNT`, `CARD_LIMIT_AMT`, `CARD_MONTHLY_SPEND_AMT`
+- 값이 `null`이거나 키가 없으면 바꾸지 않는다.
+- 카드 한도·월 사용액은 함께 보낸다. 한도가 0이면 오류가 아니라 카드 사용률을 결측으로 계산한다.
+
+응답 200: ML-04 응답에서 `requestId`·`shap`을 빼고, 감점 요인에 `featureName`(DIM_FEATURE)을 더한다.
+```json
+{
+  "modelVersion": "DEV-DUMMY",
+  "cutoffVersion": "CUT-0.1",
+  "before": { "score": 588, "gradeBandCode": "CAUTION", "defaultProb": 0.21 },
+  "after":  { "score": 618, "gradeBandCode": "CAUTION", "defaultProb": 0.21 },
+  "delta":  { "total": 30, "financialEffect": 16, "alternativeEffect": 14 },
+  "topReductionFactors": [
+    { "rank": 1, "featureCode": "CL0631905", "featureName": "카드 한도 사용률", "featureValue": 60.0, "shapScore": -12, "recoverScore": 12 }
+  ]
+}
+```
+- `delta.total = financialEffect + alternativeEffect` (N-18-5 "금융 이력 영향"과 "대안 데이터 영향").
+- `defaultProb`는 그대로 내려준다. 화면 표시 여부는 N-18-6 미정(D2)이다.
+
+오류 400 `INVALID_INPUT`: 모르는 키는 `changes.<키>` "모르는 항목입니다.", 카드 한쪽만 보내면 `changes.CARD_LIMIT_AMT`. ML-04의 422를 Spring이 공통 형식(400)으로 바꾼다.
+
+프론트: `features/simulation/api/simulationApi.js`의 `recalculateCreditCare({ changes })`. mock은 588점 예시에서 간단한 규칙으로 계산한다(진짜 모델 아님).

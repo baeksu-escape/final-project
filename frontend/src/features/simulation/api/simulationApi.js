@@ -19,7 +19,8 @@ export function recommendLoans(score, jobType) {
   return apiGet(`${SIMULATION_API.RECOMMEND_LOANS}?score=${score}&jobType=${jobType}`)
 }
 
-// N-18-5 시뮬레이터 9개 행동값 기반 예상 대안 점수 및 감점 요인 재계산
+// N-18-5·8 바꾼 값으로 예상 대안 점수·금융/대안 영향·감점 요인 3개를 다시 구한다(SIM-02, Spring 미구현이라 지금은 mock).
+// payload: { changes: { TELECOM_ON_TIME_MONTHS: 12, ... } } — ML-04 키 10개 중 바꾼 것만. 카드 한도·월 사용액은 함께 보낸다.
 export function recalculateCreditCare(payload) {
   return apiPost(SIMULATION_API.RECALCULATE_CREDIT_CARE, payload)
 }
