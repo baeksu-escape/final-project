@@ -23,7 +23,6 @@ SELECT USER FROM DUAL;
 
 - FS-DRAFT 피처 시드: `TOTAL_CNT=39`, `ALT_CNT=20`, `SIM_CNT=9`; FS-V1 38개를 합친 `DIM_FEATURE`는 77행
 - 테이블 수: 47개, `99_check.sql`의 기대 행 수와 실제 행 수 일치
-- `99_check.sql`의 각 테이블 기대 행 수와 실제 행 수가 일치
 
 피처 시드 SQL은 2번 파일이 자동 실행하므로 따로 실행하지 않는다. 오류나 불일치가 있으면 재실행·초기화하지 말고 결과를 DB 담당자에게 전달한다.
 
@@ -34,3 +33,10 @@ SELECT USER FROM DUAL;
 - 기존 DB에 FS-V1을 추가할 때는 [피처 세트 추가 SQL](add_fs_v1_feature_set.sql) 실행 후 [FS-V1 피처 시드](seed/avenue_seed_dim_feature_fs_v1.sql) 38행을 한 번만 넣는다. ACTIVE 모델은 바뀌지 않는다.
 - `dummy_db/run_all.sql`은 테이블을 삭제한 뒤 다시 만든다. **기존 데이터가 삭제되므로 버려도 되는 별도 스키마에서만 실행한다.**
 - 모델 학습 CSV는 Oracle에 넣지 않는다. 위치와 사용법은 [학습 데이터 안내](../../../fastapi_server/data/README.md)를 참고한다.
+- 실제 모델 전환·복구는 [FastAPI 안내](../../../fastapi_server/README.md)의 공용 DB 전환 절차를 따른다. 전환 전 `/v1/health`에서 `modelLoaded: true`를 확인하고 DB 담당자와 순서를 맞춘다.
+
+## DDL 변경 시 확인
+
+DDL을 변경하면 `dummy_db/01_create_tables.sql` 사본과 `seed_report.json`의 LF 기준 DDL 해시를 갱신한다. 기준 INSERT나 피처 시드 행 수가 바뀌면 `99_check.sql`과 `seed_report.json`의 기대 행 수도 맞춘다. 피처 시드는 원본과 실행용 사본을 함께 갱신한다. 회원 시드 구조 변경은 생성기 담당자와 상의해 재생성한다.
+
+저장소 루트에서 `python -B -m unittest discover -s docs/spec/sql/dummy_db/tools/tests`를 실행하고, 기존 DB용 변경 SQL과 작업 로그를 함께 준비한다. 공용 DB 적용은 DB 담당자와 순서를 맞춘다.

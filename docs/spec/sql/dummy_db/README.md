@@ -52,3 +52,15 @@
 ## 시드 재생성
 
 일반 사용자는 시드를 다시 만들 필요가 없다. 시드 원천이나 매핑을 바꾸는 담당자는 [데이터 생성 안내](../../../../fastapi_server/data_generation/README.md)와 `tools/build_db.py`를 확인한다. 생성기는 FS-DRAFT 39행과 FS-V1 38행을 각각 25번·26번 시드 파일로 만든다. 개발 키와 시연 비밀번호는 저장소 밖의 팀 보안 경로로 관리하며, 실제 값을 문서·명령 기록·커밋에 남기지 않는다.
+
+## 팀 개발 키로 시드 만들기
+
+팀에서 공유한 env 파일을 저장소 밖에 두고 시연 비밀번호를 채운다. 백엔드도 같은 AES·HMAC 키를 사용해야 복호화와 검색이 일치한다. 키가 바뀌면 생성기 담당자와 상의해 시드를 다시 만들어야 한다.
+
+저장소 루트 PowerShell에서 다음과 같이 실행한다. 원천 폴더는 `service_dummy` 경로를 지정한다.
+
+```powershell
+python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더> docs/spec/sql/dummy_db --env-file "$env:USERPROFILE\avenue-secrets\avenue_dev.env"
+```
+
+생성된 SQL·`seed_report.json`과 실행 파일을 함께 반영하고 env 파일은 커밋하지 않는다. 적재 중에는 다른 작업이 시드 대상 테이블에 쓰지 않도록 한다.
