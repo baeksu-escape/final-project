@@ -58,6 +58,13 @@ MODELS = {
     "alternative": {"features": ALTERNATIVE_FEATURES, "label": "label_nonfin_effect_12m"},
 }
 
+# DB 장부(MODEL_REGISTRY, FEATURE_SET_VERSION)에 등록한 이름. 기존·대안 두 모델이 한 묶음으로 같은 버전을 쓴다.
+# 재학습하면 MODEL_VERSION을 0.2, 0.3으로 올리고 DB에 새 행을 넣는다. 피처 목록이 바뀌면 FS-V2를 새로 만든다.
+# tests/test_fs_v1_seed.py가 이 값이 avenue_ddl.sql 기준 데이터와 같은지 검사한다.
+MODEL_VERSION = "LGBM-BASE-0.1"
+FEATURE_SET_VERSION = "FS-V1"
+ALGORITHM_NAME = "LightGBM"
+
 SPLIT_COLUMN = "data_split"
 TRAIN_SPLIT = "TRAIN"
 VALID_SPLIT = "VALID"          # TEST는 최종 평가 때만 쓰며, 이 스크립트는 읽은 뒤 바로 버린다.

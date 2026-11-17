@@ -65,6 +65,9 @@ def main() -> None:
         joblib.dump(saved, args.out_dir / f"{name}.joblib")
         meta = {
             "model": name,
+            "model_version": config.MODEL_VERSION,
+            "feature_set_version": config.FEATURE_SET_VERSION,
+            "algorithm_name": config.ALGORITHM_NAME,
             "label": label,
             "features": features,
             "category_codes": config.CATEGORY_CODES,
