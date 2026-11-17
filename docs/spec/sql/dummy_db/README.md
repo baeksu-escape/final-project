@@ -64,3 +64,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 ```
 
 생성된 SQL·`seed_report.json`과 실행 파일을 함께 반영하고 env 파일은 커밋하지 않는다. 적재 중에는 다른 작업이 시드 대상 테이블에 쓰지 않도록 한다.
+
+## 참고
+
+개인정보 암호화 규격, 원천 매핑과 기준월, 대출·자산 입력 규칙, 시드 생성과 적재 시 주의사항은 [시드 상세 안내](REFERENCE.md)를 따른다. 팀 키 최초 생성 방법과 출력 폴더 제한도 이 문서에 있다.
