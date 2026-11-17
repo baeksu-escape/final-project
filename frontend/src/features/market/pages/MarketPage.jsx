@@ -99,7 +99,7 @@ export default function MarketPage() {
   return (
     <div className="market-page">
       <header className="market-page__head">
-        <span className="market-tag">N-24 상권 분석 · 서울특별시</span>
+        <span className="market-tag">상권 분석 · 서울특별시</span>
         <h2 className="market-page__title">서울 상권 히트맵</h2>
         <p className="market-hint">업종과 지표를 고르면 행정동 색이 바뀝니다. 동을 누르면 그 동의 상세 현황과 업종 순위가 열립니다.</p>
       </header>

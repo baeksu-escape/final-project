@@ -11,6 +11,7 @@ import {
   SOCIAL_PATHS,
   toSocialErrorMessage,
 } from '../socialLoginConfig.js'
+import '../auth.css'
 
 // N-01-6 소셜 로그인 콜백 — 일회용 코드를 토큰으로 바꾸고 결과에 따라 화면을 나눈다.
 // 연결된 계정이면 로그인 상태가 바뀌면서 GuestOnlyRoute가 역할별 첫 화면으로 보낸다.

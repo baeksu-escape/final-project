@@ -27,6 +27,10 @@
 | `docs/spec/training_data_report.md` | `data_report.py`가 만든 생성 보고서 (신규, FP-131) |
 | `docs/spec/feature_definition.md` | 2장 label 행, 2-1(라벨·AUC 비교), 9장 확정 행, 10장 C20(C17 정정) (FP-130) |
 | `fastapi_server/training/README.md`, `preprocess.py` | 입력·출력 규격 표·AUC 비교·보고서 안내 추가, `encode_categories`가 없는 범주형 열을 건너뜀 (수정) |
+| **보완(11/17, PR #65 병합 후, 브랜치 `feature-B/FP-131-report-label-check`)** | |
+| `fastapi_server/training/data_io.py` | `sha256_of`, `load_train_valid`를 `train.py`에서 옮김. 보고서만 만들 때 lightgbm·shap이 필요 없게 함 (신규, 리뷰 제안) |
+| `fastapi_server/training/train.py`, `data_report.py` | `data_io`에서 import(`train.py`는 기존 import 경로도 유지). 보고서에 라벨 검증 소절(FP-130)과 숫자 피처 평균 열(FP-131) 추가 (수정) |
+| `fastapi_server/tests/test_training_report.py`, `docs/spec/training_data_report.md`, `docs/spec/feature_definition.md` | 라벨 검증·평균·보고서 전체·import 가벼움 시험 8개 추가, 보고서 다시 생성, 2-1에 TEST 양성 비율을 보지 않는 이유 한 줄 (수정) |
 
 ## DB·API 변경
 - DB: 없음
@@ -40,12 +44,13 @@
 - 확인함(11/17 추가): FastAPI 테스트 68개 통과(기존 33 + 범영 님 Mock 2 + 학습 전처리 14 + 입력 규격 12 + 보고서 7). 저장한 모델 파일(`artifacts/*.joblib`)이 `to_model_input`의 규격으로 확률을 내는지(`predict_proba` 0~1, 결측 입력 포함) 확인. `python -m training.compare_labels`로 같은 라벨 비교 재현(연체 라벨 기존 0.6049 / 대안 0.5991, 비금융 효과 라벨 기존 0.6102 / 대안 0.6533). `python -m training.data_report`로 보고서 생성, 분할 행 수 8,400 / 1,800 / 1,800과 C8 상한 초과 건수가 정의서와 같은 규모임을 확인.
 - **주의(정정)**: 정의서 10장 C17의 "대안 모델이 기존 모델보다 0.05~0.07 높다"는 서로 다른 라벨로 잰 값이라 C20에서 정정했다(같은 라벨 +0.043은 라벨에 넣은 효과를 찾은 것).
 - **TEST 사용 알림**: 11/17 분석 중 TEST 행의 라벨 건수·양성 비율을 한 번 훑어봤다(모델 학습·평가·결정에는 쓰지 않음). 보고서와 스크립트는 TEST를 행 수만 센다.
-- 확인 못 함: 다른 PC에서의 재현, 서비스 연결(FP-141, 범영 님), TEST 평가(FP-144), 점수·SHAP 변환(FP-138).
+- 확인함(11/17 보완): FastAPI 테스트 76개 통과(기존 68 + 새 8). `python -m training.data_report`가 lightgbm·shap 없이 import됨(별도 프로세스 시험). 라벨 검증 결과: 두 라벨 모두 TRAIN·VALID에서 값이 0/1뿐이고 결측 0(양성 비율 TRAIN 0.097/0.099, VALID 0.097/0.097). `python -m training.train`을 임시 폴더로 다시 실행해 AUC가 같고(기존 0.6049 ± 0.0026, 대안 0.6533 ± 0.0051) 모델 파일 SHA-256이 11/16 공유본과 **바이트까지 같음**을 확인(같은 PC, 같은 데이터·시드·LightGBM 4.6.0). `compare_labels`도 같은 값.
+- 확인 못 함: 다른 PC에서의 재현, 서비스 연결(FP-141, 범영 님), TEST 평가(FP-144), 점수·SHAP 변환(FP-138). FP-135의 "모델 버전" 필드는 `MODEL_REGISTRY`의 버전 이름이 정해지면 추가한다(지금은 `model` 이름, `trained_at`, 학습 표 해시로 식별).
 
 ## 다음 사람이 알아야 할 것
 - 결과는 합성 데이터·튜닝 없음·TEST 미사용 임시 베이스라인이다. 점수 변환(O-3)과 등급 경계(D-01)는 포함하지 않았다.
 - `voluntary`·가입 상태 `unknown`은 -1(결측)로 둔다. 정의서 9장 미정이다(`config.py`의 `TODO`).
-- `artifacts/*.meta.json`은 `.gitignore` 대상이 아니라서 실수로 커밋하지 않도록 주의한다. 커밋 대상으로 삼을지는 팀이 정한다.
+- `artifacts/*.meta.json`은 `.gitignore`(PR #63)로 제외돼 있어 실수로 올라가지 않는다. 설명 파일도 커밋 대상으로 삼기로 하면 그 규칙을 지운다.
 - 로그 파일명의 작성자 약어 `cjw`는 제안이다.
 
 ## 검수
