@@ -20,6 +20,7 @@ export default function AppHeader() {
 
   // 로그인 상태를 지운 뒤 메인(홍보) 첫 화면으로 보낸다(N-10, 데모 v2).
   // 라우터 이동(navigate)으로는 로그아웃 순간 RouteGuard가 로그인 화면으로 덮어써서, 페이지를 '/'로 새로 연다(11/17 확인).
+  // RouteGuard 기본 이동(/login)은 바꾸지 않는다 — 탈퇴 알림, 세션 만료(401), 로그인 없이 주소로 바로 들어온 경우는 로그인 화면이 맞다.
   const handleLogout = async () => {
     await logout()
     window.location.replace(PATHS.HOME)
