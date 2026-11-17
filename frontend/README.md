@@ -105,6 +105,7 @@ frontend/
 - 화면 모양은 공통 재료로 맞춘다(기준 UI: 데모 v2). 컴포넌트는 `common/components`(Card·Button·Chip·Notice·Modal·Toast·입력류·차트), 배치는 `layout.css` 클래스를 쓴다.
   - 제목 줄 `page-head`(`__tag`·`__title`·`__lead`), 2:1 `l-cols`(+`l-cols__main`), 3열 `l-grid3`, 숫자 타일 `l-kpis`, 자동 칸 `l-g2`, 표 `data-table`(+`data-table-wrap`), 안쪽 상자 `panel-sunk`, 글자 `hint`·`num`
   - 색·간격은 `tokens.css` 변수만 쓴다. 이 재료로 안 되는 모양이 필요하면 기능 폴더에 `<기능>.css`를 만들기 전에 프론트 담당에게 알린다. 공통 CSS 4개(`tokens`·`forms`·`components`·`layout.css`)는 프론트 담당만 고친다(AGENTS.md 3-2).
+  - 공통으로 올릴 후보: 여러 줄 입력칸(`lounge-textarea`), 쪽 번호(`lounge-pager`), 설명이 붙은 라디오 카드(`report-option`). 지금은 `community.css`에 있으니 필요하면 프론트 담당에게 알린다.
 
 ## 5. 현재 상태 (2026-11-17)
 

@@ -15,7 +15,7 @@ export default function PostDetail({ post, reportedKeys, onBack, onEdit, onDelet
     return (
       <section className="card lounge-detail">
         <Notice type="warn">신고로 숨김 처리된 글입니다. 관리자가 확인한 뒤 다시 보이거나 삭제됩니다.</Notice>
-        <div className="lounge-actions">
+        <div className="l-row">
           <Button size="sm" onClick={onBack}>
             목록으로
           </Button>
@@ -62,7 +62,7 @@ export default function PostDetail({ post, reportedKeys, onBack, onEdit, onDelet
 
   return (
     <article className="card lounge-detail" aria-labelledby="lounge-post-title">
-      <div className="lounge-actions">
+      <div className="l-row">
         <Button size="sm" onClick={onBack}>
           ← 목록으로
         </Button>
@@ -82,7 +82,7 @@ export default function PostDetail({ post, reportedKeys, onBack, onEdit, onDelet
             <span>댓글 {visibleComments}</span>
           </p>
         </div>
-        <div className="lounge-actions">
+        <div className="l-row">
           {reportButton('POST', post.postId, post.mine)}
           {post.mine && !askDelete && (
             <>
@@ -131,7 +131,7 @@ export default function PostDetail({ post, reportedKeys, onBack, onEdit, onDelet
         )}
       </section>
 
-      <form className="lounge-comment-form" onSubmit={handleComment}>
+      <form className="l-stack" onSubmit={handleComment}>
         <label htmlFor="lounge-comment-input" className="form-field__label">
           댓글 쓰기
         </label>
@@ -148,7 +148,7 @@ export default function PostDetail({ post, reportedKeys, onBack, onEdit, onDelet
             {commentError}
           </p>
         )}
-        <div className="lounge-actions">
+        <div className="l-row">
           <Button type="submit" variant="primary" size="sm" disabled={sending}>
             댓글 등록
           </Button>

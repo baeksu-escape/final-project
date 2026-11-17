@@ -36,7 +36,7 @@ export default function ReportModal({ target, onClose, onDone }) {
 
   return (
     <Modal open={Boolean(target)} title={`이 ${kind} 신고`} onClose={onClose}>
-      <div className="report-modal">
+      <div className="l-stack">
         <fieldset className="report-modal__reasons">
           <legend className="form-field__label">신고 사유를 골라 주세요</legend>
           {REPORT_REASONS.map((item) => (
@@ -65,10 +65,10 @@ export default function ReportModal({ target, onClose, onDone }) {
             {error}
           </p>
         )}
-        <p className="report-modal__hint">
+        <p className="hint">
           작성자가 아니라 이 {kind} 자체를 신고합니다. 신고가 쌓이면 관리자 확인 전에 자동으로 숨겨집니다. 신고한 사람은 공개되지 않습니다. 신고는 하루 3번까지 할 수 있습니다.
         </p>
-        <div className="lounge-actions">
+        <div className="l-row">
           <Button variant="primary" size="sm" onClick={handleSubmit} disabled={sending}>
             신고하기
           </Button>

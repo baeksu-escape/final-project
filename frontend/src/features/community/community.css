@@ -1,51 +1,10 @@
 /* N-06·N-33·N-34 신용 라운지·신고 접수 화면 전용 스타일 — 'Avenue 기능 데모 v2'의 게시판 표·페이저·신고 창·신고 목록 기준.
-   색·글꼴은 모두 tokens.css 변수를 써서 화이트·블랙 테마를 같이 따른다. */
+   색·글꼴은 모두 tokens.css 변수를 써서 화이트·블랙 테마를 같이 따른다.
+   제목 줄·배치·표·안쪽 상자·글자(page-head·l-*·data-table·panel-sunk·hint·tag·sr-only)는 layout.css 공통 클래스를 쓰고,
+   이 파일에는 공통에 없는 라운지·신고 전용 모양만 둔다: 1) 게시판 2) 글 상세·댓글 3) 신고 선택 4) 관리자 신고함 */
 
-/* ---------- 페이지 틀 ---------- */
-.lounge-page,
-.report-admin-page {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  min-width: 0;
-  max-width: 1320px;
-}
-
-.lounge-page__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.lounge-page__title {
-  margin: 0;
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.lounge-page__lead {
-  margin: 4px 0 0;
-  max-width: 70ch;
-  color: var(--mut);
-  font-size: 14px;
-}
-
-.lounge-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.lounge-loading {
-  margin: 0;
-  color: var(--mut2);
-  font-size: 13px;
-}
-
+/* ---------- 1) 게시판 ---------- */
+/* 글쓴이·날짜처럼 작은 글자를 한 줄에 나열 (상세·신고함에서도 쓴다) */
 .lounge-meta {
   display: flex;
   flex-wrap: wrap;
@@ -59,16 +18,7 @@
   color: var(--fg);
 }
 
-/* 화면 낭독기에만 읽히는 라벨 */
-.lounge-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
+/* 글·댓글 입력칸 (공통 입력 컴포넌트에 여러 줄 입력이 없어 여기 둔다) */
 .lounge-textarea {
   box-sizing: border-box;
   width: 100%;
@@ -96,7 +46,7 @@
   color: var(--mut2);
 }
 
-/* ---------- 글 목록 (데모 .btbl · .pager) ---------- */
+/* 글 목록 (데모 .btbl · .pager) — 표 자체는 공통 data-table, 여기는 열 꾸밈만 */
 .lounge-list__head {
   display: flex;
   flex-wrap: wrap;
@@ -116,33 +66,6 @@
   display: flex;
   gap: 8px;
   width: min(100%, 320px);
-}
-
-.lounge-table-wrap {
-  min-width: 0;
-  overflow-x: auto;
-}
-
-.lounge-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.lounge-table th {
-  padding: 8px;
-  border-bottom: 1px solid var(--line2);
-  color: var(--mut2);
-  font-size: 12px;
-  font-weight: 500;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.lounge-table td {
-  padding: 10px 8px;
-  border-bottom: 1px solid var(--line);
-  vertical-align: middle;
 }
 
 .lounge-table__no {
@@ -215,7 +138,8 @@
   cursor: default;
 }
 
-/* ---------- 글 상세·댓글 ---------- */
+/* ---------- 2) 글 상세·댓글 ---------- */
+/* 제목 | 버튼 한 줄 (관리자 신고 상세 머리에도 쓴다) */
 .lounge-detail__head {
   display: flex;
   flex-wrap: wrap;
@@ -274,19 +198,7 @@
   word-break: break-word;
 }
 
-.lounge-comment-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* ---------- 신고 창·처리 결과 라디오 (데모 .opt) ---------- */
-.report-modal {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
+/* ---------- 3) 신고 선택 — 신고 창 사유·관리자 처리 결과 라디오 카드 (데모 .opt) ---------- */
 .report-modal__reasons,
 .report-process__options {
   display: grid;
@@ -301,12 +213,6 @@
 .report-process__options legend {
   margin-bottom: 6px;
   padding: 0;
-}
-
-.report-modal__hint {
-  margin: 0;
-  color: var(--mut2);
-  font-size: 12.5px;
 }
 
 .report-option {
@@ -346,18 +252,11 @@
   font-size: 12.5px;
 }
 
-/* ---------- 관리자 신고 접수 ---------- */
+/* ---------- 4) 관리자 신고함 ---------- */
+/* 필터 칸 배치는 공통 l-g2, 여기는 칸 최소 넓이와 아래 맞춤만 */
 .report-filters {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  --min: 150px;
   align-items: end;
-  gap: 12px;
-}
-
-@media (max-width: 960px) {
-  .report-filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 .report-filters__threshold {
@@ -379,19 +278,7 @@
   font-family: var(--f-d);
 }
 
-.report-admin-page__cols {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-  align-items: start;
-  gap: 18px;
-}
-
-@media (max-width: 960px) {
-  .report-admin-page__cols {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
+/* 목록 1 : 상세 2 배치는 공통 l-cols, 목록 카드는 안쪽 여백만 좁게 */
 .report-admin-page__list {
   padding: 8px;
 }
@@ -402,12 +289,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.report-list__empty {
-  margin: 0;
-  padding: 12px;
-  color: var(--mut2);
 }
 
 .report-list__item {
@@ -471,49 +352,7 @@
   color: var(--mint);
 }
 
-.report-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.report-detail__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.report-detail__tag {
-  margin: 0 0 2px;
-  color: var(--mut2);
-  font: 600 11px var(--f-d);
-  letter-spacing: 0.08em;
-}
-
-.report-detail__origin {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel2);
-}
-
-.report-detail__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-  gap: 12px;
-}
-
-.report-detail__block {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
+/* 사유별 건수 한 줄: 사유 | 막대(공통 ProgressBar) | 건수 */
 .report-reason-row {
   display: grid;
   grid-template-columns: 96px 1fr 28px;
@@ -555,10 +394,4 @@
   gap: 12px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
-}
-
-.report-detail__done {
-  margin: 0;
-  color: var(--mut2);
-  font-size: 13px;
 }

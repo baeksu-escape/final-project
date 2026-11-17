@@ -118,7 +118,7 @@ export default function LoungePage() {
     body = current.error ? (
       <Card>
         <Notice type="warn">{current.error}</Notice>
-        <div className="lounge-actions">
+        <div className="l-row">
           <Button size="sm" onClick={toList}>
             목록으로
           </Button>
@@ -135,7 +135,7 @@ export default function LoungePage() {
         onAddComment={handleAddComment}
       />
     ) : (
-      <p className="lounge-loading">불러오는 중…</p>
+      <p className="hint">불러오는 중…</p>
     )
   } else {
     const data = list.data
@@ -147,7 +147,7 @@ export default function LoungePage() {
             전체 글 {data && <span className="lounge-count">{data.totalCount}건</span>}
           </h2>
           <form className="lounge-search" onSubmit={handleSearch} role="search">
-            <label htmlFor="lounge-search-input" className="lounge-sr-only">
+            <label htmlFor="lounge-search-input" className="sr-only">
               제목·내용 검색
             </label>
             <input
@@ -163,7 +163,7 @@ export default function LoungePage() {
           </form>
         </div>
         {list.error && <Notice type="warn">{list.error}</Notice>}
-        {!data && !list.error && <p className="lounge-loading">불러오는 중…</p>}
+        {!data && !list.error && <p className="hint">불러오는 중…</p>}
         {data && (
           <>
             <PostTable items={data.items} startNo={data.totalCount - (data.page - 1) * PAGE_SIZE} onOpen={openPost} />
@@ -175,11 +175,11 @@ export default function LoungePage() {
   }
 
   return (
-    <div className="lounge-page">
-      <div className="lounge-page__head">
+    <>
+      <div className="page-head">
         <div>
-          <h1 className="lounge-page__title">신용 라운지</h1>
-          <p className="lounge-page__lead">같은 고민을 가진 사람들과 이야기를 나눕니다. 이름 대신 닉네임으로 보이고, 문제 있는 글·댓글은 신고할 수 있습니다.</p>
+          <h1 className="page-head__title">신용 라운지</h1>
+          <p className="page-head__lead">같은 고민을 가진 사람들과 이야기를 나눕니다. 이름 대신 닉네임으로 보이고, 문제 있는 글·댓글은 신고할 수 있습니다.</p>
         </div>
         {view.mode === 'list' && (
           <Button variant="primary" onClick={() => setView({ mode: 'write', postId: null })}>
@@ -192,6 +192,6 @@ export default function LoungePage() {
         <ReportModal key={`${reportTarget.targetType}:${reportTarget.targetId}`} target={reportTarget} onClose={() => setReportTarget(null)} onDone={handleReported} />
       )}
       <Toast message={toast} onClose={() => setToast('')} />
-    </div>
+    </>
   )
 }

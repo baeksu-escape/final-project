@@ -5,8 +5,8 @@ import { formatDate } from '../config/communityCodes.js'
 // No는 최신 글이 가장 큰 번호다(전체 글 수에서 거꾸로 센다).
 export default function PostTable({ items, startNo, onOpen }) {
   return (
-    <div className="lounge-table-wrap">
-      <table className="lounge-table">
+    <div className="data-table-wrap">
+      <table className="data-table">
         <thead>
           <tr>
             <th className="lounge-table__no">No</th>

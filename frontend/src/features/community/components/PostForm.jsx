@@ -50,7 +50,7 @@ export default function PostForm({ initial, onSubmit, onCancel }) {
           {error}
         </p>
       )}
-      <div className="lounge-actions">
+      <div className="l-row">
         <Button type="submit" variant="primary" disabled={saving}>
           {editing ? '수정' : '등록'}
         </Button>

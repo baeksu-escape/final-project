@@ -28,7 +28,7 @@ export default function AdminReportDetail({ reportId, onProcessed }) {
   }, [reportId, version])
 
   if (state.error) return <Notice type="warn">{state.error}</Notice>
-  if (!state.data) return <p className="lounge-loading">불러오는 중…</p>
+  if (!state.data) return <p className="hint">불러오는 중…</p>
 
   const detail = state.data
   const kind = detail.targetType === 'POST' ? '게시글' : '댓글'
@@ -53,10 +53,10 @@ export default function AdminReportDetail({ reportId, onProcessed }) {
   }
 
   return (
-    <div className="report-detail">
-      <div className="report-detail__head">
+    <div className="l-stack">
+      <div className="lounge-detail__head">
         <div>
-          <p className="report-detail__tag">
+          <p className="tag">
             신고 #{detail.reportId} · {kind}
           </p>
           <h2 className="card__title">{detail.title ?? `${kind} 원문`}</h2>
@@ -64,7 +64,7 @@ export default function AdminReportDetail({ reportId, onProcessed }) {
         {groupStatus && <StatusChip statusCode={groupStatus} targetStatus={detail.targetStatus} />}
       </div>
 
-      <div className="report-detail__origin">
+      <div className="panel-sunk l-stack">
         <p className="lounge-meta">
           <span>원문 · 작성자 {detail.authorNickname ?? '—'}</span>
           {detail.parentPostId && <span>글 번호 {detail.parentPostId}</span>}
@@ -73,8 +73,8 @@ export default function AdminReportDetail({ reportId, onProcessed }) {
         <p className="lounge-detail__body">{detail.content}</p>
       </div>
 
-      <div className="report-detail__grid">
-        <div className="report-detail__block">
+      <div className="l-g2">
+        <div className="l-stack">
           <p className="form-field__label">사유별 건수 · 누적 {detail.reportCount}건</p>
           {REPORT_REASONS.filter((reason) => detail.reasonCounts[reason.value] > 0).map((reason) => (
             <div key={reason.value} className="report-reason-row">
@@ -84,7 +84,7 @@ export default function AdminReportDetail({ reportId, onProcessed }) {
             </div>
           ))}
         </div>
-        <div className="report-detail__block">
+        <div className="l-stack">
           <p className="form-field__label">신고자 (가려서 표시)</p>
           <ul className="report-reporters">
             {detail.reports.map((line) => (
@@ -128,14 +128,14 @@ export default function AdminReportDetail({ reportId, onProcessed }) {
               {formError}
             </p>
           )}
-          <div className="lounge-actions">
+          <div className="l-row">
             <Button variant="primary" onClick={handleSave} disabled={saving}>
               처리 결과 저장
             </Button>
           </div>
         </div>
       ) : (
-        <p className="report-detail__done">미처리 신고가 없어 더 처리할 것이 없습니다.</p>
+        <p className="hint">미처리 신고가 없어 더 처리할 것이 없습니다.</p>
       )}
     </div>
   )

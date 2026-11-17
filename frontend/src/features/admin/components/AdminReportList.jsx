@@ -22,7 +22,7 @@ export function StatusChip({ statusCode, targetStatus }) {
 
 // N-34-1 신고 묶음 목록 — 같은 글·댓글의 신고를 한 줄로 묶어 누적 건수·최근 접수 시각을 보여 준다. 숨김 대상이 먼저 온다(서버 정렬).
 export default function AdminReportList({ items, selectedId, onSelect }) {
-  if (items.length === 0) return <p className="report-list__empty">조건에 맞는 신고가 없습니다.</p>
+  if (items.length === 0) return <p className="hint">조건에 맞는 신고가 없습니다.</p>
   return (
     <ul className="report-list">
       {items.map((group) => (

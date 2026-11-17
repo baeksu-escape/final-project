@@ -78,15 +78,15 @@ export default function AdminReportsPage() {
   const autoHide = data?.autoHideCount ?? threshold.value ?? '—'
 
   return (
-    <div className="report-admin-page">
-      <div className="lounge-page__head">
+    <>
+      <div className="page-head">
         <div>
-          <h1 className="lounge-page__title">신고 접수 게시판</h1>
-          <p className="lounge-page__lead">같은 글·댓글에 들어온 신고를 묶어 보여 줍니다. 신고가 {autoHide}건 이상 쌓여 자동으로 숨겨진 대상이 먼저 나옵니다.</p>
+          <h1 className="page-head__title">신고 접수 게시판</h1>
+          <p className="page-head__lead">같은 글·댓글에 들어온 신고를 묶어 보여 줍니다. 신고가 {autoHide}건 이상 쌓여 자동으로 숨겨진 대상이 먼저 나옵니다.</p>
         </div>
       </div>
 
-      <section className="card report-filters" aria-label="필터">
+      <section className="card l-g2 report-filters" aria-label="필터">
         <Select label="상태" value={status} onChange={setStatus} options={REPORT_STATUSES} placeholder="전체" />
         <Select label="사유" value={reason} onChange={setReason} options={REPORT_REASONS} placeholder="전체" />
         <Select label="기간" value={period} onChange={(value) => setPeriod(value ?? 'all')} options={REPORT_PERIODS} />
@@ -109,19 +109,19 @@ export default function AdminReportsPage() {
       </section>
 
       {list.error && <Notice type="warn">{list.error}</Notice>}
-      <div className="report-admin-page__cols">
+      <div className="l-cols">
         <section className="card report-admin-page__list" aria-label="신고 목록">
-          {data ? <AdminReportList items={data.items} selectedId={selectedId} onSelect={setSelectedId} /> : !list.error && <p className="lounge-loading">불러오는 중…</p>}
+          {data ? <AdminReportList items={data.items} selectedId={selectedId} onSelect={setSelectedId} /> : !list.error && <p className="hint">불러오는 중…</p>}
         </section>
-        <section className="card report-admin-page__detail" aria-label="신고 상세">
+        <section className="card l-cols__main" aria-label="신고 상세">
           {selectedId ? (
             <AdminReportDetail key={selectedId} reportId={selectedId} onProcessed={handleProcessed} />
           ) : (
-            <p className="lounge-loading">왼쪽 목록에서 신고 대상을 고르세요.</p>
+            <p className="hint">왼쪽 목록에서 신고 대상을 고르세요.</p>
           )}
         </section>
       </div>
       <Toast message={toast} onClose={() => setToast('')} />
-    </div>
+    </>
   )
 }
