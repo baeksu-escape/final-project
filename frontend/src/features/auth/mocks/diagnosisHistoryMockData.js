@@ -13,7 +13,7 @@ export const MOCK_DIAGNOSES = Object.freeze([
   { diagnosisId: '2b8e4f6a-1c3d-4e5f-8a7b-9c0d1e2f3a02', calculatedAt: '2026-08-03T09:40:00', existingScore: 605, alternativeScore: 672, modelVersion: 'alt-v1.0', gradeStatusCode: GRADE_STATUS.SCORED, notScorableReasonCode: null },
   { diagnosisId: '9d3a5c7e-2f4b-4a6c-8e1d-0b2c4d6e8f03', calculatedAt: '2026-09-02T20:15:00', existingScore: 610, alternativeScore: 667, modelVersion: 'alt-v1.0', gradeStatusCode: GRADE_STATUS.SCORED, notScorableReasonCode: null },
   { diagnosisId: '4e7b9d1f-3a5c-4e8a-9b2d-1c3e5f7a9b04', calculatedAt: '2026-10-01T14:30:00', existingScore: 612, alternativeScore: 667, modelVersion: 'alt-v1.0', gradeStatusCode: GRADE_STATUS.SCORED, notScorableReasonCode: null },
-  { diagnosisId: 'a1c3e5f7-4b6d-4f8a-8c0e-2d4f6a8c0e05', calculatedAt: '2026-11-09T14:30:00', existingScore: 630, alternativeScore: 785, modelVersion: 'alt-v1.0', gradeStatusCode: GRADE_STATUS.SCORED, notScorableReasonCode: null },
+  { diagnosisId: '3f1c2a9e-8b7d-4c1e-9a2b-1d2e3f4a5b6c', calculatedAt: '2026-11-12T14:30:00', existingScore: 612, alternativeScore: 701, modelVersion: 'DEV-DUMMY', gradeStatusCode: GRADE_STATUS.SCORED, notScorableReasonCode: null },
 ])
 
 // 'MIXED' 시나리오에서 더하는 산출 불가 평가 1건(입력 자료가 오래됨). 점수·등급이 없다.
