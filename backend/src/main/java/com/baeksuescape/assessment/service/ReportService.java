@@ -94,6 +94,19 @@ public class ReportService {
         }
         return new ReportDtos.Report(row.getRequestId(), users.toOffset(row.getAssessedAt()), row.getInputBaseMonth(),
                 row.getWorkerTypeCode(), row.getGradeStatusCode(), row.getNotScorableReasonCode(), traditional, alternative,
-                comparison, gradeBands, shap, row.getAiSummary(), row.getModelVersion());
+                comparison, gradeBands, shap, row.getAiSummary(), row.getModelVersion(), modelFeatures(row));
+    }
+
+    // N-12-6 모델별 피처 칩 — 대안 모델은 피처 사전 전체, 기존 모델은 그중 대안 데이터가 아닌 것(ALTERNATIVE_YN = N).
+    // 산출 불가 평가도 "이 모델이 보는 피처"는 같으므로 모델 버전의 피처 세트로 보여 준다. 사전이 없으면 null(화면이 칩을 숨긴다).
+    private ReportDtos.ModelFeatures modelFeatures(AssessmentRow row) {
+        List<ReportDtos.ModelFeature> all = mapper.selectModelFeatures(row.getFeatureSetVersion(), row.getModelVersion()).stream()
+                .map(f -> new ReportDtos.ModelFeature(f.getFeatureCode(), f.getFeatureName(), f.getAlternativeYn()))
+                .toList();
+        if (all.isEmpty()) {
+            return null;
+        }
+        List<ReportDtos.ModelFeature> traditional = all.stream().filter(f -> "N".equals(f.alternativeYn())).toList();
+        return new ReportDtos.ModelFeatures(traditional, all);
     }
 }
