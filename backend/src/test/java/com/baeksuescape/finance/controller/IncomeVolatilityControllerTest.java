@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.global.exception.ErrorResponse;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -114,6 +115,19 @@ class IncomeVolatilityControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
         verifyNoInteractions(incomeVolatilityService);
+    }
+
+    @Test
+    @DisplayName("GET /api/diagnosis/cash-flow/forecast: 예측 기간이 3·6·12가 아니면 400, fieldErrors에 forecastMonths")
+    void getCashFlowForecast_invalidMonths_badRequest() throws Exception {
+        when(incomeVolatilityService.forecastSavedCashFlow(eq(2L), any()))
+                .thenThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "예측 기간은 3·6·12개월 중 하나여야 합니다.",
+                        List.of(new ErrorResponse.FieldErrorItem("forecastMonths", "예측 기간은 3·6·12개월 중 하나여야 합니다."))));
+
+        mockMvc.perform(loggedIn(get("/api/diagnosis/cash-flow/forecast").param("forecastMonths", "1000"), 2L))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("forecastMonths"));
     }
 
     @Test

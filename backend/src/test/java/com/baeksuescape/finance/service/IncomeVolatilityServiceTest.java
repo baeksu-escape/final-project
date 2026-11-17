@@ -42,7 +42,7 @@ class IncomeVolatilityServiceTest {
     // =========================================================================
 
     @Test
-    @DisplayName("POST 진단: 본문의 월별 소득·고정지출로 계산하고, 본문이 없으면 빈 응답")
+    @DisplayName("POST 진단: 본문의 월별 소득·고정지출로 계산한다")
     void diagnoseIncomeVolatility_fromRequestBody() {
         IncomeVolatilityRequest request = IncomeVolatilityRequest.builder()
                 .monthlyIncomes(List.of(
@@ -57,8 +57,63 @@ class IncomeVolatilityServiceTest {
         assertEquals(2000000L, response.getPeakOffPeakGap());
         assertTrue(response.isHasDeficitWarning(), "7월 소득 100만 < 고정지출 200만");
         assertEquals("2026-07", response.getNearestDeficitMonth());
-        assertEquals(0L, service.diagnoseIncomeVolatility(null).getMeanIncome());
         verifyNoInteractions(mapper);
+    }
+
+    @Test
+    @DisplayName("POST 진단: 본문이 없거나 월별 소득이 비어 있으면 400 INVALID_INPUT (field monthlyIncomes)")
+    void diagnoseIncomeVolatility_emptyBody_badRequest() {
+        assertInvalid(() -> service.diagnoseIncomeVolatility(null), "monthlyIncomes");
+        assertInvalid(() -> service.diagnoseIncomeVolatility(IncomeVolatilityRequest.builder().build()), "monthlyIncomes");
+        assertInvalid(() -> service.diagnoseIncomeVolatility(
+                IncomeVolatilityRequest.builder().monthlyIncomes(List.of()).build()), "monthlyIncomes");
+    }
+
+    @Test
+    @DisplayName("POST 전망: 본문이 없으면 400 INVALID_INPUT")
+    void forecastCashFlow_nullBody_badRequest() {
+        ApiException ex = assertThrows(ApiException.class, () -> service.forecastCashFlow(null));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("INVALID_INPUT", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("N-21-2 예측 기간: 3·6·12만 받고 그 밖의 값(1·7·24·1000·-1)은 400 (field forecastMonths)")
+    void forecastMonths_onlyThreeSixTwelve() {
+        for (int months : new int[] {3, 6, 12}) {
+            CashFlowForecastResponse response = service.forecastCashFlow(forecastRequest(months));
+            assertEquals(months, response.getMonthlyForecasts().size());
+        }
+        for (int months : new int[] {1, 7, 24, 1000, -1}) {
+            assertInvalid(() -> service.forecastCashFlow(forecastRequest(months)), "forecastMonths");
+        }
+    }
+
+    @Test
+    @DisplayName("N-21-2 예측 기간: 저장 데이터 전망(GET)도 같은 규칙 — 1000개월이면 400이고 DB를 읽기 전에 막는다")
+    void forecastSavedCashFlow_invalidMonths_badRequest() {
+        CashFlowConditionRequest condition = CashFlowConditionRequest.builder().forecastMonths(1000).build();
+
+        assertInvalid(() -> service.forecastSavedCashFlow(2L, condition), "forecastMonths");
+        verifyNoInteractions(mapper);
+    }
+
+    /** 1개월 이력 + 기준값으로 예측 기간만 바꿔 보는 POST 전망 요청 */
+    private CashFlowForecastRequest forecastRequest(int forecastMonths) {
+        return CashFlowForecastRequest.builder()
+                .past12MonthsHistory(List.of(MonthlyIncomeItem.builder().yearMonth("2026-08").income(3000000L).build()))
+                .baseMonthlyIncome(3000000L)
+                .baseMonthlyFixedExpense(2000000L)
+                .forecastMonths(forecastMonths)
+                .build();
+    }
+
+    /** 400 INVALID_INPUT이고 fieldErrors 첫 칸이 field인지 확인한다 */
+    private void assertInvalid(org.junit.jupiter.api.function.Executable call, String field) {
+        ApiException ex = assertThrows(ApiException.class, call);
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("INVALID_INPUT", ex.getCode());
+        assertEquals(field, ex.getFieldErrors().get(0).field());
     }
 
     @Test

@@ -1,5 +1,6 @@
 // N-20 DSR 계산 및 N-17 시나리오 상환 여력 재계산 mock 핸들러
 import { registerMockHandlers, requireMockUser } from '../../../common/mocks/mockHandlers.js'
+import { ApiError } from '../../../common/api/ApiError.js'
 import {
   evaluateDsrRisk,
   evaluateHealthLevel,
@@ -124,8 +125,13 @@ function handleCashFlowForecast({ query, token }) {
   const incomeChangePercent = Number(query?.get('incomeChangePercent') ?? 0)
   const expenseChangePercent = Number(query?.get('expenseChangePercent') ?? 0)
   const loanPaymentChangePercent = Number(query?.get('loanPaymentChangePercent') ?? 0)
+  // N-21-2 예측 기간은 실제 API처럼 없거나 0이면 6개월, 3·6·12만 받고 그 밖은 400이다.
   const requestedMonths = Number(query?.get('forecastMonths') ?? 0)
-  const forecastMonths = requestedMonths > 0 ? requestedMonths : 6
+  if (requestedMonths !== 0 && ![3, 6, 12].includes(requestedMonths)) {
+    const message = '예측 기간은 3·6·12개월 중 하나여야 합니다.'
+    throw new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors: [{ field: 'forecastMonths', message }] })
+  }
+  const forecastMonths = requestedMonths || 6
 
   const { baseMonthlyIncome, monthlyTotalExpense, monthlyLoanPayment } = SAMPLE_CASH_FLOW_BASE
   const forecastIncome = Math.round(baseMonthlyIncome * (1 + incomeChangePercent / 100))

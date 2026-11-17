@@ -24,6 +24,8 @@
 - 오류:
   - 로그인 토큰이 없거나 쓸 수 없으면(만료·잠금·탈퇴) `401 UNAUTHORIZED` "로그인이 필요합니다."
   - 저장된 소득이 없으면 `404 NOT_FOUND`
+  - 예측 기간(`forecastMonths`)이 3·6·12가 아니면 `400 INVALID_INPUT` (GET 쿼리·POST 본문 공통)
+  - POST `/income-volatility`에 본문이 없거나 `monthlyIncomes`가 없거나 비어 있으면 `400 INVALID_INPUT`(field `monthlyIncomes`), POST `/cash-flow/forecast`에 본문이 없으면 `400 INVALID_INPUT`
   - 본문은 위의 공통 오류 형식이다.
 
 ### 계산에 쓰는 저장 데이터
@@ -98,7 +100,7 @@
 | `incomeChangePercent` | 소수 | 아니오 (기본 0) | 소득 변화율(%). 예: `-10`은 10% 감소 |
 | `expenseChangePercent` | 소수 | 아니오 (기본 0) | 지출 변화율(%) |
 | `loanPaymentChangePercent` | 소수 | 아니오 (기본 0) | 원리금 변화율(%) |
-| `forecastMonths` | 정수 | 아니오 (기본 6) | 예측 기간. 화면은 3·6·12 중 고른다 |
+| `forecastMonths` | 정수 | 아니오 (기본 6) | 예측 기간. **3·6·12만** 받는다(없거나 0이면 6). 그 밖의 값은 `400 INVALID_INPUT`, `fieldErrors[0].field = forecastMonths` |
 
 계산 규칙:
 
