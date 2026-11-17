@@ -155,6 +155,11 @@ class IncomeVolatilityControllerTest {
                         .isDeficit(true)
                         .build()))
                 .worstForecastMonth("2026-09")
+                .months(List.of(CashFlowForecastResponse.PastMonthItem.builder()
+                        .baseMonth("2026-08")
+                        .incomeAmount(2061303L)
+                        .expenseAmount(1315514L)
+                        .build()))
                 .build();
         when(incomeVolatilityService.forecastSavedCashFlow(eq(2L), any())).thenReturn(response);
 
@@ -165,7 +170,11 @@ class IncomeVolatilityControllerTest {
                 .andExpect(jsonPath("$.monthlyForecasts[0].forecastYearMonth").value("2026-09"))
                 .andExpect(jsonPath("$.monthlyForecasts[0].deficit").value(true))
                 .andExpect(jsonPath("$.monthlyForecasts[0].isDeficit").doesNotExist())
-                .andExpect(jsonPath("$.worstForecastMonth").value("2026-09"));
+                .andExpect(jsonPath("$.worstForecastMonth").value("2026-09"))
+                // N-21-9 과거 월 실적 — 화면 adapter와 맞춘 이름
+                .andExpect(jsonPath("$.months[0].baseMonth").value("2026-08"))
+                .andExpect(jsonPath("$.months[0].incomeAmount").value(2061303))
+                .andExpect(jsonPath("$.months[0].expenseAmount").value(1315514));
 
         ArgumentCaptor<CashFlowConditionRequest> captor = ArgumentCaptor.forClass(CashFlowConditionRequest.class);
         verify(incomeVolatilityService).forecastSavedCashFlow(eq(2L), captor.capture());

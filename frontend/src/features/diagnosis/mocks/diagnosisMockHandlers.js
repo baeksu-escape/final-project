@@ -169,6 +169,12 @@ function handleCashFlowForecast({ query, token }) {
     worstForecastMonth: monthlyForecasts[0].forecastYearMonth,
     worstNetCashFlow: netCashFlow,
     totalAccumulatedSurplus: netCashFlow * forecastMonths,
+    // N-21-9 과거 월 실적 (오래된 달 → 최근 달). 실제 API처럼 지출은 매달 같은 월 지출 합계다.
+    months: SAMPLE_MONTHLY_INCOMES.map(({ yearMonth, income }) => ({
+      baseMonth: yearMonth,
+      incomeAmount: income,
+      expenseAmount: monthlyTotalExpense,
+    })),
   }
 }
 

@@ -36,6 +36,12 @@ public class CashFlowForecastResponse {
     /** 전망 기간 총 누적 잉여금 (원) */
     private long totalAccumulatedSurplus;
 
+    /**
+     * N-21-9 전망 앞에 이어 그릴 과거 월 실적 (오래된 달 → 최근 달). 계산에 쓴 이력을 그대로 담는다.
+     * 저장 데이터 조회는 소득 기준월까지 최대 12개월이고, 급여소득자는 월급을 12개월로 펼친 값이다.
+     */
+    private List<PastMonthItem> months;
+
     @Getter
     @Builder
     @NoArgsConstructor
@@ -53,6 +59,20 @@ public class CashFlowForecastResponse {
         private long netCashFlow;
         /** 적자 여부 */
         private boolean isDeficit;
+    }
+
+    /** N-21-9 과거 한 달 실적 — 필드 이름은 현금흐름 화면 adapter(baseMonth·incomeAmount·expenseAmount)와 맞췄다. */
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PastMonthItem {
+        /** 기준월 (예: "2026-08") */
+        private String baseMonth;
+        /** 그 달 소득 (원) */
+        private long incomeAmount;
+        /** 그 달 지출 (원). 지출은 평소 월 금액 하나만 저장하므로 저장 데이터 조회에서는 매달 같은 값이다 */
+        private long expenseAmount;
     }
 }
 

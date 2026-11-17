@@ -2,6 +2,7 @@ package com.baeksuescape.finance.util;
 
 import com.baeksuescape.finance.dto.CashFlowForecastResponse;
 import com.baeksuescape.finance.dto.CashFlowForecastResponse.MonthlyForecastItem;
+import com.baeksuescape.finance.dto.CashFlowForecastResponse.PastMonthItem;
 import com.baeksuescape.finance.dto.DeficitMonthsResult;
 import com.baeksuescape.finance.dto.DeficitMonthsResult.DeficitMonthDetail;
 import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
@@ -337,7 +338,23 @@ public final class IncomeVolatilityCalculator {
                 .worstForecastMonth(worstMonth)
                 .worstNetCashFlow(worstNet == Long.MAX_VALUE ? 0L : worstNet)
                 .totalAccumulatedSurplus(totalSurplus)
+                .months(toPastMonths(pastHistory))
                 .build();
+    }
+
+    /** N-21-9 계산에 쓴 과거 이력을 화면이 이어 그릴 과거 월 실적(오래된 달 → 최근 달)으로 바꾼다. 이력이 없으면 빈 목록이다. */
+    private static List<PastMonthItem> toPastMonths(List<MonthlyIncomeItem> pastHistory) {
+        if (pastHistory == null) {
+            return List.of();
+        }
+        return pastHistory.stream()
+                .sorted(Comparator.comparing(MonthlyIncomeItem::toYearMonth))
+                .map(item -> PastMonthItem.builder()
+                        .baseMonth(item.getYearMonth())
+                        .incomeAmount(item.getIncome())
+                        .expenseAmount(item.getExpense())
+                        .build())
+                .toList();
     }
 
     /** calculatePeakOffPeakGap()의 결과: 격차, 성수기 달·금액, 비수기 달·금액 */

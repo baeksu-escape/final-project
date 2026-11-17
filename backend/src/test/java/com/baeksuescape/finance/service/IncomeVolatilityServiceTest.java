@@ -199,6 +199,12 @@ class IncomeVolatilityServiceTest {
         when(mapper.selectLatestLoanMonthlyPayment(1L)).thenReturn(0L);
         CashFlowForecastResponse forecast = service.forecastSavedCashFlow(1L, null);
         assertEquals("2026-09", forecast.getMonthlyForecasts().get(0).getForecastYearMonth());
+
+        // N-21-9 과거 월 실적도 서버가 월급을 12개월로 펼쳐서 준다(2025-09 ~ 2026-08, 매달 같은 월급·지출 합계).
+        assertEquals(12, forecast.getMonths().size());
+        assertEquals("2025-09", forecast.getMonths().get(0).getBaseMonth());
+        assertEquals("2026-08", forecast.getMonths().get(11).getBaseMonth());
+        assertTrue(forecast.getMonths().stream().allMatch(m -> m.getIncomeAmount() == 2404634L && m.getExpenseAmount() == 1461547L));
     }
 
     @Test
@@ -234,5 +240,13 @@ class IncomeVolatilityServiceTest {
         assertEquals(200000L, first.getForecastLoanPayment());
         assertEquals(1889548L - 1315514L - 200000L, first.getNetCashFlow());
         assertEquals(3884117L - 1327643L, response.getPeakOffPeakGap(), "N-21-7은 N-22-4와 같은 격차여야 한다.");
+
+        // N-21-9 과거 월 실적: 저장된 12개월 소득 그대로, 지출은 월 지출 합계(매달 같은 값)
+        assertEquals(12, response.getMonths().size());
+        assertEquals("2025-09", response.getMonths().get(0).getBaseMonth());
+        assertEquals(1933611L, response.getMonths().get(0).getIncomeAmount());
+        assertEquals(1315514L, response.getMonths().get(0).getExpenseAmount());
+        assertEquals("2026-08", response.getMonths().get(11).getBaseMonth());
+        assertEquals(2061303L, response.getMonths().get(11).getIncomeAmount());
     }
 }
