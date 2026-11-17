@@ -42,9 +42,10 @@ export default function LandingPage() {
 
       <section className="landing-page__promo" aria-labelledby="landing-promo-title">
         <div className="landing-page__promo-head">
-          <span className="tag landing-page__eyebrow">N-10 · 홍보 그래프</span>
+          {/* N-10-1·N-10-2 전후 점수 비교 — 화면 번호는 사용자에게 보이지 않게 주석에만 둔다 */}
+          <span className="tag landing-page__eyebrow">서비스 효과 예시</span>
           <h2 className="landing-page__promo-title" id="landing-promo-title">
-            금융 데이터의 시작부터 안전하게 보호합니다
+            성실하게 낸 기록이 점수를 바꿉니다
           </h2>
         </div>
         <div className="landing-page__promo-cards">
