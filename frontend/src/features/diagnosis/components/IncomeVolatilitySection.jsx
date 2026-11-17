@@ -57,26 +57,19 @@ export default function IncomeVolatilitySection({ data }) {
   const query = useIncomeVolatility(user?.userId, user?.jobType, data)
   const response = query.result
   const stats = response?.stats ?? null
-  const fixedExpenseAmount = response?.fixedExpenseAmount ?? null
   const deficits = response?.deficits ?? null
   const hasIncomeStats = Boolean(stats)
-  const validFixedExpense = Number.isSafeInteger(fixedExpenseAmount) && fixedExpenseAmount >= 0
   // 12% 초과 강조는 화면 표시 기준(시연 설정 상수)이다.
   const highVolatility = stats?.coefficientOfVariationPct != null
     && stats.coefficientOfVariationPct > VOLATILITY_WARNING_PCT
   const recentDirection = stats?.recentThreeVsAnnualAverageAmount
-  const lowMonthMargin = response?.lowestMonthVsFixedExpenseAmount ?? null
+  const fixedExpenseRatio = response?.fixedExpenseRatio
   let volatilityLabel = '소득 자료를 확인해 주세요.'
   if (stats) {
     if (stats.coefficientOfVariationPct == null) volatilityLabel = '평균 소득이 0원이라 계산할 수 없습니다.'
     else volatilityLabel = highVolatility ? '변동이 큼 (12% 초과)' : '12% 이하'
   }
-  let lowMonthComparison = '월 고정지출을 확인해 주세요.'
-  if (lowMonthMargin != null) {
-    if (lowMonthMargin < 0) lowMonthComparison = `고정지출이 ${formatWon(Math.abs(lowMonthMargin))} 더 큽니다`
-    else if (lowMonthMargin === 0) lowMonthComparison = '소득과 고정지출이 같습니다.'
-    else lowMonthComparison = `소득이 ${formatWon(lowMonthMargin)} 더 큽니다`
-  }
+  const lowMonthComparison = Number.isFinite(fixedExpenseRatio) ? `최저 소득 대비 ${formatPercent(fixedExpenseRatio)}` : '비율을 확인할 수 없습니다.'
 
   return (
     <section className="iv-section" aria-labelledby="iv-title">
@@ -99,7 +92,7 @@ export default function IncomeVolatilitySection({ data }) {
         <article className="iv-kpi">
           <h3>고정지출 미달 월</h3>
           <p className="iv-kpi__value">{deficits == null ? '—' : `${deficits.length}개월`}</p>
-          <span>{validFixedExpense ? '소득이 월 고정지출보다 적은 달' : '월 고정지출 미입력'}</span>
+          <span>소득이 월 고정지출보다 적은 달</span>
         </article>
         <article className="iv-kpi">
           <h3>가장 적게 번 달</h3>
@@ -131,7 +124,7 @@ export default function IncomeVolatilitySection({ data }) {
         {!response ? (
           <p className="iv-unavailable">{query.loading ? '불러오는 중입니다.' : '지표를 불러오지 못했습니다.'}</p>
         ) : deficits == null ? (
-          <p className="iv-unavailable">{validFixedExpense ? getIncomeUnavailableMessage(response.unavailableReason) : '월 고정지출이 미입력되어 부족 달을 확인할 수 없습니다.'}</p>
+          <p className="iv-unavailable">{getIncomeUnavailableMessage(response.unavailableReason)}</p>
         ) : deficits.length === 0 ? (
           <p>최근 12개월 중 월 고정지출보다 소득이 적은 달이 없습니다.</p>
         ) : (
@@ -140,7 +133,7 @@ export default function IncomeVolatilitySection({ data }) {
               <li key={item.baseMonth}>
                 <strong>{formatMonth(item.baseMonth)}</strong>
                 <span>소득 {formatWon(item.incomeAmount)} · 부족액 {formatWon(item.shortageAmount)}</span>
-                <span>다시 올 시점: {formatMonth(item.nextOccurrenceMonth)} ({item.monthsUntilNextOccurrence}개월 뒤)</span>
+                <span>다시 올 시점: {item.monthsUntilNextOccurrence}개월 뒤</span>
                 <span>미리 준비할 금액: {formatWon(item.shortageAmount)}</span>
               </li>
             ))}
