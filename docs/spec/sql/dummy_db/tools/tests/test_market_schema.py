@@ -52,7 +52,7 @@ class MarketSchemaTests(unittest.TestCase):
             for line in self.ddl.decode('utf-8-sig').splitlines()
         )
         self.assertEqual(sum(map(len, self.base_rows.values())), ddl_insert_count)
-        self.assertEqual(report['rows']['DIM_FEATURE'], 39)
+        self.assertEqual(report['rows']['DIM_FEATURE'], 77)   # FS-DRAFT 39 + FS-V1 38
         self.assertEqual(report['rows']['LOAN_PRODUCT_FEATURE'], 34)
 
     def test_published_cleanup_and_checks_match_schema(self):
@@ -79,12 +79,15 @@ class MarketSchemaTests(unittest.TestCase):
         self.assertEqual(files['01_create_tables.sql'], self.ddl)
         self.assertEqual(files['25_seed_dim_feature_fs_draft.sql'],
                          (SQL_DIR / 'seed' / 'avenue_seed_dim_feature_fs_draft.sql').read_bytes())
-        self.assertEqual(report['rows']['DIM_FEATURE'], 39)
+        self.assertEqual(files['26_seed_dim_feature_fs_v1.sql'],
+                         (SQL_DIR / 'seed' / 'avenue_seed_dim_feature_fs_v1.sql').read_bytes())
+        self.assertEqual(report['rows']['DIM_FEATURE'], 77)
         self.assertEqual([line[2:] for line in files['run_all.sql'].decode('utf-8').splitlines() if line.startswith('@@')],
-                         ['00_drop_all.sql', '01_create_tables.sql', '25_seed_dim_feature_fs_draft.sql', '99_check.sql'])
+                         ['00_drop_all.sql', '01_create_tables.sql', '25_seed_dim_feature_fs_draft.sql',
+                          '26_seed_dim_feature_fs_v1.sql', '99_check.sql'])
         seed_only = files['run_seed_only.sql'].decode('utf-8')
         self.assertEqual([line[2:] for line in seed_only.splitlines() if line.startswith('@@')],
-                         ['25_seed_dim_feature_fs_draft.sql', '99_check.sql'])
+                         ['25_seed_dim_feature_fs_draft.sql', '26_seed_dim_feature_fs_v1.sql', '99_check.sql'])
         self.assertIn("'DIM_FEATURE'", seed_only)
         self.assertEqual(files['00_drop_all.sql'].decode('utf-8'),
                          (DB_DIR / '00_drop_all.sql').read_text(encoding='utf-8'))
