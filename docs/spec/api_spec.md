@@ -32,10 +32,12 @@
 
 | 값 | 테이블 | 규칙 |
 |---|---|---|
-| 최근 12개월 소득 | `USER_INCOME_MONTH` | 최신 기준월부터 최대 12행. 급여소득자(`SALARY`)는 월급 1행을 마지막 기준월까지 12개월로 펼친다(연소득 = 월급 × 12와 같은 해석) |
-| 월 고정지출 (N-22) | `USER_EXPENSE_ITEM` | 최신 기준월의 `EXPENSE_GROUP_CODE = 'FIXED'` 합계 |
-| 월 지출 합계 (N-21) | `USER_EXPENSE_ITEM` | 최신 기준월의 모든 지출 그룹 합계 |
-| 월 원리금 (N-21) | `USER_LOAN` | 최신 기준월의 `MONTHLY_PAYMENT_AMT` 합계. 대출이 없으면 0 |
+| 최근 12개월 소득 | `USER_INCOME_MONTH` | 소득 기준월(가장 늦은 달)부터 최대 12행. 급여소득자(`SALARY`)는 월급 1행을 마지막 기준월까지 12개월로 펼친다(연소득 = 월급 × 12와 같은 해석) |
+| 월 고정지출 (N-22) | `USER_EXPENSE_ITEM` | **소득 기준월**의 `EXPENSE_GROUP_CODE = 'FIXED'` 합계. 그 달에 행이 없으면 0 |
+| 월 지출 합계 (N-21) | `USER_EXPENSE_ITEM` | **소득 기준월**의 모든 지출 그룹 합계. 그 달에 행이 없으면 0 |
+| 월 원리금 (N-21) | `USER_LOAN` | **소득 기준월**의 `MONTHLY_PAYMENT_AMT` 합계. 대출이 없으면 0 |
+
+- 기준월은 DDL 11/10 결정대로 `USER_INCOME_MONTH`의 가장 늦은 `BASE_MONTH` 하나로 정하고, 지출·대출도 같은 달 값을 쓴다(테이블마다 최신 달을 따로 잡으면 서로 다른 달 값이 섞이므로, 11/17 리뷰 반영).
 
 ### GET `/api/diagnosis/income-volatility`
 
@@ -314,6 +316,7 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 { "changes": { "TELECOM_ON_TIME_MONTHS": 12, "CARD_LIMIT_AMT": 5000000, "CARD_MONTHLY_SPEND_AMT": 1000000 } }
 ```
 - 키 10개(ML-04와 같음): `TELECOM_ON_TIME_MONTHS`, `DELINQ_COUNT_12M`, `CASH_ADVANCE_MONTHS`, `NEW_LOAN_COUNT_3M`, `LOAN_BALANCE_AMT`, `PRIVATE_LENDER_LOAN_BALANCE_AMT`, `UTILITY_LATE_MONTHS`(11/17 확정, 피처 정의서 C21), `EASYPAY_MONTHLY_COUNT`, `CARD_LIMIT_AMT`, `CARD_MONTHLY_SPEND_AMT`
+- `EASYPAY_MONTHLY_COUNT`는 **월 횟수 그대로** 보낸다. 12개월 값 변환(× 12)은 FastAPI ML-04가 한다(`simulation.py`).
 - 값이 `null`이면 키를 뺀 것과 같다(바꾸지 않음). 단 카드 한도·월 사용액은 한쪽만 값이 있고 다른 쪽이 `null`·없음이면 400이다.
 - 카드 한도·월 사용액은 함께 보낸다. 한도가 0이면 오류가 아니라 카드 사용률을 결측으로 계산한다.
 
@@ -349,5 +352,14 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 - 상한 초과 → "0~12 사이로 입력해 주세요."
 - 카드 한쪽만 → `changes.CARD_LIMIT_AMT` "카드 한도와 월 카드 사용액은 함께 보내야 합니다."
 - ML-04가 422를 주면 Spring이 같은 공통 형식(400)으로 바꾼다.
+
+ML-04의 그 밖의 오류를 화면에 전달하는 규칙(제안, Spring 미구현). 시뮬레이터는 결과를 저장하지 않으므로 NOT_SCORABLE로 저장하지 않고 오류를 그대로 알린다.
+
+| ML-04 응답 | Spring → 화면 | 문구 |
+|---|---|---|
+| 422 `INVALID_INPUT` | 400 `INVALID_INPUT` + `fieldErrors` | 입력값을 확인해 주세요. |
+| 503 `MODEL_NOT_READY` (실제 모델 파일 없음) | 503 `MODEL_NOT_READY` | 점수 계산 서버가 준비 중입니다. 잠시 후 다시 시도해 주세요. |
+| 409 `VERSION_MISMATCH` (모르는 모델 버전) | 409 `VERSION_MISMATCH` | 저장된 평가의 모델이 바뀌었습니다. 점수를 다시 산출한 뒤 이용해 주세요. |
+| 연결 실패·그 밖의 5xx | 503 `MODEL_NOT_READY` | 점수 계산 서버가 준비 중입니다. 잠시 후 다시 시도해 주세요. |
 
 프론트: `features/simulation/api/simulationApi.js`의 `recalculateCreditCare({ changes })`. mock은 588점 예시에서 간단한 규칙으로 계산한다(진짜 모델 아님).

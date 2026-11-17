@@ -21,28 +21,28 @@
          ORDER BY BASE_MONTH
     </select>
 
-    <!-- 최신 기준월의 월 고정 지출(FIXED) 합계 -->
+    <!-- 소득 기준월(USER_INCOME_MONTH의 가장 늦은 달, DDL 11/10 결정)의 월 고정 지출(FIXED) 합계. 그 달에 행이 없으면 0 -->
     <select id="selectLatestFixedExpense" resultType="long">
         SELECT NVL(SUM(MONTHLY_AMT), 0)
           FROM USER_EXPENSE_ITEM
          WHERE USER_ID = #{userId}
            AND EXPENSE_GROUP_CODE = 'FIXED'
-           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_EXPENSE_ITEM WHERE USER_ID = #{userId})
+           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
     </select>
 
-    <!-- 최신 기준월의 월 지출 합계(고정·할부·정기결제·기타) -->
+    <!-- 소득 기준월의 월 지출 합계(고정·할부·정기결제·기타). 소득·지출·대출이 같은 달 값을 쓰게 한다 -->
     <select id="selectLatestTotalExpense" resultType="long">
         SELECT NVL(SUM(MONTHLY_AMT), 0)
           FROM USER_EXPENSE_ITEM
          WHERE USER_ID = #{userId}
-           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_EXPENSE_ITEM WHERE USER_ID = #{userId})
+           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
     </select>
 
-    <!-- 최신 기준월의 대출 월 원리금 합계 -->
+    <!-- 소득 기준월의 대출 월 원리금 합계. 대출이 없으면 0 -->
     <select id="selectLatestLoanMonthlyPayment" resultType="long">
         SELECT NVL(SUM(MONTHLY_PAYMENT_AMT), 0)
           FROM USER_LOAN
          WHERE USER_ID = #{userId}
-           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_LOAN WHERE USER_ID = #{userId})
+           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
     </select>
 </mapper>

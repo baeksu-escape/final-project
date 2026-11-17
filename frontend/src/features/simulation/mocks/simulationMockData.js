@@ -123,7 +123,7 @@ export const SIMULATION_DEFAULT_PROB = Object.freeze({ CAUTION: 0.21, STANDARD: 
 export const SIMULATION_FEATURES = Object.freeze([
   { key: 'TELECOM_ON_TIME_MONTHS', featureCode: 'telecom_on_time_streak', featureName: '통신비 정시 납부 기간', alternative: true, base: 6, best: 12, pointPerUnit: 2 },
   { key: 'UTILITY_LATE_MONTHS', featureCode: 'utility_late_months', featureName: '공과금 미납 개월', alternative: true, base: 2, best: 0, pointPerUnit: 4 }, // 10번째 키 확정(11/17, 피처 정의서 C21)
-  { key: 'EASYPAY_MONTHLY_COUNT', featureCode: 'dp_payment_count_12m', featureName: '간편결제 이용 건수(12개월)', alternative: true, base: 5, best: 50, pointPerUnit: 0.2, featureScale: 12 }, // 월 건수 × 12 (ML-04 TODO 정의서 9장)
+  { key: 'EASYPAY_MONTHLY_COUNT', featureCode: 'dp_payment_count_12m', featureName: '간편결제 이용 건수(12개월)', alternative: true, base: 5, best: 50, pointPerUnit: 0.2, featureScale: 12 }, // 월 건수 × 12 — FastAPI ML-04가 하는 변환을 mock이 흉내 낸다(화면·Spring은 월 횟수 그대로 보냄)
   { key: 'DELINQ_COUNT_12M', featureCode: 'DQ1200001', featureName: '최근 1년 30일 이상 연체 횟수', alternative: false, base: 1, best: 0, pointPerUnit: 15 },
   { key: 'CASH_ADVANCE_MONTHS', featureCode: 'CF1231605', featureName: '현금서비스 이용 기간', alternative: false, base: 3, best: 0, pointPerUnit: 3 },
   { key: 'NEW_LOAN_COUNT_3M', featureCode: 'L22000900', featureName: '최근 3개월 신규 대출(상환 중)', alternative: false, base: 1, best: 0, pointPerUnit: 6 },
