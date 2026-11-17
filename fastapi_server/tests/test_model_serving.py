@@ -126,6 +126,32 @@ class ModelFileLoadingTest(unittest.TestCase):
             self.assertTrue(load_from_artifacts(directory).ready)
 
 
+class ModelHashCheckTest(unittest.TestCase):
+    """SHA256SUMS.txt가 있으면 joblib을 열기 전에 해시를 대조한다(#74 리뷰 ④)."""
+
+    def write_bundle(self, directory: Path, tamper: bool):
+        import hashlib
+        import joblib
+        lines = []
+        for name in ("legacy", "alternative"):
+            path = directory / f"{name}.joblib"
+            joblib.dump(tiny_model(name), path)
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            lines.append(f"{'0' * 64 if tamper and name == 'legacy' else digest}  {path.name}")
+        (directory / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def test_matching_hashes_load(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.write_bundle(Path(folder), tamper=False)
+            self.assertTrue(load_from_artifacts(Path(folder)).ready)
+
+    def test_wrong_hash_is_not_loaded(self):
+        """받은 묶음과 다른 파일(해시 불일치)은 열지 않고 준비 안 됨 → 실제 모델 요청은 503."""
+        with tempfile.TemporaryDirectory() as folder:
+            self.write_bundle(Path(folder), tamper=True)
+            self.assertFalse(load_from_artifacts(Path(folder)).ready)
+
+
 class RoundHalfUpTest(unittest.TestCase):
     def test_exact_half_goes_up_like_training_data(self):
         """학습 생성 코드와 같은 ROUND_HALF_UP. Python round(1.25, 1)은 1.2라서 경계값이 학습과 달라진다."""

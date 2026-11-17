@@ -34,9 +34,17 @@ uvicorn main:app --port 8000
 
 **실제 모델 파일 받기 (실제 모델을 쓸 때만)**
 1. 팀 채널 #파일공유에서 모델 묶음(`legacy.joblib`, `alternative.joblib`, `*.meta.json`, `SHA256SUMS.txt`)을 받는다.
-2. 4개 파일을 `fastapi_server/artifacts/`에 넣는다(Git에는 올라가지 않는다).
-3. 해시가 `SHA256SUMS.txt`와 같은지 확인한다: PowerShell `Get-FileHash artifacts\legacy.joblib -Algorithm SHA256`. joblib은 불러올 때 파일 안의 코드가 실행될 수 있으므로 이 묶음 외의 `.joblib`은 넣지 않는다.
+2. 모델 파일 4개와 **`SHA256SUMS.txt`까지 5개**를 `fastapi_server/artifacts/`에 넣는다(Git에는 올리지 않는다).
+3. `SHA256SUMS.txt`가 있으면 서버가 켜질 때 **joblib을 열기 전에 해시를 자동으로 대조**한다. 하나라도 다르면 모델을 열지 않고 "준비 안 됨"(로그에 `model hash mismatch`)이다. joblib은 불러올 때 파일 안의 코드가 실행될 수 있으므로 이 묶음 외의 `.joblib`은 넣지 않는다.
 4. 서버를 다시 켜고 http://localhost:8000/v1/health 에서 `"modelLoaded": true`인지 본다.
+
+**공용 DB를 실제 모델로 전환하는 절차 (DB 담당)**
+1. 시연·공유에 쓰는 서버 PC의 `artifacts/`에 위 5개 파일을 넣고 FastAPI를 켠다 → `/v1/health`가 **`"modelLoaded": true`**인지 확인한다. false면 여기서 멈춘다(그대로 바꾸면 모든 점수 요청이 503 → `MODEL_ERROR` 저장).
+2. 공용 DB에 FS-V1 기준 데이터가 있는지 본다: `SELECT COUNT(*) FROM DIM_FEATURE WHERE FEATURE_SET_VERSION = 'FS-V1'` → 38(없으면 `docs/spec/sql/add_fs_v1_feature_set.sql` → `seed/avenue_seed_dim_feature_fs_v1.sql`).
+3. 팀에 "지금 실제 모델로 바꾼다"고 알린 뒤, SQL Developer **공용 DB 접속**에서 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`을 F5로 실행한다 → `LGBM-BASE-0.1` ACTIVE, `DEV-DUMMY` RETIRED.
+4. 시연 계정으로 점수 산출 → 리포트 `modelVersion`이 `LGBM-BASE-0.1`, SHAP 요인 38개, 피처 칩 기존 18·대안 38인지 확인한다. FastAPI 로그에 `model=LGBM-BASE-0.1`.
+5. 문제가 생기면 바로 `docs/spec/sql/rollback_model_to_dev_dummy.sql`로 Mock에 되돌린다(저장된 평가는 그대로).
+6. 팀에 알린다: 이제 각자 PC에서 공용 DB를 쓰려면 모델 파일 5개가 `artifacts/`에 있어야 한다(없으면 503). 로컬 DB를 쓰는 팀원은 각자 DB가 `DEV-DUMMY`인 동안 영향이 없다.
 
 브라우저에서 http://localhost:8000/docs 를 열면 API 4개를 직접 눌러 볼 수 있다.
 
@@ -70,7 +78,8 @@ cd fastapi_server
 .venv\Scripts\activate                 # 가상환경 켜기 (만들고 설치하는 법은 「실행」)
 python -m unittest discover tests -v
 ```
-마지막 줄이 `Ran 103 tests ... OK`이면 정상이다(학습·SHAP 시험 포함, 모델 파일이 없어도 작은 합성 모델로 돈다). 검사하는 것:
+마지막 줄이 `Ran 116 tests ... OK`이면 정상이다(학습·SHAP·FS-V1 시험 포함, 모델 파일이 없어도 작은 합성 모델로 돈다). 검사하는 것:
+- 모델 파일 해시 자동 대조: `SHA256SUMS.txt`와 다르면 열지 않고 준비 안 됨
 - 모델 버전으로 계산기 고르기(FP-141): `DEV-DUMMY`·버전 없음 → Mock, `LGBM-BASE-0.1` → 실제 모델(응답 모양이 Mock과 같고 합 규칙·38개 요인), 파일 없음 → 503, 모르는 버전 → 409, 설명 파일 버전이 다르면 준비 안 됨, ROUND_HALF_UP 반올림
 - 피처 39개가 시드 SQL(`FS-DRAFT`)과 같은지, 피처 정의서 11장(지금 38개)이 모두 들어 있고 차이는 `LRZ021201`(C9로 제외)뿐인지
 - 이상치 고정 상한(정의서 C8): 소득 합계 20억 초과·평균 월 지출 2억 초과·월 상환액 0 미만이면 그 값과 그 값으로 계산하는 피처를 결측으로
