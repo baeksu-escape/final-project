@@ -30,7 +30,7 @@
 ## 확인
 - `./mvnw test` **227개 통과**(새 3개)
 - FastAPI 가상환경 `python -m unittest discover tests` **35개 통과**(새 2개)
-- 확인 못 함: 공용 DB 실제 저장(사유 코드 행은 적용됨, 기관 기록 없는 새 계정으로 점수 산출해 `NOT_SCORABLE`/`ALT_DATA_EMPTY` 1행 저장 확인 예정)
+- 실제 연결 확인(11/17, 로컬 연습 DB — 공용 DB에는 쓰지 않음): 시연 계정의 통신비 기록을 지워 "동의·불러오기는 했지만 기관 기록 0건" 상황을 만들고 점수 산출 → `NOT_SCORABLE` / `ALT_DATA_EMPTY` 저장, FastAPI 호출 없음 확인(FP-141 PR에 함께 기록)
 
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)

@@ -1,17 +1,27 @@
-# FP-140 예측 서버(FastAPI) 시작점 — 지금은 Mock 모델로 ML-01~04를 제공한다.
+# FP-140·FP-141 예측 서버(FastAPI) 시작점 — ML-01~04. 요청의 모델 버전이 DEV-DUMMY면 Mock, LGBM-BASE-0.1이면 실제 모델로 계산한다.
 # 실행: fastapi_server 폴더에서 `uvicorn main:app --port 8000` → 브라우저에서 http://localhost:8000/docs
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from pipeline.model_scorer import get_scorer
 from routers.assessment import ApiError, router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("avenue.prediction")
 
-app = FastAPI(title="Avenue 예측 서버 (Mock)", version="FS-DRAFT")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """서버가 켜질 때 실제 모델을 미리 불러온다(첫 점수 요청이 느려지지 않게). 파일이 없어도 서버는 켜지고 health로 알린다."""
+    get_scorer()
+    yield
+
+
+app = FastAPI(title="Avenue 예측 서버", version="LGBM-BASE-0.1 / DEV-DUMMY", lifespan=lifespan)
 app.include_router(router)
 
 

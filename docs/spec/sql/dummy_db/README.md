@@ -6,7 +6,7 @@
 
 ## 상황에 맞는 실행 파일 선택
 
-- **일반적인 최초 준비:** 원본 `avenue_ddl.sql`로 테이블 생성 → 같은 스키마에서 `run_seed_only.sql`로 빈 시드 대상 테이블에 적재(FS-DRAFT 피처 39개 포함) → `99_check.sql` 결과 확인.
+- **일반적인 최초 준비:** 원본 `avenue_ddl.sql`로 테이블 생성 → 같은 스키마에서 `run_seed_only.sql`로 빈 시드 대상 테이블에 적재(FS-DRAFT 피처 39개·FS-V1 피처 38개 포함) → `99_check.sql` 결과 확인.
 - **최신 테이블이 이미 있고 시드 대상만 비어 있음:** DDL을 다시 실행하지 않고 `run_seed_only.sql`만 실행한다. 기존 기준 데이터는 유지한다.
 - **데이터가 있는 DB의 구조 변경:** 해당 ALTER SQL만 적용한다. 이번 자산·대출 상태 변경은 아래 O-15 안내를 따른다. 기존 데이터 보정은 별도다.
 - **기존 DB의 상권 표 제거:** `../drop_unused_market_tables.sql`로 상권 전용 표 5개만 별도로 삭제한다. 최신 초기화 묶음은 이 5개 표를 만들거나 지우지 않는다.
@@ -77,7 +77,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
    python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더> docs/spec/sql/dummy_db --env-file "$env:USERPROFILE\avenue-secrets\avenue_dev.env"
    ```
 
-5. **커밋할 파일:** 이 폴더의 `00_drop_all.sql`, `01_create_tables.sql`, `10_seed_*.sql`~`25_seed_*.sql`, `99_check.sql`, `run_all.sql`(시드 적재용으로 바뀜), `run_seed_only.sql`, `seed_report.json`, `README.md`. env 파일은 절대 커밋하지 않는다.
+5. **커밋할 파일:** 이 폴더의 `00_drop_all.sql`, `01_create_tables.sql`, `10_seed_*.sql`~`26_seed_*.sql`, `99_check.sql`, `run_all.sql`(시드 적재용으로 바뀜), `run_seed_only.sql`, `seed_report.json`, `README.md`. env 파일은 절대 커밋하지 않는다.
 6. **키가 바뀌면** 4번을 다시 실행해 시드 전체를 새로 만들고 커밋한다. 이전 키로 만든 암호문·HMAC은 새 키로 복호화·검색되지 않는다. Spring도 같은 env 값을 써야 한다.
 
 **시연 계정(N-01-5):** 사용자는 직군별로 회원 ID 정렬 후 첫 회원 1명씩 3명이고, 관리자 1명을 새 행으로 추가해 모두 4개다. 네 계정은 같은 비밀번호를 쓴다.
@@ -132,13 +132,13 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 생성기는 받은 DDL에서 타입·문자 길이·숫자 자릿수·NOT NULL·CHECK(Oracle NULL/UNKNOWN 포함)·PK·UNIQUE·복합 FK·조건부 UNIQUE INDEX를 읽어 검사한다. 모든 행 검증과 원천 대조가 끝나야 파일을 쓴다. SQL*Plus 2,499자 줄 제한도 생성 SQL에 적용한다. 당시 DDL v0.3.2는 11/12 범영 님이 Oracle 적재를 확인했으며 시드는 11/13 경환이 `run_all.sql`로 적재해 `99_check.sql`의 표 51개·표별 행 수 일치를 확인했다. 이는 상권 표 제거 전 기록이며, 현재 47개 표 개정본의 실제 Oracle 적재·삭제는 아직 확인하지 않았다.
 
-성공한 출력의 `run_all.sql`은 `00_drop_all.sql` → 받은 DDL(내장 기준 INSERT 포함) → 회원·상품 시드 → FS-DRAFT 피처 시드 → `99_check.sql`을 실행한다. SQL Developer F5 또는 SQL*Plus `@run_all.sql`을 사용한다. `WHENEVER SQLERROR/OSERROR EXIT FAILURE ROLLBACK`이 있으나 **DDL과 이미 COMMIT한 데이터는 오류 후 ROLLBACK으로 되돌아오지 않는다.** 반드시 새 개발 스키마에서 실행한다.
+성공한 출력의 `run_all.sql`은 `00_drop_all.sql` → 받은 DDL(내장 기준 INSERT 포함) → 회원·상품 시드 → FS-DRAFT·FS-V1 피처 시드 → `99_check.sql`을 실행한다. SQL Developer F5 또는 SQL*Plus `@run_all.sql`을 사용한다. `WHENEVER SQLERROR/OSERROR EXIT FAILURE ROLLBACK`이 있으나 **DDL과 이미 COMMIT한 데이터는 오류 후 ROLLBACK으로 되돌아오지 않는다.** 반드시 새 개발 스키마에서 실행한다.
 
 **최초 시드 적재:** 확정 `docs/spec/sql/avenue_ddl.sql`을 먼저 실행한 뒤 같은 스키마에서 `run_seed_only.sql`을 실행한다. DDL에 내장된 기준 데이터는 유지한다. 일반 시드 대상과 `DIM_FEATURE`가 모두 존재하고 비어 있는지 실행 전에 검사하며, 하나라도 없거나 기존 행이 있으면 중단한다. 따라서 피처 시드가 일부 적용됐거나 `ASSESSMENT_FACTOR`가 피처 행을 참조하는 DB에서는 중단되며, 피처 시드 SQL을 재실행하지 않는다. 이 검사는 동시 쓰기를 잠그지 않으므로 적재 중 다른 작업이 같은 테이블에 쓰지 않아야 한다. 기존 행의 병합·삭제·재적재는 지원하지 않는다. 시드 파일의 중간 COMMIT과 IDENTITY 변경 때문에 적재 도중 오류가 나면 전체 롤백할 수 없다. `99_check.sql`은 비교 결과를 출력하므로 직접 확인한다. 생성기 재실행 시 이 실행 파일도 함께 생성한다.
 
 `00_drop_all.sql`은 첫 DROP 전에 USER_TABLES에서 옛 DB 표식(APP_MEMBER·MEMBER_MONTHLY_INPUT·MEMBER_LOAN·EXTERNAL_API_RESPONSE)을 확인하고 하나라도 있으면 오류로 종료한다. 단독 실행에도 WHENEVER SQLERROR EXIT가 적용된다. 표식이 없는 스키마의 공유 테이블까지 자동 식별하는 가드는 아니므로 별도 스키마 원칙은 유지한다.
 
-`99_check.sql`은 현재 개정 DDL 기준 테이블 47개·테이블별 기대 행 수(FS-DRAFT DIM_FEATURE 39개 포함)·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·CRLF를 LF로 정규화한 DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
+`99_check.sql`은 현재 개정 DDL 기준 테이블 47개·테이블별 기대 행 수(DIM_FEATURE 77개 = FS-DRAFT 39 + FS-V1 38 포함)·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·CRLF를 LF로 정규화한 DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
 
 테스트(저장소 루트, cryptography가 설치된 Python):
 
