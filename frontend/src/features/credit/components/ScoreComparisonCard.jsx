@@ -45,7 +45,7 @@ function ModelScore({ title, model, bands, features, alternative, diff }) {
   const hasAlternativeFeatures = alternative && features?.some((feature) => feature.alternativeYn === 'Y')
   const featureGroups = groupModelFeatures(features)
   return (
-    <div className="credit-model">
+    <div className="panel-sunk">
       <div className="credit-model__header">
         <div>
           <h3>{title}</h3>
@@ -58,7 +58,7 @@ function ModelScore({ title, model, bands, features, alternative, diff }) {
         )}
       </div>
       {alternative && diff != null && (
-        <p className={diff < 0 ? 'credit-diff credit-diff--negative' : 'credit-diff'}>
+        <p className={diff < 0 ? 'credit-diff credit-diff--negative num' : 'credit-diff num'}>
           기존보다 {signedScore(diff)}점
         </p>
       )}
@@ -67,7 +67,7 @@ function ModelScore({ title, model, bands, features, alternative, diff }) {
       ) : <p className="credit-unavailable">산정 불가</p>}
       {featureGroups.length > 0 && (
         <div>
-          <p className="credit-feature-title">이 모델이 보는 영역</p>
+          <p className="hint">이 모델이 보는 영역</p>
           <div className="credit-chips">
             {featureGroups.map((group) => (
               <span
@@ -80,7 +80,7 @@ function ModelScore({ title, model, bands, features, alternative, diff }) {
               </span>
             ))}
           </div>
-          {hasAlternativeFeatures && <p className="credit-hint">보라색 태그는 대안 모델에서 새로 더한 비금융 피처입니다.</p>}
+          {hasAlternativeFeatures && <p className="hint">보라색 태그는 대안 모델에서 새로 더한 비금융 피처입니다.</p>}
         </div>
       )}
     </div>
@@ -92,7 +92,7 @@ export default function ScoreComparisonCard({ report }) {
   const bands = report.gradeBands?.bands ?? []
   return (
     <Card title="점수 비교">
-      <div className="credit-models">
+      <div className="l-g2" style={{ '--min': '300px' }}>
         <ModelScore title="기존 모델" model={report.traditional} bands={bands} features={report.modelFeatures?.traditional} />
         <ModelScore title="대안 모델" model={report.alternative} bands={bands} features={report.modelFeatures?.alternative} alternative diff={report.comparison?.scoreDiff} />
       </div>

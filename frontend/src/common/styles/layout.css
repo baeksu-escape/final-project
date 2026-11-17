@@ -44,9 +44,6 @@ p {
   flex-direction: column;
   gap: 18px;
   min-width: 0;
-  width: calc(100% - 32px);
-  max-width: 1288px;
-  margin-inline: auto;
   padding-bottom: 56px;
 }
 

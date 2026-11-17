@@ -10,7 +10,7 @@ import { fetchCreditReport } from '../api/creditApi.js'
 import ScoreComparisonCard from '../components/ScoreComparisonCard.jsx'
 import CreditReportSummaryCard from '../components/CreditReportSummaryCard.jsx'
 import ShapFactorsCard from '../components/ShapFactorsCard.jsx'
-import '../styles/creditReport.css'
+import '../credit.css'
 
 const LAST_SEEN_REQUEST_KEY = 'avenue.credit.lastSeenRequestId'
 
@@ -60,17 +60,19 @@ export default function CreditReportPage() {
   const diff = scoreChange
   const showInputLink = ['CONSENT_REQUIRED', 'ALT_DATA_EMPTY', 'INPUT_INCOMPLETE', 'STALE_INPUT'].includes(report.notScorableReasonCode)
   return (
-    <div className="credit-report">
+    <>
       {alertVisible && report.gradeStatusCode === 'SCORED' && (
         <Notice type="success">
-          <span>새 점수가 나왔어요 · 대안 {report.alternative?.score}점{diff != null && ` (지난번보다 ${diff > 0 ? '+' : ''}${diff}점)`}</span>{' '}
+          <span>새 점수가 나왔어요 · 대안 <span className="num">{report.alternative?.score}</span>점{diff != null && <> (지난번보다 <span className="num">{diff > 0 ? '+' : ''}{diff}</span>점)</>}</span>{' '}
           <Button size="sm" onClick={() => setAlertVisible(false)}>닫기</Button>
         </Notice>
       )}
-      <header>
-        <h1>신용 리포트</h1>
-        <p>{JOB_TYPE_LABELS[report.workerTypeCode] ?? report.workerTypeCode} 기준 · 마지막 산출 {date}</p>
-      </header>
+      <div className="page-head">
+        <div>
+          <h1 className="page-head__title">신용 리포트</h1>
+          <p className="page-head__lead">{JOB_TYPE_LABELS[report.workerTypeCode] ?? report.workerTypeCode} 기준 · 마지막 산출 {date}</p>
+        </div>
+      </div>
       {report.gradeStatusCode === 'NOT_SCORABLE' ? (
         <Notice type="warn">
           {getNotScorableMessage(report.notScorableReasonCode)}{' '}
@@ -84,11 +86,13 @@ export default function CreditReportPage() {
         </Notice>
       ) : <ScoreComparisonCard report={report} />}
       {report.gradeStatusCode === 'SCORED' && (
-        <div className="credit-insights">
-          <ShapFactorsCard shap={report.shap} alternativeScore={report.alternative?.score} />
+        <div className="l-cols">
+          <div className="l-cols__main">
+            <ShapFactorsCard shap={report.shap} alternativeScore={report.alternative?.score} />
+          </div>
           <CreditReportSummaryCard factors={report.shap?.factors} />
         </div>
       )}
-    </div>
+    </>
   )
 }
