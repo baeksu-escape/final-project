@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-85·FP-86 N-05 데이터 입력(DDL v0.3.2 + FP-209 NO_LOAN_YN). 시각은 서버 Clock 값(#{now})으로 넣는다(DB 기본값 SYSTIMESTAMP는 컨테이너 시간대를 따른다). -->
+<mapper namespace="com.baeksuescape.user.mapper.FinancialInputMapper">
+
+    <!-- 저장한 기준월 목록(오래된 달부터). 입력을 저장할 때마다 자산 행을 MERGE하므로 저장 기록으로 쓴다. -->
+    <select id="selectSavedBaseMonths" resultType="string">
+        SELECT BASE_MONTH
+          FROM USER_ASSET_SNAPSHOT
+         WHERE USER_ID = #{userId}
+         ORDER BY BASE_MONTH
+    </select>
+
+    <select id="selectAsset" resultType="com.baeksuescape.user.dto.DataInputRows$AssetRow">
+        SELECT USER_ID AS userId, BASE_MONTH AS baseMonth, TOTAL_ASSET_AMT AS totalAssetAmt, NO_LOAN_YN AS noLoanYn,
+               CREATED_AT AS createdAt, UPDATED_AT AS updatedAt
+          FROM USER_ASSET_SNAPSHOT
+         WHERE USER_ID = #{userId}
+           AND BASE_MONTH = #{baseMonth}
+    </select>
+
+    <!-- N-05-4·O-15 기준월 자산 행을 만들거나 고친다. TOTAL_ASSET_AMT NULL = 미입력, NO_LOAN_YN NULL = 대출 미확인. -->
+    <update id="mergeAsset">
+        MERGE INTO USER_ASSET_SNAPSHOT t
+        USING (SELECT #{userId} AS USER_ID, #{baseMonth} AS BASE_MONTH FROM DUAL) s
+           ON (t.USER_ID = s.USER_ID AND t.BASE_MONTH = s.BASE_MONTH)
+         WHEN MATCHED THEN UPDATE
+              SET t.TOTAL_ASSET_AMT = #{totalAssetAmt,jdbcType=NUMERIC}, t.NO_LOAN_YN = #{noLoanYn,jdbcType=CHAR}, t.UPDATED_AT = #{now}
+         WHEN NOT MATCHED THEN INSERT (USER_ID, BASE_MONTH, TOTAL_ASSET_AMT, NO_LOAN_YN, CREATED_AT)
+              VALUES (s.USER_ID, s.BASE_MONTH, #{totalAssetAmt,jdbcType=NUMERIC}, #{noLoanYn,jdbcType=CHAR}, #{now})
+    </update>
+
+    <select id="selectIncomes" resultType="com.baeksuescape.user.dto.DataInputRows$IncomeRow">
+        SELECT USER_ID AS userId, BASE_MONTH AS baseMonth, INCOME_KIND_CODE AS incomeKindCode, INCOME_AMT AS incomeAmt, INPUT_DATE AS inputDate
+          FROM USER_INCOME_MONTH
+         WHERE USER_ID = #{userId}
+           AND BASE_MONTH BETWEEN #{fromMonth} AND #{toMonth}
+         ORDER BY BASE_MONTH
+    </select>
+
+    <!-- N-05-2 달마다 한 행(UK_UIM_USER_MONTH). 같은 달을 다시 저장하면 금액만 바꾼다. -->
+    <update id="mergeIncome">
+        MERGE INTO USER_INCOME_MONTH t
+        USING (SELECT #{userId} AS USER_ID, #{baseMonth} AS BASE_MONTH FROM DUAL) s
+           ON (t.USER_ID = s.USER_ID AND t.BASE_MONTH = s.BASE_MONTH)
+         WHEN MATCHED THEN UPDATE
+              SET t.INCOME_KIND_CODE = #{incomeKindCode}, t.INCOME_AMT = #{incomeAmt}, t.INPUT_DATE = #{inputDate}, t.UPDATED_AT = #{now}
+         WHEN NOT MATCHED THEN INSERT (USER_ID, BASE_MONTH, INCOME_KIND_CODE, INCOME_AMT, INPUT_DATE, CREATED_AT)
+              VALUES (s.USER_ID, s.BASE_MONTH, #{incomeKindCode}, #{incomeAmt}, #{inputDate}, #{now})
+    </update>
+
+    <delete id="deleteIncome">
+        DELETE FROM USER_INCOME_MONTH
+         WHERE USER_ID = #{userId}
+           AND BASE_MONTH = #{baseMonth}
+    </delete>
+
+    <select id="selectWorkPeriod" resultType="java.lang.Integer">
+        SELECT WORK_PERIOD_MONTHS FROM APP_USER WHERE USER_ID = #{userId}
+    </select>
+
+    <update id="updateWorkPeriod">
+        UPDATE APP_USER
+           SET WORK_PERIOD_MONTHS = #{months,jdbcType=NUMERIC}, UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 기준월 대출 전부(직접 입력·불러옴). 완료 현황은 둘 다 세고, 화면 복원은 MANUAL만 쓴다. -->
+    <select id="selectLoans" resultType="com.baeksuescape.user.dto.DataInputRows$LoanRow">
+        SELECT USER_ID AS userId, BASE_MONTH AS baseMonth, LOAN_TYPE_CODE AS loanTypeCode, BALANCE_AMT AS balanceAmt,
+               ANNUAL_RATE_PCT AS annualRatePct, RATE_TYPE_CODE AS rateTypeCode, REMAINING_MONTHS AS remainingMonths,
+               MONTHLY_PAYMENT_AMT AS monthlyPaymentAmt, SOURCE_CODE AS sourceCode, CONSENT_ID AS consentId
+          FROM USER_LOAN
+         WHERE USER_ID = #{userId}
+           AND BASE_MONTH = #{baseMonth}
+         ORDER BY LOAN_ID
+    </select>
+
+    <!-- 직접 입력한 대출만 지운다. 불러온 대출(IMPORTED)은 건드리지 않는다. -->
+    <delete id="deleteManualLoans">
+        DELETE FROM USER_LOAN
+         WHERE USER_ID = #{userId}
+           AND BASE_MONTH = #{baseMonth}
+           AND SOURCE_CODE = 'MANUAL'
+    </delete>
+
+    <insert id="insertLoan">
+        INSERT INTO USER_LOAN (USER_ID, BASE_MONTH, LOAN_TYPE_CODE, BALANCE_AMT, ANNUAL_RATE_PCT, RATE_TYPE_CODE, REMAINING_MONTHS,
+                               MONTHLY_PAYMENT_AMT, SOURCE_CODE, CONSENT_ID, CREATED_AT)
+        VALUES (#{userId}, #{baseMonth}, #{loanTypeCode}, #{balanceAmt}, #{annualRatePct}, #{rateTypeCode}, #{remainingMonths},
+                #{monthlyPaymentAmt}, #{sourceCode}, #{consentId,jdbcType=NUMERIC}, #{now})
+    </insert>
+
+    <select id="selectExpenses" resultType="com.baeksuescape.user.dto.DataInputRows$ExpenseRow">
+        SELECT USER_ID AS userId, BASE_MONTH AS baseMonth, EXPENSE_GROUP_CODE AS expenseGroupCode, EXPENSE_CATEGORY AS expenseCategory,
+               DESCRIPTION AS description, MONTHLY_AMT AS monthlyAmt
+          FROM USER_EXPENSE_ITEM
+         WHERE USER_ID = #{userId}
+           AND BASE_MONTH = #{baseMonth}
+         ORDER BY EXPENSE_ID
+    </select>
+
+    <delete id="deleteExpenses">
+        DELETE FROM USER_EXPENSE_ITEM
+         WHERE USER_ID = #{userId}
+           AND BASE_MONTH = #{baseMonth}
+    </delete>
+
+    <insert id="insertExpense">
+        INSERT INTO USER_EXPENSE_ITEM (USER_ID, BASE_MONTH, EXPENSE_GROUP_CODE, EXPENSE_CATEGORY, DESCRIPTION, MONTHLY_AMT, CREATED_AT)
+        VALUES (#{userId}, #{baseMonth}, #{expenseGroupCode}, #{expenseCategory,jdbcType=VARCHAR}, #{description,jdbcType=VARCHAR},
+                #{monthlyAmt}, #{now})
+    </insert>
+
+    <sql id="creditColumns">
+        USER_ID AS userId, BASE_DATE AS baseDate, CREDIT_HISTORY_DAYS AS creditHistoryDays, DELINQ_COUNT_12M AS delinqCount12m,
+        NEW_LOAN_COUNT_3M AS newLoanCount3m, CARD_LIMIT_AMT AS cardLimitAmt, CARD_MONTHLY_SPEND_AMT AS cardMonthlySpendAmt,
+        CARD_UTIL_PCT AS cardUtilPct, CASH_ADVANCE_MONTHS AS cashAdvanceMonths,
+        PRIVATE_LENDER_LOAN_BALANCE_AMT AS privateLenderLoanBalanceAmt, SOURCE_CODE AS sourceCode
+    </sql>
+
+    <select id="selectManualCredit" resultType="com.baeksuescape.user.dto.DataInputRows$CreditRow">
+        SELECT <include refid="creditColumns"/>
+          FROM USER_CREDIT_PROFILE
+         WHERE USER_ID = #{userId}
+           AND BASE_DATE = #{baseDate}
+           AND SOURCE_CODE = 'MANUAL'
+    </select>
+
+    <!-- D-29 카드·신용 직접 입력. 같은 날짜에 불러온 행(IMPORTED)이 있으면 바꾸지 않는다(UK_UCP_USER_DATE). -->
+    <update id="mergeManualCredit">
+        MERGE INTO USER_CREDIT_PROFILE t
+        USING (SELECT #{userId} AS USER_ID, #{baseDate} AS BASE_DATE FROM DUAL) s
+           ON (t.USER_ID = s.USER_ID AND t.BASE_DATE = s.BASE_DATE)
+         WHEN MATCHED THEN UPDATE
+              SET t.CREDIT_HISTORY_DAYS = #{creditHistoryDays,jdbcType=NUMERIC}, t.DELINQ_COUNT_12M = #{delinqCount12m,jdbcType=NUMERIC},
+                  t.NEW_LOAN_COUNT_3M = #{newLoanCount3m,jdbcType=NUMERIC}, t.CARD_LIMIT_AMT = #{cardLimitAmt,jdbcType=NUMERIC},
+                  t.CARD_MONTHLY_SPEND_AMT = #{cardMonthlySpendAmt,jdbcType=NUMERIC}, t.CARD_UTIL_PCT = #{cardUtilPct,jdbcType=NUMERIC},
+                  t.CASH_ADVANCE_MONTHS = #{cashAdvanceMonths,jdbcType=NUMERIC},
+                  t.PRIVATE_LENDER_LOAN_BALANCE_AMT = #{privateLenderLoanBalanceAmt,jdbcType=NUMERIC}
+              WHERE t.SOURCE_CODE = 'MANUAL'
+         WHEN NOT MATCHED THEN INSERT (USER_ID, BASE_DATE, CB_AVAILABLE_YN, CB_GRADE, CREDIT_HISTORY_DAYS, DELINQ_COUNT_12M,
+                                       NEW_LOAN_COUNT_3M, CARD_LIMIT_AMT, CARD_MONTHLY_SPEND_AMT, CARD_UTIL_PCT, CASH_ADVANCE_MONTHS,
+                                       PRIVATE_LENDER_LOAN_BALANCE_AMT, SOURCE_CODE, CONSENT_ID, CREATED_AT)
+              VALUES (s.USER_ID, s.BASE_DATE, 'N', NULL, #{creditHistoryDays,jdbcType=NUMERIC}, #{delinqCount12m,jdbcType=NUMERIC},
+                      #{newLoanCount3m,jdbcType=NUMERIC}, #{cardLimitAmt,jdbcType=NUMERIC}, #{cardMonthlySpendAmt,jdbcType=NUMERIC},
+                      #{cardUtilPct,jdbcType=NUMERIC}, #{cashAdvanceMonths,jdbcType=NUMERIC},
+                      #{privateLenderLoanBalanceAmt,jdbcType=NUMERIC}, 'MANUAL', NULL, #{now})
+    </update>
+
+    <delete id="deleteManualCredit">
+        DELETE FROM USER_CREDIT_PROFILE
+         WHERE USER_ID = #{userId}
+           AND BASE_DATE = #{baseDate}
+           AND SOURCE_CODE = 'MANUAL'
+    </delete>
+</mapper>

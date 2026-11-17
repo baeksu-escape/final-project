@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-142 N-12-2 점수 산출 저장, N-14 SHAP 요인, N-04-6 진단 내역 (DDL avenue_ddl.sql ASSESSMENT·ASSESSMENT_FACTOR).
+     평가는 추가만 하고 고치거나 지우지 않는다(탈퇴해도 보존, DDL W1). 서비스 회원 평가라 DATASET_CODE = 'SERVICE'. -->
+<mapper namespace="com.baeksuescape.assessment.mapper.AssessmentMapper">
+
+    <sql id="assessmentColumns">
+        ASSESSMENT_ID AS assessmentId, REQUEST_ID AS requestId, USER_ID AS userId, WORKER_TYPE_CODE AS workerTypeCode,
+        AGE_BAND_CODE AS ageBandCode, INPUT_BASE_MONTH AS inputBaseMonth, MODEL_VERSION AS modelVersion,
+        FEATURE_SET_VERSION AS featureSetVersion, CUTOFF_VERSION AS cutoffVersion, GRADE_STATUS_CODE AS gradeStatusCode,
+        NOT_SCORABLE_REASON_CODE AS notScorableReasonCode, TRAD_SCORABLE_YN AS tradScorableYn, TRAD_SCORE AS tradScore,
+        TRAD_GRADE_BAND_CODE AS tradGradeBandCode, TRAD_DEFAULT_PROB AS tradDefaultProb, ALT_SCORABLE_YN AS altScorableYn,
+        ALT_SCORE AS altScore, ALT_GRADE_BAND_CODE AS altGradeBandCode, ALT_DEFAULT_PROB AS altDefaultProb,
+        SHAP_BASE_SCORE AS shapBaseScore, AI_SUMMARY AS aiSummary, ASSESSED_AT AS assessedAt
+    </sql>
+
+    <!-- ── RPT-01 점수 산출 ── -->
+
+    <!-- 같은 requestId가 이미 있는지 (어느 회원 것이든) -->
+    <select id="selectByRequestId" resultType="com.baeksuescape.assessment.dto.AssessmentRows$AssessmentRow">
+        SELECT <include refid="assessmentColumns"/>
+          FROM ASSESSMENT
+         WHERE REQUEST_ID = #{requestId}
+    </select>
+
+    <!-- 지금 쓰는 모델 버전 (MODEL_REGISTRY ACTIVE 1건) -->
+    <select id="selectActiveModelVersion" resultType="string">
+        SELECT MODEL_VERSION
+          FROM MODEL_REGISTRY
+         WHERE STATUS_CODE = 'ACTIVE'
+         ORDER BY ACTIVATED_AT DESC
+         FETCH FIRST 1 ROWS ONLY
+    </select>
+
+    <select id="selectSetting" resultType="string">
+        SELECT SETTING_VALUE FROM APP_SETTING WHERE SETTING_KEY = #{settingKey}
+    </select>
+
+    <select id="selectRequiredIncomeMonths" resultType="int">
+        SELECT REQUIRED_INCOME_MONTHS FROM DIM_WORKER_TYPE WHERE WORKER_TYPE_CODE = #{workerTypeCode}
+    </select>
+
+    <!-- 동의로 불러온 대안 데이터 5종. 철회·만료되면 그 동의로 불러온 행은 지워지므로 IMPORTED만 읽는다. -->
+    <select id="selectImportedTelecom" resultType="com.baeksuescape.user.dto.DataInputRows$BillRow">
+        SELECT USER_ID AS userId, BILL_MONTH AS billMonth, BILLED_AMT AS billedAmt, DUE_DATE AS dueDate, PAID_DATE AS paidDate,
+               PAYMENT_STATUS_CODE AS paymentStatusCode
+          FROM USER_TELECOM_PAYMENT
+         WHERE USER_ID = #{userId} AND SOURCE_CODE = 'IMPORTED'
+         ORDER BY BILL_MONTH
+    </select>
+
+    <select id="selectImportedUtility" resultType="com.baeksuescape.user.dto.DataInputRows$BillRow">
+        SELECT USER_ID AS userId, BILL_MONTH AS billMonth, BILLED_AMT AS billedAmt, DUE_DATE AS dueDate, PAID_DATE AS paidDate,
+               PAYMENT_STATUS_CODE AS paymentStatusCode
+          FROM USER_UTILITY_PAYMENT
+         WHERE USER_ID = #{userId} AND SOURCE_CODE = 'IMPORTED'
+         ORDER BY BILL_MONTH
+    </select>
+
+    <select id="selectImportedEasypay" resultType="com.baeksuescape.user.dto.DataInputRows$EasypayRow">
+        SELECT USER_ID AS userId, BASE_MONTH AS baseMonth, OBSERVATION_STATUS_CODE AS observationStatusCode,
+               PAYMENT_COUNT AS paymentCount, PAYMENT_AMT AS paymentAmt, ACTIVE_DAYS AS activeDays
+          FROM USER_EASYPAY_USAGE
+         WHERE USER_ID = #{userId} AND SOURCE_CODE = 'IMPORTED'
+         ORDER BY BASE_MONTH
+    </select>
+
+    <select id="selectImportedInsurance" resultType="com.baeksuescape.user.dto.DataInputRows$InsuranceRow">
+        SELECT USER_ID AS userId, INSURANCE_TYPE_CODE AS insuranceTypeCode, BASE_MONTH AS baseMonth,
+               COVERAGE_STATUS_CODE AS coverageStatusCode, PAYER_TYPE_CODE AS payerTypeCode, INDIVIDUAL_AMT AS individualAmt,
+               PAID_AMT AS paidAmt, PAYMENT_STATUS_CODE AS paymentStatusCode
+          FROM USER_SOCIAL_INSURANCE_PAYMENT
+         WHERE USER_ID = #{userId} AND SOURCE_CODE = 'IMPORTED'
+         ORDER BY INSURANCE_TYPE_CODE, BASE_MONTH
+    </select>
+
+    <!-- 평가 1행. 시각은 서버 Clock 값(#{assessedAt}, 서울)으로 넣는다. FEATURE_SNAPSHOT은 JSON 문자열(CLOB). -->
+    <insert id="insertAssessment" useGeneratedKeys="true" keyProperty="assessmentId" keyColumn="ASSESSMENT_ID">
+        INSERT INTO ASSESSMENT (
+            REQUEST_ID, USER_ID, DATASET_CODE, WORKER_TYPE_CODE, AGE_BAND_CODE, INPUT_BASE_MONTH,
+            MODEL_VERSION, FEATURE_SET_VERSION, CUTOFF_VERSION, GRADE_STATUS_CODE, NOT_SCORABLE_REASON_CODE,
+            TRAD_SCORABLE_YN, TRAD_SCORE, TRAD_GRADE_BAND_CODE, TRAD_DEFAULT_PROB,
+            ALT_SCORABLE_YN, ALT_SCORE, ALT_GRADE_BAND_CODE, ALT_DEFAULT_PROB,
+            SHAP_BASE_SCORE, FEATURE_SNAPSHOT, ASSESSED_AT, CREATED_AT
+        ) VALUES (
+            #{requestId}, #{userId}, 'SERVICE', #{workerTypeCode}, #{ageBandCode}, #{inputBaseMonth},
+            #{modelVersion}, #{featureSetVersion, jdbcType=VARCHAR}, #{cutoffVersion, jdbcType=VARCHAR},
+            #{gradeStatusCode}, #{notScorableReasonCode, jdbcType=VARCHAR},
+            #{tradScorableYn}, #{tradScore, jdbcType=INTEGER}, #{tradGradeBandCode, jdbcType=VARCHAR}, #{tradDefaultProb, jdbcType=DECIMAL},
+            #{altScorableYn}, #{altScore, jdbcType=INTEGER}, #{altGradeBandCode, jdbcType=VARCHAR}, #{altDefaultProb, jdbcType=DECIMAL},
+            #{shapBaseScore, jdbcType=INTEGER}, #{featureSnapshot, jdbcType=CLOB}, #{assessedAt}, #{assessedAt}
+        )
+    </insert>
+
+    <!-- SHAP 요인 1행. FEATURE_CODE는 DIM_FEATURE(같은 FEATURE_SET_VERSION)에 있어야 한다(FK). -->
+    <insert id="insertFactor">
+        INSERT INTO ASSESSMENT_FACTOR (
+            ASSESSMENT_ID, FEATURE_SET_VERSION, FEATURE_RANK, FEATURE_CODE, FEATURE_VALUE, SHAP_VALUE, SHAP_SCORE
+        ) VALUES (
+            #{assessmentId}, #{featureSetVersion}, #{featureRank}, #{featureCode}, #{featureValue, jdbcType=VARCHAR},
+            #{shapValue, jdbcType=DECIMAL}, #{shapScore}
+        )
+    </insert>
+
+    <!-- ── RPT-02·03 리포트, MEM-06 진단 내역 ── -->
+
+    <select id="selectLatest" resultType="com.baeksuescape.assessment.dto.AssessmentRows$AssessmentRow">
+        SELECT <include refid="assessmentColumns"/>
+          FROM ASSESSMENT
+         WHERE USER_ID = #{userId} AND DATASET_CODE = 'SERVICE'
+         ORDER BY ASSESSED_AT DESC, ASSESSMENT_ID DESC
+         FETCH FIRST 1 ROWS ONLY
+    </select>
+
+    <!-- 본인 평가만 — 남의 requestId면 null(404) -->
+    <select id="selectByUserAndRequestId" resultType="com.baeksuescape.assessment.dto.AssessmentRows$AssessmentRow">
+        SELECT <include refid="assessmentColumns"/>
+          FROM ASSESSMENT
+         WHERE USER_ID = #{userId} AND REQUEST_ID = #{requestId} AND DATASET_CODE = 'SERVICE'
+    </select>
+
+    <select id="selectHistory" resultType="com.baeksuescape.assessment.dto.AssessmentRows$AssessmentRow">
+        SELECT <include refid="assessmentColumns"/>
+          FROM ASSESSMENT
+         WHERE USER_ID = #{userId} AND DATASET_CODE = 'SERVICE'
+         ORDER BY ASSESSED_AT DESC, ASSESSMENT_ID DESC
+    </select>
+
+    <!-- 요인 + 피처 사전 이름·단위·대안·시뮬 여부 (화면 표시는 DIM_FEATURE 한 곳에서 관리) -->
+    <select id="selectFactors" resultType="com.baeksuescape.assessment.dto.AssessmentRows$FactorRow">
+        SELECT f.ASSESSMENT_ID AS assessmentId, f.FEATURE_SET_VERSION AS featureSetVersion, f.FEATURE_RANK AS featureRank,
+               f.FEATURE_CODE AS featureCode, f.FEATURE_VALUE AS featureValue, f.SHAP_VALUE AS shapValue, f.SHAP_SCORE AS shapScore,
+               d.FEATURE_NAME AS featureName, d.UNIT_NAME AS unitName, d.ALTERNATIVE_YN AS alternativeYn, d.SIMULATABLE_YN AS simulatableYn
+          FROM ASSESSMENT_FACTOR f
+          JOIN DIM_FEATURE d ON d.FEATURE_SET_VERSION = f.FEATURE_SET_VERSION AND d.FEATURE_CODE = f.FEATURE_CODE
+         WHERE f.ASSESSMENT_ID = #{assessmentId}
+         ORDER BY f.FEATURE_RANK
+    </select>
+
+    <select id="selectGradeBands" resultType="com.baeksuescape.assessment.dto.AssessmentRows$GradeBandRow">
+        SELECT GRADE_BAND_CODE AS gradeBandCode, MIN_SCORE AS minScore, MAX_SCORE AS maxScore
+          FROM SCORE_GRADE_BAND
+         WHERE CUTOFF_VERSION = #{cutoffVersion}
+         ORDER BY DISPLAY_ORDER
+    </select>
+
+    <!-- N-12-6 모델별 피처 칩: 그 평가의 피처 세트 전체. 산출 불가 평가는 FEATURE_SET_VERSION이 없어 모델 버전의 피처 세트로 찾는다 -->
+    <select id="selectModelFeatures" resultType="com.baeksuescape.assessment.dto.AssessmentRows$FeatureRow">
+        SELECT FEATURE_CODE AS featureCode, FEATURE_NAME AS featureName, ALTERNATIVE_YN AS alternativeYn
+          FROM DIM_FEATURE
+         WHERE FEATURE_SET_VERSION = NVL(#{featureSetVersion, jdbcType=VARCHAR},
+                   (SELECT FEATURE_SET_VERSION FROM MODEL_REGISTRY WHERE MODEL_VERSION = #{modelVersion, jdbcType=VARCHAR}))
+         ORDER BY DISPLAY_ORDER, FEATURE_CODE
+    </select>
+</mapper>

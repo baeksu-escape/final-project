@@ -114,7 +114,11 @@ export function buildPayload(values, sections, jobType) {
       body.items = value.map(withoutId)
       if (section.noItemsLabel) body.noItems = values.noItems[section.key]
     } else {
-      for (const field of section.fields) body[field.key] = value[field.key]
+      // FP-86 체크 칸은 true/false로, 비활성 칸(disabledWhen)은 null로 보낸다.
+      for (const field of section.fields) {
+        if (field.input === 'checkbox') body[field.key] = value[field.key] === true
+        else body[field.key] = field.disabledWhen?.(value) ? null : value[field.key]
+      }
       Object.assign(body, section.derive?.(value))
     }
     payload[section.key] = body
@@ -132,7 +136,9 @@ export function getSectionStatus(input, sections) {
       const filled =
         section.kind === 'list'
           ? (saved?.items?.length ?? 0) > 0 || saved?.noItems === true
-          : section.fields.some((field) => !isEmptyValue(saved?.[field.key]))
+          : section.fields.some((field) =>
+              field.input === 'checkbox' ? saved?.[field.key] === true : !isEmptyValue(saved?.[field.key]),
+            )
       return [section.key, filled]
     }),
   )

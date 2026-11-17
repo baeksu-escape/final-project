@@ -8,6 +8,7 @@ import AuthLinks from '../components/AuthLinks.jsx'
 import EmailVerification from '../components/EmailVerification.jsx'
 import PasswordRuleList from '../components/PasswordRuleList.jsx'
 import { validateNewPassword } from '../validation.js'
+import '../auth.css'
 
 // N-03 비밀번호 찾기 화면 — ① 아이디·이메일 인증 → ② 새 비밀번호 재설정 → ③ 완료 순서로 진행한다.
 export default function FindPasswordPage() {

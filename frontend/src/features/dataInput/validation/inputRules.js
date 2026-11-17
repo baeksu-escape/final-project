@@ -42,6 +42,15 @@ export function amountRule(max) {
   return (value) => checkNumber(value, { max, integer: true, unit: '원' })
 }
 
+// D-29 월 카드 사용액 규칙 — 월 금액 규칙에 더해, 같은 섹션의 카드 한도가 있으면 한도보다 클 수 없다.
+export function cardSpendRule(value, { row } = {}) {
+  const amountError = amountRule(VALIDATION_LIMITS.MONTHLY_AMOUNT_MAX)(value)
+  if (amountError) return amountError
+  const limit = row?.cardLimitAmount
+  if (typeof limit === 'number' && value > limit) return '월 카드 사용액은 카드 한도보다 클 수 없습니다.'
+  return null
+}
+
 // 숫자 칸 규칙을 만든다 — 0 이상, max 이하. integer가 true면 소수점을 막는다. unit은 오류 문구에 붙는 단위.
 // 사용 예: { key: 'remainingMonths', input: 'number', validate: numberRule({ max: 600, integer: true, unit: '개월' }) }
 export function numberRule({ max, integer = false, unit = '' }) {

@@ -7,6 +7,7 @@ import { JOB_TYPE_OPTIONS } from '../../../common/config/jobTypes.js'
 import { isAdmin } from '../../../common/config/roles.js'
 import { saveJobType } from '../api/dataInputApi.js'
 import { DATA_INPUT_PATHS } from '../dataInputPaths.js'
+import '../dataInput.css'
 
 // N-05-1 직군 선택 화면 — 직군이 없는 일반 사용자가 세 직군 중 하나를 골라 저장하면 데이터 입력 화면으로 보낸다.
 // 이미 직군이 있거나 관리자면 첫 화면으로 보낸다(직군 변경은 팀 결정 전이라 만들지 않는다).
@@ -41,7 +42,7 @@ export default function JobSelectPage() {
     <section className="job-select-page">
       <h1 className="job-select-page__title">직군 선택</h1>
       <p className="job-select-page__message">
-        직군에 따라 입력 항목과 진단 화면이 달라집니다. 지금 소득을 얻는 방식에 가장 가까운 직군을 골라 주세요.
+        직군에 따라 소득 입력 항목이 달라집니다. 지금 소득을 얻는 방식에 가장 가까운 직군을 골라 주세요.
       </p>
       <form className="job-select-form" onSubmit={handleSubmit}>
         <fieldset className="job-select-form__options">

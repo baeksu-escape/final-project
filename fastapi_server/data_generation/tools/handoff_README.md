@@ -1,6 +1,6 @@
-# 학습용 합성 데이터 v3.6.0 — 이것부터 보세요
+# 학습용 합성 데이터 v3.6.1 — 이것부터 보세요
 
-모든 값은 합성 데이터다. 성능 수치는 실제 예측력의 근거가 아니다. 저장소의 생성 코드 v3.6.0(`fastapi_server/data_generation/`)를 기본 설정으로 생성했다.
+모든 값은 합성 데이터다. 성능 수치는 실제 예측력의 근거가 아니다. 저장소의 생성 코드 v3.6.1(`fastapi_server/data_generation/`)를 기본 설정으로 생성했다.
 
 **v3.6.0 변경.** 서비스 입력 규칙(소득만 12개월, 지출 = 평균 월 지출, 상환 = 현재 월 상환액, 급여소득자 소득 = 기준월 × 12)과 같은 정의의 12개월 9열(`*_svc_12m*`, `expense_avg_month_krw`, `debt_service_current_krw`)을 라벨 앞에 추가해 기본 학습으로 쓴다. 기존 12개월 집계 중 10열(`income_12m_krw`, `income_cv_12m`, `zero_income_months_12m`, `dp_amount_to_income_12m`, `expense_12m_krw`, `debt_service_12m_krw`, `expense_ratio_12m`, `dsr_12m`, `deficit_months_12m`, `worst_month_net_cash_12m_krw`)은 **모델 표에서 뺐다**(상세 `2_detail/*/input_features_12m.csv`에는 값 그대로). 평균 월 지출은 `ROUND_HALF_UP`(정확히 .5이면 올림)이다. 학습·검증·시험 구분 `data_split`(TRAIN/VALID/TEST = 70/15/15)을 `dataset` 바로 뒤에 넣었다. 그 밖의 기존 열 값·상대 순서는 그대로다.
 
@@ -95,4 +95,5 @@ v3.5.13 설명: **기본 학습은 12개월(role=feature), 6개월은 보존·�
 - 직군 코드는 원본 값 `wage/selfemp/freelance`다(서비스 코드 `EMPLOYEE/SELF_EMPLOYED/FREELANCER`).
 - 대출 상환 일정(`loan_extension/`, 약 440MB)은 크기 때문에 뺐다. 필요하면 `data_generation/`에서 `python -m generate.build_loan_extension`으로 만든다.
 - 권장 재현 환경은 `requirements.txt`의 고정 버전(numpy 2.3.5·pandas 2.2.3·scipy 1.17.0·scikit-learn 1.8.0)이다. 다른 버전으로 다시 만들면 소수점 마지막 자리가 다를 수 있다.
-- 이번 묶음(v3.6.0)의 실제 생성 환경은 Python 3.11.9·numpy 2.4.6·pandas 3.0.5·scipy 1.17.1·scikit-learn 1.9.1이다(`3_reference/legacy/validation.json`에 numpy·pandas 버전 기록). 기존 원천·6개월 값 보존 결과와 실행 검증은 provenance.json 및 작업 로그에 기록한다.
+- 이번 묶음(v3.6.1)의 실제 생성 환경은 Python 3.11.9와 requirements.txt 고정 버전(numpy 2.3.5·pandas 2.2.3·scipy 1.17.0·scikit-learn 1.8.0 등)이다(`3_reference/legacy/validation.json`에 numpy·pandas 버전 기록). 기존 원천·6개월 값 보존 결과와 실행 검증은 provenance.json 및 작업 로그에 기록한다.
+- 학습 값은 v3.6.0과 같다(줄바꿈 외 바이트 동일). v3.6.1 변경은 서비스 더미 대출 종류·금리 방식뿐이다.
