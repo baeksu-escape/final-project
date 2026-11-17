@@ -6,6 +6,7 @@ import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { DATA_INPUT_PATHS } from '../../dataInput/dataInputPaths.js'
 import { fetchCreditDiagnosisHistory, fetchCreditReport } from '../api/creditApi.js'
 import ScoreComparisonCard from '../components/ScoreComparisonCard.jsx'
+import CreditReportSummaryCard from '../components/CreditReportSummaryCard.jsx'
 import ShapFactorsCard from '../components/ShapFactorsCard.jsx'
 import '../styles/creditReport.css'
 
@@ -80,8 +81,12 @@ export default function CreditReportPage() {
           {showInputLink && <Link to={DATA_INPUT_PATHS.DATA_INPUT}>입력 화면으로</Link>}
         </Notice>
       ) : <ScoreComparisonCard report={report} />}
-      {report.gradeStatusCode === 'SCORED' && <ShapFactorsCard shap={report.shap} alternativeScore={report.alternative?.score} />}
-      {/* FP-89: 요약 카드 자리 */}
+      {report.gradeStatusCode === 'SCORED' && (
+        <div className="credit-insights">
+          <ShapFactorsCard shap={report.shap} alternativeScore={report.alternative?.score} />
+          <CreditReportSummaryCard factors={report.shap?.factors} />
+        </div>
+      )}
     </div>
   )
 }
