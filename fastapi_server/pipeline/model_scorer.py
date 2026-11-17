@@ -2,6 +2,7 @@
 # 응답 모양은 Mock(pipeline/mock_scorer.score_features)과 같다: {traditional, alternative, shap}. 그래서 라우터·Spring은 그대로다.
 # 점수 환산·SHAP·합 규칙은 training/explain.py(FP-138)를, 모델 입력은 training/interface.py(to_model_input)를 그대로 쓴다.
 # 점수·SHAP은 실제 신용평가 결과나 인과관계가 아니다. 화면에는 "작용한 정도"로만 보여 준다.
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -56,6 +57,29 @@ def _meta_matches(path: Path) -> bool:
     return not wrong
 
 
+HASH_LIST_FILE = "SHA256SUMS.txt"
+
+
+def _hashes_match(directory: Path) -> bool:
+    """모델 묶음에 들어 있는 SHA256SUMS.txt가 artifacts/에 있으면, 적힌 파일마다 해시를 대조한다(joblib을 열기 전에).
+    목록 파일이 없으면 통과(로컬 개발 편의). 적힌 파일이 없거나 해시가 다르면 False — 받은 묶음이 아닌 파일은 열지 않는다."""
+    hash_list = directory / HASH_LIST_FILE
+    if not hash_list.exists():
+        return True
+    wrong = []
+    for line in hash_list.read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if len(parts) != 2:
+            continue
+        expected, name = parts[0].lower(), parts[1].lstrip("*")
+        path = directory / name
+        if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+            wrong.append(name)
+    if wrong:
+        log.warning("model hash mismatch files=%s — %s 요청은 503", wrong, REAL_MODEL_VERSION)
+    return not wrong
+
+
 def load_from_artifacts(directory: Path = ARTIFACT_DIR) -> ModelScorer:
     """artifacts/의 legacy.joblib·alternative.joblib을 불러온다. 파일이 없거나 실패하면 준비 안 된 ModelScorer(점수 요청은 503).
     joblib은 불러올 때 파일 안의 코드가 실행될 수 있으므로 팀이 공유한 묶음(해시 확인)만 이 폴더에 둔다."""
@@ -63,6 +87,8 @@ def load_from_artifacts(directory: Path = ARTIFACT_DIR) -> ModelScorer:
     missing = [path.name for path in files.values() if not path.exists()]
     if missing:
         log.warning("model files not found dir=%s missing=%s — %s 요청은 503", directory, missing, REAL_MODEL_VERSION)
+        return ModelScorer()
+    if not _hashes_match(directory):
         return ModelScorer()
     if not all(_meta_matches(directory / f"{name}.meta.json") for name in files):
         return ModelScorer()

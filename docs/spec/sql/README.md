@@ -34,6 +34,8 @@
 | 데이터가 있는 기존 DB에 산출 불가 사유 `ALT_DATA_EMPTY` 1행만 추가 | [add_not_scorable_reason_alt_data_empty.sql](add_not_scorable_reason_alt_data_empty.sql) | 이미 있으면 넣지 않으므로 다시 실행해도 된다. 새로 DDL을 실행하는 DB에는 필요 없다 |
 | 데이터가 있는 기존 DB에 피처 세트 `FS-V1`(DRAFT)과 모델 버전 `LGBM-BASE-0.1`(CANDIDATE) 추가 | 1단계 [add_fs_v1_feature_set.sql](add_fs_v1_feature_set.sql), 2단계 [seed/avenue_seed_dim_feature_fs_v1.sql](seed/avenue_seed_dim_feature_fs_v1.sql) | 1단계는 이미 있으면 넣지 않아 다시 실행해도 된다. **2단계 `DIM_FEATURE` 38행은 한 번만** 실행한다(다시 실행하면 PK 중복). 서비스는 바뀌지 않는다(ACTIVE 모델은 그대로, 전환은 DB 담당이 따로). 새로 DDL을 실행하는 DB는 `run_seed_only.sql`이 포함한다 |
 | 데이터가 있는 기존 DB에 게시글 본문 열 변경(`BOARD_POST.CONTENT` CLOB → `VARCHAR2(1300 CHAR)`, DDL C9)만 적용 | [alter_board_post_content_varchar2.sql](alter_board_post_content_varchar2.sql) | 글 데이터는 유지한다. 1300자를 넘는 글이 있으면 자르지 않고 멈춘다. 이미 바뀐 DB에서 다시 실행해도 된다. `CONTENT`는 표의 맨 뒤 열이 된다 |
+| 서비스 모델을 Mock(`DEV-DUMMY`)에서 실제 모델(`LGBM-BASE-0.1`)로 전환 | [activate_model_lgbm_base_0_1.sql](activate_model_lgbm_base_0_1.sql) | **실행 전 FastAPI `/v1/health`가 `"modelLoaded": true`인지 확인**(모델 파일 없이 바꾸면 모든 점수가 503). FS-V1 기준 데이터(위 행)가 없으면 멈추고 아무것도 바꾸지 않는다. 다시 실행해도 된다. 공용 DB는 DB 담당이 팀에 알린 뒤 실행. 절차: `fastapi_server/README.md` 「공용 DB를 실제 모델로 전환하는 절차」 |
+| 실제 모델 전환 뒤 문제가 생겨 Mock으로 되돌리기 | [rollback_model_to_dev_dummy.sql](rollback_model_to_dev_dummy.sql) | 저장된 평가는 지우지 않는다(평가마다 자기 모델 버전이 남음). 다시 실행해도 된다 |
 | 옛 DDL로 만든 DB에서 미사용 상권 테이블 5개 제거 | [drop_unused_market_tables.sql](drop_unused_market_tables.sql) | N-24의 JSON 전환에 따라 상권 전용 표·데이터만 제거한다. 공공통계 표는 유지한다 |
 | 버려도 되는 별도 실험용 스키마를 완전히 초기화 | `dummy_db/run_all.sql` | **대상 테이블을 삭제하고 재생성한 뒤 시드를 적재한다. 기존 데이터가 삭제된다** |
 | 기존 회원 데이터나 시드를 일부 수정·보정 | 담당자와 별도 변경 SQL 검토 | `run_seed_only.sql`은 병합·갱신·재적재 도구가 아니다. `run_all.sql`로 해결하지 않는다 |
