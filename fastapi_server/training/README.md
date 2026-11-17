@@ -12,7 +12,7 @@ python -m training.train --data-dir <학습 데이터 폴더>
 
 - `<학습 데이터 폴더>`는 안에 `1_model/legacy_model_table.csv`가 있는 폴더다. 기본값은 `fastapi_server/data/training/`(`data/README.md` 참고, Git 제외).
 - 학습 데이터는 `*_svc_12m` 열이 있는 v3.6.0 이상이어야 한다. 열이 없으면 없는 열 이름을 알리고 멈춘다.
-- 결과: `artifacts/legacy.joblib`, `artifacts/alternative.joblib`(Git 제외) 와 설명 파일 `*.meta.json`(피처 목록, 범주 부호표, 설정, 라이브러리 버전, 학습 표 SHA-256, VALID AUC). 설명 파일은 만들어지는 파일이라 커밋하지 않는다.
+- 결과: `artifacts/legacy.joblib`, `artifacts/alternative.joblib`(Git 제외) 와 설명 파일 `*.meta.json`(모델 버전 `LGBM-BASE-0.1`·피처 세트 `FS-V1`·알고리즘, 피처 목록, 범주 부호표, 설정, 라이브러리 버전, 학습 표 SHA-256, VALID AUC). 버전 이름은 DB 장부(`MODEL_REGISTRY`, `FEATURE_SET_VERSION`)와 같고 `config.py`의 상수가 원본이다. 설명 파일은 만들어지는 파일이라 커밋하지 않는다.
 - 시험: `python -m unittest discover tests -v`
 
 ## 무엇을 하나
@@ -104,3 +104,24 @@ python -m training.train --data-dir <학습 데이터 폴더>
 | `hi_payer_type` | household=0, regional=1, unknown=2, workplace=3 |
 
 이 부호표나 열 순서를 바꾸면 이미 저장한 모델의 입력이 어긋난다. 바꿀 때는 모델을 다시 학습하고 서비스 담당에게 알린다.
+
+## SHAP 요인 (FP-138)
+
+ML-03 응답의 `shap`(기준점 + 항목별 SHAP 점수)을 대안 모델에서 만든다. 형식과 규칙은 서비스 Mock(`pipeline/mock_scorer.py`)과 같아서 FP-141에서 그대로 끼울 수 있다.
+
+```python
+import joblib
+from training.explain import AlternativeExplainer, score_one
+
+explainer = AlternativeExplainer(joblib.load("artifacts/alternative.joblib"))   # 서비스 시작 때 한 번만 만든다
+result = explainer.explain(feature_dict)        # feature_dict = pipeline.feature_builder.build_features(...) 결과
+# result = {"logOdds", "score", "defaultProb", "baseScore", "factors": [{"rank", "featureCode", "featureValue", "shapValue", "shapScore"}, ...]}
+legacy = score_one(joblib.load("artifacts/legacy.joblib"), feature_dict, "legacy")   # 기존 모델·시뮬레이터 재계산: {"logOdds", "score", "defaultProb"}
+```
+
+- **합 규칙**: `baseScore + Σ shapScore = score`. 모델의 `expected_value + Σ SHAP = raw margin`(log-odds)이 정확히 맞고, 점수로 환산한 값을 정수로 반올림하면서 합이 `score`와 같게 맞춘다(최대 잉여 방식). 점수가 0이나 1000으로 잘리는 경우에도 합은 잘린 `score`와 같다.
+- **환산**: 명세서 O-3. `score = OFFSET − FACTOR × log-odds`(700점 = 우량:불량 20:1, 40점마다 오즈 2배, 0~1000). SHAP 점수 = `−FACTOR × SHAP(log-odds)`로, 불량 쪽으로 미는 항목이 점수를 깎는다. 같은 상수가 `pipeline/mock_scorer.py`에도 있고 시험이 두 곳이 같은지 검사한다.
+- **순서**: `rank`는 `|shapScore|` 큰 순서, 같으면 항목 이름 가나다순(DDL `FEATURE_RANK` 주석). 피처 38개를 모두 담는다. `featureValue`는 서비스가 만든 원래 값의 글자이고 결측이면 `None`이다.
+- **기준점**: `TreeExplainer`의 `expected_value`(학습 데이터에서 모델의 평균 log-odds)를 점수로 바꾼 값이다. 현재 베이스라인 대안 모델은 694점이다(시연용 Mock은 639점).
+- **등급은 만들지 않는다**: 등급 경계(D-01)는 팀 결정이라 `gradeBandCode`는 서비스가 정한다.
+- **주의**: SHAP 결과는 모델이 쓴 기여도이며 인과관계가 아니다. 화면에는 "작용한 정도"로만 보여 준다. 설명기 생성에 약 0.2초가 걸리고 요청마다 SHAP 계산 비용이 든다(응답 시간은 확인하지 못했다).

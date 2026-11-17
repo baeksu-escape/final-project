@@ -201,7 +201,7 @@ class RunAllRuleTests(unittest.TestCase):
         self.assertIn('RAISE_APPLICATION_ERROR(-20002',script)
         self.assertIn('RAISE_APPLICATION_ERROR(-20003',script)
         for name in seeds:
-            table = 'DIM_FEATURE' if name == '25_seed_dim_feature_fs_draft.sql' else name.split('_seed_',1)[1][:-4].upper()
+            table = 'DIM_FEATURE' if name.startswith('2') and '_seed_dim_feature_fs_' in name else name.split('_seed_',1)[1][:-4].upper()   # 피처 세트별 시드(25 FS-DRAFT, 26 FS-V1)
             self.assertIn("'"+table+"'",script)
 
 
@@ -349,6 +349,13 @@ class SchemaTests(unittest.TestCase):
             rows=copy.deepcopy(self.base);extra=dict(rows[table][0]);extra[key]='OTHER';rows[table].append(extra)
             with self.assertRaises(ValueError):db.validate_rows(self.tables,rows)
             extra['STATUS_CODE']='RETIRED';db.validate_rows(self.tables,rows)
+
+    def test_base_insert_accepts_timestamp_literal(self):
+        """기준 INSERT의 TIMESTAMP '...' 값(MODEL_REGISTRY.TRAINED_AT)을 날짜시각으로 읽는다."""
+        import datetime as dt
+        _, rows = db.parse_ddl("CREATE TABLE X(A NUMBER(2), T TIMESTAMP); "
+                               "INSERT INTO X (A, T) VALUES (1, TIMESTAMP '2026-11-16 11:19:49');")
+        self.assertEqual(rows['X'][0]['T'], dt.datetime(2026, 11, 16, 11, 19, 49))
 
     def test_rate_avg_null_and_bounds_minmax_not_null(self):
         """평균 NULL은 허용하지만 범위 밖 평균과 NULL 최소·최대는 거부한다."""
