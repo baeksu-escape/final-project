@@ -17,7 +17,7 @@ export default function ScoreGauge({ score, bands, label, alternative }) {
         const [lx, ly] = point(band.minScore, 133)
         return <g key={band.gradeBandCode}><circle className="credit-gauge__tick" cx={tx} cy={ty} r="4" /><text className="credit-gauge__label" x={lx} y={ly + 4} textAnchor="middle">{band.minScore}</text></g>
       })}
-      <text className="credit-gauge__score" x="150" y="138" textAnchor="middle">{score}</text>
+      <text className="credit-gauge__score num" x="150" y="138" textAnchor="middle">{score}</text>
       <text className="credit-gauge__label" x="40" y="164" textAnchor="middle">0</text>
       <text className="credit-gauge__label" x="260" y="164" textAnchor="middle">1000</text>
     </svg>

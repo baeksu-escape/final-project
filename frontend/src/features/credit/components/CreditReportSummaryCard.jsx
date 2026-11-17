@@ -28,21 +28,21 @@ export default function CreditReportSummaryCard({ factors = [] }) {
 
   return (
     <Card>
-      <div className="credit-summary-card">
+      <div className="l-stack">
         <div className="credit-summary-card__header">
           <div>
-            <span className="credit-summary-card__eyebrow">SUMMARY</span>
+            <span className="tag">SUMMARY</span>
             <h2>한눈에 보는 요약</h2>
           </div>
         </div>
         <div className="credit-summary-card__legend">
-          <span><i className="credit-summary-card__swatch credit-summary-card__swatch--positive" />점수를 크게 올린 항목</span>
-          <span><i className="credit-summary-card__swatch credit-summary-card__swatch--negative" />점수를 크게 내린 항목</span>
+          <span><i className="shap-swatch shap-positive" />점수를 크게 올린 항목</span>
+          <span><i className="shap-swatch shap-negative" />점수를 크게 내린 항목</span>
         </div>
         <BarChart data={chartData} height={240} ariaLabel="점수에 영향을 준 상승·하락 요인 상위 3개" />
-        <div className="credit-summary-card__action">
-          <p>조건을 바꾸면 점수가 어떻게 달라지는지 시뮬레이터에서 미리 확인해 보세요.</p>
-          <Link to={PATHS.SIMULATOR}>신용케어 시뮬레이터로 가기</Link>
+        <div className="credit-summary-card__action panel-sunk">
+          <p className="hint">조건을 바꾸면 점수가 어떻게 달라지는지 시뮬레이터에서 미리 확인해 보세요.</p>
+          <Link className="button button--primary" to={PATHS.SIMULATOR}>신용케어 시뮬레이터로 가기</Link>
         </div>
       </div>
     </Card>
