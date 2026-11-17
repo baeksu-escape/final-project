@@ -2,29 +2,28 @@ package com.baeksuescape.finance.util;
 
 import com.baeksuescape.finance.dto.CashFlowForecastResponse;
 import com.baeksuescape.finance.dto.CashFlowForecastResponse.MonthlyForecastItem;
-import com.baeksuescape.finance.dto.CashFlowForecastResult;
-import com.baeksuescape.finance.dto.CashFlowForecastResult.MonthlyFlowDetail;
 import com.baeksuescape.finance.dto.DeficitMonthsResult;
 import com.baeksuescape.finance.dto.DeficitMonthsResult.DeficitMonthDetail;
 import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
 import com.baeksuescape.finance.dto.IncomeVolatilityResponse.DeficitMonthItem;
-import com.baeksuescape.finance.dto.IncomeVolatilityResult;
 import com.baeksuescape.finance.dto.MonthlyIncomeItem;
 
 import java.math.BigDecimal;
-import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.YearMonth;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * N-22 소득 변동성 및 N-21 현금흐름 순수 계산 엔진 유틸리티.
- * FP-184(변동성 지표/격차), FP-185(소득 부족 달), FP-186(현금흐름 전망) 핵심 로직을 수행한다.
+ * N-22 소득 변동성 진단과 N-21 현금흐름 전망의 순수 계산 유틸리티 (FP-183·FP-203).
+ * 입력은 기준월이 붙은 월별 소득(MonthlyIncomeItem)이고, 결과는 화면 응답 DTO로 바로 돌려준다. DB는 읽지 않는다.
  */
 public final class IncomeVolatilityCalculator {
 
-    /** 변동성이 크다고 판정하는 변동계수(CV) 임계값 (UI 확정 기준 12.0%) */
+    /** 변동성이 크다고 판정하는 변동계수(CV) 임계값 (UI 확정 기준 12.0%, 초과일 때 "변동이 큼") */
     public static final BigDecimal HIGH_VOLATILITY_THRESHOLD_CV = new BigDecimal("12.0");
 
     private IncomeVolatilityCalculator() {
@@ -32,146 +31,55 @@ public final class IncomeVolatilityCalculator {
     }
 
     // =========================================================================
-    // [FP-184] 변동성 지표 및 성수기·비수기 소득 격차 계산 (기획서 N-22-3·4 기준)
+    // N-22-3 변동성 지표 기초 값 (평균·변동계수·소득 0원 달 수)
     // =========================================================================
 
+    /** summarizeIncomes()의 결과: 평균(소수 2자리), 변동계수(%, 소수 2자리), 12% 초과 여부, 소득 0원 달 수 */
+    private record IncomeSummary(BigDecimal mean, BigDecimal cv, boolean highVolatility, int zeroIncomeMonthsCount) {
+    }
+
     /**
-     * FP-184 월별 소득 데이터를 받아 변동성 지표(CV)와 성수기·비수기 소득 격차를 계산한다.
-     *
-     * @param monthlyIncomes 월별 소득 목록 (BigDecimal)
-     * @param seasonMonthCount 성수기/비수기 산출용 상위/하위 개월 수 (예: 1이면 최고/최저, 2 이상이면 상/하위 N개월 평균)
-     * @return IncomeVolatilityResult 계산 결과 DTO
+     * N-22-3 월별 소득의 평균, 변동계수(CV = 표준편차 ÷ 평균 × 100), 소득 0원 달 수를 구한다.
+     * 표준편차는 모표준편차(분산을 개수 n으로 나눔)다. 반올림: 평균 2자리 → 분산 4자리 → 표준편차 2자리 → CV 2자리(모두 HALF_UP).
      */
-    public static IncomeVolatilityResult calculateVolatility(List<BigDecimal> monthlyIncomes, int seasonMonthCount) {
-        if (monthlyIncomes == null || monthlyIncomes.isEmpty()) {
-            throw new IllegalArgumentException("소득 데이터가 비어 있습니다.");
-        }
+    private static IncomeSummary summarizeIncomes(List<MonthlyIncomeItem> monthlyIncomes) {
+        BigDecimal count = BigDecimal.valueOf(monthlyIncomes.size());
 
-        int count = monthlyIncomes.size();
-        if (seasonMonthCount <= 0 || seasonMonthCount > count / 2) {
-            seasonMonthCount = 1; // 방어적 기본값: 단일 최고/최저 달
-        }
-
-        // 1. 평균 소득 계산
         BigDecimal sum = BigDecimal.ZERO;
         int zeroCount = 0;
-        for (BigDecimal income : monthlyIncomes) {
-            if (income == null) income = BigDecimal.ZERO;
+        for (MonthlyIncomeItem item : monthlyIncomes) {
+            BigDecimal income = BigDecimal.valueOf(item.getIncome());
             sum = sum.add(income);
-            if (income.compareTo(BigDecimal.ZERO) == 0) {
+            if (income.signum() == 0) {
                 zeroCount++;
             }
         }
-        BigDecimal countBD = BigDecimal.valueOf(count);
-        BigDecimal mean = sum.divide(countBD, 2, RoundingMode.HALF_UP);
+        BigDecimal mean = sum.divide(count, 2, RoundingMode.HALF_UP);
 
-        // 2. 표준편차 및 변동계수(CV) 계산
-        BigDecimal varianceSum = BigDecimal.ZERO;
-        for (BigDecimal income : monthlyIncomes) {
-            if (income == null) income = BigDecimal.ZERO;
-            BigDecimal diff = income.subtract(mean);
-            varianceSum = varianceSum.add(diff.multiply(diff));
+        BigDecimal squaredDiffSum = BigDecimal.ZERO;
+        for (MonthlyIncomeItem item : monthlyIncomes) {
+            BigDecimal diff = BigDecimal.valueOf(item.getIncome()).subtract(mean);
+            squaredDiffSum = squaredDiffSum.add(diff.multiply(diff));
         }
-        BigDecimal variance = varianceSum.divide(countBD, 4, RoundingMode.HALF_UP);
-        double stdDevDouble = Math.sqrt(variance.doubleValue());
-        BigDecimal stdDev = BigDecimal.valueOf(stdDevDouble).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal variance = squaredDiffSum.divide(count, 4, RoundingMode.HALF_UP);
+        BigDecimal stdDev = BigDecimal.valueOf(Math.sqrt(variance.doubleValue())).setScale(2, RoundingMode.HALF_UP);
 
+        // 평균이 0원이면(모든 달 소득 0) 나눌 수 없으므로 변동계수는 0으로 둔다.
         BigDecimal cv = BigDecimal.ZERO;
-        if (mean.compareTo(BigDecimal.ZERO) > 0) {
-            cv = stdDev.multiply(BigDecimal.valueOf(100))
-                    .divide(mean, 2, RoundingMode.HALF_UP);
+        if (mean.signum() > 0) {
+            cv = stdDev.multiply(BigDecimal.valueOf(100)).divide(mean, 2, RoundingMode.HALF_UP);
         }
-        boolean isHighVolatility = cv.compareTo(HIGH_VOLATILITY_THRESHOLD_CV) > 0;
-
-        // 3. 성수기·비수기 격차 계산 (상위 N개월 평균 vs 하위 N개월 평균)
-        List<BigDecimal> sorted = monthlyIncomes.stream()
-                .filter(Objects::nonNull)
-                .sorted()
-                .collect(Collectors.toList());
-
-        BigDecimal offPeakSum = BigDecimal.ZERO;
-        for (int i = 0; i < seasonMonthCount; i++) {
-            offPeakSum = offPeakSum.add(sorted.get(i));
-        }
-        BigDecimal offPeakAvg = offPeakSum.divide(BigDecimal.valueOf(seasonMonthCount), 2, RoundingMode.HALF_UP);
-
-        BigDecimal peakSum = BigDecimal.ZERO;
-        for (int i = count - seasonMonthCount; i < count; i++) {
-            peakSum = peakSum.add(sorted.get(i));
-        }
-        BigDecimal peakAvg = peakSum.divide(BigDecimal.valueOf(seasonMonthCount), 2, RoundingMode.HALF_UP);
-
-        BigDecimal gapAmount = peakAvg.subtract(offPeakAvg);
-        BigDecimal gapRatio = BigDecimal.ZERO;
-        if (offPeakAvg.compareTo(BigDecimal.ZERO) > 0) {
-            gapRatio = gapAmount.multiply(BigDecimal.valueOf(100))
-                    .divide(offPeakAvg, 2, RoundingMode.HALF_UP);
-        }
-
-        return IncomeVolatilityResult.builder()
-                .meanIncome(mean)
-                .standardDeviation(stdDev)
-                .coefficientOfVariation(cv)
-                .isHighVolatility(isHighVolatility)
-                .peakSeasonAverage(peakAvg)
-                .offPeakSeasonAverage(offPeakAvg)
-                .gapAmount(gapAmount)
-                .gapRatio(gapRatio)
-                .zeroIncomeMonthsCount(zeroCount)
-                .build();
+        boolean highVolatility = cv.compareTo(HIGH_VOLATILITY_THRESHOLD_CV) > 0;
+        return new IncomeSummary(mean, cv, highVolatility, zeroCount);
     }
 
     // =========================================================================
-    // [FP-185] 소득 부족 달 확인 계산 (기획서 N-22-5 기준)
+    // N-22-5 소득 부족 달 확인
     // =========================================================================
 
     /**
-     * FP-185 기준 금액 미만인 소득 부족 달을 추출하고 총 부족액을 산출한다.
-     *
-     * @param monthlyIncomes 월별 소득 목록 (BigDecimal)
-     * @param thresholdAmount 기준 금액 (생활비 또는 설정 기준, BigDecimal)
-     * @return DeficitMonthsResult 부족 달 개수, 목록, 총 부족액
-     */
-    public static DeficitMonthsResult calculateDeficitMonths(List<BigDecimal> monthlyIncomes, BigDecimal thresholdAmount) {
-        if (monthlyIncomes == null || thresholdAmount == null) {
-            throw new IllegalArgumentException("입력 파라미터가 null일 수 없습니다.");
-        }
-
-        List<DeficitMonthDetail> deficitList = new ArrayList<>();
-        BigDecimal totalShortfall = BigDecimal.ZERO;
-
-        for (int i = 0; i < monthlyIncomes.size(); i++) {
-            BigDecimal income = monthlyIncomes.get(i);
-            if (income == null) income = BigDecimal.ZERO;
-
-            if (income.compareTo(thresholdAmount) < 0) {
-                BigDecimal shortfall = thresholdAmount.subtract(income);
-                totalShortfall = totalShortfall.add(shortfall);
-
-                deficitList.add(DeficitMonthDetail.builder()
-                        .monthIdentifier("Month " + (i + 1))
-                        .income(income)
-                        .shortfallAmount(shortfall)
-                        .monthsUntilNext(null)
-                        .build());
-            }
-        }
-
-        boolean hasWarning = !deficitList.isEmpty();
-        return DeficitMonthsResult.builder()
-                .thresholdAmount(thresholdAmount)
-                .deficitMonthsCount(deficitList.size())
-                .totalShortfallAmount(totalShortfall)
-                .hasDeficitWarning(hasWarning)
-                .deficitItems(deficitList)
-                .nearestDeficitMonth(hasWarning ? deficitList.get(0).getMonthIdentifier() : null)
-                .monthsUntilNearest(null)
-                .recommendedReserveAmount(hasWarning ? deficitList.get(0).getShortfallAmount() : BigDecimal.ZERO)
-                .build();
-    }
-
-    /**
-     * FP-185 (타임라인 포함) 날짜 정보 기반으로 도래 주기까지 계산하는 버전.
+     * N-22-5 소득이 기준 금액(월 고정지출)보다 적은 달을 찾고, 마지막 입력월 다음부터 그 달이 다시 오기까지 남은 개월 수를 구한다.
+     * 결과는 가까운 달 순서이며, 준비 권장 금액은 가장 가까운 달의 부족액이다. 부족한 달이 없으면 경고 없음(false)이다.
      */
     public static DeficitMonthsResult calculateDeficitMonthsWithTimeline(
             List<MonthlyIncomeItem> monthlyIncomes, BigDecimal thresholdAmount, YearMonth lastInputMonth) {
@@ -232,86 +140,7 @@ public final class IncomeVolatilityCalculator {
     }
 
     // =========================================================================
-    // [FP-186] 현금흐름 전망 및 적자 개월 수 계산 (기획서 N-21-5~7 기준)
-    // =========================================================================
-
-    /**
-     * FP-186 예상 수입과 예상 지출을 바탕으로 향후 N개월 순 현금흐름, 연속 적자 개월 수, 누적 적자액을 계산한다.
-     *
-     * @param expectedIncomes 예상 월별 수입 목록 (BigDecimal)
-     * @param expectedExpenses 예상 월별 지출 목록 (BigDecimal)
-     * @return CashFlowForecastResult 현금흐름 전망 결과 DTO
-     */
-    public static CashFlowForecastResult forecastCashFlow(List<BigDecimal> expectedIncomes, List<BigDecimal> expectedExpenses) {
-        if (expectedIncomes == null || expectedExpenses == null) {
-            throw new IllegalArgumentException("수입 및 지출 데이터가 null일 수 없습니다.");
-        }
-        if (expectedIncomes.size() != expectedExpenses.size()) {
-            throw new IllegalArgumentException("수입과 지출 데이터의 개월 수가 일치해야 합니다.");
-        }
-        if (expectedIncomes.isEmpty()) {
-            throw new IllegalArgumentException("전망 대상 개월 수가 최소 1개월 이상이어야 합니다.");
-        }
-
-        int months = expectedIncomes.size();
-        List<MonthlyFlowDetail> flows = new ArrayList<>();
-
-        int totalDeficits = 0;
-        int currentConsecutive = 0;
-        int maxConsecutive = 0;
-        BigDecimal totalDeficitAmount = BigDecimal.ZERO;
-        BigDecimal totalNetCash = BigDecimal.ZERO;
-
-        String worstMonth = "-";
-        BigDecimal worstNet = null;
-
-        for (int i = 0; i < months; i++) {
-            BigDecimal inc = expectedIncomes.get(i) != null ? expectedIncomes.get(i) : BigDecimal.ZERO;
-            BigDecimal exp = expectedExpenses.get(i) != null ? expectedExpenses.get(i) : BigDecimal.ZERO;
-            BigDecimal net = inc.subtract(exp);
-            String monthLabel = "Month " + (i + 1);
-
-            boolean isDeficit = net.compareTo(BigDecimal.ZERO) < 0;
-            if (isDeficit) {
-                totalDeficits++;
-                currentConsecutive++;
-                if (currentConsecutive > maxConsecutive) {
-                    maxConsecutive = currentConsecutive;
-                }
-                totalDeficitAmount = totalDeficitAmount.add(net.abs());
-            } else {
-                currentConsecutive = 0;
-            }
-
-            totalNetCash = totalNetCash.add(net);
-
-            if (worstNet == null || net.compareTo(worstNet) < 0) {
-                worstNet = net;
-                worstMonth = monthLabel;
-            }
-
-            flows.add(MonthlyFlowDetail.builder()
-                    .monthIdentifier(monthLabel)
-                    .expectedIncome(inc)
-                    .expectedExpense(exp)
-                    .netCashFlow(net)
-                    .isDeficit(isDeficit)
-                    .build());
-        }
-
-        return CashFlowForecastResult.builder()
-                .monthlyFlows(flows)
-                .totalDeficitMonthsCount(totalDeficits)
-                .maxConsecutiveDeficitMonths(maxConsecutive)
-                .totalDeficitAmount(totalDeficitAmount)
-                .totalNetCashFlow(totalNetCash)
-                .worstMonth(worstMonth)
-                .worstNetCashFlow(worstNet != null ? worstNet : BigDecimal.ZERO)
-                .build();
-    }
-
-    // =========================================================================
-    // 하위 호환 및 통합 인터페이스 (MonthlyIncomeItem 기반)
+    // N-22-4·N-21-7 성수기·비수기 격차 (공유), N-22 진단 응답 조립
     // =========================================================================
 
     /**
@@ -351,12 +180,8 @@ public final class IncomeVolatilityCalculator {
                 .sorted(Comparator.comparing(MonthlyIncomeItem::getYearMonth))
                 .collect(Collectors.toList());
 
-        List<BigDecimal> bdIncomes = sortedList.stream()
-                .map(item -> BigDecimal.valueOf(item.getIncome()))
-                .collect(Collectors.toList());
-
-        // 2) 평균·변동계수(CV)·12% 초과 여부·소득 0원 달 수는 FP-184 계산을 그대로 쓴다.
-        IncomeVolatilityResult result = calculateVolatility(bdIncomes, 1);
+        // 2) 평균·변동계수(CV)·12% 초과 여부·소득 0원 달 수
+        IncomeSummary summary = summarizeIncomes(sortedList);
         // 3) 성수기·비수기 달과 격차 (N-21-7과 공유)
         PeakOffPeakResult peakOffPeak = calculatePeakOffPeakGap(sortedList);
 
@@ -373,7 +198,7 @@ public final class IncomeVolatilityCalculator {
                 sortedList, BigDecimal.valueOf(monthlyFixedExpense), lastInputMonth);
 
         // 내부 계산 결과(BigDecimal)를 화면 응답 형식(원 단위 long)으로 옮긴다.
-        List<DeficitMonthItem> legacyDeficitList = deficitResult.getDeficitItems().stream()
+        List<DeficitMonthItem> deficitMonths = deficitResult.getDeficitItems().stream()
                 .map(d -> DeficitMonthItem.builder()
                         .yearMonth(d.getMonthIdentifier())
                         .income(d.getIncome().longValue())
@@ -385,18 +210,19 @@ public final class IncomeVolatilityCalculator {
         // 6) 최근 3개월 평균과 12개월 평균의 차이. 음수면 요즘 소득이 평소보다 줄었다는 뜻이다.
         int count = sortedList.size();
         int recentMonthsCount = Math.min(3, count);
-        List<BigDecimal> recent3 = bdIncomes.subList(count - recentMonthsCount, count);
-        BigDecimal recentSum = recent3.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal recentSum = sortedList.subList(count - recentMonthsCount, count).stream()
+                .map(item -> BigDecimal.valueOf(item.getIncome()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         long recent3Mean = recentSum.divide(BigDecimal.valueOf(recentMonthsCount), 0, RoundingMode.HALF_UP).longValue();
-        long meanLong = result.getMeanIncome().longValue();
+        long meanLong = summary.mean().longValue();
 
         return IncomeVolatilityResponse.builder()
                 .meanIncome(meanLong)
                 .medianIncome(calculateMedianIncome(sortedList))
-                .incomeCv(result.getCoefficientOfVariation().doubleValue())
-                .isHighVolatility(result.isHighVolatility())
+                .incomeCv(summary.cv().doubleValue())
+                .isHighVolatility(summary.highVolatility())
                 .fixedExpenseToLowestIncomeRatio(fixedExpenseRatio)
-                .zeroIncomeMonthsCount(result.getZeroIncomeMonthsCount())
+                .zeroIncomeMonthsCount(summary.zeroIncomeMonthsCount())
                 .recent3MonthsAverageIncome(recent3Mean)
                 .recent3MonthsDiff(recent3Mean - meanLong)
                 .peakMonth(peakOffPeak.peakMonth)
@@ -405,7 +231,7 @@ public final class IncomeVolatilityCalculator {
                 .offPeakIncome(peakOffPeak.offPeakIncome)
                 .peakOffPeakGap(peakOffPeak.gap)
                 .hasDeficitWarning(deficitResult.isHasDeficitWarning())
-                .deficitMonths(legacyDeficitList)
+                .deficitMonths(deficitMonths)
                 .nearestDeficitMonth(deficitResult.getNearestDeficitMonth())
                 .monthsUntilNearest(deficitResult.getMonthsUntilNearest())
                 .recommendedReserveAmount(deficitResult.getRecommendedReserveAmount().longValue())
@@ -429,6 +255,10 @@ public final class IncomeVolatilityCalculator {
         }
         return Math.round((sorted.get(size / 2 - 1) + sorted.get(size / 2)) / 2.0);
     }
+
+    // =========================================================================
+    // N-21 현금흐름 전망 (N-21-5 월별 전망, N-21-6 과거 적자 달, N-21-7 격차는 위 공유 함수)
+    // =========================================================================
 
     /**
      * N-21-6 최근 12개월 중 지출이 소득보다 큰(적자) 달 수를 센다. 이력이 없으면 0이다.

@@ -5,11 +5,13 @@ import com.baeksuescape.finance.service.ScoreBandOfferService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import com.baeksuescape.global.exception.ApiException;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.server.ResponseStatusException;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -17,9 +19,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * FP-170 GET /api/simulation/score-band-offer의 쿼리·JSON 필드 이름·오류 상태를 확인하는 웹 계층 테스트.
+ * FP-170 GET /api/simulation/score-band-offer의 쿼리·JSON 필드 이름·오류 상태를 확인하는 API 테스트.
+ * 보안·공통 예외 처리기까지 실제와 같게 붙이려고 test 프로필(H2)로 전체 컨텍스트를 띄운다.
  */
-@WebMvcTest(SimulationController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 class SimulationControllerTest {
 
     @Autowired
@@ -53,22 +58,26 @@ class SimulationControllerTest {
     @DisplayName("점수가 없거나 숫자가 아니면 400, 서비스가 400을 던지면 400")
     void badRequest() throws Exception {
         mockMvc.perform(get("/api/simulation/score-band-offer"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
         mockMvc.perform(get("/api/simulation/score-band-offer").param("score", "abc"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
 
         when(scoreBandOfferService.findOffer(1001))
-                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "점수는 0~1000 사이여야 합니다."));
+                .thenThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "점수는 0~1000 사이여야 합니다."));
         mockMvc.perform(get("/api/simulation/score-band-offer").param("score", "1001"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
     }
 
     @Test
     @DisplayName("자료가 없으면 404")
     void notFound() throws Exception {
         when(scoreBandOfferService.findOffer(700))
-                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "해당 점수대의 금리·한도 자료가 없습니다."));
+                .thenThrow(new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "해당 점수대의 금리·한도 자료가 없습니다."));
         mockMvc.perform(get("/api/simulation/score-band-offer").param("score", "700"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 }

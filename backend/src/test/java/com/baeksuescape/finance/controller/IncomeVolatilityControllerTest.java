@@ -8,11 +8,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import com.baeksuescape.global.exception.ApiException;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -28,8 +30,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * FP-203 저장 데이터 기반 GET API의 경로·쿼리·JSON 필드 이름을 확인하는 웹 계층 테스트.
  * 문서(api_spec.md)에 적은 필드 이름이 실제 응답과 같은지 여기서 고정한다.
+ * 보안·공통 예외 처리기까지 실제와 같게 붙이려고 다른 팀 API 테스트처럼 test 프로필(H2)로 전체 컨텍스트를 띄운다.
  */
-@WebMvcTest(IncomeVolatilityController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 class IncomeVolatilityControllerTest {
 
     @Autowired
@@ -66,17 +71,19 @@ class IncomeVolatilityControllerTest {
     @DisplayName("GET /api/diagnosis/income-volatility: 저장된 소득이 없으면 404")
     void getIncomeVolatility_notFound() throws Exception {
         when(incomeVolatilityService.diagnoseSavedIncomeVolatility(999L))
-                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "저장된 소득 데이터가 없습니다."));
+                .thenThrow(new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "저장된 소득 데이터가 없습니다."));
 
         mockMvc.perform(get("/api/diagnosis/income-volatility").param("userId", "999"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test
     @DisplayName("GET /api/diagnosis/income-volatility: userId가 없으면 400")
     void getIncomeVolatility_missingUserId() throws Exception {
         mockMvc.perform(get("/api/diagnosis/income-volatility"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
     }
 
     @Test

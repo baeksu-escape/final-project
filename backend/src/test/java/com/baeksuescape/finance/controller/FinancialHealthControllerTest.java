@@ -1,12 +1,12 @@
 package com.baeksuescape.finance.controller;
 
-import com.baeksuescape.finance.service.FinancialHealthService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -14,10 +14,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * FP-166 DSR·건전성 API 웹 계층 테스트. 서비스는 DB를 쓰지 않으므로 실제 서비스를 그대로 붙여 응답 값까지 확인한다.
+ * FP-166 DSR·건전성 API 테스트. 서비스는 DB를 쓰지 않으므로 실제 서비스를 그대로 붙여 응답 값까지 확인한다.
+ * 보안·공통 예외 처리기까지 실제와 같게 붙이려고 test 프로필(H2)로 전체 컨텍스트를 띄운다.
  */
-@WebMvcTest(FinancialHealthController.class)
-@Import(FinancialHealthService.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 class FinancialHealthControllerTest {
 
     @Autowired
@@ -43,11 +45,14 @@ class FinancialHealthControllerTest {
         mockMvc.perform(post("/api/diagnosis/dsr/calculate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"annualIncome\":0,\"annualDebtService\":1000000}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("annualIncome"));
         mockMvc.perform(post("/api/diagnosis/dsr/calculate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"annualIncome\":30000000,\"annualDebtService\":-1}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("annualDebtService"));
     }
 
     @Test
@@ -83,6 +88,8 @@ class FinancialHealthControllerTest {
         mockMvc.perform(post("/api/diagnosis/financial-health/calculate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"totalAsset\":-1,\"annualIncome\":0,\"totalDebt\":0,\"annualDebtService\":0}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("totalAsset"));
     }
 }

@@ -8,7 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
+import com.baeksuescape.global.exception.ApiException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -95,12 +95,14 @@ class ScoreBandOfferServiceTest {
     }
 
     @Test
-    @DisplayName("점수가 0~1000 밖이면 400이고 DB를 조회하지 않는다")
+    @DisplayName("점수가 0~1000 밖이면 400 INVALID_INPUT(fieldErrors에 score)이고 DB를 조회하지 않는다")
     void outOfRange() {
+        ApiException low = assertThrows(ApiException.class, () -> service.findOffer(-1));
+        assertEquals(HttpStatus.BAD_REQUEST, low.getStatus());
+        assertEquals("INVALID_INPUT", low.getCode());
+        assertEquals("score", low.getFieldErrors().get(0).field());
         assertEquals(HttpStatus.BAD_REQUEST,
-                assertThrows(ResponseStatusException.class, () -> service.findOffer(-1)).getStatusCode());
-        assertEquals(HttpStatus.BAD_REQUEST,
-                assertThrows(ResponseStatusException.class, () -> service.findOffer(1001)).getStatusCode());
+                assertThrows(ApiException.class, () -> service.findOffer(1001)).getStatus());
         verify(mapper, never()).selectOfferByScore(anyInt());
     }
 
@@ -109,10 +111,10 @@ class ScoreBandOfferServiceTest {
     void notFound() {
         when(mapper.selectOfferByScore(700)).thenReturn(null);
         assertEquals(HttpStatus.NOT_FOUND,
-                assertThrows(ResponseStatusException.class, () -> service.findOffer(700)).getStatusCode());
+                assertThrows(ApiException.class, () -> service.findOffer(700)).getStatus());
 
         when(mapper.selectActiveGradeBand(800)).thenReturn(null);
-        assertEquals(HttpStatus.NOT_FOUND,
-                assertThrows(ResponseStatusException.class, () -> service.findOffer(800)).getStatusCode());
+        assertEquals("NOT_FOUND",
+                assertThrows(ApiException.class, () -> service.findOffer(800)).getCode());
     }
 }

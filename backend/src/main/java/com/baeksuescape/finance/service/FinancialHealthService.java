@@ -7,11 +7,13 @@ import com.baeksuescape.finance.dto.FinancialHealthResponse;
 import com.baeksuescape.finance.util.FinancialHealthCalculator;
 import com.baeksuescape.finance.util.FinancialHealthCalculator.HealthResult;
 import com.baeksuescape.finance.util.FinancialHealthCalculator.RiskLevel;
+import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * FP-166 건전성 지표(N-16-1·2)와 DSR 계산기(N-20-4) 서비스.
@@ -22,20 +24,20 @@ public class FinancialHealthService {
 
     /**
      * N-20-4 DSR 계산·위험 단계. 기존 프론트 mock과 같은 응답 형식(DsrCalculateResponse)으로 돌려준다.
-     * 금액이 음수이거나 연소득이 0 이하이면 계산할 수 없으므로 400을 던진다.
+     * 금액이 음수이거나 연소득이 0 이하이면 계산할 수 없으므로 400 INVALID_INPUT을 던진다.
      */
     public DsrCalculateResponse calculateDsr(DsrCalculateRequest request) {
         if (request == null) {
-            throw badRequest("요청 값이 없습니다.");
+            throw badRequest(null, "요청 값이 없습니다.");
         }
-        requireNotNegative(request.getAnnualIncome(), "연소득");
-        requireNotNegative(request.getAnnualDebtService(), "연간 원리금 상환액");
+        requireNotNegative(request.getAnnualIncome(), "annualIncome", "연소득");
+        requireNotNegative(request.getAnnualDebtService(), "annualDebtService", "연간 원리금 상환액");
 
         BigDecimal ratio = FinancialHealthCalculator.calculateRepaymentBurdenRatio(
                 BigDecimal.valueOf(request.getAnnualDebtService()),
                 BigDecimal.valueOf(request.getAnnualIncome()));
         if (ratio == null) {
-            throw badRequest("연소득이 0원이라 DSR을 계산할 수 없습니다.");
+            throw badRequest("annualIncome", "연소득이 0원이라 DSR을 계산할 수 없습니다.");
         }
 
         RiskLevel level = FinancialHealthCalculator.evaluateRiskLevel(
@@ -53,16 +55,16 @@ public class FinancialHealthService {
 
     /**
      * N-16-1·2·3 건전성 지표 계산. 저장 값이든 값 바꿔 보기로 바꾼 값이든 같은 방식으로 계산한다.
-     * 금액이 음수면 400을 던진다. 나누는 값이 0 이하인 비율은 null(계산 불가)로 돌려준다.
+     * 금액이 음수면 400 INVALID_INPUT을 던진다. 나누는 값이 0 이하인 비율은 null(계산 불가)로 돌려준다.
      */
     public FinancialHealthResponse calculateHealth(FinancialHealthRequest request) {
         if (request == null) {
-            throw badRequest("요청 값이 없습니다.");
+            throw badRequest(null, "요청 값이 없습니다.");
         }
-        requireNotNegative(request.getTotalAsset(), "총자산");
-        requireNotNegative(request.getAnnualIncome(), "연소득");
-        requireNotNegative(request.getTotalDebt(), "총부채");
-        requireNotNegative(request.getAnnualDebtService(), "연간 원리금 상환액");
+        requireNotNegative(request.getTotalAsset(), "totalAsset", "총자산");
+        requireNotNegative(request.getAnnualIncome(), "annualIncome", "연소득");
+        requireNotNegative(request.getTotalDebt(), "totalDebt", "총부채");
+        requireNotNegative(request.getAnnualDebtService(), "annualDebtService", "연간 원리금 상환액");
 
         HealthResult result = FinancialHealthCalculator.calculateHealth(
                 BigDecimal.valueOf(request.getTotalAsset()),
@@ -107,14 +109,17 @@ public class FinancialHealthService {
         }
     }
 
-    private void requireNotNegative(long value, String label) {
+    /** 금액이 음수면 그 필드를 fieldErrors에 담아 400을 던진다(프론트 serverErrors.js가 칸 옆에 표시). */
+    private void requireNotNegative(long value, String field, String label) {
         if (value < 0) {
-            throw badRequest(label + "은(는) 0 이상이어야 합니다.");
+            throw badRequest(field, label + "은(는) 0 이상이어야 합니다.");
         }
     }
 
-    private ResponseStatusException badRequest(String message) {
-        return new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+    /** 팀 공통 오류 형식 { code: INVALID_INPUT, message, fieldErrors }로 400을 만든다. field가 null이면 fieldErrors는 비운다. */
+    private ApiException badRequest(String field, String message) {
+        List<FieldErrorItem> fieldErrors = field == null ? List.of() : List.of(new FieldErrorItem(field, message));
+        return new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", message, fieldErrors);
     }
 
     private Double toDouble(BigDecimal value) {

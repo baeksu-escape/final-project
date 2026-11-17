@@ -138,5 +138,85 @@ class IncomeVolatilityCalculatorTest {
         assertEquals(3500000L, response.getPeakOffPeakGap(), "N-21-7 성수기/비수기 격차가 일치해야 한다.");
         assertTrue(response.getTotalAccumulatedSurplus() > 0, "총 누적 잉여금은 0보다 커야 한다.");
     }
+
+    // =========================================================================
+    // 옛 함수 정리(11/17) 전후로 결과가 같은지 고정하는 테스트 — 시드 회원 2번(프리랜서) 실제 값
+    // =========================================================================
+
+    private List<MonthlyIncomeItem> seedMember2() {
+        String[] months = {"2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02",
+                "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08"};
+        long[] incomes = {1933611L, 1341079L, 3884117L, 1873023L, 2330585L, 2804640L,
+                1619240L, 2715365L, 1616535L, 1327643L, 1686835L, 2061303L};
+        List<MonthlyIncomeItem> list = new ArrayList<>();
+        for (int i = 0; i < months.length; i++) {
+            list.add(MonthlyIncomeItem.builder().yearMonth(months[i]).income(incomes[i]).build());
+        }
+        return list;
+    }
+
+    @Test
+    @DisplayName("N-22-3~5 시드 회원 2번: 응답의 모든 지표가 api_spec.md 예시와 같다")
+    void seedMember2_allIndicatorsPinned() {
+        IncomeVolatilityResponse r = IncomeVolatilityCalculator.calculateVolatility(seedMember2(), 1315514L);
+
+        assertEquals(2099498L, r.getMeanIncome());
+        assertEquals(1903317L, r.getMedianIncome());
+        assertEquals(33.68, r.getIncomeCv());
+        assertTrue(r.isHighVolatility());
+        assertEquals(99.09, r.getFixedExpenseToLowestIncomeRatio());
+        assertEquals(0, r.getZeroIncomeMonthsCount());
+        assertEquals(1691927L, r.getRecent3MonthsAverageIncome());
+        assertEquals(-407571L, r.getRecent3MonthsDiff());
+        assertEquals("2025-11", r.getPeakMonth());
+        assertEquals(3884117L, r.getPeakIncome());
+        assertEquals("2026-06", r.getOffPeakMonth());
+        assertEquals(1327643L, r.getOffPeakIncome());
+        assertEquals(2556474L, r.getPeakOffPeakGap());
+        assertFalse(r.isHasDeficitWarning());
+        assertTrue(r.getDeficitMonths().isEmpty());
+        assertNull(r.getNearestDeficitMonth());
+        assertEquals(0L, r.getRecommendedReserveAmount());
+    }
+
+    @Test
+    @DisplayName("N-22-5 부족 달 여러 건: 가까운 달 순서, 준비 금액은 가장 가까운 달의 부족액")
+    void multipleDeficitMonths() {
+        // 고정지출 300만: 1월(소득 150만, 부족 150만)·2월(소득 200만, 부족 100만). 3월 300만은 같으므로 부족 아님
+        IncomeVolatilityResponse r = IncomeVolatilityCalculator.calculateVolatility(createSample12Months(), 3000000L);
+
+        assertTrue(r.isHasDeficitWarning());
+        assertEquals(2, r.getDeficitMonths().size());
+        assertEquals("2026-01", r.getDeficitMonths().get(0).getYearMonth());
+        assertEquals(5, r.getDeficitMonths().get(0).getMonthsUntilNext());
+        assertEquals("2026-02", r.getDeficitMonths().get(1).getYearMonth());
+        assertEquals(6, r.getDeficitMonths().get(1).getMonthsUntilNext());
+        assertEquals("2026-01", r.getNearestDeficitMonth());
+        assertEquals(5, r.getMonthsUntilNearest());
+        assertEquals(1500000L, r.getRecommendedReserveAmount());
+
+        com.baeksuescape.finance.dto.DeficitMonthsResult detail = IncomeVolatilityCalculator.calculateDeficitMonthsWithTimeline(
+                createSample12Months(), java.math.BigDecimal.valueOf(3000000L), YearMonth.of(2026, 8));
+        assertEquals(0, new java.math.BigDecimal("2500000").compareTo(detail.getTotalShortfallAmount()), "총 부족액 250만");
+    }
+
+    @Test
+    @DisplayName("N-22-3 소득 0원 달 수와 변동계수, 빈 목록은 0 응답")
+    void zeroIncomeAndEmpty() {
+        List<MonthlyIncomeItem> items = new ArrayList<>();
+        String[] months = {"2026-05", "2026-06", "2026-07", "2026-08"};
+        long[] incomes = {2000000L, 0L, 2000000L, 0L};
+        for (int i = 0; i < 4; i++) {
+            items.add(MonthlyIncomeItem.builder().yearMonth(months[i]).income(incomes[i]).build());
+        }
+        IncomeVolatilityResponse r = IncomeVolatilityCalculator.calculateVolatility(items, 500000L);
+        assertEquals(2, r.getZeroIncomeMonthsCount());
+        assertEquals(1000000L, r.getMeanIncome());
+        assertEquals(100.0, r.getIncomeCv(), "평균 100만, 모표준편차 100만 → 변동계수 100%");
+
+        IncomeVolatilityResponse empty = IncomeVolatilityCalculator.calculateVolatility(List.of(), 500000L);
+        assertEquals(0L, empty.getMeanIncome());
+        assertNull(empty.getPeakMonth());
+    }
 }
 
