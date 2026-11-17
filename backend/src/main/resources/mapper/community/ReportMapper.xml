@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-191 N-33 신고 접수·N-34 관리자 신고 처리 (CONTENT_REPORT, DDL v0.3.2) -->
+<mapper namespace="com.baeksuescape.community.mapper.ReportMapper">
+
+    <!-- 한 대상(글 또는 댓글)을 고르는 조건 -->
+    <sql id="targetWhere">
+        <choose>
+            <when test="targetType == 'POST'">R.TARGET_TYPE_CODE = 'POST' AND R.POST_ID = #{targetId}</when>
+            <otherwise>R.TARGET_TYPE_CODE = 'COMMENT' AND R.COMMENT_ID = #{targetId}</otherwise>
+        </choose>
+    </sql>
+
+    <select id="countByReporterAndTarget" resultType="int">
+        SELECT COUNT(*)
+          FROM CONTENT_REPORT R
+         WHERE R.REPORTER_USER_ID = #{reporterUserId}
+           AND <include refid="targetWhere"/>
+    </select>
+
+    <select id="countByReporterSince" resultType="int">
+        SELECT COUNT(*)
+          FROM CONTENT_REPORT
+         WHERE REPORTER_USER_ID = #{reporterUserId}
+           AND REPORTED_AT &gt;= #{since}
+    </select>
+
+    <!-- N-33-1 신고 저장. 상세 내용은 사유가 OTHER일 때만 들어온다(DDL CK_CRP_DETAIL). -->
+    <insert id="insertReport" useGeneratedKeys="true" keyProperty="reportId" keyColumn="REPORT_ID">
+        INSERT INTO CONTENT_REPORT (TARGET_TYPE_CODE, POST_ID, COMMENT_ID, REPORTER_USER_ID, REASON_CODE, DETAIL_TEXT, STATUS_CODE,
+                                    REPORTED_AT)
+        VALUES (#{targetTypeCode}, #{postId,jdbcType=NUMERIC}, #{commentId,jdbcType=NUMERIC}, #{reporterUserId}, #{reasonCode},
+                #{detailText,jdbcType=VARCHAR}, 'RECEIVED', #{reportedAt})
+    </insert>
+
+    <select id="countOpenByTarget" resultType="int">
+        SELECT COUNT(*)
+          FROM CONTENT_REPORT R
+         WHERE <include refid="targetWhere"/>
+           AND R.STATUS_CODE IN ('RECEIVED', 'IN_REVIEW')
+    </select>
+
+    <select id="countOpenTargets" resultType="int">
+        SELECT COUNT(*)
+          FROM (SELECT DISTINCT TARGET_TYPE_CODE, POST_ID, COMMENT_ID
+                  FROM CONTENT_REPORT
+                 WHERE STATUS_CODE IN ('RECEIVED', 'IN_REVIEW'))
+    </select>
+
+    <!-- 관리자 화면용 신고 행: 대상 요약(글 제목·댓글 앞 50자)과 대상 상태, 신고자 닉네임을 붙인다. -->
+    <sql id="reportSelect">
+        SELECT R.REPORT_ID AS reportId, R.TARGET_TYPE_CODE AS targetTypeCode, R.POST_ID AS postId, R.COMMENT_ID AS commentId,
+               C.POST_ID AS parentPostId, R.REASON_CODE AS reasonCode, R.DETAIL_TEXT AS detailText,
+               R.STATUS_CODE AS statusCode, R.RESULT_CODE AS resultCode, R.HANDLER_MEMO AS handlerMemo,
+               R.REPORTED_AT AS reportedAt, R.HANDLED_AT AS handledAt,
+               U.NICKNAME AS reporterNickname,
+               CASE WHEN U.USER_ID IS NULL OR U.ACCOUNT_STATUS_CODE = 'WITHDRAWN' THEN 'Y' ELSE 'N' END AS reporterWithdrawn,
+               CASE WHEN R.TARGET_TYPE_CODE = 'POST' THEN P.TITLE ELSE SUBSTR(C.CONTENT, 1, 50) END AS targetText,
+               CASE WHEN R.TARGET_TYPE_CODE = 'POST' THEN P.STATUS_CODE ELSE C.STATUS_CODE END AS targetStatusCode
+          FROM CONTENT_REPORT R
+          LEFT JOIN BOARD_POST P ON P.POST_ID = R.POST_ID
+          LEFT JOIN BOARD_COMMENT C ON C.COMMENT_ID = R.COMMENT_ID
+          LEFT JOIN APP_USER U ON U.USER_ID = R.REPORTER_USER_ID
+    </sql>
+
+    <select id="selectReports" resultType="com.baeksuescape.community.dto.ReportRow">
+        <include refid="reportSelect"/>
+        <where>
+            <if test="statusCode != null">R.STATUS_CODE = #{statusCode}</if>
+            <if test="reasonCode != null">AND R.REASON_CODE = #{reasonCode}</if>
+            <if test="fromAt != null">AND R.REPORTED_AT &gt;= #{fromAt}</if>
+            <if test="toAt != null">AND R.REPORTED_AT &lt; #{toAt}</if>
+        </where>
+         ORDER BY R.REPORTED_AT DESC, R.REPORT_ID DESC
+    </select>
+
+    <select id="selectReport" resultType="com.baeksuescape.community.dto.ReportRow">
+        <include refid="reportSelect"/>
+         WHERE R.REPORT_ID = #{reportId}
+    </select>
+
+    <select id="selectReportsByTarget" resultType="com.baeksuescape.community.dto.ReportRow">
+        <include refid="reportSelect"/>
+         WHERE <include refid="targetWhere"/>
+         ORDER BY R.REPORTED_AT DESC, R.REPORT_ID DESC
+    </select>
+
+    <!-- N-34-3 처리 결과 저장. 상태·결과 조합은 DDL CK_CRP_RESULT_STATUS가 다시 검사한다. -->
+    <update id="closeOpenReports">
+        UPDATE CONTENT_REPORT R
+           SET R.STATUS_CODE = #{statusCode}, R.RESULT_CODE = #{resultCode}, R.HANDLER_USER_ID = #{handlerUserId},
+               R.HANDLER_MEMO = #{memo,jdbcType=VARCHAR}, R.HANDLED_AT = #{now}
+         WHERE <include refid="targetWhere"/>
+           AND R.STATUS_CODE IN ('RECEIVED', 'IN_REVIEW')
+    </update>
+</mapper>

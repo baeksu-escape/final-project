@@ -1,5 +1,5 @@
 {
-  "ddl_sha256": "d15a5616807741b7c03d07f718ceec657dbe8675c1030884675567cecf9b0855",
+  "ddl_sha256": "29d46469c3a418eda3c0a3e6fd2efd8183a34a4d9b5d9c0d5f093c1868a5ab3d",
   "table_count": 47,
   "rows": {
     "DIM_WORKER_TYPE": 3,
