@@ -70,3 +70,26 @@ C조 담당자의 결정과 사용자 승인에 따라 상권 분석은 DB·API 
 ## 알림 테이블은 빈 구조만 준비한다
 
 회의 결정에 따라 `USER_NOTIFICATION`은 빈 테이블로만 만든다. 알림 시드·API·생성·발송 로직은 추가하지 않는다. 기존 DB에는 [create_user_notification.sql](create_user_notification.sql)을 한 번 실행한다. `APP_USER`가 먼저 있어야 하며, 테이블이 이미 있으면 재실행하지 않는다. 새 스키마에는 기준 DDL에 포함되어 있으므로 별도 실행하지 않는다. 실제 Oracle 적용은 아직 확인하지 않았다.
+
+## DDL을 고칠 때 같이 고칠 것 (체크리스트)
+
+`avenue_ddl.sql`을 한 글자라도 고치면 아래 짝꿍 파일도 **같은 PR에서** 함께 맞춘다. DB 생성 도구 테스트가 DDL의 지문(해시)·행 수를 고정해 두고 비교하기 때문이다. 저장소에 자동 검사(CI)가 없어서, 이 테스트는 누가 직접 돌려야만 실패가 보인다(11/16 DDL 한 줄 변경 두 건이 이 파일들을 놓쳐 테스트가 깨진 뒤 추가).
+
+1. **사본:** `dummy_db/01_create_tables.sql`을 원본과 바이트까지 같게 맞춘다. 확인: `cmp docs/spec/sql/avenue_ddl.sql docs/spec/sql/dummy_db/01_create_tables.sql` (출력이 없으면 같다)
+2. **DDL 지문:** `dummy_db/seed_report.json`의 `ddl_sha256`을 새 값으로 바꾼다. DDL을 고칠 때마다 해당한다. 줄바꿈을 LF로 바꾼 뒤 계산하므로(생성기·테스트 기준, PR #61) PC의 줄바꿈 설정과 관계없이 같은 값이 나온다. 저장소 맨 위에서 아래 명령으로 구한다.
+   ```
+   python -c "import hashlib,pathlib;print(hashlib.sha256(pathlib.Path('docs/spec/sql/avenue_ddl.sql').read_bytes().replace(b'\r\n',b'\n')).hexdigest())"
+   ```
+3. **기준 데이터 INSERT를 더하거나 뺐을 때:** 아래 두 곳을 같은 숫자로 맞춘다. 도구 테스트의 기본 INSERT 총수는 DDL에서 직접 세므로 고칠 필요가 없다.
+   - `dummy_db/99_check.sql`의 그 표 `EXPECTED` 값
+   - `dummy_db/seed_report.json` `rows`의 그 표 값
+4. **피처 사전 시드(`seed/avenue_seed_dim_feature_fs_draft.sql`)를 고칠 때:** 생성기가 이 파일을 그대로 `dummy_db/25_seed_dim_feature_fs_draft.sql`로 복사해 쓰므로 둘을 바이트까지 같게 맞추고, `99_check.sql`·`seed_report.json`의 `DIM_FEATURE` 값도 맞춘다. 생성기는 이 파일이 39행이 아니면 오류를 낸다. 확정 피처 세트(FS-V1 등)는 이 파일을 고치지 말고 **새 파일로 추가**한다.
+5. **시드(회원 데이터) 구조가 바뀔 때:** 손으로 고치지 않고 [dummy_db/README.md](dummy_db/README.md)의 `build_db.py`로 다시 만든다. 팀 키 파일이 필요하고 시드 암호문이 전부 바뀌므로 생성기 담당과 먼저 상의한다. DDL 문구나 기준 데이터만 바뀐 경우에는 위 2·3번 값만 고쳐도 생성기 결과와 같다.
+6. **이미 만든 DB용 변경 SQL:** 데이터가 있는 DB에 적용할 `add_*`·`alter_*`·`update_*` SQL을 만들고, 위 「먼저 내 상황에 맞는 경로를 고른다」 표에 한 행을 추가한다.
+7. **확인:** 저장소 맨 위에서 아래를 실행하고 결과를 PR 「테스트 방법」에 적는다.
+   ```
+   python -B -m unittest discover -s docs/spec/sql/dummy_db/tools/tests
+   ```
+   `No module named 'bcrypt'` 오류 1건은 PC 환경 문제다(`fastapi_server/data_generation/requirements.txt` 설치 시 사라짐). 그 밖의 실패가 없어야 한다.
+8. **작업 로그:** DB 변경이므로 `docs/logs/`에 남긴다(AGENTS.md 3-4).
+9. **공용 DB 적용:** 실제 공용 DB에 변경 SQL을 실행하는 일은 DB 담당에게 알려 순서를 맞춘다.
