@@ -20,6 +20,31 @@ BASE_MONTH = '2026-08'  # TODO(D-16): 급여소득자 기준월은 팀 합의 �
 JOB_MAP = {'wage': 'EMPLOYEE', 'selfemp': 'SELF_EMPLOYED', 'freelance': 'FREELANCER'}
 # N-37 시연용 최소점수 가정이다. 실제 금융기관의 심사 조건이 아니다.
 PRODUCT_MIN_SCORES = {'0': 780, '5': 665, '1': 0, '2': 0, '3': 0}
+# N-37-1·2 상품 코드별 시연용 문구(상품명, 한 줄 소개, 설명, 제출 서류, 특징 1~3개). 가상 기관의 시연 상품이며 실제 상품·약속이 아니다.
+# 서류 이름에는 '·'를 쓰지 않는다(REQUIRED_DOCUMENTS는 '·'로 이어 한 칸에 저장).
+LOAN_COPY = {
+    'LP001': ('든든 일반 신용대출', '직군에 관계없이 쓸 수 있는 시연용 신용대출입니다.', '급여소득자·자영업자·프리랜서가 함께 비교해 볼 수 있는 일반 신용대출 예시입니다. 직군을 가리지 않는 기본형이라 처음 대출 조건을 가늠해 볼 때 기준으로 삼기 좋습니다.', ('신분증 사본', '소득 증빙'), ('직군 구분 없이 신청 가능', '시연용 가상 상품')),
+    'LP002': ('안심 일반 신용대출', '필요한 만큼 나눠 갚는 시연용 신용대출입니다.', '월 상환 계획을 먼저 세운 뒤 조건을 비교해 보도록 만든 일반 신용대출 예시입니다. 매달 같은 금액을 나눠 갚는 구조라 생활비 계획과 맞춰 보기 쉽습니다.', ('신분증 사본', '소득 증빙'), ('상환 계획 확인 후 비교', '시연용 가상 상품')),
+    'LP003': ('가까운 일반 신용대출', '모바일 신청 흐름을 보여 주는 시연용 신용대출입니다.', '신청 화면의 흐름을 따라가며 조건을 확인해 보는 용도의 일반 신용대출 예시입니다. 같은 점수대의 다른 상품과 나란히 놓고 비교하는 참고 자료로 쓰입니다.', ('신분증 사본', '소득 증빙'), ('모바일 신청 화면 시연', '시연용 가상 상품')),
+    'LP004': ('월급 든든 직장인 대출', '급여소득자를 위한 시연용 신용대출입니다.', '재직 중인 급여소득자를 대상으로 가정한 직장인 신용대출 예시입니다. 매달 들어오는 급여를 바탕으로 상환 계획을 짜 보는 시연용 상품입니다.', ('재직증명서', '급여 명세서'), ('급여소득자 대상', '시연용 가상 상품')),
+    'LP005': ('직장인 플러스 신용대출', '직장인이 비교해 볼 수 있는 시연용 신용대출입니다.', '소득이 꾸준한 직장인이 여러 상품을 견주어 보도록 만든 신용대출 예시입니다. 급여소득자를 대상으로 한 상품으로, 같은 직군의 다른 상품과 조건을 견주는 데 쓰입니다.', ('재직증명서', '소득금액증명원'), ('급여소득자 대상', '시연용 가상 상품')),
+    'LP006': ('사장님 사업자 대출', '자영업자를 위한 시연용 사업자 신용대출입니다.', '매출 흐름을 참고해 사업 자금을 알아보는 자영업자용 신용대출 예시입니다. 이자를 내다가 만기에 원금을 한 번에 갚는 구조라 월 부담은 상대적으로 작을 수 있지만 만기 자금 계획이 중요합니다.', ('사업자등록증', '매출 내역'), ('자영업자 대상', '시연용 가상 상품')),
+    'LP007': ('사장님 성장 대출', '사업 규모를 키우려는 자영업자를 위한 시연용 대출입니다.', '운영 중인 사업의 자금 계획을 점검해 보는 자영업자용 신용대출 예시입니다. 만기에 원금을 갚는 방식이므로 매출이 줄어드는 달의 현금흐름도 함께 살펴보는 것이 좋습니다.', ('사업자등록증', '부가세 신고 내역'), ('자영업자 대상', '시연용 가상 상품')),
+    'LP008': ('새싹 저축은행 대출', '금융 이력이 짧은 사람도 살펴볼 수 있는 시연용 대출입니다.', '금융 이력이 길지 않은 사람을 염두에 둔 저축은행 신용대출 예시입니다. 점수 조건이 낮은 대신 금리 범위가 넓어, 상한 금리 기준으로 상환 부담을 따져 보아야 합니다.', ('신분증 사본', '소득 증빙'), ('직군 구분 없이 신청 가능', '시연용 가상 상품')),
+    'LP009': ('한걸음 저축은행 대출', '소액이 필요한 사람을 위한 시연용 대출입니다.', '저축은행 신용대출의 조건을 비교해 보도록 만든 예시입니다. 모든 직군을 대상으로 가정했으며, 금리 범위가 넓은 편이라 실제 부담은 조건에 따라 크게 달라질 수 있습니다.', ('신분증 사본', '소득 증빙'), ('직군 구분 없이 신청 가능', '시연용 가상 상품')),
+    'LP010': ('이음 저축은행 대출', '꾸준히 갚아 나가는 계획을 세우는 시연용 대출입니다.', '꾸준히 갚아 나가는 계획을 세워 보는 용도의 저축은행 신용대출 예시입니다. 다른 저축은행 상품과 금리와 한도를 나란히 놓고 차이를 확인하는 참고 자료입니다.', ('신분증 사본', '소득 증빙'), ('직군 구분 없이 신청 가능', '시연용 가상 상품')),
+    'LP011': ('마을 상호금융 대출', '지역 금융기관을 가정한 시연용 신용대출입니다.', '지역 금융기관의 상호금융 신용대출을 가정한 예시입니다. 원금을 매달 같은 금액씩 갚는 방식이라 초반 상환액이 크고 갈수록 줄어드는 특징이 있습니다.', ('신분증 사본', '소득 증빙'), ('직군 구분 없이 신청 가능', '시연용 가상 상품')),
+    'LP012': ('이웃 상호금융 대출', '가까운 금융기관을 가정한 시연용 신용대출입니다.', '가까운 금융기관의 상호금융 신용대출을 가정한 예시입니다. 같은 업권의 다른 상품과 비교하며 월 상환액 변화를 살펴볼 수 있습니다.', ('신분증 사본', '소득 증빙'), ('직군 구분 없이 신청 가능', '시연용 가상 상품')),
+    'LP013': ('간편 카드론', '카드 이용 정보를 바탕으로 하는 시연용 단기 대출입니다.', '카드 이용 내역을 참고하는 단기 카드론 예시입니다. 기간이 짧고 만기에 원금을 갚는 구조라 금리와 만기 자금 계획을 꼼꼼히 확인해야 합니다.', ('신분증 사본', '카드 이용 내역'), ('단기 상환 구조', '시연용 가상 상품')),
+    'LP014': ('빠른 카드론', '급할 때 비교해 보는 시연용 카드론입니다.', '급하게 자금이 필요한 상황을 가정한 카드론 예시입니다. 상환 기간이 짧은 만큼 이자 부담과 만기 일정을 먼저 따져 보아야 하는 상품입니다.', ('신분증 사본', '카드 이용 내역'), ('단기 상환 구조', '시연용 가상 상품')),
+    'LP015': ('유연 카드론', '상환 기간을 비교해 보는 시연용 카드론입니다.', '상환 기간에 따라 부담이 어떻게 달라지는지 비교해 보도록 만든 카드론 예시입니다. 같은 카드론 가운데 한도가 가장 높게 설정되어 있어 조건 차이를 확인하기 좋습니다.', ('신분증 사본', '카드 이용 내역'), ('단기 상환 구조', '시연용 가상 상품')),
+    'LP016': ('캐피탈 신용대출 스탠다드', '할부·리스 금융사를 가정한 시연용 신용대출입니다.', '할부와 리스를 다루는 금융사를 가정한 캐피탈 신용대출 예시입니다. 원금을 매달 같은 금액씩 갚는 방식이며 금리 범위가 높은 편이라 상환 계획을 먼저 확인해야 합니다.', ('신분증 사본', '소득 증빙'), ('직군 구분 없이 신청 가능', '시연용 가상 상품')),
+    'LP017': ('캐피탈 신용대출 라이트', '가볍게 비교해 보는 시연용 캐피탈 신용대출입니다.', '캐피탈 신용대출을 가볍게 비교해 보도록 만든 예시입니다. 원금균등 상환이라 시간이 지날수록 월 부담이 줄고, 금리 상한이 높아 조건을 꼼꼼히 살펴야 합니다.', ('신분증 사본', '소득 증빙'), ('직군 구분 없이 신청 가능', '시연용 가상 상품')),
+}
+# 상품 종류별 상환 방식(시연용 가정).
+LOAN_REPAYMENT = {'일반 신용대출': '원리금균등', '직장인 신용대출': '원리금균등', '사업자 신용대출': '만기일시', '저축은행 신용대출': '원리금균등',
+                  '상호금융 신용대출': '원금균등', '카드론': '만기일시', '캐피탈 신용대출': '원금균등'}
+JOB_LABEL = {'EMPLOYEE': '급여소득자', 'SELF_EMPLOYED': '자영업자', 'FREELANCER': '프리랜서'}
 LEGACY_TABLE_MARKERS = ('APP_MEMBER', 'MEMBER_MONTHLY_INPUT', 'MEMBER_LOAN', 'EXTERNAL_API_RESPONSE')
 KEY_VERSION = 'v1'  # v0.3.1 (E2) 암호문 키 버전 접두어
 # 시연 계정: 직군별로 회원 ID 정렬 후 첫 회원. 비밀번호 원문은 AVENUE_DEMO_PASSWORD에서만 받는다.
@@ -692,20 +717,26 @@ def build_seed_rows(source, tables, base_rows, keys, demo_password=None):
 
     missing = []
     for index, product in enumerate(products,1):
+        # N-37-1·2 상품 코드별 문구. 표에 없는 코드나 '·'가 든 서류 이름은 오류로 멈춘다.
+        copy=LOAN_COPY.get(product['product_id'])
+        if copy is None: raise ValueError('대출 상품 문구가 없는 상품 코드: '+product['product_id'])
+        if any('·' in doc for doc in copy[3]): raise ValueError('서류 이름에 · 사용 불가')
+        job_codes=[JOB_MAP[s] for s in product['eligible_segments'].split('|')]
         row=dict(PRODUCT_ID=index, PRODUCT_CODE=product['product_id'], PROVIDER_NAME=product['provider_name'],
-            PRODUCT_NAME=product['product_type']+' '+product['product_id'], PRODUCT_TYPE_NAME=product['product_type'],
-            SUMMARY=product['product_type']+' 합성 참고 상품(실제 상품 아님)', DESCRIPTION='교육용 합성 데이터로 만든 참고 상품입니다.',
+            PRODUCT_NAME=copy[0], PRODUCT_TYPE_NAME=product['product_type'],
+            SUMMARY=copy[1], DESCRIPTION=loan_description(copy[2],product),
             RATE_MIN_PCT=Decimal(product['rate_min_pct']), RATE_MAX_PCT=Decimal(product['rate_max_pct']),
             LIMIT_MAX_AMT=int(product['limit_max_krw']), TERM_MIN_MONTHS=int(product['term_min_months']), TERM_MAX_MONTHS=int(product['term_max_months']),
-            REPAYMENT_METHOD=None, MIN_ALT_SCORE=PRODUCT_MIN_SCORES[product['sector']], ELIGIBILITY_TEXT='·'.join(JOB_MAP[s] for s in product['eligible_segments'].split('|')),
-            REQUIRED_DOCUMENTS='시연용: 소득 증빙', CAUTION_TEXT='더미 상품 · 실제 상품 아님', DUMMY_YN='Y', BASE_DATE=as_of)
+            REPAYMENT_METHOD=LOAN_REPAYMENT[product['product_type']], MIN_ALT_SCORE=PRODUCT_MIN_SCORES[product['sector']], ELIGIBILITY_TEXT=('모든 직군' if len(job_codes)==3 else '·'.join(JOB_LABEL[c] for c in job_codes))+' 대상(시연용)',
+            REQUIRED_DOCUMENTS='·'.join(copy[3]), CAUTION_TEXT='더미 상품 · 실제 상품 아님', DUMMY_YN='Y', BASE_DATE=as_of)
         if 'TERM_TEXT' in tables['LOAN_PRODUCT']['columns']: row['TERM_TEXT']=f"{product['term_min_months']}~{product['term_max_months']}개월(시연)"
         else: missing.append('LOAN_PRODUCT.TERM_TEXT')
         add('LOAN_PRODUCT',row)
-        for segment in product['eligible_segments'].split('|'):
-            add('LOAN_PRODUCT_WORKER_TYPE',dict(PRODUCT_ID=index,WORKER_TYPE_CODE=JOB_MAP[segment]))
+        for code in job_codes:
+            add('LOAN_PRODUCT_WORKER_TYPE',dict(PRODUCT_ID=index,WORKER_TYPE_CODE=code))
         if 'LOAN_PRODUCT_FEATURE' in tables:
-            add('LOAN_PRODUCT_FEATURE',dict(PRODUCT_ID=index,DISPLAY_ORDER=1,FEATURE_TEXT='교육용 합성 참고 상품, 실제 상품 아님'))
+            for order,text in enumerate(copy[4],1):
+                add('LOAN_PRODUCT_FEATURE',dict(PRODUCT_ID=index,DISPLAY_ORDER=order,FEATURE_TEXT=text))
         else: missing.append('LOAN_PRODUCT_FEATURE')
     for index,band in enumerate(rows['SCORE_GRADE_BAND'],1):
         # N-12·N-37 구간 최저점에서도 신청 조건을 만족하는 더미 상품만 모아 참고 범위를 계산한다.
@@ -729,6 +760,18 @@ def build_seed_rows(source, tables, base_rows, keys, demo_password=None):
     for name in rows: rows[name].extend(generated[name])
     source_checks(source,members,inputs,generated,ids)
     return rows, generated, sorted(set(missing))
+
+
+def loan_description(text, product):
+    """N-37-2 상세 설명을 문장마다 줄바꿈 1개로 잇는다. 설명 2문장 뒤에 수치 문장을 붙여 3문장이 되며 빈 줄은 없다."""
+    if text.count('다. ')!=1: raise ValueError('상품 설명은 2문장이어야 함')
+    return text.replace('다. ','다.'+chr(10))+chr(10)+loan_figures(product)
+
+
+def loan_figures(product):
+    """N-37-2 상세 설명 끝에 붙이는 수치 문장. 시드 금리·한도·기간 값에서 만들어 항상 일치한다."""
+    return (f"시연용 수치로 금리는 연 {Decimal(product['rate_min_pct'])}~{Decimal(product['rate_max_pct'])}%, "
+            f"한도는 최대 {int(product['limit_max_krw'])//10000:,}만 원, 기간은 {product['term_min_months']}~{product['term_max_months']}개월입니다.")
 
 
 def map_asset_snapshot(uid, asset):
@@ -820,7 +863,8 @@ def sql_value(value):
     if isinstance(value,dt.datetime): return "TIMESTAMP '"+value.strftime('%Y-%m-%d %H:%M:%S')+"'"
     if isinstance(value,dt.date): return "DATE '"+value.isoformat()+"'"
     if isinstance(value,(int,Decimal)): return format(value,'f') if isinstance(value,Decimal) else str(value)
-    return "'"+value.replace("'","''")+"'"
+    # 줄바꿈은 파일 줄바꿈 변환에 휘둘리지 않도록 CHR(10)으로 잇는다(빈 줄 없음).
+    return '||CHR(10)||'.join("'"+part.replace("'","''")+"'" for part in value.split(chr(10)))
 
 
 def bundle_files(ddl_bytes, tables, all_rows, generated, missing):
@@ -848,9 +892,19 @@ def bundle_files(ddl_bytes, tables, all_rows, generated, missing):
             if spec['identity'] and col in cols:
                 body+=f'ALTER TABLE {name} MODIFY ({col} GENERATED BY DEFAULT ON NULL AS IDENTITY (START WITH LIMIT VALUE));\n'
         filename=f'{index:02d}_seed_{name.lower()}.sql';files[filename]=body.encode('utf-8');seed_files.append(filename);seed_tables.append(name)
+    feature_seed_path=Path(__file__).resolve().parents[2]/'seed'/'avenue_seed_dim_feature_fs_draft.sql'
+    feature_seed=feature_seed_path.read_bytes()
+    feature_seed_count=len(re.findall(rb'^INSERT INTO DIM_FEATURE\b',feature_seed,re.MULTILINE|re.IGNORECASE))
+    if feature_seed_count!=39: raise ValueError('FS-DRAFT 피처 시드는 39행이어야 합니다')
+    feature_seed_name='25_seed_dim_feature_fs_draft.sql'
+    files[feature_seed_name]=feature_seed
+    seed_files.append(feature_seed_name)
+    if 'DIM_FEATURE' not in seed_tables: seed_tables.append('DIM_FEATURE')
+    expected_rows={name:len(all_rows[name]) for name in tables}
+    expected_rows['DIM_FEATURE']=feature_seed_count
     names=', '.join("'"+t+"'" for t in tables)
     check=header+f"SELECT {len(tables)} AS EXPECTED_TABLES, COUNT(*) AS ACTUAL_TABLES FROM USER_TABLES WHERE TABLE_NAME IN ({names});\n\n"
-    check+='\nUNION ALL\n'.join(f"SELECT '{name}' AS TABLE_NAME, {len(all_rows[name])} AS EXPECTED, (SELECT COUNT(*) FROM {name}) AS ACTUAL FROM DUAL" for name in tables)+';\n'
+    check+='\nUNION ALL\n'.join(f"SELECT '{name}' AS TABLE_NAME, {expected_rows[name]} AS EXPECTED, (SELECT COUNT(*) FROM {name}) AS ACTUAL FROM DUAL" for name in tables)+';\n'
     check+=f"SELECT TABLE_NAME, COLUMN_NAME FROM USER_COL_COMMENTS WHERE COMMENTS IS NULL AND TABLE_NAME IN ({names}) ORDER BY TABLE_NAME, COLUMN_NAME;\n"
     files['99_check.sql']=check.encode('utf-8')
     run=header+'WHENEVER SQLERROR EXIT FAILURE ROLLBACK\nWHENEVER OSERROR EXIT FAILURE ROLLBACK\n'
@@ -869,8 +923,9 @@ def bundle_files(ddl_bytes, tables, all_rows, generated, missing):
     seed_only+='  END LOOP;\nEND;\n/\n'
     seed_only+=''.join('@@'+name+'\n' for name in seed_files+['99_check.sql'])
     files['run_seed_only.sql']=seed_only.encode('utf-8')
-    report=dict(ddl_sha256=hashlib.sha256(ddl_bytes).hexdigest(),table_count=len(tables),
-                rows={name:len(all_rows[name]) for name in tables},omitted_missing_ddl=missing,base_month=BASE_MONTH,
+    # 체크아웃별 CRLF/LF 차이를 제거한 동일한 DDL 내용의 지문을 저장한다.
+    report=dict(ddl_sha256=hashlib.sha256(ddl_bytes.replace(b'\r\n',b'\n')).hexdigest(),table_count=len(tables),
+                rows=expected_rows,omitted_missing_ddl=missing,base_month=BASE_MONTH,
                 privacy='AES-256-GCM random IV per value, "v1:" + Base64(IV+ciphertext+16-byte tag), HMAC-SHA256 without prefix; no keys in output',
                 unpaid={t:sum(r['PAYMENT_STATUS_CODE']=='UNPAID' for r in all_rows[t]) for t in ('USER_TELECOM_PAYMENT','USER_UTILITY_PAYMENT') if t in all_rows},
                 card_spend_over_limit=sum(r['CARD_MONTHLY_SPEND_AMT'] > r['CARD_LIMIT_AMT'] for r in all_rows['USER_CREDIT_PROFILE'] if r['CARD_MONTHLY_SPEND_AMT'] is not None and r['CARD_LIMIT_AMT'] is not None),

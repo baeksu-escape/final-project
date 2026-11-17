@@ -38,7 +38,7 @@ avenue.altdata.source-dir=
 # 더미 응답에 회원 자료가 없을 때: EMPTY(빈 결과) | BORROW(다른 더미 회원 자료를 빌려 씀)
 avenue.altdata.missing-member-mode=EMPTY
 
-# ---- FP-142 점수 계산 서버(FastAPI) — 비워 두면 http://localhost:8000. Docker 안에서 띄우면 http://fastapi:8000 ----
+# ---- FP-142 점수 계산 서버(FastAPI) — 비워 두면 http://localhost:8000 (1차·시연: 한 PC). Docker(http://fastapi:8000)는 2차 개발 후보 ----
 avenue.prediction.base-url=
 
 # ---- 개인정보 암호화 키 (N-02-4) — Base64. AES는 정확히 32바이트, HMAC은 32바이트 이상, 둘은 서로 달라야 한다 ----

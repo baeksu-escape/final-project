@@ -6,13 +6,21 @@ Spring이 부르는 내부 API(ML-01~04)를 제공한다. 지금 점수는 **Moc
 - 피처 39개: `docs/spec/feature_definition.md` 11장 = `docs/spec/sql/seed/avenue_seed_dim_feature_fs_draft.sql`
 - FastAPI는 DB를 읽거나 쓰지 않는다. 저장은 Spring(FP-142)이 한다.
 
-## 실행
+## 실행 (1차 개발·시연 기준: 한 PC + 파이썬 가상환경)
+
+1차 개발과 시연은 Docker 없이 FastAPI·Spring·React를 **한 PC**에서 켠다(11/16 결정). FastAPI는 파이썬 내장 가상환경(venv, Python 3.11)에 라이브러리를 따로 설치해서 PC의 다른 파이썬 프로그램과 버전이 섞이지 않게 한다.
 
 ```
 cd fastapi_server
-pip install -r requirements.txt        # 처음 한 번
+python -m venv .venv                   # 처음 한 번 (.venv 폴더는 Git에 올라가지 않는다)
+.venv\Scripts\activate                 # 켤 때마다 — 터미널 앞에 (.venv)가 보이면 된 것
+pip install -r requirements.txt        # 처음 한 번, requirements.txt가 바뀌면 다시
 uvicorn main:app --port 8000
 ```
+
+- PowerShell에서 `activate`가 "스크립트를 실행할 수 없습니다"로 막히면 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`를 한 번 실행한 뒤 다시 한다. Git Bash는 `source .venv/Scripts/activate`.
+- 끌 때는 `Ctrl + C`, 가상환경에서 나올 때는 `deactivate`.
+- Spring은 기본값(`avenue.prediction.base-url`이 비어 있으면 `http://localhost:8000`)으로 이 서버를 부르므로 같은 PC면 따로 설정할 것이 없다.
 
 브라우저에서 http://localhost:8000/docs 를 열면 API 4개를 직접 눌러 볼 수 있다.
 
@@ -23,7 +31,9 @@ uvicorn main:app --port 8000
 | ML-03 | `POST /v1/assessments/score` | 기존·대안 점수, 등급, 부도 확률, SHAP 39개, 피처값 |
 | ML-04 | `POST /v1/assessments/simulate` | 바꾼 값으로 다시 계산(저장 안 함), 감점 요인 3개 |
 
-## Docker로 켜기 (FP-142, Python 설치 없이)
+## Docker (2차 개발 후보 — 1차·시연에서는 사용하지 않음)
+
+11/16 결정: Docker는 2차 개발 때 고도화하면서 쓸지 정하는 후보이며 확정이 아니다. 1차 개발과 시연은 위 「실행」(가상환경)으로 한다. 아래 방법과 `Dockerfile`은 그때를 위해 남겨 둔 것이고, **빌드·실행은 확인하지 않았다**(팀 PC에 Docker 없음).
 
 Docker Desktop이 켜져 있어야 한다. 저장소 맨 위(`final-project`)에서:
 
@@ -38,13 +48,13 @@ docker stop fastapi / docker start fastapi                  # 끄기 / 다시 �
 
 ## 테스트 방법
 
-**1. 자동 검사 (Python 내장 unittest — 새 도구는 없고, `requirements.txt` 설치는 먼저 해야 한다)**
+**1. 자동 검사 (Python 내장 unittest — 새 도구는 없고, 「실행」의 가상환경을 켠 상태에서 한다)**
 ```
 cd fastapi_server
-pip install -r requirements.txt        # 처음 한 번 (테스트가 pydantic·fastapi를 불러온다)
+.venv\Scripts\activate                 # 가상환경 켜기 (만들고 설치하는 법은 「실행」)
 python -m unittest discover tests -v
 ```
-마지막 줄이 `Ran 33 tests ... OK`이면 정상이다. 검사하는 것:
+마지막 줄이 `Ran 35 tests ... OK`이면 정상이다. 검사하는 것:
 - 피처 39개가 시드 SQL(`FS-DRAFT`)과 같은지, 피처 정의서 11장(지금 38개)이 모두 들어 있고 차이는 `LRZ021201`(C9로 제외)뿐인지
 - 이상치 고정 상한(정의서 C8): 소득 합계 20억 초과·평균 월 지출 2억 초과·월 상환액 0 미만이면 그 값과 그 값으로 계산하는 피처를 결측으로
 - 소득 합계 0 이하·카드 한도 0이면 비율 피처 결측
@@ -53,7 +63,7 @@ python -m unittest discover tests -v
 - 기준점 + SHAP 점수 합 = 대안 점수, rank(같으면 항목 이름 가나다순)
 - 급여소득자 월급 × 12, 값이 없으면 0으로 채우지 않음
 - 시뮬레이션 금융 영향 + 대안 영향 = 전체 변화
-- 409 버전 불일치, 422 입력 오류(소득 개월 수가 직군과 다름·`requiredIncomeMonths` 없음·같은 달 중복, 시뮬레이션의 모르는 키·카드 한도/사용액 한쪽만), 오류 시험 헤더
+- 409 버전 불일치, 422 입력 오류(소득 개월 수가 직군과 다름·`requiredIncomeMonths` 없음·같은 달 중복·통신비 또는 공과금 빈 목록(정의서 8-5), 시뮬레이션의 모르는 키·카드 한도/사용액 한쪽만), 오류 시험 헤더
 
 **2. 화면에서 직접 (`/docs`)**
 1. 서버를 켜고 http://localhost:8000/docs 를 연다.
