@@ -41,7 +41,7 @@ class MarketSchemaTests(unittest.TestCase):
         db.validate_rows(self.tables, self.base_rows)
 
     def test_ddl_copy_report_and_seed_counts_match(self):
-        """DDL 사본·해시·보고서의 테이블 목록과 기존 기준 INSERT를 대조한다."""
+        """DDL 사본·해시와 DDL·상품 특징 시드의 행 수를 동적으로 대조한다."""
         self.assertEqual(self.ddl, (DB_DIR / '01_create_tables.sql').read_bytes())
         report = json.loads((DB_DIR / 'seed_report.json').read_text(encoding='utf-8'))
         self.assertEqual(report['ddl_sha256'], hashlib.sha256(self.ddl.replace(b'\r\n', b'\n')).hexdigest())
@@ -53,7 +53,14 @@ class MarketSchemaTests(unittest.TestCase):
         )
         self.assertEqual(sum(map(len, self.base_rows.values())), ddl_insert_count)
         self.assertEqual(report['rows']['DIM_FEATURE'], 39)
-        self.assertEqual(report['rows']['LOAN_PRODUCT_FEATURE'], 34)
+        feature_count = sum(len(copy[4]) for copy in db.LOAN_COPY.values())
+        feature_seed = (DB_DIR / '24_seed_loan_product_feature.sql').read_text(encoding='utf-8')
+        feature_insert_count = sum(
+            line.lstrip().upper().startswith('INSERT INTO LOAN_PRODUCT_FEATURE ')
+            for line in feature_seed.splitlines()
+        )
+        self.assertEqual(feature_insert_count, feature_count)
+        self.assertEqual(report['rows']['LOAN_PRODUCT_FEATURE'], feature_count)
 
     def test_published_cleanup_and_checks_match_schema(self):
         """배포된 정리·검사 SQL이 제거된 표를 참조하지 않고 47개 표를 다룬다."""

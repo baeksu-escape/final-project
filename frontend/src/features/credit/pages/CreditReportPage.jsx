@@ -12,6 +12,7 @@ import '../styles/creditReport.css'
 
 const REASONS = {
   CONSENT_REQUIRED: '대안 데이터에 동의하고 데이터를 불러와 주세요.',
+  ALT_DATA_EMPTY: '통신비 또는 공과금 납부 기록이 없어 점수를 산출하지 않았습니다.',
   INPUT_INCOMPLETE: '입력 화면에서 필요한 정보를 입력해 주세요.',
   STALE_INPUT: '입력 정보를 최신 상태로 갱신해 주세요.',
   MODEL_ERROR: '점수를 산출하지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
@@ -62,7 +63,7 @@ export default function CreditReportPage() {
   const { report } = state
   const date = report.assessedAt ? new Date(report.assessedAt).toLocaleString('ko-KR') : '-'
   const diff = scoreChange
-  const showInputLink = ['CONSENT_REQUIRED', 'INPUT_INCOMPLETE', 'STALE_INPUT'].includes(report.notScorableReasonCode)
+  const showInputLink = ['CONSENT_REQUIRED', 'ALT_DATA_EMPTY', 'INPUT_INCOMPLETE', 'STALE_INPUT'].includes(report.notScorableReasonCode)
   return (
     <div className="credit-report">
       {alertVisible && report.gradeStatusCode === 'SCORED' && (
@@ -78,7 +79,13 @@ export default function CreditReportPage() {
       {report.gradeStatusCode === 'NOT_SCORABLE' ? (
         <Notice type="warn">
           {REASONS[report.notScorableReasonCode] ?? '점수를 산출할 수 없습니다.'}{' '}
-          {showInputLink && <Link to={DATA_INPUT_PATHS.DATA_INPUT}>입력 화면으로</Link>}
+          {showInputLink && (
+            <Link to={DATA_INPUT_PATHS.DATA_INPUT}>
+              {report.notScorableReasonCode === 'ALT_DATA_EMPTY'
+                ? '입력 화면에서 해당 항목의 불러오기 결과를 확인해 주세요.'
+                : '입력 화면으로'}
+            </Link>
+          )}
         </Notice>
       ) : <ScoreComparisonCard report={report} />}
       {report.gradeStatusCode === 'SCORED' && (

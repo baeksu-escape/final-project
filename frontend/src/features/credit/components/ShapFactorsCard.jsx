@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import Button from '../../../common/components/Button.jsx'
 import Card from '../../../common/components/Card.jsx'
-import { PATHS } from '../../../common/config/navigation.js'
 import '../styles/shapFactors.css'
 
-// N-14-2·N-14-3·N-14-4·N-14-5 항목별 점수 기여도를 정렬하고 개선할 수 있는 항목을 연결한다.
+// N-14-2·N-14-3·N-14-4 항목별 점수 기여도를 정렬해 표시한다.
 export default function ShapFactorsCard({ shap, alternativeScore }) {
   const [showAll, setShowAll] = useState(false)
   const factors = (shap?.factors ?? []).filter((factor) => factor.shapScore !== 0).sort((a, b) => {
@@ -48,8 +46,6 @@ export default function ShapFactorsCard({ shap, alternativeScore }) {
                   <span className="shap-label">
                     {factor.alternativeYn === 'Y' && <b className="shap-tag">대안</b>}
                     {factor.featureName}{factor.featureValue != null && <> ({factor.featureValue}{factor.unitName ?? ''})</>}
-                    {/* TODO(FS-V1): 피처 목록이 정해지면 시뮬레이터 입력 강조 여부를 정한다. */}
-                    {factor.shapScore < 0 && factor.simulatableYn === 'Y' && <Link to={PATHS.SIMULATOR}>개선해 보기</Link>}
                   </span>
                   <span className="shap-bar" aria-hidden="true">
                     <span className="shap-midpoint" />
