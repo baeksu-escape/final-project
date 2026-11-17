@@ -13,16 +13,17 @@
 
 | 메서드 | 경로 | 용도 | 데이터 출처 |
 |---|---|---|---|
-| GET | `/api/diagnosis/income-volatility?userId=` | N-22 소득 변동성 진단 | DB(저장 데이터) |
-| GET | `/api/diagnosis/cash-flow/forecast?userId=&…조건` | N-21 현금흐름 전망 | DB + 쿼리 조건 |
+| GET | `/api/diagnosis/income-volatility` | N-22 소득 변동성 진단 (로그인 회원) | DB(저장 데이터) |
+| GET | `/api/diagnosis/cash-flow/forecast?…조건` | N-21 현금흐름 전망 (로그인 회원) | DB + 쿼리 조건 |
 | POST | `/api/diagnosis/income-volatility` | N-22 계산만 (값을 본문으로 받음) | 요청 본문 |
 | POST | `/api/diagnosis/cash-flow/forecast` | N-21 계산만 (값을 본문으로 받음) | 요청 본문 |
 
 - **화면은 GET을 쓴다.** POST는 FP-183에서 만든 계산 전용 경로로, 지우지 않고 남겨 둔다.
-- `userId`는 로그인(JWT)이 생기기 전까지 쓰는 **임시 쿼리**다. 로그인 연동 후에는 토큰에서 회원을 찾으며, 이 값은 없어진다(`TODO(로그인 연동)`).
+- **GET은 로그인한 회원 본인 것만 조회한다.** 회원은 `Authorization: Bearer <토큰>`에서 찾고, 주소로 회원 번호를 받지 않는다(11/17 변경, 이전의 `?userId=` 쿼리는 없어졌다. 보내도 무시한다).
+- `/api/diagnosis/**`는 아직 임시 개방 경로라 보안 설정이 막지 않으므로 컨트롤러가 직접 401을 낸다. TODO(A조 협의): 임시 개방 목록에서 빼면 보안 설정이 먼저 막는다.
 - 오류:
+  - 로그인 토큰이 없거나 쓸 수 없으면(만료·잠금·탈퇴) `401 UNAUTHORIZED` "로그인이 필요합니다."
   - 저장된 소득이 없으면 `404 NOT_FOUND`
-  - `userId`가 없거나 숫자가 아니면 `400 INVALID_INPUT`
   - 본문은 위의 공통 오류 형식이다.
 
 ### 계산에 쓰는 저장 데이터
@@ -36,7 +37,7 @@
 
 ### GET `/api/diagnosis/income-volatility`
 
-요청: `?userId=2`
+요청: 쿼리 없음, `Authorization: Bearer <토큰>`
 
 응답 `200`:
 
@@ -94,7 +95,6 @@
 
 | 쿼리 | 형식 | 필수 | 설명 |
 |---|---|---|---|
-| `userId` | 정수 | 예 | 임시 회원 번호 |
 | `incomeChangePercent` | 소수 | 아니오 (기본 0) | 소득 변화율(%). 예: `-10`은 10% 감소 |
 | `expenseChangePercent` | 소수 | 아니오 (기본 0) | 지출 변화율(%) |
 | `loanPaymentChangePercent` | 소수 | 아니오 (기본 0) | 원리금 변화율(%) |
@@ -121,7 +121,7 @@
 | `worstForecastMonth`, `worstNetCashFlow` | 문자열, 정수 | 가장 빠듯한 달과 그 달 순현금 | N-21-5 |
 | `totalAccumulatedSurplus` | 정수 | 전망 기간 누적 잉여 | N-21-9 |
 
-예시 (회원 2번, `?userId=2&incomeChangePercent=-10&forecastMonths=3`):
+예시 (회원 2번으로 로그인, `?incomeChangePercent=-10&forecastMonths=3`):
 
 ```json
 {
@@ -145,9 +145,10 @@
 ### 프론트 사용법
 
 - `features/diagnosis/api/diagnosisApi.js`:
-  - `getIncomeVolatility(userId)`
-  - `getCashFlowForecast(userId, { incomeChangePercent, expenseChangePercent, loanPaymentChangePercent, forecastMonths })`
-- mock 모드(`VITE_USE_MOCK`)에서는 위 예시와 같은 회원 2번 값을 돌려준다. 전망 mock은 쿼리 조건을 반영해 계산한다.
+  - `getIncomeVolatility()`
+  - `getCashFlowForecast({ incomeChangePercent, expenseChangePercent, loanPaymentChangePercent, forecastMonths })`
+  - 회원 번호는 넘기지 않는다. 공통 `client.js`가 로그인 토큰을 붙인다.
+- mock 모드(`VITE_USE_MOCK`)에서는 로그인한 mock 회원이 누구든 위 예시와 같은 회원 2번 값을 돌려준다(로그인하지 않았으면 401). 전망 mock은 쿼리 조건을 반영해 계산한다.
 
 ---
 

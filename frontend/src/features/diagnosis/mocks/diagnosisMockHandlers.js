@@ -1,5 +1,5 @@
 // N-20 DSR 계산 및 N-17 시나리오 상환 여력 재계산 mock 핸들러
-import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
+import { registerMockHandlers, requireMockUser } from '../../../common/mocks/mockHandlers.js'
 import {
   evaluateDsrRisk,
   evaluateHealthLevel,
@@ -111,14 +111,16 @@ function handleFinancialHealth({ body }) {
   }
 }
 
-// N-22 저장 데이터 기반 소득 변동성 진단 mock — userId와 관계없이 시드 회원 2번 예시를 돌려준다.
-function handleIncomeVolatility() {
+// N-22 저장 데이터 기반 소득 변동성 진단 mock — 로그인한 mock 회원이 누구든 시드 회원 2번 예시를 돌려준다.
+function handleIncomeVolatility({ token }) {
+  requireMockUser(token) // 실제 API처럼 로그인하지 않았으면 401
   return structuredClone(SAMPLE_INCOME_VOLATILITY)
 }
 
 // N-21 저장 데이터 기반 현금흐름 전망 mock — 쿼리의 변화율·기간으로 마지막 입력월 다음 달부터 월별 전망을 만든다.
 // query는 공용 mock이 넘기는 URLSearchParams라 get()으로 읽는다(값이 없으면 null → 0).
-function handleCashFlowForecast({ query }) {
+function handleCashFlowForecast({ query, token }) {
+  requireMockUser(token) // 실제 API처럼 로그인하지 않았으면 401
   const incomeChangePercent = Number(query?.get('incomeChangePercent') ?? 0)
   const expenseChangePercent = Number(query?.get('expenseChangePercent') ?? 0)
   const loanPaymentChangePercent = Number(query?.get('loanPaymentChangePercent') ?? 0)

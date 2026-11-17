@@ -4,6 +4,9 @@ import com.baeksuescape.finance.dto.CashFlowConditionRequest;
 import com.baeksuescape.finance.dto.CashFlowForecastResponse;
 import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
 import com.baeksuescape.finance.service.IncomeVolatilityService;
+import com.baeksuescape.global.security.JwtTokenProvider;
+import com.baeksuescape.user.mapper.UserAccountMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -12,23 +15,29 @@ import com.baeksuescape.global.exception.ApiException;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * FP-203 저장 데이터 기반 GET API의 경로·쿼리·JSON 필드 이름을 확인하는 웹 계층 테스트.
+ * FP-203 저장 데이터 기반 GET API의 경로·쿼리·JSON 필드 이름과 로그인 회원 확인(토큰 없으면 401, 주소의 userId 무시)을 보는 웹 계층 테스트.
  * 문서(api_spec.md)에 적은 필드 이름이 실제 응답과 같은지 여기서 고정한다.
  * 보안·공통 예외 처리기까지 실제와 같게 붙이려고 다른 팀 API 테스트처럼 test 프로필(H2)로 전체 컨텍스트를 띄운다.
  */
@@ -42,6 +51,23 @@ class IncomeVolatilityControllerTest {
 
     @MockBean
     private IncomeVolatilityService incomeVolatilityService;
+
+    @Autowired
+    private JwtTokenProvider tokenProvider;
+
+    // JWT 필터가 계정 상태를 확인하므로(잠금·탈퇴면 무시) 사용 중인 계정으로 돌려준다.
+    @MockBean
+    private UserAccountMapper userAccountMapper;
+
+    @BeforeEach
+    void setUp() {
+        given(userAccountMapper.selectAccountStatus(anyLong())).willReturn("ACTIVE");
+    }
+
+    // 회원 번호 userId로 로그인한 요청 — 실제와 같은 Authorization: Bearer 토큰을 붙인다.
+    private MockHttpServletRequestBuilder loggedIn(MockHttpServletRequestBuilder builder, long userId) {
+        return builder.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.issue(userId, "ROLE_USER"));
+    }
 
     @Test
     @DisplayName("GET /api/diagnosis/income-volatility: 불리언 필드는 is 없이 highVolatility로 나간다")
@@ -57,7 +83,7 @@ class IncomeVolatilityControllerTest {
                 .build();
         when(incomeVolatilityService.diagnoseSavedIncomeVolatility(2L)).thenReturn(response);
 
-        mockMvc.perform(get("/api/diagnosis/income-volatility").param("userId", "2"))
+        mockMvc.perform(loggedIn(get("/api/diagnosis/income-volatility"), 2L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.meanIncome").value(2099498))
                 .andExpect(jsonPath("$.medianIncome").value(1903317))
@@ -73,17 +99,35 @@ class IncomeVolatilityControllerTest {
         when(incomeVolatilityService.diagnoseSavedIncomeVolatility(999L))
                 .thenThrow(new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "저장된 소득 데이터가 없습니다."));
 
-        mockMvc.perform(get("/api/diagnosis/income-volatility").param("userId", "999"))
+        mockMvc.perform(loggedIn(get("/api/diagnosis/income-volatility"), 999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("GET /api/diagnosis/income-volatility: userId가 없으면 400")
-    void getIncomeVolatility_missingUserId() throws Exception {
-        mockMvc.perform(get("/api/diagnosis/income-volatility"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+    @DisplayName("GET 저장 데이터 API 2개: 토큰이 없으면 401 UNAUTHORIZED이고 조회하지 않는다")
+    void savedDataApis_withoutToken_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/diagnosis/income-volatility").param("userId", "2"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        mockMvc.perform(get("/api/diagnosis/cash-flow/forecast").param("userId", "2"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        verifyNoInteractions(incomeVolatilityService);
+    }
+
+    @Test
+    @DisplayName("GET /api/diagnosis/income-volatility: 주소에 다른 userId를 붙여도 토큰의 회원으로만 조회한다")
+    void getIncomeVolatility_ignoresUserIdQuery() throws Exception {
+        when(incomeVolatilityService.diagnoseSavedIncomeVolatility(2L))
+                .thenReturn(IncomeVolatilityResponse.builder().meanIncome(2099498L).build());
+
+        mockMvc.perform(loggedIn(get("/api/diagnosis/income-volatility").param("userId", "3"), 2L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meanIncome").value(2099498));
+
+        verify(incomeVolatilityService).diagnoseSavedIncomeVolatility(2L);
+        verify(incomeVolatilityService, never()).diagnoseSavedIncomeVolatility(3L);
     }
 
     @Test
@@ -100,10 +144,9 @@ class IncomeVolatilityControllerTest {
                 .build();
         when(incomeVolatilityService.forecastSavedCashFlow(eq(2L), any())).thenReturn(response);
 
-        mockMvc.perform(get("/api/diagnosis/cash-flow/forecast")
-                        .param("userId", "2")
+        mockMvc.perform(loggedIn(get("/api/diagnosis/cash-flow/forecast")
                         .param("incomeChangePercent", "-10")
-                        .param("forecastMonths", "3"))
+                        .param("forecastMonths", "3"), 2L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.monthlyForecasts[0].forecastYearMonth").value("2026-09"))
                 .andExpect(jsonPath("$.monthlyForecasts[0].deficit").value(true))

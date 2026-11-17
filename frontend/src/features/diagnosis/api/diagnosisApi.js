@@ -11,20 +11,21 @@ export const DIAGNOSIS_API = Object.freeze({
   CASH_FLOW_FORECAST: '/api/diagnosis/cash-flow/forecast',
 })
 
-// N-22 저장된 최근 12개월 소득으로 변동성 지표·성수기·비수기 격차·소득 부족 달을 조회한다.
-// TODO(로그인 연동) 로그인이 생기면 userId 없이 토큰으로 회원을 찾는다.
-export function getIncomeVolatility(userId) {
-  return apiGet(`${DIAGNOSIS_API.INCOME_VOLATILITY}?userId=${userId}`)
+// N-22 로그인한 회원의 저장된 최근 12개월 소득으로 변동성 지표·성수기·비수기 격차·소득 부족 달을 조회한다.
+// 회원은 서버가 로그인 토큰으로 찾는다(회원 번호를 보내지 않는다). 로그인하지 않았으면 401이다.
+export function getIncomeVolatility() {
+  return apiGet(DIAGNOSIS_API.INCOME_VOLATILITY)
 }
 
-// N-21 저장 데이터에 전망 조건(소득·지출·원리금 변화율 %, 예측 기간 3·6·12개월)을 적용한 현금흐름 전망을 조회한다.
-// TODO(로그인 연동) 로그인이 생기면 userId 없이 토큰으로 회원을 찾는다.
-export function getCashFlowForecast(userId, condition = {}) {
-  const params = new URLSearchParams({ userId: String(userId) })
+// N-21 로그인한 회원의 저장 데이터에 전망 조건(소득·지출·원리금 변화율 %, 예측 기간 3·6·12개월)을 적용한 현금흐름 전망을 조회한다.
+// 회원은 서버가 로그인 토큰으로 찾는다. 로그인하지 않았으면 401이다.
+export function getCashFlowForecast(condition = {}) {
+  const params = new URLSearchParams()
   Object.entries(condition).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') params.set(key, String(value))
   })
-  return apiGet(`${DIAGNOSIS_API.CASH_FLOW_FORECAST}?${params.toString()}`)
+  const query = params.toString()
+  return apiGet(query ? `${DIAGNOSIS_API.CASH_FLOW_FORECAST}?${query}` : DIAGNOSIS_API.CASH_FLOW_FORECAST)
 }
 
 // N-20-4 연소득 및 연원리금 상환액 기반 DSR 비율 및 위험 단계 계산
