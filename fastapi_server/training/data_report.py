@@ -10,8 +10,8 @@ import pandas as pd
 
 from pipeline import feature_catalog
 from training import config
+from training.data_io import load_train_valid, sha256_of
 from training.preprocess import prepare
-from training.train import load_train_valid, sha256_of
 
 DEFAULT_REPORT_PATH = config.FASTAPI_ROOT.parent / "docs" / "spec" / "training_data_report.md"
 NUMERIC_FEATURES = [f for f in config.ALTERNATIVE_FEATURES if f not in config.CATEGORICAL_FEATURES]
@@ -41,13 +41,29 @@ def limit_violation_counts(df: pd.DataFrame) -> dict:
     return counts
 
 
+def _format_number(value: float) -> str:
+    return f"{value:,.4g}" if abs(value) < 1e5 else f"{value:,.0f}"
+
+
 def numeric_summary(df: pd.DataFrame, features: list) -> list:
-    """숫자 피처별 [최소, 25%, 중앙값, 75%, 최대] (결측 제외)."""
+    """숫자 피처별 [최소, 25%, 중앙값, 75%, 최대, 평균] (결측 제외)."""
     rows = []
     for f in features:
         q = df[f].quantile([0, 0.25, 0.5, 0.75, 1.0])
-        rows.append([f] + [f"{v:,.4g}" if abs(v) < 1e5 else f"{v:,.0f}" for v in q])
+        rows.append([f] + [_format_number(v) for v in q] + [_format_number(df[f].mean())])
     return rows
+
+
+def label_check(df: pd.DataFrame, label: str) -> dict:
+    """라벨 열 검증(FP-130): 값이 0/1뿐인지, 결측 수, 양성 수와 비율. 결측이 있으면 `ok`가 False다."""
+    column = df[label]
+    non_missing = column.dropna()
+    values_ok = bool(non_missing.isin([0, 1]).all())
+    missing = int(column.isna().sum())
+    positives = int((non_missing == 1).sum())
+    return {"rows": int(len(column)), "missing": missing, "values_ok": values_ok, "positives": positives,
+            "positive_rate": positives / len(column) if len(column) else float("nan"),
+            "ok": values_ok and missing == 0}
 
 
 def category_counts(df: pd.DataFrame) -> list:
@@ -75,6 +91,14 @@ def build_report(raw_all: pd.DataFrame, table_sha: str) -> str:
     train = data[data[config.SPLIT_COLUMN] == config.TRAIN_SPLIT]
     cleaned = prepare(data)
     labels = [spec["label"] for spec in config.MODELS.values()]
+    label_rows, label_warnings = [], []
+    for label in labels:
+        for split in [config.TRAIN_SPLIT, config.VALID_SPLIT]:
+            check = label_check(data[data[config.SPLIT_COLUMN] == split], label)
+            label_rows.append([f"`{label}`", split, f"{check['rows']:,}", "예" if check["values_ok"] else "아니오",
+                               check["missing"], f"{check['positives']:,}", f"{check['positive_rate']:.3f}"])
+            if not check["ok"]:
+                label_warnings.append(f"- **경고:** `{label}` {split}에서 0/1이 아닌 값이 있거나 결측이 있다(위 표 확인).")
 
     out = [
         "# 학습 데이터 기본 통계 보고서 (생성 파일)",
@@ -93,6 +117,12 @@ def build_report(raw_all: pd.DataFrame, table_sha: str) -> str:
         f"- 라벨 정의: 기존 모델 `{labels[0]}`, 대안 모델 `{labels[1]}`(정의서 2-1).",
         f"- TRAIN·VALID 합계 {len(data):,}행, 직군(`segment`)별 행 수: "
         + ", ".join(f"{k}={int(v):,}" for k, v in data["segment"].value_counts().items()) + ".",
+        "",
+        "### 라벨 검증 (FP-130)",
+        md_table(["라벨", "분할", "행 수", "값이 0/1뿐", "결측", "양성 수", "양성 비율"], label_rows),
+        "",
+        *(label_warnings or ["- 두 라벨 모두 TRAIN·VALID에서 값이 0/1뿐이고 결측이 없다."]),
+        "- TEST는 행 수만 센다. 데이터 README가 직군 × 연체 라벨 층화 분할이라고 설명하며, TEST 양성 비율은 최종 평가(FP-144) 때 확인한다.",
         "",
         "## 2. 결측 (TRAIN + VALID)",
     ]
@@ -113,7 +143,7 @@ def build_report(raw_all: pd.DataFrame, table_sha: str) -> str:
                      + [["하나라도 해당", "", f"{violations['any']:,}", f"{violations['any'] / len(data):.2%}"]]),
             "",
             "## 4. 숫자 피처 요약 (TRAIN, 전처리 전 원본 값)",
-            md_table(["피처", "최소", "25%", "중앙값", "75%", "최대"], numeric_summary(train, NUMERIC_FEATURES)),
+            md_table(["피처", "최소", "25%", "중앙값", "75%", "최대", "평균"], numeric_summary(train, NUMERIC_FEATURES)),
             "",
             "## 5. 범주형 값 분포 (TRAIN + VALID)",
             md_table(["열", "값별 행 수", "부호표에 없는 값·결측"], category_counts(data)),

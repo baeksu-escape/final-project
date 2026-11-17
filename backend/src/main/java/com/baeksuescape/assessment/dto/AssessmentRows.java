@@ -61,6 +61,16 @@ public final class AssessmentRows {
         private String simulatableYn;
     }
 
+    // N-12-6 모델별 피처 칩 — DIM_FEATURE 한 행(코드·이름·대안 여부).
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class FeatureRow {
+        private String featureCode;
+        private String featureName;
+        private String alternativeYn;
+    }
+
     // SCORE_GRADE_BAND 한 행 (리포트 게이지 눈금).
     @Getter
     @Setter

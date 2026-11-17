@@ -14,7 +14,16 @@ public final class ReportDtos {
     // RPT-02·03 리포트 한 건
     public record Report(String requestId, OffsetDateTime assessedAt, String inputBaseMonth, String workerTypeCode,
             String gradeStatusCode, String notScorableReasonCode, ModelScore traditional, ModelScore alternative,
-            Comparison comparison, GradeBands gradeBands, Shap shap, String aiSummary, String modelVersion) {
+            Comparison comparison, GradeBands gradeBands, Shap shap, String aiSummary, String modelVersion,
+            ModelFeatures modelFeatures) {
+    }
+
+    // N-12-6 모델별 피처 칩 — 기존 모델은 대안 데이터가 아닌 피처(ALTERNATIVE_YN = N), 대안 모델은 전체 피처.
+    // 화면이 featureCode로 영역(소득·대출·통신비 등)을 묶는다(11/17 경환 합의). 피처 사전이 없으면 null.
+    public record ModelFeatures(List<ModelFeature> traditional, List<ModelFeature> alternative) {
+    }
+
+    public record ModelFeature(String featureCode, String name, String alternativeYn) {
     }
 
     // 모델 하나의 점수. 산정 불가면 scorableYn "N"이고 나머지 null.

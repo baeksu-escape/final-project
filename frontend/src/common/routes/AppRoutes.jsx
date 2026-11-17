@@ -3,8 +3,9 @@ import RouteGuard from '../auth/RouteGuard.jsx'
 import { PATHS } from '../config/navigation.js'
 import { ROLES } from '../config/roles.js'
 import AppLayout from '../layout/AppLayout.jsx'
+import PublicLayout from '../layout/PublicLayout.jsx'
 import ForbiddenPage from '../pages/ForbiddenPage.jsx'
-import HomeRedirect from '../pages/HomeRedirect.jsx'
+import LandingPage from '../pages/LandingPage.jsx'
 import NotFoundPage from '../pages/NotFoundPage.jsx'
 import PlaceholderPage from '../pages/PlaceholderPage.jsx'
 import { ADMIN_PATHS } from '../../features/admin/adminConstants.js'
@@ -39,19 +40,23 @@ export default function AppRoutes() {
     <Routes>
       {/* 로그인 전 (FP-87 N-01~N-03) — 이미 로그인했으면 첫 화면으로 보낸다 */}
       <Route element={<GuestOnlyRoute />}>
-        <Route path={AUTH_PATHS.LOGIN} element={<LoginPage />} />
-        <Route path={AUTH_PATHS.SIGNUP} element={<SignupPage />} />
-        <Route path={AUTH_PATHS.FIND_ID} element={<FindIdPage />} />
-        <Route path={AUTH_PATHS.FIND_PASSWORD} element={<FindPasswordPage />} />
-        {/* 소셜 로그인 (FP-145 N-01-6) */}
-        <Route path={SOCIAL_PATHS.CALLBACK} element={<SocialCallbackPage />} />
-        <Route path={SOCIAL_PATHS.LINK} element={<SocialLinkPage />} />
+        {/* 로그인 전 공통 틀(로고·로그인/회원가입 링크·푸터) — FP-156 공통 레이아웃 */}
+        <Route element={<PublicLayout />}>
+          {/* N-10 메인(홍보) 첫 화면 — 로그인한 사람은 GuestOnlyRoute가 자기 첫 화면(신용 리포트 등)으로 보낸다 */}
+          <Route path={PATHS.HOME} element={<LandingPage />} />
+          <Route path={AUTH_PATHS.LOGIN} element={<LoginPage />} />
+          <Route path={AUTH_PATHS.SIGNUP} element={<SignupPage />} />
+          <Route path={AUTH_PATHS.FIND_ID} element={<FindIdPage />} />
+          <Route path={AUTH_PATHS.FIND_PASSWORD} element={<FindPasswordPage />} />
+          {/* 소셜 로그인 (FP-145 N-01-6) */}
+          <Route path={SOCIAL_PATHS.CALLBACK} element={<SocialCallbackPage />} />
+          <Route path={SOCIAL_PATHS.LINK} element={<SocialLinkPage />} />
+        </Route>
       </Route>
 
       {/* 로그인 필요 */}
       <Route element={<RouteGuard />}>
         <Route element={<AppLayout />}>
-          <Route path={PATHS.HOME} element={<HomeRedirect />} />
           <Route path={PATHS.FORBIDDEN} element={<ForbiddenPage />} />
           {/* 직군 선택 (FP-85 N-05-1) — 직군이 없는 사용자만 머문다 */}
           <Route path={PATHS.SELECT_JOB} element={<JobSelectPage />} />

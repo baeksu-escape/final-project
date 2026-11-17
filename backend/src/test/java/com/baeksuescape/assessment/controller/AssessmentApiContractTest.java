@@ -115,7 +115,10 @@ class AssessmentApiContractTest {
                 new ReportDtos.GradeBands("CUT-0.1", List.of(new ReportDtos.GradeBand("CAUTION", 0, 664))),
                 new ReportDtos.Shap(639, List.of(new ReportDtos.Factor(1, "telecom_on_time_streak", "통신비 정시 납부 기간", "개월", "12", 31,
                         "Y", "Y"))),
-                null, "DEV-DUMMY");
+                null, "DEV-DUMMY",
+                new ReportDtos.ModelFeatures(List.of(new ReportDtos.ModelFeature("DQ1200001", "최근 1년 연체 횟수", "N")),
+                        List.of(new ReportDtos.ModelFeature("DQ1200001", "최근 1년 연체 횟수", "N"),
+                                new ReportDtos.ModelFeature("telecom_on_time_streak", "통신비 정시 납부 기간", "Y"))));
         given(reportService.byRequestId(7L, REQUEST_ID)).willReturn(report);
 
         mvc.perform(asUser(get("/api/report/" + REQUEST_ID)))
@@ -124,7 +127,11 @@ class AssessmentApiContractTest {
                 .andExpect(jsonPath("$.shap.factors[0].shapValue").doesNotExist())
                 .andExpect(jsonPath("$.assessmentId").doesNotExist())
                 .andExpect(jsonPath("$.featureSnapshot").doesNotExist())
-                .andExpect(jsonPath("$.gradeBands.bands[0].maxScore").value(664));
+                .andExpect(jsonPath("$.gradeBands.bands[0].maxScore").value(664))
+                // N-12-6 화면(ScoreComparisonCard)이 읽는 필드 이름
+                .andExpect(jsonPath("$.modelFeatures.traditional[0].featureCode").value("DQ1200001"))
+                .andExpect(jsonPath("$.modelFeatures.alternative[1].name").value("통신비 정시 납부 기간"))
+                .andExpect(jsonPath("$.modelFeatures.alternative[1].alternativeYn").value("Y"));
     }
 
     @Test

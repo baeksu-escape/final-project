@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { PATHS } from '../config/navigation.js'
+import './pages.css'
 
 // 없는 경로에 들어왔을 때 보여 준다.
 export default function NotFoundPage() {
