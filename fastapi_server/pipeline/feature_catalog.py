@@ -1,5 +1,5 @@
-# FP-140 예측 Mock — 실제 모델 아님.
-# N-12-2·N-14 피처 사전(DIM_FEATURE FS-DRAFT 39개)과 버전·등급 구간 상수.
+# FP-140 예측 Mock의 피처 사전과 버전·등급 구간 상수. 실제 모델(FP-141) 버전 상수도 여기에 둔다.
+# N-12-2·N-14 피처 사전(DIM_FEATURE FS-DRAFT 39개). 실제 모델의 38개 순서는 training/config.py가 기준이다.
 # 값의 출처: docs/spec/sql/seed/avenue_seed_dim_feature_fs_draft.sql (피처 정의서 v1.0 11장).
 # 시드 SQL이 바뀌면 이 목록도 같이 고친다. tests/test_mock_scorer.py가 두 목록이 같은지 검사한다.
 from dataclasses import dataclass
@@ -8,6 +8,11 @@ from dataclasses import dataclass
 MODEL_VERSION = "DEV-DUMMY"
 FEATURE_SET_VERSION = "FS-DRAFT"
 CUTOFF_VERSION = "CUT-0.1"
+
+# FP-141 실제 모델(LightGBM 임시 베이스라인, 11/17 범영·재욱 합의). DB의 ACTIVE 모델이 이 값이면 실제 모델로 계산한다.
+# 값은 학습 코드(training/config.py)를 그대로 가져온다. 그쪽 시험(test_fs_v1_seed)이 DDL 기준 데이터와 같은지 검사하므로 세 곳이 어긋나지 않는다.
+from training.config import FEATURE_SET_VERSION as REAL_FEATURE_SET_VERSION  # noqa: E402  "FS-V1"
+from training.config import MODEL_VERSION as REAL_MODEL_VERSION  # noqa: E402  "LGBM-BASE-0.1"
 
 # 등급 구간 CUT-0.1 (decisions.md D-01 임시값: 0~664 / 665~779 / 780~1000).
 GRADE_BANDS = [
