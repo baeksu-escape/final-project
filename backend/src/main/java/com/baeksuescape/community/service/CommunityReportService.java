@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,8 +30,8 @@ import com.baeksuescape.global.exception.ApiException;
 @Service
 public class CommunityReportService {
 
-    // APP_SETTING에 값이 없을 때 쓰는 기본값(DDL 시드 값과 같다)
-    public static final int DEFAULT_AUTO_HIDE_COUNT = 5;
+    // APP_SETTING에 값이 없을 때 쓰는 기본값(DDL 시드 값과 같다). 자동 숨김은 관리자 설정 화면 기본값과 같은 값을 쓴다.
+    public static final int DEFAULT_AUTO_HIDE_COUNT = EditableSettings.find(EditableSettings.REPORT_AUTO_HIDE_COUNT).defaultValue();
     public static final int DEFAULT_DAILY_LIMIT = 3;
 
     private final ReportMapper reportMapper;
@@ -75,7 +76,12 @@ public class CommunityReportService {
         report.setReasonCode(request.reasonCode());
         report.setDetailText(REASON_OTHER.equals(request.reasonCode()) ? blankToNull(request.detailText()) : null);
         report.setReportedAt(now);
-        reportMapper.insertReport(report);
+        try {
+            reportMapper.insertReport(report);
+        } catch (DuplicateKeyException e) {
+            // 같은 사람이 거의 동시에 두 번 보내 위 중복 검사를 둘 다 통과한 경우 — DB 유니크 인덱스(UX_CRP_REPORTER_*)가 막는다
+            throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_REPORT", "이미 신고한 글·댓글입니다.");
+        }
 
         boolean hidden = HIDDEN.equals(target.statusCode());
         int autoHideCount = settings.intValue(EditableSettings.REPORT_AUTO_HIDE_COUNT, DEFAULT_AUTO_HIDE_COUNT);

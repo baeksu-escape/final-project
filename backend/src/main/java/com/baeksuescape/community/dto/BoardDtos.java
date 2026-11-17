@@ -37,7 +37,7 @@ public final class BoardDtos {
     // COMM-03 글 작성·COMM-04 글 수정
     public record PostWrite(
             @NotBlank(message = "제목을 입력해 주세요.") @Size(max = 200, message = "제목은 200자까지 쓸 수 있습니다.") String title,
-            @NotBlank(message = "내용을 입력해 주세요.") String content) {
+            @NotBlank(message = "내용을 입력해 주세요.") @Size(max = 1300, message = "내용은 1300자까지 쓸 수 있습니다.") String content) {
     }
 
     public record PostCreated(Long postId) {

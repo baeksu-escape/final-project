@@ -80,7 +80,7 @@ public class BoardService {
         PostRow row = new PostRow();
         row.setUserId(userId);
         row.setTitle(request.title().trim());
-        row.setContent(request.content());
+        row.setContent(request.content().trim());
         row.setCreatedAt(now);
         boardMapper.insertPost(row);
         boardMapper.insertPostLog(row.getPostId(), ACTION_CREATE, ACTOR_USER, userId, null, VISIBLE, null, now);
@@ -94,7 +94,7 @@ public class BoardService {
         requireOwner(post, userId);
         LocalDateTime now = LocalDateTime.now(clock);
         if (!VISIBLE.equals(post.getStatusCode())
-                || boardMapper.updatePostContent(postId, request.title().trim(), request.content(), now) == 0) {
+                || boardMapper.updatePostContent(postId, request.title().trim(), request.content().trim(), now) == 0) {
             throw new ApiException(HttpStatus.CONFLICT, "POST_HIDDEN", "신고로 숨김 처리된 글은 수정할 수 없습니다.");
         }
         boardMapper.insertPostLog(postId, ACTION_UPDATE, ACTOR_USER, userId, VISIBLE, VISIBLE, null, now);

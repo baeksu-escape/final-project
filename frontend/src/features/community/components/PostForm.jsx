@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, TextInput } from '../../../common/components/index.js'
-import { TITLE_MAX } from '../config/communityCodes.js'
+import { CONTENT_MAX, TITLE_MAX } from '../config/communityCodes.js'
 
 // N-06-2 글쓰기 · N-06-5 내 글 수정 — 같은 폼을 쓴다. initial이 있으면 수정 모드다.
 // onSubmit({ title, content })은 Promise를 돌려준다. 실패하면 서버 문구를 폼 아래에 보여 준다.
@@ -41,6 +41,7 @@ export default function PostForm({ initial, onSubmit, onCancel }) {
           id="lounge-form-content"
           className="lounge-textarea"
           value={content}
+          maxLength={CONTENT_MAX}
           onChange={(event) => setContent(event.target.value)}
           placeholder="다른 사람의 개인정보나 계좌번호는 올리지 말아 주세요."
         />

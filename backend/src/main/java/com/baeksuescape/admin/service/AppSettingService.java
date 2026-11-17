@@ -62,7 +62,7 @@ public class AppSettingService {
     private SettingDtos.SettingView view(EditableSettings.Rule rule) {
         AppSettingRow row = settingMapper.selectByKey(rule.settingKey());
         if (row == null) return null;
-        return new SettingDtos.SettingView(rule.settingKey(), parse(row, rule.min()), row.getDescription(), rule.min(), rule.max());
+        return new SettingDtos.SettingView(rule.settingKey(), parse(row, rule.defaultValue()), row.getDescription(), rule.min(), rule.max());
     }
 
     private static int parse(AppSettingRow row, int defaultValue) {

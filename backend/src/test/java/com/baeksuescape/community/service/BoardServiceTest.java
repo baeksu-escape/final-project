@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
@@ -128,9 +129,11 @@ class BoardServiceTest {
             return 1;
         }).given(boardMapper).insertPost(any());
 
-        BoardDtos.PostCreated created = service.create(ME, new BoardDtos.PostWrite("  첫 글  ", "안녕하세요"));
+        BoardDtos.PostCreated created = service.create(ME, new BoardDtos.PostWrite("  첫 글  ", "\n 안녕하세요 \n"));
 
         assertThat(created.postId()).isEqualTo(11L);
+        // 제목·댓글처럼 본문도 앞뒤 공백을 지우고 저장한다
+        verify(boardMapper).insertPost(argThat(row -> "첫 글".equals(row.getTitle()) && "안녕하세요".equals(row.getContent())));
         verify(boardMapper).insertPostLog(11L, "CREATE", "USER", ME, null, "VISIBLE", null, NOW);
     }
 

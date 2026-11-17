@@ -3,8 +3,9 @@
 // 게시판 한 쪽에 보이는 글 수 (N-06-1, 데모 기준 10개)
 export const PAGE_SIZE = 10
 
-// 글 제목·댓글·신고 상세의 최대 글자 수 — 서버 검증(BoardDtos·ReportDtos)과 같다
+// 글 제목·본문·댓글·신고 상세의 최대 글자 수 — 서버 검증(BoardDtos·ReportDtos)과 같다
 export const TITLE_MAX = 200
+export const CONTENT_MAX = 1300
 export const COMMENT_MAX = 1000
 export const DETAIL_MAX = 500
 

@@ -48,13 +48,13 @@
     <!-- N-06-2 글 저장 (상태 VISIBLE) -->
     <insert id="insertPost" useGeneratedKeys="true" keyProperty="postId" keyColumn="POST_ID">
         INSERT INTO BOARD_POST (USER_ID, TITLE, CONTENT, STATUS_CODE, CREATED_AT)
-        VALUES (#{userId}, #{title}, #{content,jdbcType=CLOB}, 'VISIBLE', #{createdAt})
+        VALUES (#{userId}, #{title}, #{content}, 'VISIBLE', #{createdAt})
     </insert>
 
     <!-- 글 수정: 보이는 글만 (숨겨진 글은 수정 불가, C조 11/12 확정) -->
     <update id="updatePostContent">
         UPDATE BOARD_POST
-           SET TITLE = #{title}, CONTENT = #{content,jdbcType=CLOB}, UPDATED_AT = #{now}
+           SET TITLE = #{title}, CONTENT = #{content}, UPDATED_AT = #{now}
          WHERE POST_ID = #{postId}
            AND STATUS_CODE = 'VISIBLE'
     </update>

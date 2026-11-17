@@ -12,6 +12,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willAnswer;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DuplicateKeyException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -83,6 +85,15 @@ class CommunityReportServiceTest {
     void 같은_사용자가_같은_대상을_중복_신고할_수_없다() {
         given(reportMapper.countByReporterAndTarget(ME, "POST", 1L)).willReturn(1);
         assertError(() -> service.submit(ME, reportPost(1L, "SPAM", null)), 409, "DUPLICATE_REPORT");
+    }
+
+    @Test
+    void 거의_동시에_두_번_보내_DB_유니크_인덱스에_걸려도_409로_답한다() {
+        willThrow(new DuplicateKeyException("UX_CRP_REPORTER_POST")).given(reportMapper).insertReport(any());
+        assertThatThrownBy(() -> service.submit(ME, reportPost(1L, "SPAM", null))).isInstanceOfSatisfying(ApiException.class, e -> {
+            assertThat(e.getStatus().value()).isEqualTo(409);
+            assertThat(e.getCode()).isEqualTo("DUPLICATE_REPORT");
+        });
     }
 
     @Test

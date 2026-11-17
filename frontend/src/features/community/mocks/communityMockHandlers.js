@@ -2,7 +2,7 @@ import { ApiError } from '../../../common/api/ApiError.js'
 import { ROLES } from '../../../common/config/roles.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { requireAccountByToken } from '../../auth/mocks/authMockHandlers.js'
-import { AUTO_HIDE_KEY, COMMENT_MAX, DETAIL_MAX, REPORT_REASONS, TITLE_MAX } from '../config/communityCodes.js'
+import { AUTO_HIDE_KEY, COMMENT_MAX, CONTENT_MAX, DETAIL_MAX, REPORT_REASONS, TITLE_MAX } from '../config/communityCodes.js'
 import { mockComments, mockPosts, mockReports, mockSeq, mockSettings, nicknameOf } from './communityMockData.js'
 
 // N-06·N-33·N-34 신용 라운지 mock — 1단계 서버(BoardService·ReportService·AdminReportService)와 같은 규칙·응답 모양으로 흉내 낸다.
@@ -60,6 +60,7 @@ function checkPostWrite(body) {
   if (!title) invalid('title', '제목을 입력해 주세요.')
   if (title.length > TITLE_MAX) invalid('title', `제목은 ${TITLE_MAX}자까지 쓸 수 있습니다.`)
   if (!content) invalid('content', '내용을 입력해 주세요.')
+  if (content.length > CONTENT_MAX) invalid('content', `내용은 ${CONTENT_MAX}자까지 쓸 수 있습니다.`)
   return { title, content }
 }
 

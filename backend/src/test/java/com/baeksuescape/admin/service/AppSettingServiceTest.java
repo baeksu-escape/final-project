@@ -97,4 +97,10 @@ class AppSettingServiceTest {
         assertThat(service.intValue("NO_SUCH_KEY", 4)).isEqualTo(4);
         assertThat(service.intValue("REPORT_AUTO_HIDE_COUNT", 9)).isEqualTo(5);
     }
+
+    @Test
+    void 화면_조회도_값을_못_읽으면_서버가_실제로_쓰는_기본값_5를_보여_준다() {
+        given(settingMapper.selectByKey("REPORT_AUTO_HIDE_COUNT")).willReturn(row("REPORT_AUTO_HIDE_COUNT", "다섯"));
+        assertThat(service.list().settings().get(0).value()).isEqualTo(5);
+    }
 }

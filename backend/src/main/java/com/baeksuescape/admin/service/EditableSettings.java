@@ -9,8 +9,8 @@ public final class EditableSettings {
     private EditableSettings() {
     }
 
-    // 설정 키 하나와 허용 범위(양 끝 포함)
-    public record Rule(String settingKey, int min, int max) {
+    // 설정 키 하나와 허용 범위(양 끝 포함), DB 값을 못 읽을 때 서버가 실제로 쓰는 기본값
+    public record Rule(String settingKey, int min, int max, int defaultValue) {
     }
 
     // N-33-2·N-34-1 신고 자동 숨김 기준(건), 관리자가 3~10건으로 바꾼다(D-10)
@@ -19,7 +19,7 @@ public final class EditableSettings {
     public static final String REPORT_DAILY_LIMIT = "REPORT_DAILY_LIMIT";
 
     public static final List<Rule> RULES = List.of(
-            new Rule(REPORT_AUTO_HIDE_COUNT, 3, 10));
+            new Rule(REPORT_AUTO_HIDE_COUNT, 3, 10, 5));
 
     // 키로 규칙을 찾는다. 바꿀 수 없는 키면 null
     public static Rule find(String settingKey) {

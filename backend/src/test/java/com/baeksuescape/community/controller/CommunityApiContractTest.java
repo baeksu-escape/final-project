@@ -150,6 +150,13 @@ class CommunityApiContractTest {
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("title"));
 
+        // 본문은 1300자까지 (DDL VARCHAR2(1300 CHAR), C9)
+        mvc.perform(asUser(json(post("/api/board/posts"), "{\"title\":\"긴 글\",\"content\":\"" + "가".repeat(1300) + "\"}")))
+                .andExpect(status().isOk());
+        mvc.perform(asUser(json(post("/api/board/posts"), "{\"title\":\"긴 글\",\"content\":\"" + "가".repeat(1301) + "\"}")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("content"));
+
         mvc.perform(asUser(json(put("/api/board/posts/12"), "{\"title\":\"고친 글\",\"content\":\"내용\"}")))
                 .andExpect(status().isOk())
                 .andExpect(content().json("{}"));
