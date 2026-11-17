@@ -1,8 +1,8 @@
-# FP-140 예측 Mock — 실제 모델 아님.
-# N-12-2 점수 계산 입력 → 피처 39개. 계산식은 피처 정의서 v1.0(docs/spec/feature_definition.md) 3장을 따른다.
-# 실제 모델(FP-141)도 이 함수를 그대로 쓰도록 계산만 담당한다(학습·서비스 계산이 갈라지지 않게 한 곳에서 만든다).
+# FP-140·FP-141 N-12-2 점수 계산 입력 → 피처 39개. 계산식은 피처 정의서 v1.0(docs/spec/feature_definition.md) 3장을 따른다.
+# Mock과 실제 모델(FP-141)이 이 함수를 함께 쓴다(학습·서비스 계산이 갈라지지 않게 한 곳에서 만든다).
 # 규칙: 0과 결측을 구분한다. 계산할 수 없는 값은 None으로 두고 0으로 채우지 않는다(정의서 7장).
-# TODO(FP-141) 소수 반올림은 Python round(짝수 쪽)다. 학습 생성 코드는 ROUND_HALF_UP이라 진짜 모델 연결 때 맞춘다.
+# 소수 반올림은 학습 데이터 생성 코드와 같은 ROUND_HALF_UP(정확히 .5면 올림)이다(FP-141).
+from decimal import ROUND_HALF_UP, Decimal
 from statistics import mean, pstdev
 
 from schemas.assessment import ScoreRequest
@@ -20,11 +20,16 @@ EXPENSE_AVG_MAX_KRW = 200_000_000       # 평균 월 지출 2억 원 초과
 DEBT_SERVICE_MIN_KRW = 0                # 월 상환액 0 미만
 
 
+def round_half_up(value: float, digits: int) -> float:
+    """학습 생성 코드와 같은 반올림(정확히 .5면 올림). Python round()는 짝수 쪽으로 가서 경계값이 학습과 달라질 수 있다."""
+    return float(Decimal(str(value)).quantize(Decimal(1).scaleb(-digits), rounding=ROUND_HALF_UP))
+
+
 def _ratio(numerator, denominator):
     """분모가 0 이하이거나 값이 없으면 None — 정의서 3-1·3-7 ①(소득 합계 0 이하면 결측)."""
     if numerator is None or denominator is None or denominator <= 0:
         return None
-    return round(numerator / denominator, 4)
+    return round_half_up(numerator / denominator, 4)
 
 
 def monthly_incomes(req: ScoreRequest) -> list[int]:
@@ -50,7 +55,7 @@ def _income_expense_features(req: ScoreRequest) -> dict:
     cash_ok = income_ok and expense_ok and debt_ok            # 월 순현금은 세 값을 모두 쓴다
     return {
         "income_svc_12m_krw": income_sum if income_ok else None,
-        "income_cv_svc_12m": round(pstdev(incomes) / avg_income, 4) if income_ok and avg_income > 0 else None,
+        "income_cv_svc_12m": round_half_up(pstdev(incomes) / avg_income, 4) if income_ok and avg_income > 0 else None,
         # 0인 달 수는 큰 값(이상치)이 있어도 셀 수 있어 그대로 둔다
         "zero_income_months_svc_12m": sum(1 for m in incomes if m == 0),
         "expense_avg_month_krw": expense if expense_ok else None,
@@ -115,7 +120,7 @@ def _profile_credit_features(req: ScoreRequest, debt_service: int) -> dict:
     cp = req.creditProfile
     card_util = None   # 한도가 없거나 0 이하면 사용률을 만들지 않는다(시뮬레이션도 같은 규칙)
     if cp.cardLimitAmt is not None and cp.cardLimitAmt > 0 and cp.cardMonthlySpendAmt is not None:
-        card_util = round(cp.cardMonthlySpendAmt / cp.cardLimitAmt * 100, 1)
+        card_util = round_half_up(cp.cardMonthlySpendAmt / cp.cardLimitAmt * 100, 1)
     return {
         "segment": SEGMENT_BY_WORKER_TYPE.get(req.applicant.workerTypeCode),
         "age": req.applicant.age,
