@@ -3,20 +3,15 @@ import { Link } from 'react-router-dom'
 import Button from '../../../common/components/Button.jsx'
 import Notice from '../../../common/components/Notice.jsx'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
+import { getNotScorableMessage } from '../../../common/config/scoreStatus.js'
+import { fetchDiagnosisHistory } from '../../auth/api/diagnosisHistoryApi.js'
 import { DATA_INPUT_PATHS } from '../../dataInput/dataInputPaths.js'
-import { fetchCreditDiagnosisHistory, fetchCreditReport } from '../api/creditApi.js'
+import { fetchCreditReport } from '../api/creditApi.js'
 import ScoreComparisonCard from '../components/ScoreComparisonCard.jsx'
 import CreditReportSummaryCard from '../components/CreditReportSummaryCard.jsx'
 import ShapFactorsCard from '../components/ShapFactorsCard.jsx'
 import '../styles/creditReport.css'
 
-const REASONS = {
-  CONSENT_REQUIRED: '대안 데이터에 동의하고 데이터를 불러와 주세요.',
-  ALT_DATA_EMPTY: '통신비 또는 공과금 납부 기록이 없어 점수를 산출하지 않았습니다.',
-  INPUT_INCOMPLETE: '입력 화면에서 필요한 정보를 입력해 주세요.',
-  STALE_INPUT: '입력 정보를 최신 상태로 갱신해 주세요.',
-  MODEL_ERROR: '점수를 산출하지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
-}
 const LAST_SEEN_REQUEST_KEY = 'avenue.credit.lastSeenRequestId'
 
 // N-12-6 평가를 처음 볼 때 배너를 표시하고 확인한 평가 번호를 저장한다.
@@ -43,7 +38,7 @@ export default function CreditReportPage() {
       if (!active) return
       setAlertVisible(isNewScore(report))
       setState({ loading: false, report, error: null })
-      fetchCreditDiagnosisHistory()
+      fetchDiagnosisHistory()
         .then(({ items }) => {
           if (active) setScoreChange(items?.find((item) => item.diagnosisId === report.requestId)?.alternativeScoreChange ?? null)
         })
@@ -78,7 +73,7 @@ export default function CreditReportPage() {
       </header>
       {report.gradeStatusCode === 'NOT_SCORABLE' ? (
         <Notice type="warn">
-          {REASONS[report.notScorableReasonCode] ?? '점수를 산출할 수 없습니다.'}{' '}
+          {getNotScorableMessage(report.notScorableReasonCode)}{' '}
           {showInputLink && (
             <Link to={DATA_INPUT_PATHS.DATA_INPUT}>
               {report.notScorableReasonCode === 'ALT_DATA_EMPTY'

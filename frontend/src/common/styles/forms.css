@@ -10,12 +10,6 @@ body {
   line-height: 1.55;
 }
 
-.app-main {
-  width: calc(100% - 32px);
-  max-width: 1288px;
-  margin-inline: auto;
-}
-
 :focus-visible {
   outline: 2px solid var(--info);
   outline-offset: 2px;
