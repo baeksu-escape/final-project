@@ -33,7 +33,7 @@ avenue.auth.temporary-open-paths=/api/finance/**,/api/diagnosis/**,/api/simulati
 avenue.cors.allowed-origins=http://localhost:5173
 
 # ---- 대안 데이터 모의 연동 (작업 5에서 씀) ----
-# 더미 기관 응답 폴더: 저장소의 docs/spec/sql/dummy_db/external_api를 각자 application.properties에 절대 경로로 지정한다.
+# 더미 기관 응답 폴더: backend 작업 디렉터리 기준 상대 경로(../docs/spec/sql/dummy_db/external_api)를 각자 application.properties에 지정한다.
 avenue.altdata.source-dir=
 # 더미 응답에 회원 자료가 없을 때: EMPTY(빈 결과) | BORROW(다른 더미 회원 자료를 빌려 씀)
 avenue.altdata.missing-member-mode=EMPTY
