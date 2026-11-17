@@ -2,7 +2,7 @@
 
 - **날짜:** 2026-11-16
 - **작성자:** 최재욱(B팀 모델·정의서 담당) / Claude Code
-- **브랜치:** `feature-B/FP-141-training-script`
+- **브랜치:** `feature-B/FP-213-model-training` (Jira FP-213)
 - **관련 N-ID:** N-12-2, N-14 (모델 학습 준비)
 - **관련 결정:** `feature_definition.md` 10장 C8·C9·C13·C19, 9장 미정(학습에 없는 코드값)
 
