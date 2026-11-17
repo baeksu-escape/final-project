@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { canSeeMainMenu } from '../auth/accessRules.js'
 import { useAuth } from '../auth/useAuth.js'
 import Toast from '../components/Toast.jsx'
@@ -15,21 +15,26 @@ const NOTIFICATION_PENDING_MESSAGE = '알림 기능은 준비 중입니다.'
 // 사용자 주 메뉴 9개는 점수가 나온 뒤에만 보이고(canSeeMainMenu), 관리자 탭 5개는 늘 보인다. 로고는 첫 화면('/')으로 간다.
 export default function AppHeader() {
   const { user, logout } = useAuth()
-  const navigate = useNavigate()
   const [toastMessage, setToastMessage] = useState('')
   const admin = isAdmin(user)
 
-  // 로그인 상태를 지운 뒤 로그인 화면으로 보낸다.
+  // 로그인 상태를 지운 뒤 메인(홍보) 첫 화면으로 보낸다(N-10, 데모 v2).
+  // 라우터 이동(navigate)으로는 로그아웃 순간 RouteGuard가 로그인 화면으로 덮어써서, 페이지를 '/'로 새로 연다(11/17 확인).
+  // RouteGuard 기본 이동(/login)은 바꾸지 않는다 — 탈퇴 알림, 세션 만료(401), 로그인 없이 주소로 바로 들어온 경우는 로그인 화면이 맞다.
   const handleLogout = async () => {
     await logout()
-    navigate(PATHS.LOGIN, { replace: true })
+    window.location.replace(PATHS.HOME)
   }
 
   return (
-    <header className="app-header">
-      {/* TODO(2차) 로고로 메인(홍보) 페이지 이동(N-10-3) — 메인 페이지(N-10, P3)를 만들 때 바꾼다. */}
+    <header className={admin ? 'app-header app-header--admin' : 'app-header'}>
+      {/* N-10-3 로고 — '/'로 가지만 로그인 상태면 GuestOnlyRoute가 자기 첫 화면으로 다시 보낸다(11/17 사용자 결정). */}
       <Link to={PATHS.HOME} className="app-header__brand">
-        {admin ? 'Avenue Admin' : 'Avenue'}
+        <span className="app-header__logo" aria-hidden="true">AV</span>
+        <span>
+          <span className="app-header__name">{admin ? 'Avenue Admin' : 'Avenue'}</span>
+          <span className="app-header__tagline">{admin ? 'RISK CONSOLE' : 'ALTERNATIVE CREDIT'}</span>
+        </span>
       </Link>
       {canSeeMainMenu(user) && <TabMenu tabs={admin ? ADMIN_TABS : USER_TABS} label={admin ? '관리자 메뉴' : '주 메뉴'} />}
       <div className="app-header__user">

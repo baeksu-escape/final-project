@@ -16,6 +16,7 @@ import { buildPayload, createEmptyValues, toValues, withFixedMonthRows } from '.
 import { monthRule } from '../validation/inputRules.js'
 import { errorKeyOf, getInputNotices, validateFinancialInput } from '../validation/inputValidation.js'
 import { SCORE_ERROR_CODES, fromServerFieldErrors } from '../validation/serverErrors.js'
+import '../dataInput.css'
 
 // N-05-8 같은 requestId로 다시 보내도 되는 실패인지 본다 — 서버에 연결하지 못함(0)·시간 초과(408·504)·서버 오류(5xx).
 // 이때는 서버가 요청을 처리했는지 모르므로 같은 값을 다시 보내 서버가 한 번만 계산하게 한다.

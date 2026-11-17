@@ -2,7 +2,6 @@
 # 실행(fastapi_server 폴더에서): python -m training.train --data-dir <학습 데이터 폴더>
 # 결과: artifacts/ 에 모델 파일(.joblib, Git 제외)과 설명 파일(.meta.json). 점수·등급 변환과 서비스 연결(FP-141)은 하지 않는다.
 import argparse
-import hashlib
 import json
 import sys
 from datetime import datetime, timezone
@@ -17,29 +16,8 @@ import sklearn
 from sklearn.metrics import roc_auc_score
 
 from training import config
+from training.data_io import load_train_valid, sha256_of  # noqa: F401  (compare_labels.py 등이 training.train에서 가져가는 이름도 유지)
 from training.preprocess import prepare
-
-
-def sha256_of(path: Path) -> str:
-    """학습 표 파일의 SHA-256 — 어떤 파일로 학습했는지 설명 파일에 남긴다."""
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def load_train_valid(table_path: Path) -> pd.DataFrame:
-    """학습 표를 읽고 TRAIN·VALID 행만 남긴다(TEST 행은 바로 버린다). 필요한 열이 없으면 이름을 알리고 멈춘다."""
-    df = pd.read_csv(table_path)
-    needed = {config.SPLIT_COLUMN}
-    for spec in config.MODELS.values():
-        needed.update(spec["features"])
-        needed.add(spec["label"])
-    missing = sorted(needed - set(df.columns))
-    if missing:
-        sys.exit(f"학습 표에 없는 열이 있다(데이터 버전이 맞는지 확인): {missing}")
-    return df[df[config.SPLIT_COLUMN].isin([config.TRAIN_SPLIT, config.VALID_SPLIT])].copy()
 
 
 def fit_model(train: pd.DataFrame, features: list, label: str, seed: int) -> lgb.LGBMClassifier:

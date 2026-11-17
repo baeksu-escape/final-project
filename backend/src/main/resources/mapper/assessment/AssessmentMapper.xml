@@ -143,4 +143,13 @@
          WHERE CUTOFF_VERSION = #{cutoffVersion}
          ORDER BY DISPLAY_ORDER
     </select>
+
+    <!-- N-12-6 모델별 피처 칩: 그 평가의 피처 세트 전체. 산출 불가 평가는 FEATURE_SET_VERSION이 없어 모델 버전의 피처 세트로 찾는다 -->
+    <select id="selectModelFeatures" resultType="com.baeksuescape.assessment.dto.AssessmentRows$FeatureRow">
+        SELECT FEATURE_CODE AS featureCode, FEATURE_NAME AS featureName, ALTERNATIVE_YN AS alternativeYn
+          FROM DIM_FEATURE
+         WHERE FEATURE_SET_VERSION = NVL(#{featureSetVersion, jdbcType=VARCHAR},
+                   (SELECT FEATURE_SET_VERSION FROM MODEL_REGISTRY WHERE MODEL_VERSION = #{modelVersion, jdbcType=VARCHAR}))
+         ORDER BY DISPLAY_ORDER, FEATURE_CODE
+    </select>
 </mapper>
