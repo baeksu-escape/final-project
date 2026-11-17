@@ -89,10 +89,15 @@ if (-not (Test-Path -Path $MAVEN_M2_PATH)) {
 }
 
 $MAVEN_WRAPPER_DISTS = $null
-if ((Get-Item $MAVEN_M2_PATH).Target[0] -eq $null) {
-  $MAVEN_WRAPPER_DISTS = "$MAVEN_M2_PATH/wrapper/dists"
+$MAVEN_M2_TARGET = (Get-Item $MAVEN_M2_PATH).Target
+if ($MAVEN_M2_TARGET -is [array]) {
+  $MAVEN_M2_TARGET = $MAVEN_M2_TARGET[0]
+}
+# 일반 폴더는 링크 Target이 비어 있으므로 기본 .m2 경로를 사용한다.
+if ([string]::IsNullOrEmpty([string]$MAVEN_M2_TARGET)) {
+  $MAVEN_WRAPPER_DISTS = Join-Path $MAVEN_M2_PATH "wrapper/dists"
 } else {
-  $MAVEN_WRAPPER_DISTS = (Get-Item $MAVEN_M2_PATH).Target[0] + "/wrapper/dists"
+  $MAVEN_WRAPPER_DISTS = Join-Path ([string]$MAVEN_M2_TARGET) "wrapper/dists"
 }
 
 $MAVEN_HOME_PARENT = "$MAVEN_WRAPPER_DISTS/$distributionUrlNameMain"

@@ -1,0 +1,98 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import Button from '../../../common/components/Button.jsx'
+import Notice from '../../../common/components/Notice.jsx'
+import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
+import { getNotScorableMessage } from '../../../common/config/scoreStatus.js'
+import { fetchDiagnosisHistory } from '../../auth/api/diagnosisHistoryApi.js'
+import { DATA_INPUT_PATHS } from '../../dataInput/dataInputPaths.js'
+import { fetchCreditReport } from '../api/creditApi.js'
+import ScoreComparisonCard from '../components/ScoreComparisonCard.jsx'
+import CreditReportSummaryCard from '../components/CreditReportSummaryCard.jsx'
+import ShapFactorsCard from '../components/ShapFactorsCard.jsx'
+import '../credit.css'
+
+const LAST_SEEN_REQUEST_KEY = 'avenue.credit.lastSeenRequestId'
+
+// N-12-6 평가를 처음 볼 때 배너를 표시하고 확인한 평가 번호를 저장한다.
+// 저장소에 접근하지 못하면 배너를 표시한다.
+function isNewScore(report) {
+  if (report.gradeStatusCode !== 'SCORED') return false
+  try {
+    const lastSeen = localStorage.getItem(LAST_SEEN_REQUEST_KEY)
+    localStorage.setItem(LAST_SEEN_REQUEST_KEY, report.requestId)
+    return lastSeen !== report.requestId
+  } catch {
+    return true
+  }
+}
+
+// N-12-6 신용 리포트의 최신 평가와 산출 불가 상태를 보여 준다.
+export default function CreditReportPage() {
+  const [state, setState] = useState({ loading: true, report: null, error: null })
+  const [alertVisible, setAlertVisible] = useState(false)
+  const [scoreChange, setScoreChange] = useState(null)
+  useEffect(() => {
+    let active = true
+    fetchCreditReport().then((report) => {
+      if (!active) return
+      setAlertVisible(isNewScore(report))
+      setState({ loading: false, report, error: null })
+      fetchDiagnosisHistory()
+        .then(({ items }) => {
+          if (active) setScoreChange(items?.find((item) => item.diagnosisId === report.requestId)?.alternativeScoreChange ?? null)
+        })
+        .catch(() => {})
+    }).catch((error) => {
+      if (active) setState({ loading: false, report: null, error })
+    })
+    return () => { active = false }
+  }, [])
+
+  if (state.loading) return <p role="status">신용 리포트를 불러오는 중입니다.</p>
+  if (state.error?.status === 404 && state.error?.data?.code === 'ASSESSMENT_NOT_FOUND') {
+    return <Notice>아직 점수가 없습니다. <Link to={DATA_INPUT_PATHS.DATA_INPUT}>입력 후 점수를 산출해 주세요.</Link></Notice>
+  }
+  if (state.error) return <Notice type="warn">신용 리포트를 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.</Notice>
+
+  const { report } = state
+  const date = report.assessedAt ? new Date(report.assessedAt).toLocaleString('ko-KR') : '-'
+  const diff = scoreChange
+  const showInputLink = ['CONSENT_REQUIRED', 'ALT_DATA_EMPTY', 'INPUT_INCOMPLETE', 'STALE_INPUT'].includes(report.notScorableReasonCode)
+  return (
+    <>
+      {alertVisible && report.gradeStatusCode === 'SCORED' && (
+        <Notice type="success">
+          <span>새 점수가 나왔어요 · 대안 <span className="num">{report.alternative?.score}</span>점{diff != null && <> (지난번보다 <span className="num">{diff > 0 ? '+' : ''}{diff}</span>점)</>}</span>{' '}
+          <Button size="sm" onClick={() => setAlertVisible(false)}>닫기</Button>
+        </Notice>
+      )}
+      <div className="page-head">
+        <div>
+          <h1 className="page-head__title">신용 리포트</h1>
+          <p className="page-head__lead">{JOB_TYPE_LABELS[report.workerTypeCode] ?? report.workerTypeCode} 기준 · 마지막 산출 {date}</p>
+        </div>
+      </div>
+      {report.gradeStatusCode === 'NOT_SCORABLE' ? (
+        <Notice type="warn">
+          {getNotScorableMessage(report.notScorableReasonCode)}{' '}
+          {showInputLink && (
+            <Link to={DATA_INPUT_PATHS.DATA_INPUT}>
+              {report.notScorableReasonCode === 'ALT_DATA_EMPTY'
+                ? '입력 화면에서 해당 항목의 불러오기 결과를 확인해 주세요.'
+                : '입력 화면으로'}
+            </Link>
+          )}
+        </Notice>
+      ) : <ScoreComparisonCard report={report} />}
+      {report.gradeStatusCode === 'SCORED' && (
+        <div className="l-cols">
+          <div className="l-cols__main">
+            <ShapFactorsCard shap={report.shap} alternativeScore={report.alternative?.score} />
+          </div>
+          <CreditReportSummaryCard factors={report.shap?.factors} />
+        </div>
+      )}
+    </>
+  )
+}
