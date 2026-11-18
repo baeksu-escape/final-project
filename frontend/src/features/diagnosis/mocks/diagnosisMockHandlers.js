@@ -126,7 +126,9 @@ function handleCashFlowForecast({ query, token }) {
   const expenseChangePercent = Number(query?.get('expenseChangePercent') ?? 0)
   const loanPaymentChangePercent = Number(query?.get('loanPaymentChangePercent') ?? 0)
   // N-21-2 예측 기간은 실제 API처럼 없거나 0이면 6개월, 3·6·12만 받고 그 밖은 400이다.
-  const requestedMonths = Number(query?.get('forecastMonths') ?? 0)
+  // 빈 값(forecastMonths=)은 실제 API가 숫자로 바꾸지 못해 400을 내므로 mock도 400으로 맞춘다.
+  const rawMonths = query?.get('forecastMonths')
+  const requestedMonths = rawMonths === '' ? Number.NaN : Number(rawMonths ?? 0)
   if (requestedMonths !== 0 && ![3, 6, 12].includes(requestedMonths)) {
     const message = '예측 기간은 3·6·12개월 중 하나여야 합니다.'
     throw new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors: [{ field: 'forecastMonths', message }] })
@@ -136,13 +138,13 @@ function handleCashFlowForecast({ query, token }) {
   // N-21-2 화면 조건 — 실제 API와 같은 검사·문구. 모두 생략할 수 있다.
   const invalid = (field, message) =>
     new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors: [{ field, message }] })
-  const rawVariation = query?.get('incomeVariationPct')
-  const incomeVariationPct = rawVariation === null || rawVariation === undefined ? null : Number(rawVariation)
+  // 숫자 조건은 실제 API처럼 없거나 빈 값이면 생략(null)으로 본다. Number('')가 0이 되어 고정지출 0원으로 계산되는 것을 막는다.
+  const optionalNumber = (raw) => (raw === null || raw === undefined || raw === '' ? null : Number(raw))
+  const incomeVariationPct = optionalNumber(query?.get('incomeVariationPct'))
   if (incomeVariationPct !== null && !(Number.isInteger(incomeVariationPct) && incomeVariationPct >= 0 && incomeVariationPct <= 200)) {
     throw invalid('incomeVariationPct', '소득 변동 폭은 0~200% 정수여야 합니다.')
   }
-  const rawFixed = query?.get('fixedExpenseAmount')
-  const fixedExpenseAmount = rawFixed === null || rawFixed === undefined ? null : Number(rawFixed)
+  const fixedExpenseAmount = optionalNumber(query?.get('fixedExpenseAmount'))
   if (fixedExpenseAmount !== null && !(Number.isSafeInteger(fixedExpenseAmount) && fixedExpenseAmount >= 0)) {
     throw invalid('fixedExpenseAmount', '월 고정 지출은 0 이상의 원 단위 정수여야 합니다.')
   }
