@@ -138,8 +138,9 @@ public class IncomeVolatilityService {
     /**
      * N-21-2 화면 조건 검사 — 문구는 현금흐름 화면 mock과 같다. 모두 생략할 수 있고, 보낸 값만 범위를 본다.
      * 소득 변동 폭 0~200, 고정지출 0 이상, 납부 상태 ON_TIME·DELAYED. 납부 상태는 예상 점수(DIAG-09)에서 쓴다.
+     * 예상 점수(ExpectedScoreService)도 같은 조건을 받으므로 같은 패키지에서 함께 쓴다.
      */
-    private void validateScreenConditions(CashFlowConditionRequest cond) {
+    void validateScreenConditions(CashFlowConditionRequest cond) {
         Integer variation = cond.getIncomeVariationPct();
         if (variation != null && (variation < MIN_INCOME_VARIATION_PCT || variation > MAX_INCOME_VARIATION_PCT)) {
             throw badRequest("incomeVariationPct", "소득 변동 폭은 0~200% 정수여야 합니다.");
