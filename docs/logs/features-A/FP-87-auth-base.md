@@ -156,24 +156,19 @@
 - **설정:** 새 키 `avenue.auth.phone.mode`(기본 `LOG`, 또는 `FIXED`)와 `avenue.auth.phone.fixed-code`(기본 없음, FIXED일 때 필요). 기본값이 코드에 있어서 `application.properties`를 고치지 않아도 된다.
 - **영향을 받는 기능·팀원:** 가입 API를 부르는 곳은 휴대폰 인증 토큰을 보내야 한다. 지금은 우리 가입 화면뿐이다.
 
-### 명세 반영 제안
-(문서 담당이 API 명세에 따로 반영한다)
-- `POST /api/auth/nickname/check`
-  - 요청 `{ nickname }`, 응답 `{ available: boolean }`. 공개 경로다.
-  - 형식 오류(2~12자 아님, '탈퇴'로 시작)는 400 `INVALID_INPUT`과 `fieldErrors[{ field: 'nickname' }]`
-- `POST /api/auth/phone/send`
-  - 요청 `{ phone, purpose: 'SIGNUP' }`, 응답 `{ expiresInSeconds }`(이메일 발송과 같은 모양). 공개 경로다.
-  - 번호 형식 오류는 400 `fieldErrors[{ field: 'phone' }]`
-- `POST /api/auth/phone/verify`
-  - 요청 `{ phone, code, purpose }`, 응답 `{ verificationToken }`(이메일 확인과 같은 모양). 공개 경로다.
-  - 틀림·만료·5회 초과는 400 `INVALID_VERIFICATION_CODE`
-  - 지시서 초안은 `{ verificationId, expiresAt }` / `{ verificationId, code }`였다. 담당자(JWC)가 이메일과 같은 모양으로 정했다.
-- **가입(AUTH-06)**
-  - 요청에 `phoneVerificationToken`(필수)을 추가한다.
-  - 휴대폰은 필수다. 토큰이 없거나 다른 번호·이메일 토큰이면 400 `fieldErrors[{ field: 'phone', message: '휴대폰 인증을 완료해 주세요.' }]`
-- **이름 규칙:** 완성형 한글 2~20자(`^[가-힣]{2,20}$`). 오류는 `이름은 한글 2~20자로 입력해 주세요. (숫자·영문·기호 불가)`
-  - 지시서의 DTO `@Pattern` 대신 가입 검사(`validateSignup`)에 넣었다. 같은 400·같은 칸별 오류가 나오게 하려는 것이다.
-- **생일:** 화면은 날짜를 받지만 서버로는 지금처럼 `birthYear`(그 연도)와 `ageGroup`만 보낸다.
+### 명세 반영
+- `docs/spec/api/api_spec_a.md` 1장 AUTH-06·AUTH-13~15, 5장에 반영(11/18)
+
+### 정의서 반영 요청(범영 님)
+ID는 임시다. 정의서 반영 때 확정한다.
+
+| 임시 ID | 메서드 | 경로 | 기능 | 담당 | 상태 |
+|---|---|---|---|---|---|
+| AUTH-13 | POST | `/api/auth/nickname/check` | N-02-1 닉네임 중복 확인 | 우찬 | ✅ 구현 |
+| AUTH-14 | POST | `/api/auth/phone/send` | N-02 휴대폰 인증번호 발송(명세 v3에 세부 ID 없음) | 우찬 | ✅ 구현 |
+| AUTH-15 | POST | `/api/auth/phone/verify` | N-02 휴대폰 인증번호 확인(명세 v3에 세부 ID 없음) | 우찬 | ✅ 구현 |
+
+- AUTH-06 `POST /api/auth/signup`: 요청에 `phoneVerificationToken` 추가(필수), 이름 한글 2~20자·닉네임 한글·영문·숫자 2~7자 검사
 
 ### 확인
 - 확인함
@@ -216,10 +211,8 @@
   - 마이 페이지 이메일 변경(`EmailVerification`)은 이 순서로 재현되지 않아 고치지 않았다.
 - ⑥ 성공·안내 문구를 공통 `.field-error`와 같은 모양(`auth-message`, `--success`)으로 맞췄다. 색만 다르다.
 
-### 바뀐 API 검사 규칙(명세 반영 제안 — 문서 담당)
-- `POST /api/auth/nickname/check`와 가입(AUTH-06)의 `nickname`: 한글·영문·숫자 2~7자다.
-  - 어기면 400 `INVALID_INPUT` `fieldErrors[{ field: 'nickname', message: '닉네임은 한글·영문·숫자 2~7자로 입력해 주세요.' }]`
-- 경로와 요청·응답 필드는 바뀌지 않았다. `docs/spec/api/api_spec_a.md`에 반영이 필요하다(이번 작업에서는 고치지 않음).
+### 명세 반영
+- 닉네임 규칙(AUTH-06·AUTH-13, 한글·영문·숫자 2~7자)은 `docs/spec/api/api_spec_a.md` 1장 AUTH-06·AUTH-13~15, 5장에 반영(11/18). 경로·요청·응답 필드는 그대로다.
 
 ### 확인
 - `npm run lint` 오류 0, `npm run build` 성공
