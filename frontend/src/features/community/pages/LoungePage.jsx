@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Notice, Toast } from '../../../common/components/index.js'
 import { createComment, createPost, deletePost, fetchPost, fetchPosts, updatePost } from '../api/boardApi.js'
 import Pager from '../components/Pager.jsx'
@@ -9,11 +10,30 @@ import ReportModal from '../components/ReportModal.jsx'
 import { PAGE_SIZE } from '../config/communityCodes.js'
 import '../community.css'
 
+// FP-223 주소(?post=3, ?post=3&mode=edit, ?mode=write)에서 지금 볼 화면을 읽는다. 번호가 이상하면 목록으로 본다.
+function readView(params) {
+  const postId = Number(params.get('post'))
+  const mode = params.get('mode')
+  if (Number.isInteger(postId) && postId > 0) return { mode: mode === 'edit' ? 'edit' : 'detail', postId }
+  return { mode: mode === 'write' ? 'write' : 'list', postId: null }
+}
+
+// FP-223 화면 → 주소 쿼리. 목록은 쿼리 없이 /lounge.
+function toSearch({ mode, postId }) {
+  if (mode === 'write') return { mode: 'write' }
+  if (mode === 'edit') return { post: String(postId), mode: 'edit' }
+  if (mode === 'detail') return { post: String(postId) }
+  return {}
+}
+
 // N-06 신용 라운지 — 글 목록·검색(N-06-1), 상세·댓글(N-06-1·3), 글쓰기(N-06-2), 내 글 수정·삭제(N-06-5·6),
 // 글·댓글 신고(N-33-1)를 한 화면에서 목록 ↔ 상세 ↔ 쓰기·수정으로 바꿔 가며 보여 준다. 이름 대신 닉네임만 보인다.
 export default function LoungePage() {
-  // mode: list | detail | write | edit
-  const [view, setView] = useState({ mode: 'list', postId: null })
+  // mode: list | detail | write | edit — 주소에 남겨 브라우저 뒤로가기가 라운지 안에서 한 단계씩 돌아가게 한다(FP-223)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const view = readView(searchParams)
   const [page, setPage] = useState(1)
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -55,7 +75,13 @@ export default function LoungePage() {
     setListVersion((v) => v + 1)
     setDetailVersion((v) => v + 1)
   }
-  const toList = () => setView({ mode: 'list', postId: null })
+  // 라운지 안에서 화면을 옮긴다. 새 기록에는 inLounge 표시를 남기고, 덮어쓸 때는 지금 기록의 표시를 그대로 둔다.
+  const setView = (next, replace = false) =>
+    setSearchParams(toSearch(next), { replace, state: replace ? location.state : { inLounge: true } })
+  // [목록으로]·[취소]·저장·삭제 뒤 — 라운지 안에서 왔으면 실제 뒤로가기(지나온 화면이 앞으로 가기 쪽에 남는다),
+  // 주소로 바로 들어왔으면 지금 기록을 fallback 화면으로 덮어쓴다.
+  const goBack = (fallback) => (location.state?.inLounge ? navigate(-1) : setView(fallback, true))
+  const toList = () => goBack({ mode: 'list', postId: null })
   const openPost = (id) => setView({ mode: 'detail', postId: id })
 
   const handleSearch = (event) => {
@@ -64,12 +90,12 @@ export default function LoungePage() {
     setKeyword(keywordInput.trim())
   }
 
-  // N-06-2 글쓰기 → 쓴 글 상세로
+  // N-06-2 글쓰기 → 쓴 글 상세로 (글쓰기 기록을 덮어써 뒤로가기로 빈 글쓰기 화면에 돌아가지 않는다)
   const handleCreate = async (values) => {
     const { postId: newId } = await createPost(values)
     setToast('글을 올렸습니다.')
     setListVersion((v) => v + 1)
-    openPost(newId)
+    setView({ mode: 'detail', postId: newId }, true)
   }
 
   // N-06-5 내 글 수정 → 상세로
@@ -77,7 +103,7 @@ export default function LoungePage() {
     await updatePost(postId, values)
     setToast('글을 고쳤습니다.')
     reloadAll()
-    setView({ mode: 'detail', postId })
+    goBack({ mode: 'detail', postId })
   }
 
   // N-06-6 내 글 삭제 → 목록으로
@@ -112,8 +138,9 @@ export default function LoungePage() {
   let body
   if (view.mode === 'write') {
     body = <PostForm onSubmit={handleCreate} onCancel={toList} />
-  } else if (view.mode === 'edit' && current.post) {
-    body = <PostForm initial={current.post} onSubmit={handleUpdate} onCancel={() => setView({ mode: 'detail', postId })} />
+  } else if (view.mode === 'edit' && current.post?.mine && !current.post.hidden) {
+    // 주소를 직접 쳐서 남의 글·숨김 글의 수정 화면으로 오면 아래 상세로 보여 준다(저장은 서버도 막는다)
+    body = <PostForm initial={current.post} onSubmit={handleUpdate} onCancel={() => goBack({ mode: 'detail', postId })} />
   } else if (view.mode !== 'list') {
     body = current.error ? (
       <Card>
