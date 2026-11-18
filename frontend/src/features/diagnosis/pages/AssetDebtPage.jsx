@@ -13,6 +13,7 @@ const FIELDS = [
   { key: 'annualIncomeAmount', label: '연소득' },
   { key: 'totalDebtAmount', label: '총부채' },
 ]
+const PREVIEW_DELAY_MS = 300
 
 // N-16-1·N-16-2·N-16-3 회원의 시연 기준값으로 건전성을 즉시 비교한다. 입력 변경은 저장하지 않는다.
 export default function AssetDebtPage() {
@@ -20,6 +21,7 @@ export default function AssetDebtPage() {
   const [revision, setRevision] = useState(0)
   const [load, setLoad] = useState({ key: null, data: null, error: '' })
   const [draft, setDraft] = useState({ key: null, values: null })
+  const [preview, setPreview] = useState({ key: null, signature: '', result: null, error: '' })
   const key = JSON.stringify([user?.userId, user?.jobType, revision])
 
   // N-16-1 회원·직군·재조회마다 범위를 구분해 이전 회원의 값과 늦은 응답을 표시하지 않는다.
@@ -32,20 +34,35 @@ export default function AssetDebtPage() {
     return () => { active = false }
   }, [key, user?.userId, user?.jobType])
 
+  const baseline = load.key === key && !load.error ? load.data : null
+  const values = !baseline ? null : draft.key === key ? draft.values : Object.fromEntries(FIELDS.map(({ key: field }) => [field, baseline[field]]))
+  const invalid = Boolean(values) && FIELDS.some(({ key: field }) => values[field] != null && (!Number.isSafeInteger(values[field]) || values[field] < 0))
+  const valuesSignature = JSON.stringify(values)
+
+  // N-16-3 입력이 바뀌면 약 300ms 뒤 건전성 계산 API를 부르고, 그사이 값이 또 바뀌면 늦게 온 이전 응답은 버린다.
+  useEffect(() => {
+    if (!baseline || invalid) return undefined
+    let active = true
+    const timer = setTimeout(() => {
+      calculateAssetDebtPreview(baseline, JSON.parse(valuesSignature)).then(
+        (result) => { if (active) setPreview({ key, signature: valuesSignature, result, error: '' }) },
+        (error) => { if (active) setPreview({ key, signature: valuesSignature, result: null, error: error.message }) },
+      )
+    }, PREVIEW_DELAY_MS)
+    return () => { active = false; clearTimeout(timer) }
+  }, [baseline, invalid, key, valuesSignature])
+
   if (load.key !== key) return <p role="status">자산·부채 자료를 불러오는 중입니다.</p>
   if (load.error) return <Notice type="warn">{load.error} <Button onClick={() => setRevision((value) => value + 1)}>다시 시도</Button></Notice>
-  const baseline = load.data
-  const values = draft.key === key ? draft.values : Object.fromEntries(FIELDS.map(({ key: field }) => [field, baseline[field]]))
   const errors = Object.fromEntries(FIELDS.map(({ key: field }) => [field,
     values[field] == null ? ''
       : !Number.isSafeInteger(values[field]) || values[field] < 0 ? '0원 이상의 안전한 원 단위 정수로 입력해 주세요.' : '',
   ]))
-  const invalid = FIELDS.some(({ key: field }) => values[field] != null && (!Number.isSafeInteger(values[field]) || values[field] < 0))
-  let result = null
-  let calculationError = ''
-  if (!invalid) {
-    try { result = calculateAssetDebtPreview(baseline, values) } catch (error) { calculationError = error.message }
-  }
+  // 다시 계산하는 동안에는 직전 결과를 그대로 두고, 현재 입력과 맞는 응답이 오면 안내 문구를 지운다.
+  const previewInScope = !invalid && preview.key === key
+  const result = previewInScope ? preview.result : null
+  const calculationError = previewInScope ? preview.error : ''
+  const calculating = !invalid && !(previewInScope && preview.signature === valuesSignature)
   const workerLabel = JOB_TYPE_LABELS[user?.jobType] ?? '내 직군'
   return <div className="ad-page">
     <header className="ad-heading"><h1>자산·부채 건전성</h1><p>{workerLabel} 기준으로 부채 부담을 살펴봅니다. 숫자를 바꾸면 바로 다시 계산하며 저장된 값에는 반영되지 않습니다.</p></header>
@@ -59,7 +76,7 @@ export default function AssetDebtPage() {
         <Notice>상환액 변화와 같은 직군 평균은 시연 가정입니다. 실제 신용평가·대출 심사 결과가 아닙니다.</Notice>
         {Array.isArray(result?.assumptions) && result.assumptions.length > 0 && <ul className="ad-hint">{result.assumptions.map((assumption, index) => <li key={index}>{assumption}</li>)}</ul>}
       </Card>
-      <div>{invalid && <Notice type="warn">금액 형식을 확인해 주세요. 잘못된 입력으로 계산하지 않습니다.</Notice>}{calculationError && <Notice type="warn">{calculationError}</Notice>}<AssetDebtRatios result={result} /></div>
+      <div>{invalid && <Notice type="warn">금액 형식을 확인해 주세요. 잘못된 입력으로 계산하지 않습니다.</Notice>}{calculationError && <Notice type="warn">{calculationError}</Notice>}{calculating && <p className="ad-hint" role="status">계산하는 중입니다.</p>}<AssetDebtRatios result={result} /></div>
     </div>
     <div className="ad-bottom-grid"><AssetDebtPeerComparison values={values} peer={baseline.peer} workerLabel={workerLabel} /><AssetDebtLoans loans={baseline.loans} /></div>
   </div>

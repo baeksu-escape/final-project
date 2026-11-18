@@ -129,6 +129,10 @@ export default function IncomeVolatilitySection({ data }) {
         ) : deficits.length === 0 ? (
           <p>최근 12개월 중 월 고정지출보다 소득이 적은 달이 없습니다.</p>
         ) : (
+          <>
+          {response.nearestDeficit && (
+            <p>가장 가까운 부족 달: {formatMonth(response.nearestDeficit.baseMonth)}({response.nearestDeficit.monthsUntil}개월 뒤) · 미리 모아 둘 금액 {formatWon(response.nearestDeficit.reserveAmount)}</p>
+          )}
           <ul className="iv-deficits__list">
             {deficits.map((item) => (
               <li key={item.baseMonth}>
@@ -139,6 +143,7 @@ export default function IncomeVolatilitySection({ data }) {
               </li>
             ))}
           </ul>
+          </>
         )}
       </Card>
     </section>

@@ -18,6 +18,10 @@ export async function getIncomeVolatility({ userId }) {
       gapAmount: data.peakOffPeakGap,
     },
     fixedExpenseRatio: data.offPeakIncome === 0 ? null : data.fixedExpenseToLowestIncomeRatio,
+    // N-22-5 가장 가까운 비수기 요약 — 경고가 있고 달이 정해졌을 때만 값을 만들고, 아니면 null이다.
+    nearestDeficit: data.hasDeficitWarning && data.nearestDeficitMonth
+      ? { baseMonth: data.nearestDeficitMonth, monthsUntil: data.monthsUntilNearest, reserveAmount: data.recommendedReserveAmount }
+      : null,
     deficits: data.deficitMonths.map((item) => ({
       baseMonth: item.yearMonth,
       incomeAmount: item.income,

@@ -26,6 +26,8 @@ export function adaptAssetDebtData(raw) {
 
 // N-21 현금흐름 월별 기준 자료는 정확히 12개월 연속이어야 하며 NULL 소득은 그대로 둔다.
 export function adaptCashFlowData(raw) {
+  // TODO(광희 요청 11/19): 소득이 12개월보다 적은 회원(자영업자·프리랜서)의 months가 짧을 때 화면이 예측을 어떻게 처리할지 정해 달라고 요청(임의 0 채우기 금지).
+  if (raw && Array.isArray(raw.months) && raw.months.length < 12) throw new Error('저장된 소득이 12개월보다 적어 현금흐름을 예측할 수 없습니다.')
   if (!raw || !Array.isArray(raw.months) || raw.months.length !== 12
     || !['fixedExpenseAmount','otherExpenseAmount','monthlyPaymentAmount','currentScore'].every((key) => Object.hasOwn(raw, key))) throw new Error('현금흐름 기준 자료는 12개월이 필요합니다.')
   const months = raw.months.map((month) => {
@@ -38,6 +40,21 @@ export function adaptCashFlowData(raw) {
   return { months, fixedExpenseAmount: raw.fixedExpenseAmount ?? null, otherExpenseAmount: raw.otherExpenseAmount ?? null,
     monthlyPaymentAmount: raw.monthlyPaymentAmount ?? null, currentScore: raw.currentScore ?? null,
     assumptions: Array.isArray(raw.assumptions) && raw.assumptions.every((value) => typeof value === 'string') ? raw.assumptions : [] }
+}
+
+// N-21-5 DIAG-08-1 응답을 화면 결과 모양으로 바꾼다(점수 필드는 호출하는 쪽에서 붙인다).
+export function adaptCashFlowForecast(raw) {
+  const rows = raw?.monthlyForecasts
+  if (!Array.isArray(rows) || rows.length === 0 || typeof raw.worstForecastMonth !== 'string'
+    || !Number.isSafeInteger(raw.worstNetCashFlow) || !Number.isSafeInteger(raw.totalAccumulatedSurplus)) throw new Error('현금흐름 전망 응답 형식이 올바르지 않습니다.')
+  const forecastMonths = rows.map((row) => {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(row.forecastYearMonth) || !Number.isSafeInteger(row.forecastIncome) || !Number.isSafeInteger(row.netCashFlow)) throw new Error('월별 전망 값이 올바르지 않습니다.')
+    return { baseMonth: row.forecastYearMonth, incomeAmount: row.forecastIncome, netAmount: row.netCashFlow }
+  })
+  const first = rows[0]
+  return { forecastMonths, monthlyExpenseAmount: first.forecastExpense + first.forecastLoanPayment,
+    cumulativeSurplusAmount: raw.totalAccumulatedSurplus,
+    tightestMonth: { baseMonth: raw.worstForecastMonth, netAmount: raw.worstNetCashFlow }, source: 'diag-08-1' }
 }
 
 export function validateForecastConditions(conditions) {
