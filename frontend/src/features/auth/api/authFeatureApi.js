@@ -3,7 +3,7 @@ import { apiPost } from '../../../common/api/client.js'
 import '../mocks/authMockHandlers.js'
 
 // N-01~N-03 인증 화면 API 경로. 로그인·내 정보는 공통 common/api/authApi.js를 쓴다.
-// TODO(D-20) api_spec.md가 정해지면 경로와 요청·응답 필드를 맞춘다.
+// TODO(D-20) docs/spec/api/api_spec_a.md가 정해지면 경로와 요청·응답 필드를 맞춘다.
 export const AUTH_FEATURE_API = Object.freeze({
   SIGNUP: '/api/auth/signup',
   EMAIL_SEND: '/api/auth/email/send',
