@@ -215,7 +215,7 @@ class IncomeVolatilityCalculatorTest {
     }
 
     @Test
-    @DisplayName("N-22-3~5 시드 회원 2번: 응답의 모든 지표가 api_spec.md 예시와 같다")
+    @DisplayName("N-22-3~5 시드 회원 2번: 응답의 모든 지표가 api_spec_c.md 예시와 같다")
     void seedMember2_allIndicatorsPinned() {
         IncomeVolatilityResponse r = IncomeVolatilityCalculator.calculateVolatility(seedMember2(), 1315514L);
 

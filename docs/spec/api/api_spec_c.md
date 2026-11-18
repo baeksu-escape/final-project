@@ -1,11 +1,12 @@
-# API 명세
+# API 명세서 — C팀 (재무 진단·시뮬레이터 등)
 
-> 팀이 합의한 API 요청·응답 형식을 기능(N-ID)별로 적는다. 아래 양식은 FP-203을 처음 쓰면서 제안한 것이다. 바꿔도 된다.
+> C팀 API의 요청·응답 상세를 기능(N-ID)별로 적는다. 관리: C팀(광희·동주).
 >
-> - 성공 응답은 본문을 감싸지 않고 그대로 보낸다. **오류 응답은 백엔드 공통 형식 `{ "code", "message", "fieldErrors": [{ "field", "message" }] }`이다**(`global/exception`, `backend/README.md`). decisions.md D-20은 아직 "미정"으로 적혀 있어 문서 담당 확인이 필요하다.
-> - 오류 코드: 입력 오류 `400 INVALID_INPUT`(어느 칸인지 `fieldErrors`에 담는다), 자료 없음 `404 NOT_FOUND`.
-> - 금액은 원 단위 정수, 비율은 % 단위 소수(소수 둘째 자리), 기준월은 `"YYYY-MM"` 문자열이다.
-> - Java DTO의 `boolean isXxx` 필드는 JSON에서 **`is`가 빠진 `xxx`**로 나간다(Lombok·Jackson 규칙). 예: `isHighVolatility` → `highVolatility`.
+> - 🆕 11/18 `docs/spec/api_spec.md`에서 이 파일로 옮겼다(내용은 그대로). 원래 머리말의 작성 규칙(오류 형식, 금액·비율·기준월, `isXxx` 필드 이름)은 세 팀이 함께 쓰도록 [README](README.md) 「명세서 작성 규칙」으로 옮겼다.
+> - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
+>
+> **최근 변경**
+> - 🆕 11/18 (광희, FP-170) SIM-01 `credit-care/base`·DIAG-09 `cash-flow/expected-score` 추가, SIM-02 Spring 구현(출발 평가 = 최근 SCORED, 404 `ASSESSMENT_NOT_FOUND`).
 
 ---
 
@@ -18,7 +19,7 @@
 | POST | `/api/diagnosis/income-volatility` | DIAG-07 · N-22 계산만 (값을 본문으로 받음) | 요청 본문 |
 | POST | `/api/diagnosis/cash-flow/forecast` | DIAG-08 · N-21 계산만 (값을 본문으로 받음) | 요청 본문 |
 
-- API ID(DIAG-xx)는 B팀 API 정의서의 번호다.
+- API ID(DIAG-xx)는 [API 정의서](api_definition.md)의 번호다.
 
 - **화면은 GET을 쓴다.** POST는 FP-183에서 만든 계산 전용 경로로, 지우지 않고 남겨 둔다.
 - **GET은 로그인한 회원 본인 것만 조회한다.** 회원은 `Authorization: Bearer <토큰>`에서 찾고, 주소로 회원 번호를 받지 않는다(11/17 변경, 이전의 `?userId=` 쿼리는 없어졌다. 보내도 무시한다).
@@ -207,7 +208,7 @@
   - 회원 번호는 넘기지 않는다. 공통 `client.js`가 로그인 토큰을 붙인다.
 - mock 모드(`VITE_USE_MOCK`)에서는 로그인한 mock 회원이 누구든 위 예시와 같은 회원 2번 값을 돌려준다(로그인하지 않았으면 401). 전망 mock은 쿼리 조건을 반영해 계산한다.
 
-### POST `/api/diagnosis/cash-flow/expected-score` (DIAG-09, N-21-8, FP-170)
+### POST `/api/diagnosis/cash-flow/expected-score` (DIAG-09, N-21-8, FP-170) 🆕 11/18
 
 전망 조건 중 소득·지출 변화를 저장된 입력에 반영해 예상 대안 점수를 FastAPI ML-03으로 **다시 구한다. 저장하지 않는다**(O-6).
 
@@ -400,7 +401,7 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 
 프론트: `features/simulation/api/simulationApi.js`의 `getScoreBandOfferInfo(score)`. mock은 시드와 같은 3개 점수대 값을 돌려준다.
 
-## N-18-1·10 시뮬레이터 입력 10개의 내 실제 값 (SIM-01, FP-170, 담당 광희)
+## N-18-1·10 시뮬레이터 입력 10개의 내 실제 값 (SIM-01, FP-170, 담당 광희) 🆕 11/18
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
@@ -432,7 +433,7 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 
 ## N-18-5·8 시뮬레이터 점수 재계산 (SIM-02, 담당 광희) — FP-170 Spring 구현
 
-> Spring이 B조 ML-04(`POST /v1/assessments/simulate`, B팀 명세서 4-4)를 불러 이 모양으로 바꿔 돌려준다. 출발 평가는 위 SIM-01과 같다(최근 SCORED). ML-04에는 그 평가의 requestId·**저장된** MODEL_VERSION·FEATURE_SET_VERSION·피처값을 보내고, 요청 requestId는 매번 새 UUID다. 시간 제한은 ML-03과 같다(연결 1초·응답 3초).
+> 🆕 11/18 Spring이 B조 ML-04(`POST /v1/assessments/simulate`, [B팀 명세서](api_spec_b.md) 4-4)를 불러 이 모양으로 바꿔 돌려준다. 출발 평가는 위 SIM-01과 같다(최근 SCORED). ML-04에는 그 평가의 requestId·**저장된** MODEL_VERSION·FEATURE_SET_VERSION·피처값을 보내고, 요청 requestId는 매번 새 UUID다. 시간 제한은 ML-03과 같다(연결 1초·응답 3초).
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|

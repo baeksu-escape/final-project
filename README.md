@@ -5,7 +5,7 @@
 |------|-----------|------|
 | `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` | AI (자동) | AI 공통 규칙 |
 | `docs/ai/` | AI (작업 전) | 기능 명세, 확정·미정 사항, 웹 채팅용 붙여넣기 |
-| `docs/spec/` | 사람·AI | 팀이 합의한 API 명세, 피처 정의서, DB 스크립트 |
+| `docs/spec/` | 사람·AI | 팀이 합의한 API 명세([docs/spec/api/](docs/spec/api/README.md): 정의서·팀별 명세서), 피처 정의서, DB 스크립트 |
 | `docs/logs/` | 사람·AI | 작업 로그와 검수 |
 | `docs/guide/` | 사람 | 바이브 코딩 팀 가이드 (PDF) |
 
