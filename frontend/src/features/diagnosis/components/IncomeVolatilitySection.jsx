@@ -105,6 +105,7 @@ export default function IncomeVolatilitySection({ data }) {
         <Card title="최근 12개월 소득 지표" className="iv-details">
           <dl className="iv-details__grid">
             <div><dt>소득 중앙값</dt><dd>{formatWon(stats.medianAmount)}</dd></div>
+            <div><dt>소득 표준편차</dt><dd>{formatWon(stats.standardDeviation)}</dd></div>
             <div><dt>소득 0원인 달</dt><dd>{stats.zeroIncomeMonthCount}개월</dd></div>
             <div>
               <dt>최근 3개월 월평균</dt>

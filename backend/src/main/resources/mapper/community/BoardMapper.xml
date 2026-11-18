@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-191 N-06 신용 라운지 글·댓글·글 기록 (BOARD_POST, BOARD_COMMENT, BOARD_POST_LOG, DDL v0.3.2) -->
+<mapper namespace="com.baeksuescape.community.mapper.BoardMapper">
+
+    <!-- 작성자 표시: 탈퇴 회원(또는 회원 번호 없음)은 '탈퇴한 회원'. 닉네임 칸의 '탈퇴123' 값을 그대로 내보내지 않는다(11/12 결정). -->
+    <sql id="authorName">
+        CASE WHEN U.USER_ID IS NULL OR U.ACCOUNT_STATUS_CODE = 'WITHDRAWN' THEN '탈퇴한 회원' ELSE U.NICKNAME END
+    </sql>
+
+    <!-- 목록 검색: 보이는 글의 제목·내용에서만 찾는다(숨김 글 내용이 검색으로 드러나지 않게). -->
+    <sql id="postListWhere">
+        WHERE P.STATUS_CODE &lt;&gt; 'DELETED'
+        <if test="likePattern != null">
+            AND P.STATUS_CODE = 'VISIBLE'
+            AND (P.TITLE LIKE #{likePattern} ESCAPE '\' OR P.CONTENT LIKE #{likePattern} ESCAPE '\')
+        </if>
+    </sql>
+
+    <!-- N-06-1 목록 한 쪽. 댓글 수는 삭제되지 않은 댓글만 센다. -->
+    <select id="selectPosts" resultType="com.baeksuescape.community.dto.PostRow">
+        SELECT P.POST_ID AS postId, P.USER_ID AS userId, P.TITLE AS title, P.STATUS_CODE AS statusCode,
+               <include refid="authorName"/> AS nickname,
+               (SELECT COUNT(*) FROM BOARD_COMMENT C WHERE C.POST_ID = P.POST_ID AND C.STATUS_CODE &lt;&gt; 'DELETED') AS commentCount,
+               P.CREATED_AT AS createdAt, P.UPDATED_AT AS updatedAt
+          FROM BOARD_POST P
+          LEFT JOIN APP_USER U ON U.USER_ID = P.USER_ID
+        <include refid="postListWhere"/>
+         ORDER BY P.CREATED_AT DESC, P.POST_ID DESC
+        OFFSET #{offset} ROWS FETCH NEXT #{limit} ROWS ONLY
+    </select>
+
+    <select id="countPosts" resultType="int">
+        SELECT COUNT(*)
+          FROM BOARD_POST P
+        <include refid="postListWhere"/>
+    </select>
+
+    <select id="selectPost" resultType="com.baeksuescape.community.dto.PostRow">
+        SELECT P.POST_ID AS postId, P.USER_ID AS userId, P.TITLE AS title, P.CONTENT AS content, P.STATUS_CODE AS statusCode,
+               <include refid="authorName"/> AS nickname,
+               P.CREATED_AT AS createdAt, P.UPDATED_AT AS updatedAt
+          FROM BOARD_POST P
+          LEFT JOIN APP_USER U ON U.USER_ID = P.USER_ID
+         WHERE P.POST_ID = #{postId}
+    </select>
+
+    <!-- N-06-2 글 저장 (상태 VISIBLE) -->
+    <insert id="insertPost" useGeneratedKeys="true" keyProperty="postId" keyColumn="POST_ID">
+        INSERT INTO BOARD_POST (USER_ID, TITLE, CONTENT, STATUS_CODE, CREATED_AT)
+        VALUES (#{userId}, #{title}, #{content}, 'VISIBLE', #{createdAt})
+    </insert>
+
+    <!-- 글 수정: 보이는 글만 (숨겨진 글은 수정 불가, C조 11/12 확정) -->
+    <update id="updatePostContent">
+        UPDATE BOARD_POST
+           SET TITLE = #{title}, CONTENT = #{content}, UPDATED_AT = #{now}
+         WHERE POST_ID = #{postId}
+           AND STATUS_CODE = 'VISIBLE'
+    </update>
+
+    <update id="updatePostStatus">
+        UPDATE BOARD_POST
+           SET STATUS_CODE = #{toStatus}, UPDATED_AT = #{now}
+         WHERE POST_ID = #{postId}
+           AND STATUS_CODE = #{fromStatus}
+    </update>
+
+    <!-- 허용되는 동작·상태 조합은 DDL CK_BPL_TRANSITION이 다시 검사한다. -->
+    <insert id="insertPostLog">
+        INSERT INTO BOARD_POST_LOG (POST_ID, ACTION_CODE, ACTOR_TYPE_CODE, ACTOR_USER_ID, BEFORE_STATUS_CODE, AFTER_STATUS_CODE,
+                                    REPORT_ID, CREATED_AT)
+        VALUES (#{postId}, #{actionCode}, #{actorTypeCode}, #{actorUserId,jdbcType=NUMERIC}, #{beforeStatus,jdbcType=VARCHAR},
+                #{afterStatus}, #{reportId,jdbcType=NUMERIC}, #{now})
+    </insert>
+
+    <select id="selectComments" resultType="com.baeksuescape.community.dto.CommentRow">
+        SELECT C.COMMENT_ID AS commentId, C.POST_ID AS postId, C.USER_ID AS userId, C.CONTENT AS content, C.STATUS_CODE AS statusCode,
+               <include refid="authorName"/> AS nickname, C.CREATED_AT AS createdAt
+          FROM BOARD_COMMENT C
+          LEFT JOIN APP_USER U ON U.USER_ID = C.USER_ID
+         WHERE C.POST_ID = #{postId}
+           AND C.STATUS_CODE &lt;&gt; 'DELETED'
+         ORDER BY C.CREATED_AT, C.COMMENT_ID
+    </select>
+
+    <select id="selectComment" resultType="com.baeksuescape.community.dto.CommentRow">
+        SELECT C.COMMENT_ID AS commentId, C.POST_ID AS postId, C.USER_ID AS userId, C.CONTENT AS content, C.STATUS_CODE AS statusCode,
+               <include refid="authorName"/> AS nickname, C.CREATED_AT AS createdAt
+          FROM BOARD_COMMENT C
+          LEFT JOIN APP_USER U ON U.USER_ID = C.USER_ID
+         WHERE C.COMMENT_ID = #{commentId}
+    </select>
+
+    <!-- N-06-3 댓글 저장 (상태 VISIBLE) -->
+    <insert id="insertComment" useGeneratedKeys="true" keyProperty="commentId" keyColumn="COMMENT_ID">
+        INSERT INTO BOARD_COMMENT (POST_ID, USER_ID, CONTENT, STATUS_CODE, CREATED_AT)
+        VALUES (#{postId}, #{userId}, #{content}, 'VISIBLE', #{createdAt})
+    </insert>
+
+    <update id="updateCommentStatus">
+        UPDATE BOARD_COMMENT
+           SET STATUS_CODE = #{toStatus}, UPDATED_AT = #{now}
+         WHERE COMMENT_ID = #{commentId}
+           AND STATUS_CODE = #{fromStatus}
+    </update>
+</mapper>

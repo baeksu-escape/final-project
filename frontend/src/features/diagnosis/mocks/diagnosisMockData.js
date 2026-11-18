@@ -58,6 +58,7 @@ export const SAMPLE_MONTHLY_INCOMES = Object.freeze([
 export const SAMPLE_CASH_FLOW_BASE = Object.freeze({
   baseMonthlyIncome: 2099498,
   monthlyTotalExpense: 1315514,
+  monthlyFixedExpense: 1315514, // 저장된 고정지출(FIXED 합계). 회원 2번은 지출이 모두 고정지출이다
   monthlyLoanPayment: 0,
 })
 
@@ -66,6 +67,7 @@ export const SAMPLE_INCOME_VOLATILITY = Object.freeze({
   meanIncome: 2099498,
   medianIncome: 1903317,
   incomeCv: 33.68,
+  standardDeviation: 707118.75,
   highVolatility: true,
   fixedExpenseToLowestIncomeRatio: 99.09,
   zeroIncomeMonthsCount: 0,

@@ -39,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * FP-203 저장 데이터 기반 GET API의 경로·쿼리·JSON 필드 이름과 로그인 회원 확인(토큰 없으면 401, 주소의 userId 무시)을 보는 웹 계층 테스트.
- * 문서(api_spec.md)에 적은 필드 이름이 실제 응답과 같은지 여기서 고정한다.
+ * 문서(docs/spec/api/api_spec_c.md)에 적은 필드 이름이 실제 응답과 같은지 여기서 고정한다.
  * 보안·공통 예외 처리기까지 실제와 같게 붙이려고 다른 팀 API 테스트처럼 test 프로필(H2)로 전체 컨텍스트를 띄운다.
  */
 @SpringBootTest
@@ -77,6 +77,7 @@ class IncomeVolatilityControllerTest {
                 .meanIncome(2099498L)
                 .medianIncome(1903317L)
                 .incomeCv(33.68)
+                .standardDeviation(707118.75)
                 .isHighVolatility(true)
                 .peakMonth("2025-11")
                 .hasDeficitWarning(false)
@@ -89,6 +90,7 @@ class IncomeVolatilityControllerTest {
                 .andExpect(jsonPath("$.meanIncome").value(2099498))
                 .andExpect(jsonPath("$.medianIncome").value(1903317))
                 .andExpect(jsonPath("$.highVolatility").value(true))
+                .andExpect(jsonPath("$.standardDeviation").value(707118.75))
                 .andExpect(jsonPath("$.isHighVolatility").doesNotExist())
                 .andExpect(jsonPath("$.hasDeficitWarning").value(false))
                 .andExpect(jsonPath("$.peakMonth").value("2025-11"));
@@ -155,6 +157,11 @@ class IncomeVolatilityControllerTest {
                         .isDeficit(true)
                         .build()))
                 .worstForecastMonth("2026-09")
+                .months(List.of(CashFlowForecastResponse.PastMonthItem.builder()
+                        .baseMonth("2026-08")
+                        .incomeAmount(2061303L)
+                        .expenseAmount(1315514L)
+                        .build()))
                 .build();
         when(incomeVolatilityService.forecastSavedCashFlow(eq(2L), any())).thenReturn(response);
 
@@ -165,11 +172,36 @@ class IncomeVolatilityControllerTest {
                 .andExpect(jsonPath("$.monthlyForecasts[0].forecastYearMonth").value("2026-09"))
                 .andExpect(jsonPath("$.monthlyForecasts[0].deficit").value(true))
                 .andExpect(jsonPath("$.monthlyForecasts[0].isDeficit").doesNotExist())
-                .andExpect(jsonPath("$.worstForecastMonth").value("2026-09"));
+                .andExpect(jsonPath("$.worstForecastMonth").value("2026-09"))
+                // N-21-9 과거 월 실적 — 화면 adapter와 맞춘 이름
+                .andExpect(jsonPath("$.months[0].baseMonth").value("2026-08"))
+                .andExpect(jsonPath("$.months[0].incomeAmount").value(2061303))
+                .andExpect(jsonPath("$.months[0].expenseAmount").value(1315514));
 
         ArgumentCaptor<CashFlowConditionRequest> captor = ArgumentCaptor.forClass(CashFlowConditionRequest.class);
         verify(incomeVolatilityService).forecastSavedCashFlow(eq(2L), captor.capture());
         assertEquals(-10.0, captor.getValue().getIncomeChangePercent());
         assertEquals(3, captor.getValue().getForecastMonths());
+        assertEquals(null, captor.getValue().getIncomeVariationPct(), "보내지 않은 화면 조건은 null(생략)");
+    }
+
+    @Test
+    @DisplayName("GET /api/diagnosis/cash-flow/forecast: N-21-2 화면 조건 쿼리(incomeVariationPct·fixedExpenseAmount·paymentStatus)가 전달된다")
+    void getCashFlowForecast_screenConditionQueries() throws Exception {
+        when(incomeVolatilityService.forecastSavedCashFlow(eq(2L), any()))
+                .thenReturn(CashFlowForecastResponse.builder().monthlyForecasts(List.of()).build());
+
+        mockMvc.perform(loggedIn(get("/api/diagnosis/cash-flow/forecast")
+                        .param("forecastMonths", "6")
+                        .param("incomeVariationPct", "100")
+                        .param("fixedExpenseAmount", "1000000")
+                        .param("paymentStatus", "ON_TIME"), 2L))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<CashFlowConditionRequest> captor = ArgumentCaptor.forClass(CashFlowConditionRequest.class);
+        verify(incomeVolatilityService).forecastSavedCashFlow(eq(2L), captor.capture());
+        assertEquals(100, captor.getValue().getIncomeVariationPct());
+        assertEquals(1000000L, captor.getValue().getFixedExpenseAmount());
+        assertEquals("ON_TIME", captor.getValue().getPaymentStatus());
     }
 }

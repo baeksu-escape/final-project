@@ -33,6 +33,8 @@ import MarketPage from '../../features/market/pages/MarketPage.jsx'
 import AssetDebtPage from '../../features/diagnosis/pages/AssetDebtPage.jsx'
 import CashFlowPage from '../../features/diagnosis/pages/CashFlowPage.jsx'
 import ScenarioPage from '../../features/scenario/pages/ScenarioPage.jsx'
+import AdminReportsPage from '../../features/admin/pages/AdminReportsPage.jsx'
+import LoungePage from '../../features/community/pages/LoungePage.jsx'
 
 // 앱 전체 라우트. 다른 팀은 자기 화면의 element 한 줄만 바꾼다(가드·경로 구조는 그대로 둔다).
 export default function AppRoutes() {
@@ -76,7 +78,7 @@ export default function AppRoutes() {
             <Route path={PATHS.LOANS} element={<LoanProductsPage />} />
             <Route path={PATHS.LOAN_DETAIL} element={<LoanProductDetailPage />} />
             <Route path={PATHS.COMPARISON} element={<PlaceholderPage title="비교 분석" nId="N-13·N-26" />} />
-            <Route path={PATHS.LOUNGE} element={<PlaceholderPage title="신용 라운지" nId="N-06" />} />
+            <Route path={PATHS.LOUNGE} element={<LoungePage />} />
             <Route path={DATA_INPUT_PATHS.DATA_INPUT} element={<DataInputPage />} />
           </Route>
 
@@ -90,7 +92,7 @@ export default function AppRoutes() {
             <Route path={PATHS.ADMIN_MODEL} element={<PlaceholderPage title="모형 성능 비교" nId="N-25" />} />
             <Route path={PATHS.ADMIN_STATS} element={<PlaceholderPage title="직군·연령별 통계" nId="N-26" />} />
             <Route path={PATHS.ADMIN_ACCOUNTS} element={<AdminAccountsPage />} />
-            <Route path={PATHS.ADMIN_REPORTS} element={<PlaceholderPage title="신고 접수" nId="N-34" />} />
+            <Route path={PATHS.ADMIN_REPORTS} element={<AdminReportsPage />} />
             <Route path={PATHS.ADMIN_AUDIT} element={<AdminAuditLogsPage />} />
             {/* FP-80 관리자 비밀번호 변경 — 탭이 아니라 헤더의 [비밀번호 변경]으로 들어온다 */}
             <Route path={ADMIN_PATHS.PASSWORD} element={<AdminPasswordPage />} />

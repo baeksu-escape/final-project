@@ -34,6 +34,8 @@ SELECT USER FROM DUAL;
 - `dummy_db/run_all.sql`은 테이블을 삭제한 뒤 다시 만든다. **기존 데이터가 삭제되므로 버려도 되는 별도 스키마에서만 실행한다.**
 - 모델 학습 CSV는 Oracle에 넣지 않는다. 위치와 사용법은 [학습 데이터 안내](../../../fastapi_server/data/README.md)를 참고한다.
 - 실제 모델 전환·복구는 [전환 SQL](activate_model_lgbm_base_0_1.sql)과 [되돌리기 SQL](rollback_model_to_dev_dummy.sql)을 사용하며, [FastAPI 안내](../../../fastapi_server/README.md)의 공용 DB 전환 절차를 따른다. 전환 전 `/v1/health`에서 `modelLoaded: true`를 확인하고 DB 담당자와 순서를 맞춘다.
+- 기존 DB의 게시글 본문 열 변경(`BOARD_POST.CONTENT` CLOB → `VARCHAR2(1300 CHAR)`, DDL C9)은 [게시글 본문 변경 SQL](alter_board_post_content_varchar2.sql)을 사용한다. 글 데이터는 유지하고, 1300자를 넘는 글이 있으면 자르지 않고 멈춘다. 다시 실행해도 된다.
+- 실제 모델 LGBM-BASE-0.1의 학습 데이터·모델 파일 기록(N-25 근거)은 [모델 기록 SQL](register_model_lgbm_base_0_1.sql)을 사용한다. `DATASET_VERSION` 1행과 `MODEL_ARTIFACT` 2행만 넣고 ACTIVE는 바꾸지 않는다. 다시 실행해도 되며, 적용 후 `99_check.sql`의 두 표 기대값 0과 다르게 나오는 것은 정상이다.
 
 ## 참고
 

@@ -9,6 +9,7 @@ export async function getIncomeVolatility({ userId }) {
     stats: {
       averageAmount: data.meanIncome,
       medianAmount: data.medianIncome,
+      standardDeviation: data.standardDeviation,
       coefficientOfVariationPct: data.meanIncome === 0 ? null : data.incomeCv,
       zeroIncomeMonthCount: data.zeroIncomeMonthsCount,
       lowestMonth: { baseMonth: data.offPeakMonth, incomeAmount: data.offPeakIncome },

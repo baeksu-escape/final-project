@@ -1,6 +1,6 @@
 import { apiGet, apiPost } from './client.js'
 
-// N-01 인증 API 경로. TODO(D-20) api_spec.md가 정해지면 경로와 응답 모양을 맞춘다.
+// N-01 인증 API 경로. TODO(D-20) docs/spec/api/api_spec_a.md가 정해지면 경로와 응답 모양을 맞춘다.
 export const AUTH_API = Object.freeze({
   LOGIN: '/api/auth/login',
   ME: '/api/auth/me',
