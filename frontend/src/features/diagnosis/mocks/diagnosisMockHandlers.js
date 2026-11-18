@@ -122,9 +122,20 @@ function handleIncomeVolatility({ token }) {
 // query는 공용 mock이 넘기는 URLSearchParams라 get()으로 읽는다(값이 없으면 null → 0).
 function handleCashFlowForecast({ query, token }) {
   requireMockUser(token) // 실제 API처럼 로그인하지 않았으면 401
-  const incomeChangePercent = Number(query?.get('incomeChangePercent') ?? 0)
-  const expenseChangePercent = Number(query?.get('expenseChangePercent') ?? 0)
-  const loanPaymentChangePercent = Number(query?.get('loanPaymentChangePercent') ?? 0)
+  // 변화율(%)은 실제 API가 소수 칸(double)으로 받아, 빈 값이나 숫자가 아닌 값이면 400이다. mock도 같게 막는다(문구는 한국어).
+  const readPercent = (field) => {
+    const raw = query?.get(field)
+    if (raw === null || raw === undefined) return 0
+    const value = raw.trim() === '' ? Number.NaN : Number(raw)
+    if (!Number.isFinite(value)) {
+      const message = '숫자로 입력해 주세요.'
+      throw new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors: [{ field, message }] })
+    }
+    return value
+  }
+  const incomeChangePercent = readPercent('incomeChangePercent')
+  const expenseChangePercent = readPercent('expenseChangePercent')
+  const loanPaymentChangePercent = readPercent('loanPaymentChangePercent')
   // N-21-2 예측 기간은 실제 API처럼 없거나 0이면 6개월, 3·6·12만 받고 그 밖은 400이다.
   // 빈 값(forecastMonths=)은 실제 API가 숫자로 바꾸지 못해 400을 내므로 mock도 400으로 맞춘다.
   const rawMonths = query?.get('forecastMonths')

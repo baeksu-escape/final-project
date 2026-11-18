@@ -28,7 +28,7 @@
   - 저장된 소득이 없으면 `404 NOT_FOUND`
   - 예측 기간(`forecastMonths`)이 3·6·12가 아니면 `400 INVALID_INPUT` (GET 쿼리·POST 본문 공통)
   - GET 현금흐름의 화면 조건이 범위 밖이면 `400 INVALID_INPUT`, `fieldErrors[0].field` = 쿼리 이름 (11/17 추가): `incomeVariationPct`가 0~200 정수가 아님 "소득 변동 폭은 0~200% 정수여야 합니다.", `fixedExpenseAmount`가 음수 "월 고정 지출은 0 이상의 원 단위 정수여야 합니다.", `paymentStatus`가 `ON_TIME`·`DELAYED`가 아님 "납부 상태를 선택해 주세요." DB를 읽기 전에 검사한다.
-  - 빈 값(11/18 확인): `incomeVariationPct=`·`fixedExpenseAmount=`처럼 숫자 조건을 빈 값으로 보내면 생략과 같다. `paymentStatus=`(빈 문자열)는 400, `forecastMonths=`는 숫자로 바꿀 수 없어 400이다. 화면의 `getCashFlowForecast()`는 빈 값을 쿼리에서 빼고 보낸다.
+  - 빈 값(11/18 확인): `incomeVariationPct=`·`fixedExpenseAmount=`처럼 숫자 조건을 빈 값으로 보내면 생략과 같다. `paymentStatus=`(빈 문자열)는 400, `forecastMonths=`와 변화율 3개(`incomeChangePercent=` 등)는 숫자로 바꿀 수 없어 400이다(변화율은 숫자가 아닌 값도 400). 화면의 `getCashFlowForecast()`는 빈 값을 쿼리에서 빼고 보낸다.
   - 숫자 자리에 `abc`·`50.5`처럼 형식이 틀린 값을 보내면 `400 INVALID_INPUT`이지만, 지금은 공통 예외 처리기(A조)가 칸별 문구를 영어 변환 오류 문장으로 준다. 한국어 문구로 바꾸는 개선은 A조에 따로 요청한다(mock은 위 한국어 문구를 쓴다).
   - POST `/income-volatility`에 본문이 없거나 `monthlyIncomes`가 없거나 비어 있으면 `400 INVALID_INPUT`(field `monthlyIncomes`), POST `/cash-flow/forecast`에 본문이 없으면 `400 INVALID_INPUT`
   - 본문은 위의 공통 오류 형식이다.
