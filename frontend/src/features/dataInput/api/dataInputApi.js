@@ -3,7 +3,7 @@ import { ALT_DATA_CONSENT_TYPE } from '../config/altDataSources.js'
 // mock 모드에서 쓸 응답을 등록한다(VITE_USE_MOCK=false면 등록돼도 쓰이지 않는다).
 import '../mocks/dataInputMockHandlers.js'
 
-// N-05 API 경로. TODO(D-20) api_spec.md가 정해지면 경로와 요청·응답 필드를 맞춘다.
+// N-05 API 경로. TODO(D-20) docs/spec/api/api_spec_a.md가 정해지면 경로와 요청·응답 필드를 맞춘다.
 export const DATA_INPUT_API = Object.freeze({
   JOB_TYPE: '/api/members/me/job-type',
   FINANCIAL_INPUT: '/api/members/me/financial-input',
