@@ -34,10 +34,12 @@ function FixedMonthRows({ section, items, onChange, errors }) {
 // onChange(items)로 바뀐 줄 목록 전체를 부모에 알린다. 섹션 전체 오류(최소 줄 수 등)는 목록 아래에 보여 준다.
 // FP-86: 설정의 maxItems만큼 줄이 차면 추가 버튼이 막힌다.
 // N-05-8: 설정에 noItemsLabel이 있으면 "없음" 체크를 보여 주고, 체크하면 줄 목록을 숨긴다.
-export default function SectionList({ section, items, onChange, errors, noItems = false, onNoItemsChange }) {
+// headerSlot은 설명 아래에 먼저 끼워 넣을 칸(예: 월별 소득 카드 안의 기준월)이다.
+export default function SectionList({ section, items, onChange, errors, noItems = false, onNoItemsChange, headerSlot }) {
   return (
     <Card title={section.title} className={`input-section input-section--${section.key}`}>
       {section.description && <p className="input-section__description">{section.description}</p>}
+      {headerSlot}
       {section.noItemsLabel && <Checkbox label={section.noItemsLabel} checked={noItems} onChange={onNoItemsChange} />}
       {section.fixedMonths ? (
         <FixedMonthRows section={section} items={items} onChange={onChange} errors={errors} />

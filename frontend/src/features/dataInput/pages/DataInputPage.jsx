@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { PATHS } from '../../../common/config/navigation.js'
+import { Button, Chip, ProgressBar } from '../../../common/components/index.js'
 import { GRADE_STATUS, getNotScorableMessage } from '../../../common/config/scoreStatus.js'
 import { fetchFinancialInput, requestScoreCalculation, saveFinancialInput } from '../api/dataInputApi.js'
 import AltDataImport from '../components/AltDataImport.jsx'
@@ -12,6 +13,8 @@ import SectionFields from '../components/SectionFields.jsx'
 import SectionList from '../components/SectionList.jsx'
 import { isInputComplete } from '../config/completionItems.js'
 import { BASE_MONTH_FIELD, getSectionsForJob } from '../config/inputSections.js'
+import { INPUT_STEPS, LAST_INPUT_STEP, REVIEW_STEP, getStepIndexOfErrorKey } from '../config/inputSteps.js'
+import { clearDraft, loadDraft, saveDraft } from '../utils/inputDraft.js'
 import { buildPayload, createEmptyValues, toValues, withFixedMonthRows } from '../utils/inputValues.js'
 import { createRequestId } from '../utils/requestId.js'
 import { monthRule } from '../validation/inputRules.js'
@@ -27,7 +30,9 @@ function isRetryableFailure(error) {
 
 // N-05 데이터 입력 화면 — 내 직군의 소득 섹션과 공통 섹션(부채·자산·월 고정 지출·할부·정기결제)을 설정대로 그리고,
 // 기준월과 함께 저장한 뒤 입력 완료 현황을 보여 준다. 대안 데이터는 모의 연동으로 따로 불러온다.
-// FP-86: 잘못된 값은 입력 즉시, 빈 필수 칸은 첫 저장 시도 뒤부터 칸 옆에 오류를 보여 주고, 오류가 있으면 저장 버튼을 막는다.
+// 카드를 단계(config/inputSteps.js)로 묶어 [이전]/[다음]으로 넘기고, 입력값은 브라우저에 임시저장한다(utils/inputDraft.js).
+// 마지막 입력 단계의 [저장하고 다음]에서 서버에 저장하고, 마지막 단계에서 대안 데이터·완료 현황·점수 산출을 한다.
+// FP-86: 잘못된 값은 입력 즉시, 빈 필수 칸은 그 단계에서 [다음]을 시도한 뒤부터 칸 옆에 오류를 보여 주고, 오류가 있으면 [다음] 버튼을 막는다.
 export default function DataInputPage() {
   const { user, updateUser } = useAuth()
   const navigate = useNavigate()
@@ -39,7 +44,9 @@ export default function DataInputPage() {
   const [status, setStatus] = useState(null)
   const [savedAt, setSavedAt] = useState(null)
   const [altData, setAltData] = useState({})
-  const [submitted, setSubmitted] = useState(false)
+  const [step, setStep] = useState(0)
+  // 빈 필수 칸 오류를 보여 줄 단계 번호들 — [다음]을 시도한 단계만 넣는다.
+  const [attemptedSteps, setAttemptedSteps] = useState([])
   const [pending, setPending] = useState(false)
   const [formError, setFormError] = useState('')
   const [justSaved, setJustSaved] = useState(false)
@@ -53,15 +60,20 @@ export default function DataInputPage() {
   const calculatingRef = useRef(false)
 
   // 들어오면 저장된 입력과 완료 현황, 불러온 대안 데이터를 받아 화면을 채운다.
+  // 브라우저 임시저장본이 있으면 서버 저장본보다 나중에 고친 값이므로 입력값과 단계를 그걸로 채운다.
   useEffect(() => {
     let cancelled = false
     fetchFinancialInput()
       .then((result) => {
         if (cancelled) return
-        if (result.input) {
+        const draft = loadDraft(user.jobType, sections)
+        if (draft) {
+          setValues(draft.values)
+          setStep(draft.step)
+        } else if (result.input) {
           setValues(toValues(result.input, sections))
-          setSavedAt(result.input.savedAt)
         }
+        if (result.input) setSavedAt(result.input.savedAt)
         setSavedBaseMonths(result.savedBaseMonths ?? [])
         setStatus(result.status)
         setAltData(result.altData ?? {})
@@ -75,11 +87,23 @@ export default function DataInputPage() {
     return () => {
       cancelled = true
     }
-  }, [sections])
+  }, [sections, user.jobType])
 
-  // 입력할 때마다 다시 검사한다. 빈 필수 칸 오류는 처음 저장을 시도한 뒤부터 넣고, 서버가 돌려준 칸 오류도 함께 보여 준다.
-  const errors = { ...validateFinancialInput(values, sections, { checkRequired: submitted }), ...serverErrors }
-  const errorCount = Object.keys(errors).length
+  // 입력값과 단계를 바뀔 때마다 브라우저에 임시저장한다. 불러오기 전에는 저장본을 덮어쓰지 않고, 입력 카드가 없는 마지막 단계에서는 저장하지 않는다.
+  useEffect(() => {
+    if (!loading && step < REVIEW_STEP) saveDraft(user.jobType, values, step)
+  }, [loading, values, step, user.jobType])
+
+  // 입력할 때마다 다시 검사한다. 빈 필수 칸 오류는 [다음]을 시도한 단계의 칸에만 넣고, 서버가 돌려준 칸 오류도 함께 보여 준다.
+  const fullErrors = validateFinancialInput(values, sections)
+  const errors = {
+    ...validateFinancialInput(values, sections, { checkRequired: false }),
+    ...Object.fromEntries(Object.entries(fullErrors).filter(([key]) => attemptedSteps.includes(getStepIndexOfErrorKey(key)))),
+    ...serverErrors,
+  }
+  // 지금 단계의 카드(기준월은 0단계)에 있는 오류만 센다.
+  const errorCount = Object.keys(errors).filter((key) => getStepIndexOfErrorKey(key) === step).length
+  const stepSectionKeys = INPUT_STEPS[step].sectionKeys
   // N-05-7 오류가 아닌 안내(월별 소득의 남은 달 수). 지금 입력 중인 값으로 세고, 저장은 막지 않는다.
   const notices = getInputNotices(values, sections)
   // 이미 저장한 기준월로 다시 저장하려 하면 덮어쓴다고 알려 준다. 입력은 기준월별로 저장된다(D-16).
@@ -120,14 +144,38 @@ export default function DataInputPage() {
       sectionKey,
     )
 
-  // 저장 — 검사를 통과하면 요청 본문(모든 섹션에 기준월)을 보내고, 응답의 완료 현황으로 화면을 바꾼다.
-  // 서버가 400과 칸별 오류(fieldErrors)를 주면 해당 칸 옆에 보여 주고, 칸을 찾지 못한 오류는 폼 아래 문구에 붙인다.
-  // TODO(D-20) { code, message, fieldErrors }는 팀 공통 형식이 정해지지 않은 임시 형식이다.
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setSubmitted(true)
+  // 단계를 바꾸고 화면 맨 위로 올린다.
+  const goToStep = (nextStep) => {
+    setStep(nextStep)
+    window.scrollTo(0, 0)
+  }
+
+  // [이전] — 검사 없이 앞 단계로 돌아간다. 입력값은 임시저장되어 있다.
+  const handlePrev = () => {
     setFormError('')
-    if (Object.keys({ ...validateFinancialInput(values, sections), ...serverErrors }).length > 0) return
+    goToStep(step - 1)
+  }
+
+  // [다음]·[저장하고 다음] — 지금 단계의 오류가 없으면 다음 단계로 넘긴다. 임시저장은 값이 바뀔 때마다 이미 되어 있다.
+  // 마지막 입력 단계에서는 모든 단계를 검사해 오류가 있는 가장 앞 단계로 돌아가고, 통과하면 요청 본문(모든 섹션에 기준월)을 서버에 저장한 뒤 마지막 단계로 간다.
+  // 서버가 400과 칸별 오류(fieldErrors)를 주면 해당 칸이 있는 단계로 돌아가 칸 옆에 보여 주고, 칸을 찾지 못한 오류는 폼 아래 문구에 붙인다.
+  // TODO(D-20) { code, message, fieldErrors }는 팀 공통 형식이 정해지지 않은 임시 형식이다.
+  const handleNext = async (event) => {
+    event.preventDefault()
+    setFormError('')
+    const checkedSteps = step < LAST_INPUT_STEP ? [step] : Array.from({ length: LAST_INPUT_STEP + 1 }, (_, index) => index)
+    setAttemptedSteps((prev) => [...new Set([...prev, ...checkedSteps])])
+    const errorSteps = Object.keys({ ...fullErrors, ...serverErrors })
+      .map(getStepIndexOfErrorKey)
+      .filter((index) => checkedSteps.includes(index))
+    if (errorSteps.length > 0) {
+      goToStep(Math.min(...errorSteps))
+      return
+    }
+    if (step < LAST_INPUT_STEP) {
+      goToStep(step + 1)
+      return
+    }
 
     setPending(true)
     try {
@@ -137,10 +185,14 @@ export default function DataInputPage() {
       setSavedBaseMonths(result.savedBaseMonths ?? [])
       setServerErrors({})
       setJustSaved(true)
+      clearDraft(user.jobType)
+      goToStep(REVIEW_STEP)
     } catch (error) {
       const { errors: fieldErrors, unmatched } = fromServerFieldErrors(error.data?.fieldErrors, values)
       setServerErrors(fieldErrors)
       setFormError([error.message, ...unmatched].join(' '))
+      const errorKeys = Object.keys(fieldErrors)
+      if (errorKeys.length > 0) goToStep(Math.min(...errorKeys.map(getStepIndexOfErrorKey)))
     } finally {
       setPending(false)
     }
@@ -214,84 +266,114 @@ export default function DataInputPage() {
         </p>
       )}
 
-      <form className="data-input-form" onSubmit={handleSubmit} noValidate>
-        <FieldControl
-          field={BASE_MONTH_FIELD}
-          value={values.baseMonth}
-          onChange={handleBaseMonthChange}
-          error={errors[BASE_MONTH_FIELD.key]}
-        />
-        {sections.map((section) =>
-          section.kind === 'list' ? (
-            <SectionList
-              key={section.key}
-              section={section}
-              items={values[section.key]}
-              onChange={handleListChange(section.key)}
-              noItems={values.noItems[section.key]}
-              onNoItemsChange={handleNoItemsChange(section.key)}
-              errors={errors}
-            />
-          ) : (
-            <SectionFields
-              key={section.key}
-              section={section}
-              value={values[section.key]}
-              onFieldChange={handleFieldChange(section.key)}
-              errors={errors}
-            />
-          ),
-        )}
-        {errorCount > 0 && (
-          <p className="data-input-form__error-summary" role="alert">
-            고쳐야 할 항목이 {errorCount}개 있습니다. 모두 고치면 저장할 수 있습니다.
-          </p>
-        )}
-        {formError && (
-          <p className="data-input-form__error" role="alert">
-            {formError}
-          </p>
-        )}
-        {willOverwrite && (
-          <p className="data-input-form__overwrite-notice" role="status">
-            기준월 {values.baseMonth}에 저장한 입력이 있습니다. 지금 저장하면 기존 입력을 덮어씁니다.
-          </p>
-        )}
-        <button type="submit" className="data-input-form__submit" disabled={pending || errorCount > 0}>
-          {pending ? '저장 중…' : '저장하기'}
-        </button>
-        {justSaved && (
-          <p className="data-input-form__saved" role="status">
-            저장되었습니다.
-          </p>
-        )}
-      </form>
+      {/* 단계 표시 — 현재 단계는 강조 칩, 아래 막대는 진행 정도 */}
+      <div role="group" aria-label="입력 단계">
+        {INPUT_STEPS.map((inputStep, index) => (
+          <Chip key={inputStep.key} accent={index === step}>
+            {index + 1}. {inputStep.title}
+          </Chip>
+        ))}
+        <ProgressBar label="입력 단계 진행" value={step + 1} max={INPUT_STEPS.length} />
+      </div>
 
-      <InputStatus status={status} savedAt={savedAt} notices={notices} />
-      <AltDataImport
-        baseMonth={values.baseMonth}
-        imported={altData}
-        onImported={handleAltImported}
-        onDisconnected={handleAltDisconnected}
-      />
-
-      <button
-        type="button"
-        className="data-input-page__calculate"
-        onClick={handleCalculateScore}
-        disabled={calculating || !isInputComplete(status)}
-      >
-        {calculating ? '산출 중…' : '점수 산출하기'}
-      </button>
-      {calculateError && (
-        <p className="data-input-page__calculate-error" role="alert">
-          {calculateError}
-        </p>
+      {step < REVIEW_STEP && (
+        <form className="data-input-form" onSubmit={handleNext} noValidate>
+          {sections
+            .filter((section) => stepSectionKeys.includes(section.key))
+            .map((section) => {
+              // N-05-2 기준월은 소득 카드 안에서 입력한다.
+              const headerSlot =
+                section.key === 'income' ? (
+                  <FieldControl
+                    field={BASE_MONTH_FIELD}
+                    value={values.baseMonth}
+                    onChange={handleBaseMonthChange}
+                    error={errors[BASE_MONTH_FIELD.key]}
+                  />
+                ) : null
+              return section.kind === 'list' ? (
+                <SectionList
+                  key={section.key}
+                  section={section}
+                  items={values[section.key]}
+                  onChange={handleListChange(section.key)}
+                  noItems={values.noItems[section.key]}
+                  onNoItemsChange={handleNoItemsChange(section.key)}
+                  errors={errors}
+                  headerSlot={headerSlot}
+                />
+              ) : (
+                <SectionFields
+                  key={section.key}
+                  section={section}
+                  value={values[section.key]}
+                  onFieldChange={handleFieldChange(section.key)}
+                  errors={errors}
+                  headerSlot={headerSlot}
+                />
+              )
+            })}
+          {errorCount > 0 && (
+            <p className="data-input-form__error-summary" role="alert">
+              고쳐야 할 항목이 {errorCount}개 있습니다. 모두 고치면 다음 단계로 넘어갈 수 있습니다.
+            </p>
+          )}
+          {formError && (
+            <p className="data-input-form__error" role="alert">
+              {formError}
+            </p>
+          )}
+          {step === LAST_INPUT_STEP && willOverwrite && (
+            <p className="data-input-form__overwrite-notice" role="status">
+              기준월 {values.baseMonth}에 저장한 입력이 있습니다. 지금 저장하면 기존 입력을 덮어씁니다.
+            </p>
+          )}
+          <div>
+            {step > 0 && <Button onClick={handlePrev}>이전</Button>}
+            <Button variant="primary" type="submit" disabled={pending || errorCount > 0}>
+              {step === LAST_INPUT_STEP ? (pending ? '저장 중…' : '저장하고 다음') : '다음'}
+            </Button>
+          </div>
+        </form>
       )}
 
-      <Link to={PATHS.REPORT} className="data-input-page__next-link">
-        신용 리포트로 이동
-      </Link>
+      {step === REVIEW_STEP && (
+        <>
+          {justSaved && (
+            <p className="data-input-form__saved" role="status">
+              저장되었습니다.
+            </p>
+          )}
+          <InputStatus status={status} savedAt={savedAt} notices={notices} />
+          <AltDataImport
+            baseMonth={values.baseMonth}
+            imported={altData}
+            onImported={handleAltImported}
+            onDisconnected={handleAltDisconnected}
+          />
+
+          <button
+            type="button"
+            className="data-input-page__calculate"
+            onClick={handleCalculateScore}
+            disabled={calculating || !isInputComplete(status)}
+          >
+            {calculating ? '산출 중…' : '점수 산출하기'}
+          </button>
+          {calculateError && (
+            <p className="data-input-page__calculate-error" role="alert">
+              {calculateError}
+            </p>
+          )}
+
+          <div>
+            <Button onClick={handlePrev}>이전</Button>
+          </div>
+          <Link to={PATHS.REPORT} className="data-input-page__next-link">
+            신용 리포트로 이동
+          </Link>
+        </>
+      )}
     </section>
   )
 }
