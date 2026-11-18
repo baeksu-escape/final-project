@@ -19,16 +19,48 @@
 // 사용 예: <BarChart data={[{ label: '매출', value: 4.2 }, { label: '폐업률', value: -1.3, tag: '[내 동]' }]} unit="%" />
 import React from 'react';
 
+const LABEL_MAX_CHARS = 6;
+const LABEL_LINE_HEIGHT = 14;
+
+// N-12-8 요약 차트의 좁은 축 라벨을 자르지 않고 여러 줄로 나눈다.
+function wrapLabel(label) {
+  const lines = [];
+  let line = '';
+
+  String(label).trim().split(/\s+/).filter(Boolean).forEach((word) => {
+    const characters = Array.from(word);
+    const chunks = [];
+    for (let index = 0; index < characters.length; index += LABEL_MAX_CHARS) {
+      chunks.push(characters.slice(index, index + LABEL_MAX_CHARS).join(''));
+    }
+
+    chunks.forEach((chunk) => {
+      if (line && Array.from(`${line} ${chunk}`).length > LABEL_MAX_CHARS) {
+        lines.push(line);
+        line = chunk;
+      } else {
+        line = line ? `${line} ${chunk}` : chunk;
+      }
+    });
+  });
+
+  if (line) lines.push(line);
+  return lines.length > 0 ? lines : [''];
+}
+
 export default function BarChart({
   data = [],
   width = 380,
   height = 240,
-  positiveColor = 'var(--c-pos, #00e6a5)',
-  negativeColor = 'var(--c-neg, #ff8d7d)',
-  defaultColor = 'var(--mint, #00e6a5)',
+  positiveColor = 'var(--mint, #277b68)',
+  negativeColor = 'var(--bad, #974646)',
+  defaultColor = 'var(--mint, #277b68)',
   unit = '',
   ariaLabel = '막대 그래프',
   showValues = true,
+  wrapLabels = false,
+  barGap = false,
+  labelGap = 0,
 }) {
   const items = React.useMemo(() => {
     if (!Array.isArray(data) || data.length === 0) return [];
@@ -55,7 +87,9 @@ export default function BarChart({
   const minVal = Math.min(0, ...values);
 
   const padTop = 24;
-  const padBottom = 48;
+  const labelLinesByItem = wrapLabels ? items.map((item) => wrapLabel(item.label)) : [];
+  const maxLabelLines = wrapLabels ? Math.max(1, ...labelLinesByItem.map((lines) => lines.length)) : 1;
+  const padBottom = wrapLabels ? Math.max(48, 24 + maxLabelLines * LABEL_LINE_HEIGHT + labelGap) : 48;
   const padLeft = 16;
   const padRight = 16;
 
@@ -63,7 +97,7 @@ export default function BarChart({
   const chartH = height - padTop - padBottom;
 
   const colWidth = chartW / items.length;
-  const barWidth = Math.min(36, colWidth * 0.58);
+  const barWidth = Math.min(36, colWidth * (barGap ? 0.48 : 0.58));
 
   // 0 기준선 Y좌표 계산
   const totalSpan = maxVal - minVal || 1;
@@ -90,7 +124,9 @@ export default function BarChart({
 
         {/* 막대 및 수치 */}
         {items.map((item, i) => {
-          const x = padLeft + i * colWidth + (colWidth - barWidth) / 2;
+          const labelLines = wrapLabels ? labelLinesByItem[i] : [item.label];
+          const centerX = padLeft + i * colWidth + colWidth / 2;
+          const x = centerX - barWidth / 2;
           const isPos = item.value >= 0;
           const barH = totalSpan === 0 ? 0 : (Math.abs(item.value) / totalSpan) * chartH;
           const y = isPos ? zeroY - barH : zeroY;
@@ -127,13 +163,19 @@ export default function BarChart({
 
               {/* X축 카테고리 라벨 */}
               <text
-                x={(padLeft + i * colWidth + colWidth / 2).toFixed(1)}
-                y={height - 24}
+                x={centerX.toFixed(1)}
+                y={wrapLabels
+                  ? height - (item.tag ? 24 + (labelLines.length - 1) * LABEL_LINE_HEIGHT : labelLines.length * LABEL_LINE_HEIGHT)
+                  : height - 24}
                 fontSize="11"
                 fill="var(--mut, #a7b4c6)"
                 textAnchor="middle"
               >
-                {item.label}
+                {labelLines.map((line, lineIndex) => (
+                  <tspan key={`${item.label}-${lineIndex}`} x={centerX.toFixed(1)} dy={lineIndex === 0 ? 0 : LABEL_LINE_HEIGHT}>
+                    {line}
+                  </tspan>
+                ))}
               </text>
 
               {/* 추가 태그 (예: [대안]) */}
