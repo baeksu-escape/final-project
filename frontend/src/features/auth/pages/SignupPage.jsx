@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Checkbox, FieldError, TextInput } from '../../../common/components/index.js'
 import { checkNicknameAvailability, requestSignup } from '../api/authFeatureApi.js'
-import { AUTH_ERROR_CODES, CREDIT_INFO_AGREEMENT_LABEL, PHONE_PURPOSES, toAgeGroup } from '../authConstants.js'
+import { AUTH_ERROR_CODES, CREDIT_INFO_AGREEMENT_LABEL, EMAIL_PURPOSES, PHONE_PURPOSES, toAgeGroup } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
 import PasswordRuleList from '../components/PasswordRuleList.jsx'
 import PhoneVerification from '../components/PhoneVerification.jsx'
-import SignupEmailField from '../components/SignupEmailField.jsx'
+import SplitEmailField from '../components/SplitEmailField.jsx'
 import { resolveEmailDomain, splitEmail } from '../emailParts.js'
 import {
   NICKNAME_MAX,
@@ -189,6 +189,9 @@ export default function SignupPage() {
         nextErrors = Object.fromEntries(fieldErrors.map(({ field, message }) => [SERVER_FIELD_KEY[field] ?? field, message]))
       } else setFormError(error.message)
       if (nextErrors) {
+        // 휴대폰·이메일 칸 오류(인증 토큰 만료 등)면 그 인증 결과를 비워서, 완료 문구 대신 오류와 [받기] 버튼이 보이게 한다.
+        if (nextErrors.phone) setPhoneVerification(null)
+        if (nextErrors.email) setEmailVerification(null)
         setServerErrors(nextErrors)
         moveToFirstError(nextErrors)
       }
@@ -237,8 +240,9 @@ export default function SignupPage() {
             maxLength={20}
           />
         </div>
-        {/* N-02-1 닉네임 — DDL APP_USER.NICKNAME(2~12자, 중복 불가). [중복 확인]은 형식이 맞을 때만 눌린다. 가입할 때 서버가 한 번 더 막는다. */}
-        <div {...fieldProps('nickname')}>
+        {/* N-02-1 닉네임 — 한글·영문·숫자 2~7자(DDL 2~12자보다 좁게, 새 가입에만), 중복 불가. [중복 확인]은 형식이 맞을 때만 눌린다. 가입할 때 서버가 한 번 더 막는다. */}
+        {/* auth-field: 칸 밖의 성공·오류 문구가 TextInput 안 오류와 같은 간격(5px)에 놓이게 묶는다. */}
+        <div {...fieldProps('nickname')} className="auth-field">
           <div className="signup-form__row">
             <TextInput
               label="닉네임"
@@ -257,9 +261,9 @@ export default function SignupPage() {
               중복 확인
             </button>
           </div>
-          <p className="form-field__hint">신용 라운지에 작성자로 보입니다.</p>
+          <p className="form-field__hint">한글·영문·숫자, 신용 라운지에 작성자로 보입니다</p>
           {nicknameChecked && (
-            <p className="signup-form__ok" role="status">
+            <p className="auth-message auth-message--success" role="status">
               사용할 수 있는 닉네임입니다.
             </p>
           )}
@@ -278,11 +282,12 @@ export default function SignupPage() {
           />
         </div>
         <div {...fieldProps('email')}>
-          <SignupEmailField
+          <SplitEmailField
             local={form.emailLocal}
             domainChoice={form.emailDomainChoice}
             customDomain={form.emailCustomDomain}
             onChange={patchForm}
+            purpose={EMAIL_PURPOSES.SIGNUP}
             verified={emailVerified}
             onVerified={setEmailVerification}
             error={errorOf('email')}
@@ -300,7 +305,7 @@ export default function SignupPage() {
           />
         </div>
         <PasswordRuleList password={form.password} />
-        <div {...fieldProps('passwordConfirm')}>
+        <div {...fieldProps('passwordConfirm')} className="auth-field">
           <TextInput
             label="비밀번호 확인"
             type="password"
@@ -311,7 +316,7 @@ export default function SignupPage() {
             autoComplete="new-password"
           />
           {form.passwordConfirm && form.password === form.passwordConfirm && (
-            <p className="signup-form__ok" role="status">
+            <p className="auth-message auth-message--success" role="status">
               비밀번호가 일치합니다.
             </p>
           )}

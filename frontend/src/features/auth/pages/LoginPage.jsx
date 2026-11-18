@@ -156,11 +156,13 @@ export default function LoginPage() {
             {formError}
           </p>
         )}
-        <button type="submit" className="auth-form__submit" disabled={pending}>
-          {pending ? '로그인 중…' : '로그인'}
-        </button>
-        {/* 11/18 1차 시연 후속: 헤더 버튼을 하나로 합쳐서, 회원가입은 로그인 아래 보조 버튼으로 들어간다. 아래 링크 줄에서는 [회원가입]을 뺀다. */}
-        <Button onClick={() => navigate(AUTH_PATHS.SIGNUP)}>회원가입</Button>
+        {/* 11/18 1차 시연 후속: 헤더 버튼을 하나로 합쳐서, 회원가입은 [로그인] 옆 보조 버튼으로 들어간다(좌우 한 줄, 아주 좁은 창에서만 위아래). 아래 링크 줄에서는 [회원가입]을 뺀다. */}
+        <div className="login-form__actions">
+          <button type="submit" className="auth-form__submit" disabled={pending}>
+            {pending ? '로그인 중…' : '로그인'}
+          </button>
+          <Button onClick={() => navigate(AUTH_PATHS.SIGNUP)}>회원가입</Button>
+        </div>
       </form>
       <SocialLoginButtons />
       <AuthLinks exclude={[AUTH_PATHS.SIGNUP]} />

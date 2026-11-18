@@ -8,7 +8,9 @@ public final class AccountRules {
     public static final int BIRTH_YEAR_MIN = 1930;
     public static final int MIN_SIGNUP_AGE = 20;
     public static final int NICKNAME_MIN = 2;
-    public static final int NICKNAME_MAX = 12;
+    // N-02-1 닉네임: 한글(완성형)·영문·숫자 2~7자(11/18 화면 확인 후속, 프론트 validation.js NICKNAME_PATTERN과 같음).
+    // DDL(2~12자)보다 좁게 막는 것이라 새로 가입할 때만 적용한다. 관리자 자동 닉네임('관리자'+4자리)은 이 검사를 거치지 않는다.
+    public static final int NICKNAME_MAX = 7;
     public static final int NAME_MAX = 50;
     public static final int EMAIL_MAX = 100;
     // BCrypt는 72바이트까지만 쓰므로 그보다 짧게 받는다.
@@ -19,6 +21,8 @@ public final class AccountRules {
     private static final Pattern LOGIN_ID = Pattern.compile("^[a-z][a-z0-9]{3,19}$");
     // N-02 이름: 완성형 한글 2~20자(11/18 1차 시연 후속, 프론트 validation.js NAME_PATTERN과 같음).
     private static final Pattern NAME = Pattern.compile("^[가-힣]{2,20}$");
+    private static final Pattern NICKNAME = Pattern.compile("^[A-Za-z0-9가-힣]{" + NICKNAME_MIN + "," + NICKNAME_MAX + "}$");
+    public static final String NICKNAME_RULE_MESSAGE = "닉네임은 한글·영문·숫자 2~7자로 입력해 주세요.";
     public static final String NAME_RULE_MESSAGE = "이름은 한글 2~20자로 입력해 주세요. (숫자·영문·기호 불가)";
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
     private static final Pattern PHONE = Pattern.compile("^01[016-9]\\d{7,8}$");
@@ -75,11 +79,11 @@ public final class AccountRules {
         return null;
     }
 
-    // 닉네임 오류 문구(앞뒤 공백을 뺀 값으로 검사). 문제없으면 null.
+    // 닉네임 오류 문구(앞뒤 공백을 뺀 값으로 검사). 공백·기호·자음/모음만은 거절한다. 문제없으면 null. 닉네임 확인 API와 가입 검사가 함께 쓴다.
     public static String nicknameError(String nickname) {
         String text = nickname == null ? "" : nickname.strip();
         if (text.isEmpty()) return "닉네임을 넣어 주세요.";
-        if (text.length() < NICKNAME_MIN || text.length() > NICKNAME_MAX) return "닉네임은 " + NICKNAME_MIN + "~" + NICKNAME_MAX + "자로 넣어 주세요.";
+        if (!NICKNAME.matcher(text).matches()) return NICKNAME_RULE_MESSAGE;
         if (text.startsWith(WITHDRAWN_NICKNAME_PREFIX)) return "쓸 수 없는 닉네임입니다.";
         return null;
     }

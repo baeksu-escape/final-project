@@ -58,17 +58,21 @@ export function validateBirthYear(value) {
   return ''
 }
 
-// N-02-1 가입 닉네임 검사 규칙 — DDL v0.3.2 APP_USER.NICKNAME VARCHAR2(12 CHAR) NOT NULL, CK_APU_NICKNAME_LEN(2~12자), UK_APU_NICKNAME(중복 불가).
-// '탈퇴'로 시작하는 닉네임은 탈퇴 회원 표시값으로 예약돼 일반 회원이 쓸 수 없다(CK_APU_PII_BY_STATUS). 중복 여부는 서버(mock)가 본다.
+// N-02-1 가입 닉네임 검사 규칙 — 한글(완성형)·영문·숫자 2~7자(11/18 화면 확인 후속, 서버 AccountRules와 같은 규칙·문구).
+// DDL v0.3.2 APP_USER.NICKNAME(CK_APU_NICKNAME_LEN 2~12자)보다 좁게 막는 것이라 DDL은 그대로이고, 새로 가입할 때만 적용한다(기존 회원·관리자 자동 닉네임은 그대로).
+// '탈퇴'로 시작하는 닉네임은 탈퇴 회원 표시값으로 예약돼 일반 회원이 쓸 수 없다(CK_APU_PII_BY_STATUS). 중복 여부(UK_APU_NICKNAME)는 서버(mock)가 본다.
 export const NICKNAME_MIN = 2
-export const NICKNAME_MAX = 12
+export const NICKNAME_MAX = 7
+export const NICKNAME_PATTERN = /^[A-Za-z0-9가-힣]{2,7}$/
+export const NICKNAME_RULE_MESSAGE = '닉네임은 한글·영문·숫자 2~7자로 입력해 주세요.'
 export const WITHDRAWN_NICKNAME_PREFIX = '탈퇴'
 
-// 닉네임을 앞뒤 공백을 뺀 값으로 검사해 오류 문구를 돌려준다. 문제가 없으면 ''. 가입 화면과 가입 mock이 같은 규칙을 쓴다.
+// 닉네임을 앞뒤 공백을 뺀 값으로 검사해 오류 문구를 돌려준다. 문제가 없으면 ''. 가입 화면과 가입·닉네임 확인 mock이 같은 규칙을 쓴다.
+// 공백·기호·자음/모음만(ㄱ, ㅏ)은 거절한다.
 export function validateNickname(value) {
   const text = String(value ?? '').trim()
   if (!text) return '닉네임을 넣어 주세요.'
-  if (text.length < NICKNAME_MIN || text.length > NICKNAME_MAX) return `닉네임은 ${NICKNAME_MIN}~${NICKNAME_MAX}자로 넣어 주세요.`
+  if (!NICKNAME_PATTERN.test(text)) return NICKNAME_RULE_MESSAGE
   if (text.startsWith(WITHDRAWN_NICKNAME_PREFIX)) return '쓸 수 없는 닉네임입니다.'
   return ''
 }

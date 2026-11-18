@@ -266,10 +266,52 @@ class AuthServiceTest {
     }
 
     @Test
-    void 닉네임은_2에서_12자이고_탈퇴로_시작할_수_없다() {
+    void 닉네임은_2에서_7자이고_탈퇴로_시작할_수_없다() {
         assertThat(fieldOf(() -> service.signup(signup("탈퇴한사람", 1990, PHONE, true, null)))).isEqualTo("nickname");
         assertThat(fieldOf(() -> service.signup(signup("가", 1990, PHONE, true, null)))).isEqualTo("nickname");
-        assertThat(fieldOf(() -> service.signup(signup("가나다라마바사아자차카타파", 1990, PHONE, true, null)))).isEqualTo("nickname");
+        assertThat(fieldOf(() -> service.signup(signup("가나다라마바사아", 1990, PHONE, true, null)))).isEqualTo("nickname");
+    }
+
+    // 11/18 화면 확인 후속 — 닉네임 규칙(한글·영문·숫자 2~7자)을 닉네임 확인 API와 가입 검사 두 곳에서 같은 문구로 막는지 본다.
+    private static final String[] NICKNAMES_OK = { "홍길동", "abc12", "가나다라마바사" };
+    private static final String[] NICKNAMES_BAD_FORMAT = { "가나다라마바사아", "a", "홍 길동", "홍길동!", "ㄱㄴ" };
+
+    @Test
+    void 닉네임_확인_API는_한글_영문_숫자_2에서_7자만_통과한다() {
+        for (String nickname : NICKNAMES_OK) {
+            assertThat(service.checkNickname(new AuthRequests.NicknameCheck(nickname)).available()).as(nickname).isTrue();
+        }
+        for (String nickname : NICKNAMES_BAD_FORMAT) {
+            assertThat(nicknameMessageOf(() -> service.checkNickname(new AuthRequests.NicknameCheck(nickname))))
+                    .as(nickname).isEqualTo(AccountRules.NICKNAME_RULE_MESSAGE);
+        }
+        assertThat(nicknameMessageOf(() -> service.checkNickname(new AuthRequests.NicknameCheck("탈퇴123")))).isEqualTo("쓸 수 없는 닉네임입니다.");
+        verify(userMapper, never()).countByNickname("홍 길동");
+    }
+
+    @Test
+    void 가입_검사도_닉네임_확인과_같은_규칙과_문구로_막는다() {
+        givenInsertReturnsId(100L);
+        for (String nickname : NICKNAMES_OK) {
+            assertThat(codeOf(() -> service.signup(signup(nickname, 1990, PHONE, true, null)))).as(nickname).isEqualTo("no error");
+        }
+        for (String nickname : NICKNAMES_BAD_FORMAT) {
+            assertThat(nicknameMessageOf(() -> service.signup(signup(nickname, 1990, PHONE, true, null))))
+                    .as(nickname).isEqualTo(AccountRules.NICKNAME_RULE_MESSAGE);
+        }
+        assertThat(nicknameMessageOf(() -> service.signup(signup("탈퇴123", 1990, PHONE, true, null)))).isEqualTo("쓸 수 없는 닉네임입니다.");
+    }
+
+    // 400 INVALID_INPUT의 nickname 칸 오류 문구를 꺼낸다. 오류가 없으면 "no error".
+    private static String nicknameMessageOf(Runnable action) {
+        try {
+            action.run();
+        } catch (ApiException e) {
+            assertThat(e.getCode()).isEqualTo("INVALID_INPUT");
+            return e.getFieldErrors().stream().filter(item -> item.field().equals("nickname")).findFirst()
+                    .map(item -> item.message()).orElse("no nickname error");
+        }
+        return "no error";
     }
 
     @Test
@@ -318,7 +360,7 @@ class AuthServiceTest {
         given(userMapper.countByNickname("있는닉네임")).willReturn(1);
         assertThat(service.checkNickname(new AuthRequests.NicknameCheck("  새닉네임 ")).available()).isTrue();
         assertThat(service.checkNickname(new AuthRequests.NicknameCheck("있는닉네임")).available()).isFalse();
-        for (String nickname : new String[] { "가", "탈퇴한사람", "", "가나다라마바사아자차카타파" }) {
+        for (String nickname : new String[] { "가", "탈퇴한사람", "", "가나다라마바사아" }) {
             assertThat(fieldOf(() -> service.checkNickname(new AuthRequests.NicknameCheck(nickname)))).as(nickname).isEqualTo("nickname");
         }
         assertThat(fieldOf(() -> service.checkNickname(new AuthRequests.NicknameCheck(null)))).isEqualTo("nickname");
