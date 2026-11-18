@@ -28,6 +28,7 @@ import JobSelectPage from '../../features/dataInput/pages/JobSelectPage.jsx'
 import CreditReportPage from '../../features/credit/pages/CreditReportPage.jsx'
 import MarketPage from '../../features/market/pages/MarketPage.jsx'
 import AdminReportsPage from '../../features/admin/pages/AdminReportsPage.jsx'
+import ModelPerformancePage from '../../features/admin/pages/ModelPerformancePage.jsx'
 import LoungePage from '../../features/community/pages/LoungePage.jsx'
 
 // 앱 전체 라우트. 다른 팀은 자기 화면의 element 한 줄만 바꾼다(가드·경로 구조는 그대로 둔다).
@@ -82,7 +83,7 @@ export default function AppRoutes() {
 
           {/* 관리자 전용 — N-08-1 관리자 탭 5개 */}
           <Route element={<RouteGuard requiredRole={ROLES.ADMIN} />}>
-            <Route path={PATHS.ADMIN_MODEL} element={<PlaceholderPage title="모형 성능 비교" nId="N-25" />} />
+            <Route path={PATHS.ADMIN_MODEL} element={<ModelPerformancePage />} />
             <Route path={PATHS.ADMIN_STATS} element={<PlaceholderPage title="직군·연령별 통계" nId="N-26" />} />
             <Route path={PATHS.ADMIN_ACCOUNTS} element={<AdminAccountsPage />} />
             <Route path={PATHS.ADMIN_REPORTS} element={<AdminReportsPage />} />
