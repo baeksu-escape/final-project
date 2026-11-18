@@ -76,3 +76,131 @@
 | 이름 | 역할 | 날짜 | 의견 |
 |------|------|------|------|
 | | | | |
+
+---
+
+## 11/18 1차 시연 후속: 로그인·회원가입 화면 개편
+
+- **날짜:** 2026-11-18
+- **작성자:** JWC / Claude Code
+- **브랜치:** `feature-A/FP-87-signup-form-v2` (develop `5ff443c`에서 만듦)
+- **관련 N-ID:** N-01(로그인 전 헤더·로그인 화면), N-02(회원가입), N-02-1(닉네임·생일), N-02-3(이메일 인증)
+- **관련 결정:** 11/18 1차 시연 수정 요청, 팀 결정 A안(올해 20세가 되는 해까지 가입)
+
+### 무엇을, 왜 바꿨나
+1차 시연에서 로그인 전 화면에 수정 요청이 나왔다.
+- **헤더:** [로그인]·[회원가입] 두 버튼을 [로그인 / 회원가입] 하나로 합쳤다. 어느 로그인 전 화면에서 눌러도 로그인 화면으로 간다.
+- **로그인 화면**
+  - [로그인] 아래에 [회원가입] 보조 버튼을 두었다.
+  - 아래 링크 줄에서는 [회원가입]을 뺐다. `AuthLinks`에 선택 속성 `exclude`를 추가했고, 다른 화면의 링크는 그대로다.
+- **회원가입 화면**
+  - **실시간 검사:** 칸마다 한 번 입력했거나 칸을 벗어난 뒤부터 입력할 때마다 검사해 칸 아래에 바로 보여 준다. 손대지 않은 칸에는 빈 값 오류를 미리 띄우지 않는다.
+    - "중복 확인을 해 주세요", "인증을 완료해 주세요"는 [가입하기]를 누른 뒤에만 보인다.
+    - [가입하기]에서 오류가 있으면 첫 오류 칸으로 스크롤하고 포커스를 옮긴다.
+  - **이름:** 완성형 한글 2~20자만 받는다(`^[가-힣]{2,20}$`). 서버도 같은 규칙으로 검사한다.
+  - **닉네임:** [중복 확인] 버튼을 두었다. 확인을 마친 닉네임만 가입할 수 있고, 가입할 때 서버의 중복 검사(409)는 그대로다.
+  - **휴대폰:** `010 - [4자리] - [4자리]` 칸에 인증을 붙였다. 인증을 마쳐야 가입할 수 있다. 실제 문자는 보내지 않고, 개발 서버는 로그에 코드를 남긴다.
+  - **이메일:** `[앞부분] @ [naver.com|gmail.com|직접 입력] [인증코드 받기]` 한 줄로 받는다.
+    - 가입 화면 전용 `SignupEmailField`를 새로 만들었다. 비밀번호 찾기·마이 페이지의 `EmailVerification`은 바꾸지 않았다.
+  - **생일:** 출생연도 칸을 브라우저 달력(`<input type="date">`)으로 바꿨다.
+    - 고를 수 있는 범위는 1930-01-01부터 (올해 − 20)-12-31까지다.
+    - 서버에는 지금처럼 연도(`birthYear`)와 `ageGroup`만 보낸다. 월·일은 저장하지 않는다.
+- **mock 모드**(`VITE_USE_MOCK=true`)에서도 같은 흐름이 돈다. 닉네임 확인, 휴대폰 발송·확인 mock을 추가했고, 가입 mock이 휴대폰 토큰을 검사한다.
+
+### 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `frontend/src/common/layout/PublicLayout.jsx` | 헤더 링크 2개 → [로그인 / 회원가입] 1개(로그인 화면으로) |
+| `frontend/src/features/auth/components/AuthLinks.jsx` | 선택 속성 `exclude`(뺄 경로 목록) |
+| `frontend/src/features/auth/pages/LoginPage.jsx` | [회원가입] 보조 버튼, 링크 줄에서 회원가입 제외 |
+| `frontend/src/features/auth/pages/SignupPage.jsx` | 칸 구조화·실시간 검사·첫 오류 칸 이동·닉네임 확인·생일 달력 |
+| `frontend/src/features/auth/components/PhoneVerification.jsx` | (새 파일) 휴대폰 `010-[ ]-[ ]` 입력과 인증 |
+| `frontend/src/features/auth/components/SignupEmailField.jsx` | (새 파일) 이메일 한 줄 입력과 인증(가입 전용) |
+| `frontend/src/features/auth/emailParts.js` | (새 파일) 도메인 선택지, 이메일 나누기·합치기 |
+| `frontend/src/features/auth/validation.js` | 칸별 검사 함수 추가, `validateSignup` 새 폼 모양으로(기존 export 유지) |
+| `frontend/src/features/auth/authConstants.js` | `PHONE_PURPOSES` |
+| `frontend/src/features/auth/api/authFeatureApi.js` | 닉네임 확인·휴대폰 발송·확인 함수, 가입 요청 주석 |
+| `frontend/src/features/auth/mocks/authMockData.js` | `MOCK_PHONE_CODE`·유효 시간 |
+| `frontend/src/features/auth/mocks/authMockHandlers.js` | 새 API 3개 mock, 가입 mock 이름·휴대폰 토큰 검사, 탈퇴 시 휴대폰 인증 기록 삭제 |
+| `frontend/src/features/auth/auth.css` | 새 클래스만 추가(아래 표) |
+| `backend/.../user/controller/AuthController.java` | 새 경로 3개 |
+| `backend/.../user/dto/AuthRequests.java` | `NicknameCheck`·`PhoneSend`·`PhoneVerify`, `Signup.phoneVerificationToken` |
+| `backend/.../user/dto/AuthResponses.java` | `NicknameAvailability`·`PhoneSent`·`PhoneVerified` |
+| `backend/.../user/service/AuthService.java` | `checkNickname`, 가입: 이름 규칙·휴대폰 필수·휴대폰 토큰 사용 |
+| `backend/.../user/service/AccountRules.java` | `nameError`(한글 2~20자) |
+| `backend/.../user/service/PhonePurpose.java` | (새 파일) 휴대폰 인증 목적(SIGNUP) |
+| `backend/.../user/service/PhoneVerificationService.java` | (새 파일) 휴대폰 발송·확인·토큰 사용 |
+| `backend/.../user/service/VerificationTokenService.java` | `issuePhone`·`parsePhone`(종류 `phone-verification`), 기존 메서드 그대로 |
+| `backend/.../user/service/phone/*.java` | (새 파일) `PhoneCodeSender`, `LogPhoneCodeSender`(기본), `FixedPhoneCodeSender` |
+| `backend/.../global/config/AvenueProperties.java` | `avenue.auth.phone.mode`·`fixed-code` |
+| `backend/.../global/security/SecurityConfig.java` | 공개 POST 경로 2개 추가 |
+| `backend/src/test/...` | `PhoneVerificationServiceTest`(새), `AuthServiceTest`·`UserApiContractTest`·`WithdrawalApiTest`·`SocialAndMyPageServiceTest` 맞춤 |
+
+**새 CSS 클래스** (`auth.css`, 프론트 담당 확인 대상)
+| 클래스 | 용도 |
+|---|---|
+| `signup-form__row` | 칸 + 버튼 한 줄(닉네임·휴대폰·이메일), 좁으면 두 줄 |
+| `signup-form__fixed` | `010`·`-`·`@` 고정 글자 |
+| `signup-form__part` | 휴대폰 4자리 칸 너비 |
+| `signup-form__grow` | 이메일 앞부분·직접 입력 도메인 칸 |
+| `signup-form__check` | [중복 확인]·[인증번호 받기]·[확인] 보조 버튼 |
+| `signup-form__ok` | 성공 안내(사용할 수 있는 닉네임·비밀번호 일치) |
+| `signup-email` | 이메일 묶음(선택 상자 너비 포함) |
+| `phone-verification`, `phone-verification__done`, `phone-verification__notice` | 휴대폰 인증 묶음·완료·안내 |
+
+### DB·API 변경
+- **DB:** 없음(DDL 그대로).
+  - 휴대폰 인증 기록은 기존 `VERIFICATION_CODE`에 `CHANNEL_CODE='PHONE'`, `PURPOSE_CODE='SIGNUP'`으로 저장한다(`CK_VCD_CHANNEL`·`CK_VCD_PURPOSE`가 이미 허용).
+  - 번호는 HMAC으로만, 코드는 BCrypt 해시로만 저장한다.
+- **API:** 새 경로 3개, 그리고 가입 요청 필드 1개 추가와 검사 강화(아래 명세 반영 제안).
+- **설정:** 새 키 `avenue.auth.phone.mode`(기본 `LOG`, 또는 `FIXED`)와 `avenue.auth.phone.fixed-code`(기본 없음, FIXED일 때 필요). 기본값이 코드에 있어서 `application.properties`를 고치지 않아도 된다.
+- **영향을 받는 기능·팀원:** 가입 API를 부르는 곳은 휴대폰 인증 토큰을 보내야 한다. 지금은 우리 가입 화면뿐이다.
+
+### 명세 반영 제안
+(문서 담당이 API 명세에 따로 반영한다)
+- `POST /api/auth/nickname/check`
+  - 요청 `{ nickname }`, 응답 `{ available: boolean }`. 공개 경로다.
+  - 형식 오류(2~12자 아님, '탈퇴'로 시작)는 400 `INVALID_INPUT`과 `fieldErrors[{ field: 'nickname' }]`
+- `POST /api/auth/phone/send`
+  - 요청 `{ phone, purpose: 'SIGNUP' }`, 응답 `{ expiresInSeconds }`(이메일 발송과 같은 모양). 공개 경로다.
+  - 번호 형식 오류는 400 `fieldErrors[{ field: 'phone' }]`
+- `POST /api/auth/phone/verify`
+  - 요청 `{ phone, code, purpose }`, 응답 `{ verificationToken }`(이메일 확인과 같은 모양). 공개 경로다.
+  - 틀림·만료·5회 초과는 400 `INVALID_VERIFICATION_CODE`
+  - 지시서 초안은 `{ verificationId, expiresAt }` / `{ verificationId, code }`였다. 담당자(JWC)가 이메일과 같은 모양으로 정했다.
+- **가입(AUTH-06)**
+  - 요청에 `phoneVerificationToken`(필수)을 추가한다.
+  - 휴대폰은 필수다. 토큰이 없거나 다른 번호·이메일 토큰이면 400 `fieldErrors[{ field: 'phone', message: '휴대폰 인증을 완료해 주세요.' }]`
+- **이름 규칙:** 완성형 한글 2~20자(`^[가-힣]{2,20}$`). 오류는 `이름은 한글 2~20자로 입력해 주세요. (숫자·영문·기호 불가)`
+  - 지시서의 DTO `@Pattern` 대신 가입 검사(`validateSignup`)에 넣었다. 같은 400·같은 칸별 오류가 나오게 하려는 것이다.
+- **생일:** 화면은 날짜를 받지만 서버로는 지금처럼 `birthYear`(그 연도)와 `ageGroup`만 보낸다.
+
+### 확인
+- 확인함
+  - `npm run lint` 오류 0, `npm run build` 성공
+  - `mvnw test`: 342개 통과, 실패 0
+    - 새 `PhoneVerificationServiceTest` 10개: 발송 시 PHONE 행·HMAC·해시만 저장, 응답·로그에 번호·코드 원문 없음(LOG 모드 개발용 줄은 가린 번호), 틀린 코드·만료·5회·이메일 행 거절, 다른 번호·이메일 토큰·깨진 토큰 거절
+    - `AuthServiceTest`: 휴대폰 없음·토큰 없음·토큰 거절 시 가입 안 함, 이름 `홍길동` 통과 / `hong`·`홍길동1`·`홍 길동`·`ㄱㄴ` 거절, 닉네임 확인(쓸 수 있음·이미 있음·형식 오류 400)
+    - `UserApiContractTest`: 새 3개 경로를 토큰 없이 부르고 JSON 키가 mock과 같음
+  - 탈퇴의 휴대폰 HMAC 인증 기록 삭제는 기존 `WithdrawalServiceTest`로 그대로 통과한다.
+  - 헤드리스 Chrome(mock 모드) 화면 점검 68건 통과(저장소 밖 스크립트)
+    - 헤더 버튼 → 로그인 화면, 로그인 화면 버튼 2개
+    - 칸별 실시간 문구, 닉네임 확인, 휴대폰 자동 이동·Backspace·인증, 이메일 한 줄·직접 입력
+    - 생일 범위, 첫 오류 칸 포커스, 가입 → 새 계정 로그인, 간편 로그인 가입 미리 채움
+- 확인 못 함
+  - 실제 Spring 서버에 curl로 닉네임 확인을 부르는 것. 작업할 때 8080 서버가 꺼져 있어서 시험 결과로 갈음했다.
+  - 실제 Oracle에 휴대폰 인증 행 저장
+
+### 사람 확인 필요
+- **생일 전체 저장·만 나이 판단:** `APP_USER`에 생일 칸을 추가하는 DDL 변경과 팀 승인이 필요하다. 이번에는 연도만 저장한다.
+- **실제 문자 발송 업체 연동:** 업체·계정·발송 키·비용을 팀이 정해야 한다. `PhoneCodeSender` 구현을 하나 추가하면 된다.
+- **새 CSS 클래스:** 위 표. 프론트 담당 확인이 필요하다.
+- **이름 한글 제한:** 외국인 이름(영문 등)은 가입할 수 없게 된다. 팀 확인이 필요하다.
+- **휴대폰 중복 가입:** 같은 번호로 여러 계정을 만드는 것은 막지 않았다(지시서에 없음, `PHONE_HMAC`은 UNIQUE가 아님). 막을지 팀이 정해야 한다.
+
+### 검수
+> 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
+
+| 이름 | 역할 | 날짜 | 의견 |
+|------|------|------|------|
+| | | | |

@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { requestLogin } from '../../../common/api/authApi.js'
 import { useAuth } from '../../../common/auth/useAuth.js'
-import { TextInput, Toast } from '../../../common/components/index.js'
+import { Button, TextInput, Toast } from '../../../common/components/index.js'
 import { pickAccessToken } from '../../admin/api/adminAuthApi.js'
 import AdminPasswordSetupForm from '../../admin/components/AdminPasswordSetupForm.jsx'
 import AdminTwoFactorStep from '../components/AdminTwoFactorStep.jsx'
 // 로그인 mock 응답(잠긴 계정·가입자 포함)을 등록하기 위해 불러온다.
 import '../api/authFeatureApi.js'
 import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, LOGIN_FAILED_MESSAGE } from '../authConstants.js'
+import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
 import SocialLoginButtons from '../components/SocialLoginButtons.jsx'
 import '../auth.css'
@@ -29,6 +30,7 @@ function toLoginErrorMessage(error) {
 export default function LoginPage() {
   const { loginWithToken, notice: pendingNotice, clearNotice } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   // N-01-6 소셜 로그인 콜백이 돌려보내며 넘긴 안내 문구(관리자 차단·잠금·취소·오류).
   const socialMessage = location.state?.socialMessage
   // N-04-7 로그아웃할 때 맡겨 둔 알림(예: 회원 탈퇴 뒤 '탈퇴를 마쳤습니다.'). 들어올 때 이 화면 상태로 옮겨 토스트로 잠깐 보여 준다.
@@ -157,9 +159,11 @@ export default function LoginPage() {
         <button type="submit" className="auth-form__submit" disabled={pending}>
           {pending ? '로그인 중…' : '로그인'}
         </button>
+        {/* 11/18 1차 시연 후속: 헤더 버튼을 하나로 합쳐서, 회원가입은 로그인 아래 보조 버튼으로 들어간다. 아래 링크 줄에서는 [회원가입]을 뺀다. */}
+        <Button onClick={() => navigate(AUTH_PATHS.SIGNUP)}>회원가입</Button>
       </form>
       <SocialLoginButtons />
-      <AuthLinks />
+      <AuthLinks exclude={[AUTH_PATHS.SIGNUP]} />
       <Toast message={notice} onClose={() => setNotice('')} />
     </section>
   )

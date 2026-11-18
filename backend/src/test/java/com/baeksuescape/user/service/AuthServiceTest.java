@@ -59,6 +59,8 @@ class AuthServiceTest {
     @Mock
     private EmailVerificationService emailVerification;
     @Mock
+    private PhoneVerificationService phoneVerification;
+    @Mock
     private AdminAuthService adminAuth;
     @Mock
     private SystemLogMapper systemLogMapper;
@@ -69,7 +71,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AuthService(userMapper, consentMapper, socialMapper, emailVerification, socialStore,
+        service = new AuthService(userMapper, consentMapper, socialMapper, emailVerification, phoneVerification, socialStore,
                 new UserViewFactory(userMapper, CRYPTO), tokenProvider, ENCODER, CRYPTO, HMAC, CLOCK, adminAuth,
                 new SystemLogService(systemLogMapper, TransactionOperations.withoutTransaction(), CLOCK));
     }
@@ -185,9 +187,18 @@ class AuthServiceTest {
 
     // ---- AUTH-06 가입 ----
 
+    // 11/18 1차 시연 후속: 휴대폰이 필수가 되어 기본 가입 요청은 인증받은 휴대폰 번호와 휴대폰 인증 토큰을 함께 보낸다.
+    private static final String PHONE = "010-1234-5678";
+    private static final String PHONE_TOKEN = "phone-token";
+
     private static AuthRequests.Signup signup(String nickname, Integer birthYear, String phone, Boolean agree, String socialLinkKey) {
-        return new AuthRequests.Signup("newbie01", "홍길동", nickname, phone, "Newbie@Example.com", "abcd1234", birthYear, "AGE_30S",
-                agree, null, "token", socialLinkKey);
+        return signup("홍길동", nickname, birthYear, phone, agree, socialLinkKey, PHONE_TOKEN);
+    }
+
+    private static AuthRequests.Signup signup(String name, String nickname, Integer birthYear, String phone, Boolean agree, String socialLinkKey,
+            String phoneToken) {
+        return new AuthRequests.Signup("newbie01", name, nickname, phone, "Newbie@Example.com", "abcd1234", birthYear, "AGE_30S",
+                agree, null, "token", socialLinkKey, phoneToken);
     }
 
     private void givenInsertReturnsId(long userId) {
@@ -200,7 +211,7 @@ class AuthServiceTest {
     @Test
     void 가입하면_암호문_HMAC_동의_3행을_저장하고_인증_토큰을_쓴다() {
         givenInsertReturnsId(100L);
-        AuthResponses.Signup result = service.signup(signup("  새닉네임  ", 1990, "", true, null));
+        AuthResponses.Signup result = service.signup(signup("  새닉네임  ", 1990, PHONE, true, null));
 
         assertThat(result.userId()).isEqualTo(100L);
         ArgumentCaptor<UserAccount> saved = ArgumentCaptor.forClass(UserAccount.class);
@@ -210,10 +221,10 @@ class AuthServiceTest {
         assertThat(account.getNameEnc()).startsWith("v1:").doesNotContain("홍길동");
         assertThat(CRYPTO.decrypt(account.getEmailEnc())).isEqualTo("Newbie@Example.com");
         assertThat(account.getEmailHmac()).isEqualTo(HMAC.email("newbie@example.com"));
-        assertThat(account.getPhoneEnc()).isNull();
-        assertThat(account.getPhoneHmac()).isNull();
+        assertThat(account.getPhoneHmac()).isEqualTo(HMAC.phone("01012345678"));
         assertThat(ENCODER.matches("abcd1234", account.getPasswordHash())).isTrue();
         verify(emailVerification).consume("token", EmailPurpose.SIGNUP, "Newbie@Example.com", null);
+        verify(phoneVerification).consume(PHONE_TOKEN, PhonePurpose.SIGNUP, "01012345678");
         verify(consentMapper).insertSignupConsent(eq(100L), eq("TERMS_OF_SERVICE"), eq("Y"), eq("Y"), any(), any());
         verify(consentMapper).insertSignupConsent(eq(100L), eq("PRIVACY_COLLECTION"), eq("Y"), eq("Y"), any(), any());
         verify(consentMapper).insertSignupConsent(eq(100L), eq("NOTIFICATION_MARKETING"), eq("N"), eq("N"), isNull(), any());
@@ -232,49 +243,95 @@ class AuthServiceTest {
     @Test
     void 아이디_이메일_닉네임_중복은_409와_각자의_code() {
         given(userMapper.countByLoginId("newbie01")).willReturn(1);
-        assertThat(codeOf(() -> service.signup(signup("새닉네임", 1990, "", true, null)))).isEqualTo("409 DUPLICATE_LOGIN_ID");
+        assertThat(codeOf(() -> service.signup(signup("새닉네임", 1990, PHONE, true, null)))).isEqualTo("409 DUPLICATE_LOGIN_ID");
 
         given(userMapper.countByLoginId("newbie01")).willReturn(0);
         given(userMapper.countByEmailHmac(HMAC.email("newbie@example.com"))).willReturn(1);
-        assertThat(codeOf(() -> service.signup(signup("새닉네임", 1990, "", true, null)))).isEqualTo("409 DUPLICATE_EMAIL");
+        assertThat(codeOf(() -> service.signup(signup("새닉네임", 1990, PHONE, true, null)))).isEqualTo("409 DUPLICATE_EMAIL");
 
         given(userMapper.countByEmailHmac(anyString())).willReturn(0);
         given(userMapper.countByNickname("새닉네임")).willReturn(1);
-        assertThat(codeOf(() -> service.signup(signup("새닉네임", 1990, "", true, null)))).isEqualTo("409 DUPLICATE_NICKNAME");
+        assertThat(codeOf(() -> service.signup(signup("새닉네임", 1990, PHONE, true, null)))).isEqualTo("409 DUPLICATE_NICKNAME");
         verify(emailVerification, never()).consume(any(), any(), any(), any());
     }
 
     @Test
     void 출생연도는_1930부터_올해_빼기_20까지() {
         givenInsertReturnsId(100L);
-        assertThat(codeOf(() -> service.signup(signup("닉네임가", 1930, "", true, null)))).isEqualTo("no error");
-        assertThat(codeOf(() -> service.signup(signup("닉네임나", 2006, "", true, null)))).isEqualTo("no error");
-        assertThat(fieldOf(() -> service.signup(signup("닉네임다", 2007, "", true, null)))).isEqualTo("birthYear");
-        assertThat(fieldOf(() -> service.signup(signup("닉네임라", 1929, "", true, null)))).isEqualTo("birthYear");
-        assertThat(fieldOf(() -> service.signup(signup("닉네임마", null, "", true, null)))).isEqualTo("birthYear");
+        assertThat(codeOf(() -> service.signup(signup("닉네임가", 1930, PHONE, true, null)))).isEqualTo("no error");
+        assertThat(codeOf(() -> service.signup(signup("닉네임나", 2006, PHONE, true, null)))).isEqualTo("no error");
+        assertThat(fieldOf(() -> service.signup(signup("닉네임다", 2007, PHONE, true, null)))).isEqualTo("birthYear");
+        assertThat(fieldOf(() -> service.signup(signup("닉네임라", 1929, PHONE, true, null)))).isEqualTo("birthYear");
+        assertThat(fieldOf(() -> service.signup(signup("닉네임마", null, PHONE, true, null)))).isEqualTo("birthYear");
     }
 
     @Test
     void 닉네임은_2에서_12자이고_탈퇴로_시작할_수_없다() {
-        assertThat(fieldOf(() -> service.signup(signup("탈퇴한사람", 1990, "", true, null)))).isEqualTo("nickname");
-        assertThat(fieldOf(() -> service.signup(signup("가", 1990, "", true, null)))).isEqualTo("nickname");
-        assertThat(fieldOf(() -> service.signup(signup("가나다라마바사아자차카타파", 1990, "", true, null)))).isEqualTo("nickname");
+        assertThat(fieldOf(() -> service.signup(signup("탈퇴한사람", 1990, PHONE, true, null)))).isEqualTo("nickname");
+        assertThat(fieldOf(() -> service.signup(signup("가", 1990, PHONE, true, null)))).isEqualTo("nickname");
+        assertThat(fieldOf(() -> service.signup(signup("가나다라마바사아자차카타파", 1990, PHONE, true, null)))).isEqualTo("nickname");
     }
 
     @Test
     void 필수_동의가_없거나_휴대폰_형식이_틀리면_칸별_오류() {
-        assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, "", false, null)))).isEqualTo("agreeCreditInfo");
+        assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, PHONE, false, null)))).isEqualTo("agreeCreditInfo");
         assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, "02-123-4567", true, null)))).isEqualTo("phone");
+    }
+
+    // ---- 11/18 1차 시연 후속: 휴대폰 필수·인증, 이름 한글, 닉네임 중복 확인 ----
+
+    @Test
+    void 휴대폰이_없거나_휴대폰_인증_토큰이_없으면_phone_칸_오류이고_인증_토큰을_쓰지_않는다() {
+        assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, "", true, null)))).isEqualTo("phone");
+        assertThat(fieldOf(() -> service.signup(signup("홍길동", "새닉네임", 1990, PHONE, true, null, null)))).isEqualTo("phone");
+        assertThat(fieldOf(() -> service.signup(signup("홍길동", "새닉네임", 1990, PHONE, true, null, " ")))).isEqualTo("phone");
+        verify(emailVerification, never()).consume(any(), any(), any(), any());
+        verify(phoneVerification, never()).consume(any(), any(), any());
+        verify(userMapper, never()).insertUser(any());
+    }
+
+    @Test
+    void 다른_번호의_토큰이나_이메일_토큰이면_휴대폰_인증_단계에서_거절하고_가입하지_않는다() {
+        // 토큰 종류·번호 확인은 PhoneVerificationService.consume이 한다(PhoneVerificationServiceTest). 여기서는 거절되면 가입이 멈추는지 본다.
+        willThrowPhoneRequired();
+        assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, PHONE, true, null)))).isEqualTo("phone");
+        verify(userMapper, never()).insertUser(any());
+    }
+
+    private void willThrowPhoneRequired() {
+        org.mockito.Mockito.doThrow(PhoneVerificationService.verificationRequired())
+                .when(phoneVerification).consume(any(), any(), any());
+    }
+
+    @Test
+    void 이름은_완성형_한글_2에서_20자만_통과한다() {
+        givenInsertReturnsId(100L);
+        assertThat(codeOf(() -> service.signup(signup("홍길동", "닉네임가", 1990, PHONE, true, null, PHONE_TOKEN)))).isEqualTo("no error");
+        for (String name : new String[] { "hong", "홍길동1", "홍 길동", "ㄱㄴ", "홍", "가".repeat(21) }) {
+            assertThat(fieldOf(() -> service.signup(signup(name, "닉네임나", 1990, PHONE, true, null, PHONE_TOKEN)))).as(name).isEqualTo("name");
+        }
+    }
+
+    @Test
+    void 닉네임_확인은_쓸_수_있음_이미_있음_형식_오류_400() {
+        given(userMapper.countByNickname("새닉네임")).willReturn(0);
+        given(userMapper.countByNickname("있는닉네임")).willReturn(1);
+        assertThat(service.checkNickname(new AuthRequests.NicknameCheck("  새닉네임 ")).available()).isTrue();
+        assertThat(service.checkNickname(new AuthRequests.NicknameCheck("있는닉네임")).available()).isFalse();
+        for (String nickname : new String[] { "가", "탈퇴한사람", "", "가나다라마바사아자차카타파" }) {
+            assertThat(fieldOf(() -> service.checkNickname(new AuthRequests.NicknameCheck(nickname)))).as(nickname).isEqualTo("nickname");
+        }
+        assertThat(fieldOf(() -> service.checkNickname(new AuthRequests.NicknameCheck(null)))).isEqualTo("nickname");
     }
 
     @Test
     void 간편_로그인_키로_가입하면_연결_행도_만들고_키를_지운다() {
         givenInsertReturnsId(100L);
         String key = socialStore.issueLinkKey(new DevSocialStore.PendingLink("GOOGLE", "dev-google-user"));
-        service.signup(signup("새닉네임", 1990, "", true, key));
+        service.signup(signup("새닉네임", 1990, PHONE, true, key));
         verify(socialMapper).insertLink(100L, "GOOGLE", "dev-google-user");
         assertThat(socialStore.findLinkKey(key)).isEmpty();
-        assertThat(codeOf(() -> service.signup(signup("새닉네임", 1990, "", true, "unknown-key")))).isEqualTo("400 SOCIAL_LINK_EXPIRED");
+        assertThat(codeOf(() -> service.signup(signup("새닉네임", 1990, PHONE, true, "unknown-key")))).isEqualTo("400 SOCIAL_LINK_EXPIRED");
     }
 
     private static String fieldOf(Runnable action) {

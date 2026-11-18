@@ -238,6 +238,99 @@
   content: '● ';
 }
 
+/* ===== 회원가입 입력칸 구조화 (11/18 1차 시연 후속) — 새 클래스만 추가, 프론트 담당 확인 대상 ===== */
+
+/* 칸 + 버튼 한 줄(닉네임·휴대폰·이메일). 좁은 창에서는 두 줄로 내려간다. */
+.signup-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.signup-form__row > .form-field {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+/* 휴대폰 010·-, 이메일 @ 같은 고정 글자 */
+.signup-form__fixed {
+  align-self: center;
+  color: var(--mut);
+  font-weight: 600;
+}
+
+/* 휴대폰 가운데·끝 4자리 칸 */
+.signup-form__part {
+  flex: 0 1 88px;
+  width: 88px;
+  min-width: 64px;
+  text-align: center;
+}
+
+/* 이메일 앞부분·직접 입력 도메인 칸 */
+.signup-form__grow {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.signup-email .select__control {
+  flex: 0 1 150px;
+  min-width: 0;
+}
+
+/* 휴대폰·이메일 묶음 — 줄 사이 간격 */
+.phone-verification,
+.signup-email {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* [중복 확인]·[인증번호 받기]·[확인] — 이메일 [인증코드 받기]와 같은 보조 버튼 */
+.signup-form__check {
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--inp);
+  color: var(--fg2);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.signup-form__check:hover {
+  border-color: var(--acc);
+  color: var(--fg);
+}
+
+.signup-form__check:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 성공 안내(사용할 수 있는 닉네임·비밀번호 일치) */
+.signup-form__ok {
+  color: var(--ok-fg);
+  font-size: 12.5px;
+}
+
+.phone-verification__notice {
+  color: var(--mut2);
+  font-size: 12.5px;
+}
+
+.phone-verification__done {
+  padding: 12px 14px;
+  border: 1px solid var(--ok-line);
+  border-radius: 10px;
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+  font-size: 13px;
+}
+
 /* 아이디 찾기 결과 — 데모 .okbox */
 .find-id-result {
   display: flex;

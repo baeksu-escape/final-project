@@ -17,6 +17,9 @@ public final class AccountRules {
     public static final String WITHDRAWN_NICKNAME_PREFIX = "탈퇴";
 
     private static final Pattern LOGIN_ID = Pattern.compile("^[a-z][a-z0-9]{3,19}$");
+    // N-02 이름: 완성형 한글 2~20자(11/18 1차 시연 후속, 프론트 validation.js NAME_PATTERN과 같음).
+    private static final Pattern NAME = Pattern.compile("^[가-힣]{2,20}$");
+    public static final String NAME_RULE_MESSAGE = "이름은 한글 2~20자로 입력해 주세요. (숫자·영문·기호 불가)";
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
     private static final Pattern PHONE = Pattern.compile("^01[016-9]\\d{7,8}$");
     private static final Pattern LETTER = Pattern.compile("[A-Za-z]");
@@ -62,6 +65,13 @@ public final class AccountRules {
         if (birthYear < BIRTH_YEAR_MIN || birthYear > max) {
             return "올해 기준 " + MIN_SIGNUP_AGE + "세 이상(" + max + "년생까지)만 가입할 수 있습니다. 출생연도를 확인해 주세요.";
         }
+        return null;
+    }
+
+    // 가입 이름 오류 문구. 숫자·영문·기호·공백·자음만 입력은 거절한다. 문제없으면 null. 아이디 찾기·관리자 계정 만들기는 이 규칙을 쓰지 않는다.
+    public static String nameError(String name) {
+        if (name == null || name.isBlank()) return "이름을 입력해 주세요.";
+        if (!NAME.matcher(name).matches()) return NAME_RULE_MESSAGE;
         return null;
     }
 

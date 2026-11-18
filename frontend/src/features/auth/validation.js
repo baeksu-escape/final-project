@@ -73,6 +73,73 @@ export function validateNickname(value) {
   return ''
 }
 
+// ===== 11/18 1차 시연 후속: 회원가입 칸별 검사 =====
+// 칸마다 오류 문구를 돌려준다(문제가 없으면 ''). 가입 화면은 입력할 때마다 칸 하나씩, [가입하기]에서는 validateSignup으로 전부 부른다. 가입 mock도 같은 함수를 쓴다.
+
+// N-02 아이디 — 규칙은 isValidLoginId 그대로다. 가입할 때 서버가 중복을 막는다(중복 확인 버튼은 이번 범위가 아님).
+export function validateLoginId(value) {
+  if (!value) return '아이디를 입력해 주세요.'
+  if (!isValidLoginId(value)) return `아이디는 ${LOGIN_ID_RULE_TEXT}로 입력해 주세요.`
+  return ''
+}
+
+// N-02 이름 — 완성형 한글 2~20자만 받는다(숫자·영문·기호·공백·자음만 입력은 오류). 서버 AccountRules.nameError와 같은 규칙·문구.
+// 한글 조합 중 글자가 끊기지 않게 값을 고치지 않고 문구로만 알린다.
+export const NAME_PATTERN = /^[가-힣]{2,20}$/
+export const NAME_RULE_MESSAGE = '이름은 한글 2~20자로 입력해 주세요. (숫자·영문·기호 불가)'
+export function validateName(value) {
+  const text = String(value ?? '')
+  if (!text.trim()) return '이름을 입력해 주세요.'
+  if (!NAME_PATTERN.test(text)) return NAME_RULE_MESSAGE
+  return ''
+}
+
+// N-02 휴대폰 앞자리는 010으로 고정하고, 가운데·끝 4자리씩 받는다.
+export const PHONE_PREFIX = '010'
+export function joinPhone(middle, last) {
+  return `${PHONE_PREFIX}${middle ?? ''}${last ?? ''}`
+}
+export function validatePhoneParts(middle, last) {
+  if (!middle && !last) return '휴대폰 번호를 입력해 주세요.'
+  if (!/^\d{4}$/.test(middle ?? '') || !/^\d{4}$/.test(last ?? '')) return '휴대폰 번호 가운데·끝 자리를 숫자 4자리씩 입력해 주세요.'
+  if (!isValidPhone(joinPhone(middle, last))) return '휴대폰 번호 형식이 올바르지 않습니다. 예) 010-1234-5678'
+  return ''
+}
+
+// N-02 이메일은 앞부분과 도메인을 따로 받아 '앞부분@도메인'으로 합친다.
+export function joinEmail(local, domain) {
+  return `${String(local ?? '').trim()}@${String(domain ?? '').trim()}`
+}
+export function validateEmailParts(local, domain) {
+  if (!String(local ?? '').trim()) return '이메일을 입력해 주세요.'
+  if (!String(domain ?? '').trim()) return '이메일 도메인을 선택하거나 입력해 주세요.'
+  if (!isValidEmail(joinEmail(local, domain))) return '이메일 형식이 올바르지 않습니다. 예) name@example.com'
+  return ''
+}
+
+// N-02-1 생일 — 달력(<input type="date">)으로 고를 수 있는 범위. 하한은 DB BIRTH_YEAR 하한(1930)과 같고,
+// 상한은 팀 결정 A안 '올해 20세가 되는 해까지'(올해 − 20년 12월 31일)다. 연도는 실행 시점의 올해로 계산한다.
+// 서버로는 연도(birthYear)만 보낸다. 월·일은 저장하지 않는다(생일 전체 저장은 DDL 변경·팀 승인이 필요).
+export function getBirthDateRange() {
+  return { min: `${BIRTH_YEAR_MIN}-01-01`, max: `${getMaxBirthYear()}-12-31` }
+}
+export function validateBirthDate(value) {
+  const text = String(value ?? '')
+  if (!text) return '생일을 선택해 주세요.'
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '생일을 달력에서 골라 주세요.'
+  const { min, max } = getBirthDateRange()
+  if (text > max) return `올해 기준 ${MIN_SIGNUP_AGE}세 이상만 가입할 수 있습니다.`
+  if (text < min) return `${BIRTH_YEAR_MIN}년 1월 1일 이후로 골라 주세요.`
+  return ''
+}
+
+// N-02 비밀번호 확인 — 비밀번호 칸이 바뀌어도 다시 검사한다(가입 화면은 렌더마다 다시 부른다).
+export function validatePasswordConfirm(password, passwordConfirm) {
+  if (!passwordConfirm) return '비밀번호를 한 번 더 입력해 주세요.'
+  if (password !== passwordConfirm) return '비밀번호가 일치하지 않습니다.'
+  return ''
+}
+
 // 새 비밀번호와 확인 값을 검사해 { password?, passwordConfirm? } 오류 객체를 돌려준다(재설정 화면과 가입 화면이 함께 쓴다).
 export function validateNewPassword(password, passwordConfirm) {
   const errors = {}
@@ -83,28 +150,29 @@ export function validateNewPassword(password, passwordConfirm) {
   return errors
 }
 
+// 가입 화면에서 [가입하기]를 누르기 전에는 띄우지 않는 문구(중복 확인·인증을 아직 안 한 상태). 입력하는 도중에는 형식 오류만 보인다.
+export const SIGNUP_PENDING_MESSAGES = Object.freeze({
+  nickname: '닉네임 중복 확인을 해 주세요.',
+  phone: '휴대폰 인증을 완료해 주세요.',
+  email: '이메일 인증을 완료해 주세요.',
+})
+
 // N-02 가입 입력값 전체를 검사해 항목별 오류 객체를 돌려준다. 오류가 없으면 빈 객체.
-export function validateSignup(form, { emailVerified }) {
+// form: { loginId, name, nickname, phoneMiddle, phoneLast, emailLocal, emailDomain, password, passwordConfirm, birthDate, agreeCreditInfo }
+//   emailDomain은 '직접 입력'까지 반영한 최종 도메인이다. 키 순서가 화면 칸 순서와 같아서, 첫 오류 칸을 찾을 때 이 순서를 쓴다.
+export function validateSignup(form, { emailVerified = false, phoneVerified = false, nicknameChecked = false } = {}) {
   const errors = {}
-  if (!form.loginId) errors.loginId = '아이디를 입력해 주세요.'
-  else if (!isValidLoginId(form.loginId)) errors.loginId = `아이디는 ${LOGIN_ID_RULE_TEXT}로 입력해 주세요.`
-
-  if (!form.name.trim()) errors.name = '이름을 입력해 주세요.'
-
-  const nicknameError = validateNickname(form.nickname)
-  if (nicknameError) errors.nickname = nicknameError
-
-  if (!form.phone) errors.phone = '휴대폰 번호를 입력해 주세요.'
-  else if (!isValidPhone(form.phone)) errors.phone = '휴대폰 번호 형식이 올바르지 않습니다. 예) 010-1234-5678'
-
-  if (!form.email) errors.email = '이메일을 입력해 주세요.'
-  else if (!isValidEmail(form.email)) errors.email = '이메일 형식이 올바르지 않습니다. 예) name@example.com'
-  else if (!emailVerified) errors.email = '이메일 인증을 완료해 주세요.'
-
-  Object.assign(errors, validateNewPassword(form.password, form.passwordConfirm))
-
-  const birthYearError = validateBirthYear(form.birthYear)
-  if (birthYearError) errors.birthYear = birthYearError
+  const put = (key, message) => {
+    if (message) errors[key] = message
+  }
+  put('loginId', validateLoginId(form.loginId))
+  put('name', validateName(form.name))
+  put('nickname', validateNickname(form.nickname) || (nicknameChecked ? '' : SIGNUP_PENDING_MESSAGES.nickname))
+  put('phone', validatePhoneParts(form.phoneMiddle, form.phoneLast) || (phoneVerified ? '' : SIGNUP_PENDING_MESSAGES.phone))
+  put('email', validateEmailParts(form.emailLocal, form.emailDomain) || (emailVerified ? '' : SIGNUP_PENDING_MESSAGES.email))
+  put('password', validateNewPassword(form.password, form.passwordConfirm).password)
+  put('passwordConfirm', validatePasswordConfirm(form.password, form.passwordConfirm))
+  put('birthDate', validateBirthDate(form.birthDate))
   if (!form.agreeCreditInfo) errors.agreeCreditInfo = '필수 동의 항목입니다.'
   return errors
 }
