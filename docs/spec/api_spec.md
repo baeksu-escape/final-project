@@ -13,10 +13,12 @@
 
 | 메서드 | 경로 | 용도 | 데이터 출처 |
 |---|---|---|---|
-| GET | `/api/diagnosis/income-volatility` | N-22 소득 변동성 진단 (로그인 회원) | DB(저장 데이터) |
-| GET | `/api/diagnosis/cash-flow/forecast?…조건` | N-21 현금흐름 전망 (로그인 회원) | DB + 쿼리 조건 |
-| POST | `/api/diagnosis/income-volatility` | N-22 계산만 (값을 본문으로 받음) | 요청 본문 |
-| POST | `/api/diagnosis/cash-flow/forecast` | N-21 계산만 (값을 본문으로 받음) | 요청 본문 |
+| GET | `/api/diagnosis/income-volatility` | DIAG-07-1 · N-22 소득 변동성 진단 (로그인 회원) | DB(저장 데이터) |
+| GET | `/api/diagnosis/cash-flow/forecast?…조건` | DIAG-08-1 · N-21 현금흐름 전망 (로그인 회원) | DB + 쿼리 조건 |
+| POST | `/api/diagnosis/income-volatility` | DIAG-07 · N-22 계산만 (값을 본문으로 받음) | 요청 본문 |
+| POST | `/api/diagnosis/cash-flow/forecast` | DIAG-08 · N-21 계산만 (값을 본문으로 받음) | 요청 본문 |
+
+- API ID(DIAG-xx)는 B팀 API 정의서의 번호다.
 
 - **화면은 GET을 쓴다.** POST는 FP-183에서 만든 계산 전용 경로로, 지우지 않고 남겨 둔다.
 - **GET은 로그인한 회원 본인 것만 조회한다.** 회원은 `Authorization: Bearer <토큰>`에서 찾고, 주소로 회원 번호를 받지 않는다(11/17 변경, 이전의 `?userId=` 쿼리는 없어졌다. 보내도 무시한다).
@@ -25,6 +27,9 @@
   - 로그인 토큰이 없거나 쓸 수 없으면(만료·잠금·탈퇴) `401 UNAUTHORIZED` "로그인이 필요합니다."
   - 저장된 소득이 없으면 `404 NOT_FOUND`
   - 예측 기간(`forecastMonths`)이 3·6·12가 아니면 `400 INVALID_INPUT` (GET 쿼리·POST 본문 공통)
+  - GET 현금흐름의 화면 조건이 범위 밖이면 `400 INVALID_INPUT`, `fieldErrors[0].field` = 쿼리 이름 (11/17 추가): `incomeVariationPct`가 0~200 정수가 아님 "소득 변동 폭은 0~200% 정수여야 합니다.", `fixedExpenseAmount`가 음수 "월 고정 지출은 0 이상의 원 단위 정수여야 합니다.", `paymentStatus`가 `ON_TIME`·`DELAYED`가 아님 "납부 상태를 선택해 주세요." DB를 읽기 전에 검사한다.
+  - 빈 값(11/18 확인): `incomeVariationPct=`·`fixedExpenseAmount=`처럼 숫자 조건을 빈 값으로 보내면 생략과 같다. `paymentStatus=`(빈 문자열)는 400, `forecastMonths=`와 변화율 3개(`incomeChangePercent=` 등)는 숫자로 바꿀 수 없어 400이다(변화율은 숫자가 아닌 값도 400). 화면의 `getCashFlowForecast()`는 빈 값을 쿼리에서 빼고 보낸다.
+  - 숫자 자리에 `abc`·`50.5`처럼 형식이 틀린 값을 보내면 `400 INVALID_INPUT`이지만, 지금은 공통 예외 처리기(A조)가 칸별 문구를 영어 변환 오류 문장으로 준다. 한국어 문구로 바꾸는 개선은 A조에 따로 요청한다(mock은 위 한국어 문구를 쓴다).
   - POST `/income-volatility`에 본문이 없거나 `monthlyIncomes`가 없거나 비어 있으면 `400 INVALID_INPUT`(field `monthlyIncomes`), POST `/cash-flow/forecast`에 본문이 없으면 `400 INVALID_INPUT`
   - 본문은 위의 공통 오류 형식이다.
 
@@ -39,7 +44,7 @@
 
 - 기준월은 DDL 11/10 결정대로 `USER_INCOME_MONTH`의 가장 늦은 `BASE_MONTH` 하나로 정하고, 지출·대출도 같은 달 값을 쓴다(테이블마다 최신 달을 따로 잡으면 서로 다른 달 값이 섞이므로, 11/17 리뷰 반영).
 
-### GET `/api/diagnosis/income-volatility`
+### GET `/api/diagnosis/income-volatility` (DIAG-07-1)
 
 요청: 쿼리 없음, `Authorization: Bearer <토큰>`
 
@@ -50,6 +55,7 @@
 | `meanIncome` | 정수 | 12개월 평균 소득 | N-22-3 |
 | `medianIncome` | 정수 | 12개월 중앙값(짝수 개면 가운데 두 값 평균) | N-22-3 |
 | `incomeCv` | 소수 | 월 소득 변동계수(%) | N-22-3 |
+| `standardDeviation` | 소수 | 월 소득 표준편차(원). 모표준편차(n으로 나눔), 소수 둘째 자리. POST(DIAG-07) 응답에도 있다 (11/17 추가) | N-22-3 |
 | `highVolatility` | 불리언 | 변동계수 12% 초과면 `true` ("변동이 큼") | N-22-3 |
 | `fixedExpenseToLowestIncomeRatio` | 소수 | 가장 낮은 달 소득 대비 고정지출(%) | N-22-3 |
 | `zeroIncomeMonthsCount` | 정수 | 소득 0원인 달 수 | N-22-3 |
@@ -75,6 +81,7 @@
   "meanIncome": 2099498,
   "medianIncome": 1903317,
   "incomeCv": 33.68,
+  "standardDeviation": 707118.75,
   "highVolatility": true,
   "fixedExpenseToLowestIncomeRatio": 99.09,
   "zeroIncomeMonthsCount": 0,
@@ -93,7 +100,7 @@
 }
 ```
 
-### GET `/api/diagnosis/cash-flow/forecast`
+### GET `/api/diagnosis/cash-flow/forecast` (DIAG-08-1)
 
 요청 쿼리 (N-21-2 전망 조건):
 
@@ -103,11 +110,18 @@
 | `expenseChangePercent` | 소수 | 아니오 (기본 0) | 지출 변화율(%) |
 | `loanPaymentChangePercent` | 소수 | 아니오 (기본 0) | 원리금 변화율(%) |
 | `forecastMonths` | 정수 | 아니오 (기본 6) | 예측 기간. **3·6·12만** 받는다(없거나 0이면 6). 그 밖의 값은 `400 INVALID_INPUT`, `fieldErrors[0].field = forecastMonths` |
+| `incomeVariationPct` | 정수 0~200 | 아니오 | 소득 변동 폭(%). 과거 같은 달 패턴을 얼마나 반영할지 (11/17 추가) |
+| `fixedExpenseAmount` | 정수 ≥ 0 | 아니오 (기본 저장값) | 월 고정지출(원). 저장된 고정지출(FIXED) 자리만 이 값으로 바꾼다 (11/17 추가) |
+| `paymentStatus` | `ON_TIME`·`DELAYED` | 아니오 | 납부 상태. 지금은 값만 검사하고 계산에 쓰지 않는다. 예상 점수(DIAG-09, N-21-8)에서 쓸 예정 (11/17 추가) |
 
 계산 규칙:
 
 - 기준 소득은 최근 12개월 평균이다. 여기에 변화율을 곱해 전망 기간 동안 매달 같은 값을 쓴다.
 - 전망은 **마지막 입력월 다음 달부터** 시작한다(N-21-9 실적 뒤에 이어 그리기).
+- 화면 조건 3개는 모두 생략할 수 있고, **생략하면 결과는 위 규칙과 같다**(11/17 추가, 경환 님 화면과 합의).
+  - `incomeVariationPct`를 보내면 달마다 전망 소득 = 평균 + (과거 같은 달 소득 − 평균) × 변동 폭 ÷ 100. 같은 달(1~12월)이 과거 이력에 없으면 평균을 쓰고, 0원 아래로는 내려가지 않는다(원 단위 반올림). 0%면 매달 평균, 100%면 과거 패턴 그대로다. 그 뒤에 `incomeChangePercent`를 곱한다.
+  - `fixedExpenseAmount`를 보내면 전망 월 지출 = 이 값 + (월 지출 합계 − 저장된 FIXED 합계). 그 뒤에 `expenseChangePercent`를 곱한다. 과거 `months`의 지출은 저장값 그대로다.
+  - 전망 소득이 달마다 달라질 수 있으므로 `worstForecastMonth`·`totalAccumulatedSurplus`는 달별 순현금으로 구한다.
 
 응답 `200`:
 
@@ -124,6 +138,13 @@
 | `monthlyForecasts[].deficit` | 불리언 | 순현금이 0보다 작으면 `true` | N-21-5 |
 | `worstForecastMonth`, `worstNetCashFlow` | 문자열, 정수 | 가장 빠듯한 달과 그 달 순현금 | N-21-5 |
 | `totalAccumulatedSurplus` | 정수 | 전망 기간 누적 잉여 | N-21-9 |
+| `months[]` | 배열 | 과거 월 실적. 오래된 달 → 최근 달 순서, 소득 기준월까지 최대 12개 (11/17 추가, 화면이 실적 뒤에 전망을 이어 그림) | N-21-9 |
+| `months[].baseMonth` | 문자열 | 기준월 `"YYYY-MM"` | N-21-9 |
+| `months[].incomeAmount` | 정수 | 그 달 소득. 급여소득자는 월급을 12개월로 펼친 값 | N-21-9 |
+| `months[].expenseAmount` | 정수 | 월 지출 합계. 지출은 월별이 아니라 평소 월 금액 하나만 저장되므로 매달 같은 값 | N-21-9 |
+
+- 저장된 소득이 12개월보다 적은 자영업자·프리랜서는 `months`도 그만큼 짧다.
+- POST `/api/diagnosis/cash-flow/forecast`(DIAG-08)도 요청의 `past12MonthsHistory`를 같은 모양의 `months`로 돌려준다.
 
 예시 (회원 2번으로 로그인, `?incomeChangePercent=-10&forecastMonths=3`):
 
@@ -142,7 +163,38 @@
   ],
   "worstForecastMonth": "2026-09",
   "worstNetCashFlow": 574034,
-  "totalAccumulatedSurplus": 1722102
+  "totalAccumulatedSurplus": 1722102,
+  "months": [
+    { "baseMonth": "2025-09", "incomeAmount": 1933611, "expenseAmount": 1315514 },
+    { "baseMonth": "2025-10", "incomeAmount": 1341079, "expenseAmount": 1315514 },
+    { "baseMonth": "2025-11", "incomeAmount": 3884117, "expenseAmount": 1315514 },
+    { "baseMonth": "2025-12", "incomeAmount": 1873023, "expenseAmount": 1315514 },
+    { "baseMonth": "2026-01", "incomeAmount": 2330585, "expenseAmount": 1315514 },
+    { "baseMonth": "2026-02", "incomeAmount": 2804640, "expenseAmount": 1315514 },
+    { "baseMonth": "2026-03", "incomeAmount": 1619240, "expenseAmount": 1315514 },
+    { "baseMonth": "2026-04", "incomeAmount": 2715365, "expenseAmount": 1315514 },
+    { "baseMonth": "2026-05", "incomeAmount": 1616535, "expenseAmount": 1315514 },
+    { "baseMonth": "2026-06", "incomeAmount": 1327643, "expenseAmount": 1315514 },
+    { "baseMonth": "2026-07", "incomeAmount": 1686835, "expenseAmount": 1315514 },
+    { "baseMonth": "2026-08", "incomeAmount": 2061303, "expenseAmount": 1315514 }
+  ]
+}
+```
+
+화면 조건 예시 (회원 2번, `?incomeVariationPct=100&fixedExpenseAmount=1000000&forecastMonths=3`, 바뀌는 필드만):
+
+- 소득은 과거 같은 달(2025-09·10·11) 값을 그대로 따른다. 회원 2번은 지출이 모두 고정지출이라(FIXED 합계 = 지출 합계 = 1,315,514) 월 지출 = 1,000,000 + (1,315,514 − 1,315,514) = 1,000,000
+
+```json
+{
+  "monthlyForecasts": [
+    { "forecastYearMonth": "2026-09", "forecastIncome": 1933611, "forecastExpense": 1000000, "forecastLoanPayment": 0, "netCashFlow": 933611, "deficit": false },
+    { "forecastYearMonth": "2026-10", "forecastIncome": 1341079, "forecastExpense": 1000000, "forecastLoanPayment": 0, "netCashFlow": 341079, "deficit": false },
+    { "forecastYearMonth": "2026-11", "forecastIncome": 3884117, "forecastExpense": 1000000, "forecastLoanPayment": 0, "netCashFlow": 2884117, "deficit": false }
+  ],
+  "worstForecastMonth": "2026-10",
+  "worstNetCashFlow": 341079,
+  "totalAccumulatedSurplus": 4158807
 }
 ```
 
@@ -151,6 +203,7 @@
 - `features/diagnosis/api/diagnosisApi.js`:
   - `getIncomeVolatility()`
   - `getCashFlowForecast({ incomeChangePercent, expenseChangePercent, loanPaymentChangePercent, forecastMonths })`
+  - 화면 조건도 같은 객체에 넣으면 쿼리로 붙는다(값이 없으면 빠짐): `getCashFlowForecast({ forecastMonths: 6, incomeVariationPct: 100, fixedExpenseAmount: 1000000, paymentStatus: 'ON_TIME' })`
   - 회원 번호는 넘기지 않는다. 공통 `client.js`가 로그인 토큰을 붙인다.
 - mock 모드(`VITE_USE_MOCK`)에서는 로그인한 mock 회원이 누구든 위 예시와 같은 회원 2번 값을 돌려준다(로그인하지 않았으면 401). 전망 mock은 쿼리 조건을 반영해 계산한다.
 

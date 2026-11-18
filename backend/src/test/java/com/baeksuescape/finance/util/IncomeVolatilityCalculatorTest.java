@@ -139,6 +139,65 @@ class IncomeVolatilityCalculatorTest {
         assertTrue(response.getTotalAccumulatedSurplus() > 0, "총 누적 잉여금은 0보다 커야 한다.");
     }
 
+    @Test
+    @DisplayName("N-21-2 소득 변동 폭: 평균 + (과거 같은 달 − 평균) × %. 0%는 매달 평균, 100%는 과거 패턴, 200%는 두 배 진폭, 0원 아래로는 안 내려감")
+    void testIncomeVariationPct() {
+        // 과거 9월 300만, 10월 100만 → 평균 200만. 전망 9·10월
+        List<MonthlyIncomeItem> history = List.of(
+                MonthlyIncomeItem.builder().yearMonth("2025-09").income(3000000L).build(),
+                MonthlyIncomeItem.builder().yearMonth("2025-10").income(1000000L).build());
+        long avg = 2000000L;
+
+        CashFlowForecastResponse flat = IncomeVolatilityCalculator.forecastCashFlow(
+                history, avg, 0L, 0L, 0.0, 0.0, 0.0, 2, YearMonth.of(2026, 9), 0);
+        assertEquals(2000000L, flat.getMonthlyForecasts().get(0).getForecastIncome());
+        assertEquals(2000000L, flat.getMonthlyForecasts().get(1).getForecastIncome());
+
+        CashFlowForecastResponse same = IncomeVolatilityCalculator.forecastCashFlow(
+                history, avg, 0L, 0L, 0.0, 0.0, 0.0, 2, YearMonth.of(2026, 9), 100);
+        assertEquals(3000000L, same.getMonthlyForecasts().get(0).getForecastIncome(), "9월은 과거 9월 그대로");
+        assertEquals(1000000L, same.getMonthlyForecasts().get(1).getForecastIncome(), "10월은 과거 10월 그대로");
+
+        CashFlowForecastResponse twice = IncomeVolatilityCalculator.forecastCashFlow(
+                history, avg, 0L, 0L, 0.0, 0.0, 0.0, 2, YearMonth.of(2026, 9), 200);
+        assertEquals(4000000L, twice.getMonthlyForecasts().get(0).getForecastIncome());
+        assertEquals(0L, twice.getMonthlyForecasts().get(1).getForecastIncome(), "200만 + (100만 − 200만) × 2 = 0");
+
+        // 과거에 같은 달이 없으면(11월) 평균을 쓴다. 변동 폭을 안 주면 지금처럼 매달 평균이다.
+        CashFlowForecastResponse missing = IncomeVolatilityCalculator.forecastCashFlow(
+                history, avg, 0L, 0L, 0.0, 0.0, 0.0, 1, YearMonth.of(2026, 11), 100);
+        assertEquals(2000000L, missing.getMonthlyForecasts().get(0).getForecastIncome());
+        CashFlowForecastResponse none = IncomeVolatilityCalculator.forecastCashFlow(
+                history, avg, 0L, 0L, 0.0, 0.0, 0.0, 1, YearMonth.of(2026, 9));
+        assertEquals(2000000L, none.getMonthlyForecasts().get(0).getForecastIncome());
+
+        // 누적 잉여·가장 빠듯한 달은 달별 값으로 계산된다.
+        assertEquals(3000000L + 1000000L, same.getTotalAccumulatedSurplus());
+        assertEquals("2026-10", same.getWorstForecastMonth());
+    }
+
+    @Test
+    @DisplayName("N-21-9 과거 월 실적 months: 받은 이력을 오래된 달부터 그대로 담고, 이력이 없으면 빈 목록")
+    void testForecastPastMonths() {
+        // 순서를 섞어 넣어도 기준월 오름차순으로 나와야 한다.
+        List<MonthlyIncomeItem> history = List.of(
+                MonthlyIncomeItem.builder().yearMonth("2026-08").income(2061303L).expense(1315514L).build(),
+                MonthlyIncomeItem.builder().yearMonth("2026-07").income(1686835L).expense(1315514L).build());
+
+        CashFlowForecastResponse response = IncomeVolatilityCalculator.forecastCashFlow(
+                history, 1874069L, 1315514L, 0L, 0.0, 0.0, 0.0, 3, YearMonth.of(2026, 9));
+
+        assertEquals(2, response.getMonths().size());
+        assertEquals("2026-07", response.getMonths().get(0).getBaseMonth());
+        assertEquals(1686835L, response.getMonths().get(0).getIncomeAmount());
+        assertEquals(1315514L, response.getMonths().get(0).getExpenseAmount());
+        assertEquals("2026-08", response.getMonths().get(1).getBaseMonth());
+
+        CashFlowForecastResponse empty = IncomeVolatilityCalculator.forecastCashFlow(
+                null, 0L, 0L, 0L, 0.0, 0.0, 0.0, 3, YearMonth.of(2026, 9));
+        assertTrue(empty.getMonths().isEmpty(), "이력이 없으면 빈 목록이어야 한다.");
+    }
+
     // =========================================================================
     // 옛 함수 정리(11/17) 전후로 결과가 같은지 고정하는 테스트 — 시드 회원 2번(프리랜서) 실제 값
     // =========================================================================
@@ -163,6 +222,7 @@ class IncomeVolatilityCalculatorTest {
         assertEquals(2099498L, r.getMeanIncome());
         assertEquals(1903317L, r.getMedianIncome());
         assertEquals(33.68, r.getIncomeCv());
+        assertEquals(707118.75, r.getStandardDeviation(), "N-22-3 표준편차(모표준편차, 소수 2자리)");
         assertTrue(r.isHighVolatility());
         assertEquals(99.09, r.getFixedExpenseToLowestIncomeRatio());
         assertEquals(0, r.getZeroIncomeMonthsCount());

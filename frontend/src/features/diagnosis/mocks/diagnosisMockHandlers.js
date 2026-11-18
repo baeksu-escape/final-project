@@ -122,28 +122,68 @@ function handleIncomeVolatility({ token }) {
 // query는 공용 mock이 넘기는 URLSearchParams라 get()으로 읽는다(값이 없으면 null → 0).
 function handleCashFlowForecast({ query, token }) {
   requireMockUser(token) // 실제 API처럼 로그인하지 않았으면 401
-  const incomeChangePercent = Number(query?.get('incomeChangePercent') ?? 0)
-  const expenseChangePercent = Number(query?.get('expenseChangePercent') ?? 0)
-  const loanPaymentChangePercent = Number(query?.get('loanPaymentChangePercent') ?? 0)
+  // 변화율(%)은 실제 API가 소수 칸(double)으로 받아, 빈 값이나 숫자가 아닌 값이면 400이다. mock도 같게 막는다(문구는 한국어).
+  const readPercent = (field) => {
+    const raw = query?.get(field)
+    if (raw === null || raw === undefined) return 0
+    const value = raw.trim() === '' ? Number.NaN : Number(raw)
+    if (!Number.isFinite(value)) {
+      const message = '숫자로 입력해 주세요.'
+      throw new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors: [{ field, message }] })
+    }
+    return value
+  }
+  const incomeChangePercent = readPercent('incomeChangePercent')
+  const expenseChangePercent = readPercent('expenseChangePercent')
+  const loanPaymentChangePercent = readPercent('loanPaymentChangePercent')
   // N-21-2 예측 기간은 실제 API처럼 없거나 0이면 6개월, 3·6·12만 받고 그 밖은 400이다.
-  const requestedMonths = Number(query?.get('forecastMonths') ?? 0)
+  // 빈 값(forecastMonths=)은 실제 API가 숫자로 바꾸지 못해 400을 내므로 mock도 400으로 맞춘다.
+  const rawMonths = query?.get('forecastMonths')
+  const requestedMonths = rawMonths === '' ? Number.NaN : Number(rawMonths ?? 0)
   if (requestedMonths !== 0 && ![3, 6, 12].includes(requestedMonths)) {
     const message = '예측 기간은 3·6·12개월 중 하나여야 합니다.'
     throw new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors: [{ field: 'forecastMonths', message }] })
   }
   const forecastMonths = requestedMonths || 6
 
-  const { baseMonthlyIncome, monthlyTotalExpense, monthlyLoanPayment } = SAMPLE_CASH_FLOW_BASE
-  const forecastIncome = Math.round(baseMonthlyIncome * (1 + incomeChangePercent / 100))
-  const forecastExpense = Math.round(monthlyTotalExpense * (1 + expenseChangePercent / 100))
+  // N-21-2 화면 조건 — 실제 API와 같은 검사·문구. 모두 생략할 수 있다.
+  const invalid = (field, message) =>
+    new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors: [{ field, message }] })
+  // 숫자 조건은 실제 API처럼 없거나 빈 값이면 생략(null)으로 본다. Number('')가 0이 되어 고정지출 0원으로 계산되는 것을 막는다.
+  const optionalNumber = (raw) => (raw === null || raw === undefined || raw === '' ? null : Number(raw))
+  const incomeVariationPct = optionalNumber(query?.get('incomeVariationPct'))
+  if (incomeVariationPct !== null && !(Number.isInteger(incomeVariationPct) && incomeVariationPct >= 0 && incomeVariationPct <= 200)) {
+    throw invalid('incomeVariationPct', '소득 변동 폭은 0~200% 정수여야 합니다.')
+  }
+  const fixedExpenseAmount = optionalNumber(query?.get('fixedExpenseAmount'))
+  if (fixedExpenseAmount !== null && !(Number.isSafeInteger(fixedExpenseAmount) && fixedExpenseAmount >= 0)) {
+    throw invalid('fixedExpenseAmount', '월 고정 지출은 0 이상의 원 단위 정수여야 합니다.')
+  }
+  const paymentStatus = query?.get('paymentStatus') ?? null
+  if (paymentStatus !== null && !['ON_TIME', 'DELAYED'].includes(paymentStatus)) {
+    throw invalid('paymentStatus', '납부 상태를 선택해 주세요.')
+  }
+
+  const { baseMonthlyIncome, monthlyTotalExpense, monthlyFixedExpense, monthlyLoanPayment } = SAMPLE_CASH_FLOW_BASE
+  // 고정지출을 보내면 저장된 고정지출(FIXED) 자리만 그 값으로 바꾼다.
+  const baseExpense = fixedExpenseAmount === null ? monthlyTotalExpense : fixedExpenseAmount + (monthlyTotalExpense - monthlyFixedExpense)
+  const forecastExpense = Math.round(baseExpense * (1 + expenseChangePercent / 100))
   const forecastLoanPayment = Math.round(monthlyLoanPayment * (1 + loanPaymentChangePercent / 100))
-  const netCashFlow = forecastIncome - (forecastExpense + forecastLoanPayment)
+  // 소득 변동 폭: 평균 + (과거 같은 달 − 평균) × % (같은 달이 없으면 평균, 0원 아래로 안 내려감)
+  const monthIncome = (month) => {
+    if (incomeVariationPct === null) return baseMonthlyIncome
+    const same = SAMPLE_MONTHLY_INCOMES.find(({ yearMonth }) => Number(yearMonth.slice(5)) === month)
+    const past = same ? same.income : baseMonthlyIncome
+    return Math.round(Math.max(0, baseMonthlyIncome + ((past - baseMonthlyIncome) * incomeVariationPct) / 100))
+  }
 
   const lastMonth = SAMPLE_MONTHLY_INCOMES[SAMPLE_MONTHLY_INCOMES.length - 1].yearMonth
   const [lastYear, lastMonthNumber] = lastMonth.split('-').map(Number)
   const monthlyForecasts = Array.from({ length: forecastMonths }, (_, index) => {
     const date = new Date(lastYear, lastMonthNumber + index, 1)
     const forecastYearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    const forecastIncome = Math.round(monthIncome(date.getMonth() + 1) * (1 + incomeChangePercent / 100))
+    const netCashFlow = forecastIncome - (forecastExpense + forecastLoanPayment)
     return {
       forecastYearMonth,
       forecastIncome,
@@ -153,6 +193,9 @@ function handleCashFlowForecast({ query, token }) {
       deficit: netCashFlow < 0,
     }
   })
+
+  // 순현금이 가장 적은 달(같으면 앞선 달)
+  const worst = monthlyForecasts.reduce((min, item) => (item.netCashFlow < min.netCashFlow ? item : min))
 
   const pastDeficitMonthsCount = SAMPLE_MONTHLY_INCOMES.filter(
     ({ income }) => monthlyTotalExpense > income
@@ -166,9 +209,15 @@ function handleCashFlowForecast({ query, token }) {
     offPeakMonth: SAMPLE_INCOME_VOLATILITY.offPeakMonth,
     offPeakIncome: SAMPLE_INCOME_VOLATILITY.offPeakIncome,
     monthlyForecasts,
-    worstForecastMonth: monthlyForecasts[0].forecastYearMonth,
-    worstNetCashFlow: netCashFlow,
-    totalAccumulatedSurplus: netCashFlow * forecastMonths,
+    worstForecastMonth: worst.forecastYearMonth,
+    worstNetCashFlow: worst.netCashFlow,
+    totalAccumulatedSurplus: monthlyForecasts.reduce((sum, item) => sum + item.netCashFlow, 0),
+    // N-21-9 과거 월 실적 (오래된 달 → 최근 달). 실제 API처럼 지출은 매달 같은 월 지출 합계다.
+    months: SAMPLE_MONTHLY_INCOMES.map(({ yearMonth, income }) => ({
+      baseMonth: yearMonth,
+      incomeAmount: income,
+      expenseAmount: monthlyTotalExpense,
+    })),
   }
 }
 

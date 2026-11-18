@@ -29,6 +29,11 @@ public class IncomeVolatilityService {
     private static final int DEFAULT_FORECAST_MONTHS = 6;
     /** N-21-2 예측 기간 선택지 (개월) */
     private static final Set<Integer> ALLOWED_FORECAST_MONTHS = Set.of(3, 6, 12);
+    /** N-21-2 소득 변동 폭 범위 (%) — 화면 mock과 같다 */
+    private static final int MIN_INCOME_VARIATION_PCT = 0;
+    private static final int MAX_INCOME_VARIATION_PCT = 200;
+    /** N-21-2 카드값·대출 납부 상태 (제때·밀림) */
+    private static final Set<String> PAYMENT_STATUSES = Set.of("ON_TIME", "DELAYED");
     private static final String SALARY_KIND_CODE = "SALARY";
 
     private final IncomeVolatilityMapper incomeVolatilityMapper;
@@ -95,12 +100,20 @@ public class IncomeVolatilityService {
     public CashFlowForecastResponse forecastSavedCashFlow(long userId, CashFlowConditionRequest condition) {
         // 1) 조건을 하나도 안 보내면 모든 변화율 0, 기간 6개월로 본다.
         CashFlowConditionRequest cond = condition != null ? condition : new CashFlowConditionRequest();
-        // 예측 기간(3·6·12)은 DB를 읽기 전에 먼저 확인한다.
+        // 예측 기간(3·6·12)과 N-21-2 화면 조건(변동 폭·고정지출·납부 상태)은 DB를 읽기 전에 먼저 확인한다.
         int forecastMonths = resolveForecastMonths(cond.getForecastMonths());
+        validateScreenConditions(cond);
         // 2) DB에서 기준값을 읽는다: 월 지출 합계(모든 지출 그룹), 월 원리금 합계, 최근 12개월 소득
         long monthlyTotalExpense = incomeVolatilityMapper.selectLatestTotalExpense(userId);
         long monthlyLoanPayment = incomeVolatilityMapper.selectLatestLoanMonthlyPayment(userId);
         List<MonthlyIncomeItem> history = loadIncomeHistory(userId, monthlyTotalExpense);
+
+        // N-21-2 고정지출을 직접 입력하면 저장된 고정지출(FIXED) 자리만 그 값으로 바꾼다. 과거 실적(months)의 지출은 저장값 그대로다.
+        long forecastBaseExpense = monthlyTotalExpense;
+        if (cond.getFixedExpenseAmount() != null) {
+            long storedFixedExpense = incomeVolatilityMapper.selectLatestFixedExpense(userId);
+            forecastBaseExpense = cond.getFixedExpenseAmount() + (monthlyTotalExpense - storedFixedExpense);
+        }
 
         // 3) 기준 소득 = 최근 12개월 평균. 소득이 들쭉날쭉한 직군도 한 값으로 전망하기 위해서다.
         long baseMonthlyIncome = Math.round(history.stream()
@@ -111,14 +124,32 @@ public class IncomeVolatilityService {
         return IncomeVolatilityCalculator.forecastCashFlow(
                 history,
                 baseMonthlyIncome,
-                monthlyTotalExpense,
+                forecastBaseExpense,
                 monthlyLoanPayment,
                 cond.getIncomeChangePercent(),
                 cond.getExpenseChangePercent(),
                 cond.getLoanPaymentChangePercent(),
                 forecastMonths,
-                nextMonthAfter(history)
+                nextMonthAfter(history),
+                cond.getIncomeVariationPct()
         );
+    }
+
+    /**
+     * N-21-2 화면 조건 검사 — 문구는 현금흐름 화면 mock과 같다. 모두 생략할 수 있고, 보낸 값만 범위를 본다.
+     * 소득 변동 폭 0~200, 고정지출 0 이상, 납부 상태 ON_TIME·DELAYED. 납부 상태는 예상 점수(DIAG-09)에서 쓴다.
+     */
+    private void validateScreenConditions(CashFlowConditionRequest cond) {
+        Integer variation = cond.getIncomeVariationPct();
+        if (variation != null && (variation < MIN_INCOME_VARIATION_PCT || variation > MAX_INCOME_VARIATION_PCT)) {
+            throw badRequest("incomeVariationPct", "소득 변동 폭은 0~200% 정수여야 합니다.");
+        }
+        if (cond.getFixedExpenseAmount() != null && cond.getFixedExpenseAmount() < 0) {
+            throw badRequest("fixedExpenseAmount", "월 고정 지출은 0 이상의 원 단위 정수여야 합니다.");
+        }
+        if (cond.getPaymentStatus() != null && !PAYMENT_STATUSES.contains(cond.getPaymentStatus())) {
+            throw badRequest("paymentStatus", "납부 상태를 선택해 주세요.");
+        }
     }
 
     /**

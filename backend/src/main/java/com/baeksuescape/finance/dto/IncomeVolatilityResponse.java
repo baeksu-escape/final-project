@@ -23,6 +23,8 @@ public class IncomeVolatilityResponse {
     private long medianIncome;
     /** 월 소득 변동계수 (CV, %) */
     private double incomeCv;
+    /** N-22-3 월 소득 표준편차 (원, 모표준편차·소수 2자리). 변동계수 = 표준편차 ÷ 평균 × 100 */
+    private double standardDeviation;
     /** 변동성이 큰지 여부 (CV > 12.0% 기준) */
     private boolean isHighVolatility;
     /** 최저 소득 달 대비 고정지출 비율 (%) */
