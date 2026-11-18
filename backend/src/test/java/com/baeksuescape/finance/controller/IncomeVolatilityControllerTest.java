@@ -39,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * FP-203 저장 데이터 기반 GET API의 경로·쿼리·JSON 필드 이름과 로그인 회원 확인(토큰 없으면 401, 주소의 userId 무시)을 보는 웹 계층 테스트.
- * 문서(api_spec.md)에 적은 필드 이름이 실제 응답과 같은지 여기서 고정한다.
+ * 문서(docs/spec/api/api_spec_c.md)에 적은 필드 이름이 실제 응답과 같은지 여기서 고정한다.
  * 보안·공통 예외 처리기까지 실제와 같게 붙이려고 다른 팀 API 테스트처럼 test 프로필(H2)로 전체 컨텍스트를 띄운다.
  */
 @SpringBootTest

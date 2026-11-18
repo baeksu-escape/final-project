@@ -12,7 +12,7 @@ Spring이 부르는 내부 API(ML-01~04)를 제공한다. **요청의 모델 버
 - 실제 모델은 `artifacts/legacy.joblib`·`alternative.joblib`에서 서버가 켜질 때 한 번 불러온다. 파일이 없으면 `/v1/health`의 `modelLoaded: false`이고, `LGBM-BASE-0.1` 요청은 **503 `MODEL_NOT_READY`**다(Mock으로 바꾸지 않는다, 11/17 범영·재욱 합의).
 - 실제 모델의 점수 환산·SHAP·합 규칙은 `training/explain.py`(FP-138), 모델 입력은 `training/interface.py`를 그대로 쓴다. 점수·SHAP은 실제 신용평가나 인과관계가 아니다.
 
-- API 상세: B팀 API 명세서 4장 (공유 페이지 https://claude.ai/artifact/XwacnHd2SAWDJvi5nXGchr#spec)
+- API 상세: B팀 명세서 4장 ([docs/spec/api/api_spec_b.md](../docs/spec/api/api_spec_b.md))
 - 피처 39개: `docs/spec/feature_definition.md` 11장 = `docs/spec/sql/seed/avenue_seed_dim_feature_fs_draft.sql`
 - FastAPI는 DB를 읽거나 쓰지 않는다. 저장은 Spring(FP-142)이 한다.
 
