@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Button from '../../../common/components/Button.jsx'
 import Card from '../../../common/components/Card.jsx'
+import { formatWithComma } from '../../../common/utils/number.js'
 import '../credit.css'
 
 // N-14-2·N-14-3·N-14-4 항목별 점수 기여도를 정렬해 표시한다.
@@ -41,11 +42,14 @@ export default function ShapFactorsCard({ shap, alternativeScore }) {
             {visibleFactors.map((factor) => {
               const width = Math.abs(factor.shapScore) / maxScore * 50
               const direction = factor.shapScore > 0 ? 'shap-positive' : factor.shapScore < 0 ? 'shap-negative' : 'shap-neutral'
+              const displayValue = factor.unitName === '원'
+                ? formatWithComma(factor.featureValue) || factor.featureValue
+                : factor.featureValue
               return (
                 <div className="shap-row" key={factor.featureCode}>
                   <span className="shap-label">
                     {factor.alternativeYn === 'Y' && <b className="shap-tag">대안</b>}
-                    {factor.featureName}{factor.featureValue != null && <> ({factor.featureValue}{factor.unitName ?? ''})</>}
+                    {factor.featureName}{factor.featureValue != null && <> ({displayValue}{factor.unitName ?? ''})</>}
                   </span>
                   <span className="shap-bar" aria-hidden="true">
                     <span className="shap-midpoint" />
