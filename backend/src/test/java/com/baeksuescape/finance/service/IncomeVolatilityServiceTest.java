@@ -1,12 +1,12 @@
 package com.baeksuescape.finance.service;
 
-import com.baeksuescape.finance.dto.CashFlowConditionRequest;
-import com.baeksuescape.finance.dto.CashFlowForecastRequest;
-import com.baeksuescape.finance.dto.CashFlowForecastResponse;
-import com.baeksuescape.finance.dto.IncomeMonthRow;
-import com.baeksuescape.finance.dto.IncomeVolatilityRequest;
-import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
-import com.baeksuescape.finance.dto.MonthlyIncomeItem;
+import com.baeksuescape.finance.dto.cashflow.CashFlowConditionRequest;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastRequest;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse;
+import com.baeksuescape.finance.dto.cashflow.IncomeMonthRow;
+import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityRequest;
+import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityResponse;
+import com.baeksuescape.finance.dto.cashflow.MonthlyIncomeItem;
 import com.baeksuescape.finance.mapper.IncomeVolatilityMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

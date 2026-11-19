@@ -31,8 +31,8 @@ import com.baeksuescape.assessment.client.PredictionClient.PredictionFailedExcep
 import com.baeksuescape.assessment.dto.AssessmentRows.AssessmentRow;
 import com.baeksuescape.assessment.mapper.AssessmentMapper;
 import com.baeksuescape.assessment.service.ScoreInputAssembler;
-import com.baeksuescape.finance.dto.CashFlowConditionRequest;
-import com.baeksuescape.finance.dto.ExpectedScoreResponse;
+import com.baeksuescape.finance.dto.cashflow.CashFlowConditionRequest;
+import com.baeksuescape.finance.dto.cashflow.ExpectedScoreResponse;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.user.dto.DataInputDtos.FinancialInputResponse;
 import com.baeksuescape.user.dto.UserAccount;

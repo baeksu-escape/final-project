@@ -1,11 +1,11 @@
 package com.baeksuescape.finance.controller;
 
-import com.baeksuescape.finance.dto.CashFlowConditionRequest;
-import com.baeksuescape.finance.dto.CashFlowForecastRequest;
-import com.baeksuescape.finance.dto.CashFlowForecastResponse;
-import com.baeksuescape.finance.dto.IncomeVolatilityRequest;
-import com.baeksuescape.finance.dto.ExpectedScoreResponse;
-import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
+import com.baeksuescape.finance.dto.cashflow.CashFlowConditionRequest;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastRequest;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse;
+import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityRequest;
+import com.baeksuescape.finance.dto.cashflow.ExpectedScoreResponse;
+import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityResponse;
 import com.baeksuescape.finance.service.ExpectedScoreService;
 import com.baeksuescape.finance.service.IncomeVolatilityService;
 import com.baeksuescape.global.exception.ApiException;

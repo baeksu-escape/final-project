@@ -1,6 +1,6 @@
 package com.baeksuescape.finance.service;
 
-import com.baeksuescape.finance.dto.*;
+import com.baeksuescape.finance.dto.cashflow.*;
 import com.baeksuescape.finance.mapper.IncomeVolatilityMapper;
 import com.baeksuescape.finance.util.IncomeVolatilityCalculator;
 import lombok.RequiredArgsConstructor;

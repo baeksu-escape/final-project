@@ -1,4 +1,4 @@
-package com.baeksuescape.finance.dto;
+package com.baeksuescape.finance.dto.cashflow;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

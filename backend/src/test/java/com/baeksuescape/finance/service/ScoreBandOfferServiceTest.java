@@ -1,8 +1,8 @@
 package com.baeksuescape.finance.service;
 
-import com.baeksuescape.finance.dto.GradeBandRow;
-import com.baeksuescape.finance.dto.ScoreBandOfferResponse;
-import com.baeksuescape.finance.dto.ScoreBandOfferRow;
+import com.baeksuescape.finance.dto.simulation.GradeBandRow;
+import com.baeksuescape.finance.dto.simulation.ScoreBandOfferResponse;
+import com.baeksuescape.finance.dto.simulation.ScoreBandOfferRow;
 import com.baeksuescape.finance.mapper.ScoreBandOfferMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
