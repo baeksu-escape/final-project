@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { adaptSimulationInputs, adaptSimulationResult, sameInputs, validateInputs } from '../adapters/simulationAdapter.js'
+import { adaptSimulationInputs, adaptSimulationResult, addDeductionExamples, sameInputs, validateInputs } from '../adapters/simulationAdapter.js'
 import { getSimulationInputs, recalculateSimulation } from './simulationApi.js'
 
 const EMPTY = { userId: null, revision: -1, loading: true, error: '', currentScore: null, baseline: null, deductions: [] }
@@ -107,7 +107,7 @@ export function useSimulation(userId) {
     error: base.error,
     currentScore: base.currentScore,
     baseline: base.baseline,
-    deductions: current.result?.deductions ?? base.deductions,
+    deductions: addDeductionExamples(current.result?.deductions ?? base.deductions, base.baseline, current.values),
     values: current.values,
     applied: current.applied,
     result: current.result,

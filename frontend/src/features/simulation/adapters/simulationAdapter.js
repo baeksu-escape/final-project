@@ -92,6 +92,32 @@ export function adaptReductionFactors(list) {
   })
 }
 
+const DEDUCTION_EXAMPLES = {
+  DQ1200001: { key: 'delinquencyCount', value: 0, text: '연체 횟수 0회' },
+  telecom_on_time_streak: { key: 'telecomOnTimeMonths', value: 12, text: '정시 납부 12개월' },
+  CL0631905: { key: 'cardMonthlyUsage', text: '한도의 30%로 쓰기' },
+}
+
+// N-18-8·9 서버 감점 코드를 기존 시연 예시와 연결한다. 저장값이 있고 현재 조건을 개선하는 예시만 제공한다.
+export function addDeductionExamples(deductions, baseline, values) {
+  return deductions?.map((item) => {
+    const example = DEDUCTION_EXAMPLES[item.featureCode]
+    if (!example || baseline?.[example.key] == null || !isStoredValue(values?.[example.key])) return item
+
+    const { key, text } = example
+    let target = example.value
+    if (key === 'cardMonthlyUsage') {
+      if (baseline.cardLimitAmount == null || !isStoredValue(values.cardLimitAmount) || values.cardLimitAmount === 0) return item
+      target = Math.floor(values.cardLimitAmount * 0.3)
+    }
+    const improves = key === 'telecomOnTimeMonths' ? target > values[key] : target < values[key]
+    if (!improves) return item
+
+    const field = [...SLIDER_FIELDS, ...MONEY_FIELDS].find((entry) => entry.key === key)
+    return { ...item, editable: true, condition: field.label, example: { [key]: target }, exampleText: text }
+  }) ?? null
+}
+
 // N-18 SIM-01·02·04 오류를 화면에 보여 줄 한국어 안내로 바꾼다. 400은 서버가 알려 준 입력 칸 이름과 문구를 함께 보여 준다.
 export function describeSimulationError(error) {
   const code = error?.data?.code
