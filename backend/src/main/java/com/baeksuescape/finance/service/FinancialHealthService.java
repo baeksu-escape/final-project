@@ -1,9 +1,9 @@
 package com.baeksuescape.finance.service;
 
-import com.baeksuescape.finance.dto.DsrCalculateRequest;
-import com.baeksuescape.finance.dto.DsrCalculateResponse;
-import com.baeksuescape.finance.dto.FinancialHealthRequest;
-import com.baeksuescape.finance.dto.FinancialHealthResponse;
+import com.baeksuescape.finance.dto.health.DsrCalculateRequest;
+import com.baeksuescape.finance.dto.health.DsrCalculateResponse;
+import com.baeksuescape.finance.dto.health.FinancialHealthRequest;
+import com.baeksuescape.finance.dto.health.FinancialHealthResponse;
 import com.baeksuescape.finance.util.FinancialHealthCalculator;
 import com.baeksuescape.finance.util.FinancialHealthCalculator.HealthResult;
 import com.baeksuescape.finance.util.FinancialHealthCalculator.RiskLevel;

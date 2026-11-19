@@ -4,7 +4,7 @@
 <!-- N-22-1·N-21-1 소득 변동성·현금흐름 전망용 저장 데이터 조회 -->
 <mapper namespace="com.baeksuescape.finance.mapper.IncomeVolatilityMapper">
 
-    <resultMap id="incomeMonthRowMap" type="com.baeksuescape.finance.dto.IncomeMonthRow">
+    <resultMap id="incomeMonthRowMap" type="com.baeksuescape.finance.dto.cashflow.IncomeMonthRow">
         <result property="yearMonth" column="BASE_MONTH"/>
         <result property="income" column="INCOME_AMT"/>
         <result property="incomeKindCode" column="INCOME_KIND_CODE"/>
