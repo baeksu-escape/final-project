@@ -1,11 +1,11 @@
-import { DIST_RANGE, HEAT_BINS, MAP_METRICS } from '../config/marketConfig.js'
+import { DIST_RANGE, HEAT_BINS, HEAT_STEPS, MAP_METRICS, OTHER_METRICS } from '../config/marketConfig.js'
 
-// N-24-3 상권 지표 계산 — 서울 평균과 비교한 색 구간, 구별 평균, 분포, 상·하위 동, 숫자 표시를 한곳에 모았다.
+// N-24-3 상권 지표 계산 — 지도 색 단계, 서울 평균과 비교한 판정, 구별 평균, 분포, 상·하위 동, 숫자 표시를 한곳에 모았다.
 
 // meta.json의 지표 정의에 화면 설정(증감 여부·설명)을 합친다. dir은 좋은 방향(1: 높을수록 좋음, -1: 낮을수록 좋음).
 export function getMetric(meta, key) {
   const base = meta.metrics.find((metric) => metric.key === key)
-  const extra = MAP_METRICS.find((metric) => metric.key === key) || {}
+  const extra = MAP_METRICS.find((metric) => metric.key === key) || OTHER_METRICS.find((metric) => metric.key === key) || {}
   return { ...base, ...extra, dir: base.higherIsBetter ? 1 : -1 }
 }
 
@@ -29,12 +29,12 @@ export function dongValue(categoryData, quarter, code, key) {
   return categoryData.dongs[code]?.quarters[quarter]?.[key] ?? null
 }
 
-// 색을 칠할 기준값. 가운데는 서울 평균(합계 기준), 폭은 행정동 값의 표준편차.
+// 지도 색과 판정의 기준값. 판정은 서울 평균(합계 기준)과 행정동 값의 표준편차로, 지도 색은 행정동 값의 5등분 경계(cuts)로 정한다.
 export function metricStats(categoryData, quarter, dongs, key) {
   const values = dongs.map((dong) => dongValue(categoryData, quarter, dong.code, key)).filter((v) => v != null)
   const seoul = categoryData.seoul[quarter]?.[key] ?? null
   // 값이 하나도 없으면 범위는 비워 두고, 화면은 "자료 없음"으로 보여 준다
-  if (values.length === 0) return { seoul, sd: 1, min: null, max: null, low: null, high: null }
+  if (values.length === 0) return { seoul, sd: 1, min: null, max: null, low: null, high: null, cuts: [] }
   const mean = values.reduce((a, b) => a + b, 0) / values.length
   const sd = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length) || 1
   const sorted = [...values].sort((a, b) => a - b)
@@ -47,7 +47,16 @@ export function metricStats(categoryData, quarter, dongs, key) {
     // 분포 막대 범위 — 점포가 적은 동의 튀는 값 때문에 막대가 한쪽에 몰리지 않게 5~95% 구간만 쓴다
     low: pick(DIST_RANGE[0]),
     high: pick(DIST_RANGE[1]),
+    // 지도 색 단계 경계 — 20·40·60·80% 백분위(동이 단계마다 비슷하게 나뉜다)
+    cuts: Array.from({ length: HEAT_STEPS - 1 }, (_, i) => pick((i + 1) / HEAT_STEPS)),
   }
+}
+
+// 지도 색 단계(1 연한 빨강 ~ 5 진한 빨강). 좋고 나쁨이 아니라 값의 크기다. 경계와 같은 값은 아래 단계에 넣는다
+// (폐업률 0%처럼 같은 값이 많아도 가장 낮은 값이 가장 연하게 보이게). 값이 없으면 'none'.
+export function heatOf(value, stats) {
+  if (value == null || !stats.cuts || stats.cuts.length === 0) return 'none'
+  return stats.cuts.filter((cut) => value > cut).length + 1
 }
 
 // 서울 평균에서 좋은 쪽으로 몇 표준편차 떨어졌는지. 값이나 서울 평균이 없으면 null.
@@ -72,12 +81,12 @@ export function verdictOf(score) {
   return { text: '서울 평균보다 좋음', bin: 'pos2' }
 }
 
-// 행정동마다 { dong, value, score, storeCount }. 값이 없는 동도 넣고 score는 null로 둔다.
+// 행정동마다 { dong, value, score, heat, storeCount }. 값이 없는 동도 넣고 score는 null, heat는 'none'으로 둔다.
 export function dongRows(dongs, categoryData, quarter, stats, metric) {
   return dongs.map((dong) => {
     const value = dongValue(categoryData, quarter, dong.code, metric.key)
     const storeCount = dongValue(categoryData, quarter, dong.code, 'storeCount') ?? 0
-    return { dong, value, score: scoreOf(value, stats, metric), storeCount }
+    return { dong, value, score: scoreOf(value, stats, metric), heat: heatOf(value, stats), storeCount }
   })
 }
 
@@ -98,7 +107,7 @@ export function sortWorstFirst(rows) {
 export function guAverages(categoryData, quarter, stats, metric) {
   const rows = Object.entries(categoryData.gu).map(([gu, byQuarter]) => {
     const value = byQuarter[quarter]?.[metric.key] ?? null
-    return { gu, value, score: scoreOf(value, stats, metric) }
+    return { gu, value, score: scoreOf(value, stats, metric), heat: heatOf(value, stats) }
   })
   return sortWorstFirst(rows)
 }
@@ -132,4 +141,11 @@ export function categoryRanking(dongSummary, categories, option) {
 // 업종 하나에서 매출 전년비 순위가 매겨진 행정동 수(순위의 분모).
 export function rankedDongCount(dongCategories, categoryCode) {
   return Object.values(dongCategories).filter((summary) => summary[categoryCode]?.salesYoYRankSeoul != null).length
+}
+
+// 순위를 "상위 N%"·"하위 N%"로 바꾼다(1차 시연 후속 — "234 / 396"보다 읽기 쉽게). 앞쪽 절반이면 상위, 아니면 하위.
+export function rankPercentText(rank, total) {
+  if (rank == null || !total) return '자료 없음'
+  const top = Math.max(1, Math.ceil((rank / total) * 100))
+  return top <= 50 ? `상위 ${top}%` : `하위 ${Math.max(1, 100 - top + 1)}%`
 }
