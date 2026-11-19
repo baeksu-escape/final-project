@@ -112,6 +112,15 @@
          FETCH FIRST 1 ROWS ONLY
     </select>
 
+    <!-- FP-170 시뮬레이터(SIM-01·02)·예상 점수(DIAG-09)의 출발 평가: 점수가 나온 최근 평가 1건 + 피처값(서버 안에서만 쓴다) -->
+    <select id="selectLatestScored" resultType="com.baeksuescape.assessment.dto.AssessmentRows$AssessmentRow">
+        SELECT <include refid="assessmentColumns"/>, FEATURE_SNAPSHOT AS featureSnapshot
+          FROM ASSESSMENT
+         WHERE USER_ID = #{userId} AND DATASET_CODE = 'SERVICE' AND GRADE_STATUS_CODE = 'SCORED'
+         ORDER BY ASSESSED_AT DESC, ASSESSMENT_ID DESC
+         FETCH FIRST 1 ROWS ONLY
+    </select>
+
     <!-- 본인 평가만 — 남의 requestId면 null(404) -->
     <select id="selectByUserAndRequestId" resultType="com.baeksuescape.assessment.dto.AssessmentRows$AssessmentRow">
         SELECT <include refid="assessmentColumns"/>

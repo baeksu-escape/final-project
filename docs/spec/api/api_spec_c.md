@@ -4,6 +4,9 @@
 >
 > - 🆕 11/18 `docs/spec/api_spec.md`에서 이 파일로 옮겼다(내용은 그대로). 원래 머리말의 작성 규칙(오류 형식, 금액·비율·기준월, `isXxx` 필드 이름)은 세 팀이 함께 쓰도록 [README](README.md) 「명세서 작성 규칙」으로 옮겼다.
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
+>
+> **최근 변경**
+> - 🆕 11/18 (광희, FP-170) SIM-01 `credit-care/base`·DIAG-09 `cash-flow/expected-score` 추가, SIM-02 Spring 구현(출발 평가 = 최근 SCORED, 404 `ASSESSMENT_NOT_FOUND`).
 
 ---
 
@@ -205,6 +208,52 @@
   - 회원 번호는 넘기지 않는다. 공통 `client.js`가 로그인 토큰을 붙인다.
 - mock 모드(`VITE_USE_MOCK`)에서는 로그인한 mock 회원이 누구든 위 예시와 같은 회원 2번 값을 돌려준다(로그인하지 않았으면 401). 전망 mock은 쿼리 조건을 반영해 계산한다.
 
+### POST `/api/diagnosis/cash-flow/expected-score` (DIAG-09, N-21-8, FP-170) 🆕 11/18
+
+전망 조건 중 소득·지출 변화를 저장된 입력에 반영해 예상 대안 점수를 FastAPI ML-03으로 **다시 구한다. 저장하지 않는다**(O-6).
+
+- 요청 본문(JSON). 이름은 현금흐름 전망 쿼리와 같고 모두 생략할 수 있다. 검사 규칙과 400 문구도 같다.
+
+  | 필드 | 형식 | 점수에 쓰는 방법 |
+  |---|---|---|
+  | `incomeVariationPct` | 정수 0~200 | 각 달 소득 = 평균 + (그 달 − 평균) × %. 생략하면 100%(저장된 소득 그대로). ⚠️ 🆕 11/19 현금흐름 전망(DIAG-08-1)은 생략하면 0%(매달 평균)라 기본값이 다르다. DIAG-09를 0%로 하면 조건 없이도 소득이 평평해져 점수가 바뀌고, DIAG-08-1을 100%로 하면 기존 결과가 바뀌어 각각 유지한다. **전망과 예상 점수를 함께 보여 줄 때는 두 API에 같은 값을 보낸다**(화면은 항상 보냄, 경환 11/19 합의) |
+  | `incomeChangePercent` | 소수 | 위 결과 × (1 + %/100). 0원 아래는 0, 원 단위 반올림. 급여소득자(1개월)는 이 값만 적용된다 |
+  | `fixedExpenseAmount` | 정수 ≥ 0 | 저장된 FIXED 항목들의 비율을 지킨 채 합계를 이 값으로 맞춘다(반올림 차이는 마지막 항목). FIXED 항목이 없으면 FIXED 1행을 더한다 |
+  | `expenseChangePercent` | 소수 | 위 결과의 모든 지출 항목 × (1 + %/100) |
+  | `paymentStatus` | `ON_TIME`·`DELAYED` | **값만 검사하고 점수에는 아직 반영하지 않는다**(반영할 피처는 범영·경환 님과 정한 뒤 추가). `forecastMonths`·`loanPaymentChangePercent`는 보내도 점수에 쓰지 않는다 |
+
+- 처리 순서(범영 11/18):
+  1. 현재 점수는 점수가 나온(SCORED) 최근 평가다.
+  2. 요청은 `ScoreInputAssembler.build()`로 만들고 소득·지출만 바꾼다. requestId는 매번 새 UUID, 모델은 ACTIVE 버전이다.
+  3. `PredictionClient.score()`를 한 번만 부른다.
+- 응답 `200`:
+
+  | 필드 | 형식 | 설명 |
+  |---|---|---|
+  | `currentScore`, `currentGradeBandCode` | 정수, 문자열 | 점수가 나온 최근 평가의 대안 점수·등급 |
+  | `expectedScore`, `expectedGradeBandCode` | 정수, 문자열 | 바꾼 조건으로 다시 구한 대안 점수·등급 |
+  | `scoreDiff` | 정수 | `expectedScore − currentScore`. 조건만의 효과가 아니다: 마지막 진단 뒤 **입력을 고쳤거나**, 🆕 11/19 그 사이 **모델이 바뀌었다면**(`modelVersion` ≠ `baseModelVersion`) 그 차이도 섞인다. 모델 호출을 1번으로 유지하려고 고른 한계다(경환 11/19 합의) |
+  | `modelVersion` | 문자열 | 예상 점수를 계산한 모델(ACTIVE) |
+  | `baseModelVersion` | 문자열 | 🆕 11/19 현재 점수를 낸 모델. `modelVersion`과 다르면 화면이 "모델이 바뀌어 점수 차이가 클 수 있습니다"를 안내한다 |
+  | `baseRequestId` | 문자열 | 현재 점수를 가져온 평가 |
+  | `paymentStatusApplied` | 불리언 | 납부 상태가 점수에 반영됐는지. 지금은 항상 `false` |
+
+  ```json
+  { "currentScore": 588, "currentGradeBandCode": "CAUTION", "expectedScore": 578, "expectedGradeBandCode": "CAUTION",
+    "scoreDiff": -10, "modelVersion": "DEV-DUMMY", "baseModelVersion": "DEV-DUMMY",
+    "baseRequestId": "00000000-0000-4000-8000-000000000588", "paymentStatusApplied": false }
+  ```
+- 오류:
+
+  | 상태 | code | 언제 |
+  |---|---|---|
+  | 400 | `INVALID_INPUT` | 조건 검사 실패(필드 = 이름). ML-03이 입력을 거절(4xx)하면 "입력값을 확인해 주세요." |
+  | 401 | `UNAUTHORIZED` | 토큰 없음 |
+  | 404 | `ASSESSMENT_NOT_FOUND` | 점수가 나온 평가가 하나도 없음(리포트와 같은 코드) |
+  | 409 | `INPUT_INCOMPLETE` | 저장된 입력 기준월이 없거나 출생연도가 없음(점수 산출과 같은 문구). 🆕 11/19 소득이 직군에 필요한 개월 수(자영업자·프리랜서 12, 급여소득자 1)보다 적거나 같은 달이 겹치면 ML-03을 부르지 않고 "소득을 필요한 개월 수만큼 입력해 주세요."(점수 산출과 같음, 0원으로 채워 계산하지 않음) |
+  | 503 | `MODEL_NOT_READY` | ML-03 연결 실패·시간 초과·5xx. 저장하지 않으므로 MODEL_ERROR 기록을 남기지 않는다 |
+- 프론트: `diagnosisApi.js`의 `getExpectedScore({ incomeVariationPct, incomeChangePercent, fixedExpenseAmount, expenseChangePercent, paymentStatus })`. mock은 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"으로만 계산하며, 진짜 모델 점수가 아니다.
+
 ---
 
 ## N-16 자산·부채 건전성 · N-20 DSR 계산기 (FP-166, 담당 광희)
@@ -354,9 +403,39 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 
 프론트: `features/simulation/api/simulationApi.js`의 `getScoreBandOfferInfo(score)`. mock은 시드와 같은 3개 점수대 값을 돌려준다.
 
-## N-18-5·8 시뮬레이터 점수 재계산 (SIM-02, 담당 광희) — 🟡 제안, Spring 미구현
+## N-18-1·10 시뮬레이터 입력 10개의 내 실제 값 (SIM-01, FP-170, 담당 광희) 🆕 11/18
 
-> 지금은 프론트 mock만 있다. Spring은 B조 ML-04(`POST /v1/assessments/simulate`, [B팀 명세서](api_spec_b.md) 4-4)를 불러 이 모양으로 바꿔 돌려줄 예정이다.
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/api/simulation/credit-care/base` | 출발 평가의 점수와 입력 10개의 원래 값. [내 실제 값으로 되돌리기](N-18-10)도 이 값을 쓴다 |
+
+- **출발 평가**(SIM-01·02 공통, 범영 11/18): 점수가 나온(`GRADE_STATUS_CODE = 'SCORED'`) 가장 최근 평가다. 최신 평가가 산출 불가(예: FastAPI가 잠깐 꺼져 MODEL_ERROR)여도 그 앞의 SCORED 평가를 쓴다. SCORED 평가가 하나도 없을 때만 404 `ASSESSMENT_NOT_FOUND`(리포트와 같은 코드)다.
+- 저장된 피처값(`FEATURE_SNAPSHOT`)은 개인 금융 정보라 **통째로 보내지 않는다**. 아래 10개 값만 보낸다.
+  - 8개는 출발 평가의 피처값에서 가져온다. 키와 피처의 대응은 FastAPI `simulation.py` `DIRECT_CHANGES`와 같다.
+  - `EASYPAY_MONTHLY_COUNT`는 `dp_payment_count_12m ÷ 12`를 반올림한 값이다(ML-04가 × 12 하므로 그 반대).
+  - 피처값에는 카드 사용률만 있다. 그래서 `CARD_LIMIT_AMT`·`CARD_MONTHLY_SPEND_AMT`는 그 평가 기준월의 카드 직접 입력(`USER_CREDIT_PROFILE`, MANUAL)에서 읽는다.
+  - 값이 없으면 `null`이다(0으로 바꾸지 않는다).
+- 응답 `200`:
+
+```json
+{
+  "baseRequestId": "00000000-0000-4000-8000-000000000588",
+  "assessedAt": "2026-11-17T10:00:00+09:00",
+  "score": 588,
+  "gradeBandCode": "CAUTION",
+  "values": {
+    "TELECOM_ON_TIME_MONTHS": 6, "UTILITY_LATE_MONTHS": 2, "EASYPAY_MONTHLY_COUNT": 5, "DELINQ_COUNT_12M": 1,
+    "CASH_ADVANCE_MONTHS": 3, "NEW_LOAN_COUNT_3M": 1, "LOAN_BALANCE_AMT": 30000000, "PRIVATE_LENDER_LOAN_BALANCE_AMT": 0,
+    "CARD_LIMIT_AMT": 5000000, "CARD_MONTHLY_SPEND_AMT": 3000000
+  }
+}
+```
+- 오류: 401 `UNAUTHORIZED`(토큰 없음), 404 `ASSESSMENT_NOT_FOUND`
+- 프론트: `simulationApi.js`의 `getCreditCareBase()`. mock은 SIM-02 mock의 출발 값과 같은 숫자를 돌려준다(위 예시).
+
+## N-18-5·8 시뮬레이터 점수 재계산 (SIM-02, 담당 광희) — FP-170 Spring 구현
+
+> 🆕 11/18 Spring이 B조 ML-04(`POST /v1/assessments/simulate`, [B팀 명세서](api_spec_b.md) 4-4)를 불러 이 모양으로 바꿔 돌려준다. 출발 평가는 위 SIM-01과 같다(최근 SCORED). ML-04에는 그 평가의 requestId·**저장된** MODEL_VERSION·FEATURE_SET_VERSION·피처값을 보내고, 요청 requestId는 매번 새 UUID다. 시간 제한은 ML-03과 같다(연결 1초·응답 3초).
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
@@ -404,7 +483,9 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 - 카드 한쪽만 → `changes.CARD_LIMIT_AMT` "카드 한도와 월 카드 사용액은 함께 보내야 합니다."
 - ML-04가 422를 주면 Spring이 같은 공통 형식(400)으로 바꾼다.
 
-ML-04의 그 밖의 오류를 화면에 전달하는 규칙(제안, Spring 미구현). 시뮬레이터는 결과를 저장하지 않으므로 NOT_SCORABLE로 저장하지 않고 오류를 그대로 알린다.
+그 밖의 오류: 401 `UNAUTHORIZED`(토큰 없음), 404 `ASSESSMENT_NOT_FOUND`(점수가 나온 평가가 없음).
+
+ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시뮬레이터는 결과를 저장하지 않으므로 NOT_SCORABLE로 저장하지 않고 오류를 그대로 알린다.
 
 | ML-04 응답 | Spring → 화면 | 문구 |
 |---|---|---|
@@ -414,3 +495,5 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(제안, Spring 미�
 | 연결 실패·그 밖의 5xx | 503 `MODEL_NOT_READY` | 점수 계산 서버가 준비 중입니다. 잠시 후 다시 시도해 주세요. |
 
 프론트: `features/simulation/api/simulationApi.js`의 `recalculateCreditCare({ changes })`. mock은 588점 예시에서 간단한 규칙으로 계산한다(진짜 모델 아님).
+
+- Spring 검사(11/18 구현): JSON 정수만 받는다. `12.0`처럼 소수점이 있는 값과 문자열(`"2"`)은 "0 이상의 정수를 입력해 주세요."로 막는다.
