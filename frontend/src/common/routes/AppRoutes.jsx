@@ -26,8 +26,6 @@ import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import DataInputPage from '../../features/dataInput/pages/DataInputPage.jsx'
 import JobSelectPage from '../../features/dataInput/pages/JobSelectPage.jsx'
 import CreditReportPage from '../../features/credit/pages/CreditReportPage.jsx'
-import LoanProductsPage from '../../features/loans/pages/LoanProductsPage.jsx'
-import LoanProductDetailPage from '../../features/loans/pages/LoanProductDetailPage.jsx'
 import SimulationPage from '../../features/simulation/pages/SimulationPage.jsx'
 import MarketPage from '../../features/market/pages/MarketPage.jsx'
 import AssetDebtPage from '../../features/diagnosis/pages/AssetDebtPage.jsx'
@@ -35,6 +33,8 @@ import CashFlowPage from '../../features/diagnosis/pages/CashFlowPage.jsx'
 import ScenarioPage from '../../features/scenario/pages/ScenarioPage.jsx'
 import AdminReportsPage from '../../features/admin/pages/AdminReportsPage.jsx'
 import LoungePage from '../../features/community/pages/LoungePage.jsx'
+import LoanProductsPage from '../../features/loans/pages/LoanProductsPage.jsx'
+import LoanProductDetailPage from '../../features/loans/pages/LoanProductDetailPage.jsx'
 
 // 앱 전체 라우트. 다른 팀은 자기 화면의 element 한 줄만 바꾼다(가드·경로 구조는 그대로 둔다).
 export default function AppRoutes() {
