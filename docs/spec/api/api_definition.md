@@ -7,12 +7,12 @@
   - C팀(재무 진단·시뮬레이터 등): [api_spec_c.md](api_spec_c.md)
 - **기준:** DDL v0.3.2 `docs/spec/sql/avenue_ddl.sql`(표 47개), 피처 정의서 v1.0 `docs/spec/feature_definition.md`(FP-132). DB 제약은 DDL을, 피처는 피처 정의서를 따르고, 서로 다르면 확인 대상으로 적는다.
 
-> **🆕 최근 변경 (11/18)** — 바뀐 곳에 🆕 11/18 표시
-> 1. **저장소로 옮김:** 공유 링크로만 보던 문서를 `docs/spec/api/`로 옮겼다. 이제 이 파일이 원본이다
-> 2. 2-5 DIAG-07·08·08-1에 PR #83(광희) 반영: 월 소득 표준편차 `standardDeviation`(N-22-3), 과거 월 실적 `months[]`(N-21-9), 전망 조건 쿼리 3개(N-21-2)
-> 3. 2-6 간편결제 × 12 정정: "확정"이 아니라 🟡 임시(피처 정의서 9장 미정)
-> 4. 1장에 Java DTO `isXxx` → JSON `xxx` 규칙 추가(C팀 문서 머리말에서 옮김)
+> **🆕 최근 변경 (11/19, FP-234)** — 바뀐 곳에 🆕 11/19 표시
+> 1. 2-1 **FP-219(우찬, PR #89)** 반영: AUTH-13 닉네임 중복 확인, AUTH-14·15 휴대폰 인증번호 발송·확인 추가, AUTH-06 가입에 휴대폰 인증 필수
+> 2. 2-5·2-6 **FP-170(광희, PR #93)** 반영: SIM-01·SIM-02·DIAG-09 Spring 구현 ✅ (출발 평가 = 최근 SCORED, 저장 안 함)
+> 3. 1-2 오류 표: SIM·DIAG-09 오류 정리, "Spring 미구현" 표시 삭제
 >
+> 이전 변경 (11/18): 저장소 `docs/spec/api/`로 이관, PR #83(DIAG-07 표준편차·DIAG-08 `months[]`·전망 조건) 반영, 간편결제 × 12 🟡 정정, `isXxx` 필드 규칙
 > 이전 변경 (11/17): A팀 명세(우찬) 반영(공통 규칙·오류 code·AUTH-11·12·ADM-07-1·ADM-ME-1~3), INP-03 `utility`, RPT-01 `{ requestId }`·`ALT_DATA_EMPTY`, 시뮬레이터 입력 10개 확정, C조 광희 재무 계산 API(PR #78), 커뮤니티(PR #80), ML-01~04 실제 모델 연결(PR #74·#77), Jira 번호 정정
 > 이전 변경 (11/16): 기준 DDL 47개 표, RPT-01 입력 부족 409(O-13), 대출 "해당 없음" `NO_LOAN_YN`(O-15), RPT·MEM-06·ML 구현 완료
 > 이전 변경 (11/13): 피처 정의서 v1.0(기존 19·대안 39), 시뮬레이터 입력 10개
@@ -58,7 +58,7 @@
 | 재확인 헤더 | 관리자 민감 작업은 헤더 `X-Step-Up-Token`(ADMIN_STEP_UP 토큰) 필요. 없거나 만료면 401 `STEP_UP_REQUIRED`. CORS 허용 헤더에 추가됨 | A팀 명세 0장 |
 | 쪽 넘기기 | 관리자 목록은 `page`(0부터)·`size`. 응답 `{ items, page, size, totalCount }` | A팀 명세 0장 |
 | 응답 시각 | ISO-8601 + 오프셋(`+09:00`) | A팀 명세 0장 |
-| 불리언 필드 이름 | Java DTO의 `boolean isXxx` 필드는 JSON에서 **`is`가 빠진 `xxx`**로 나간다(Lombok·Jackson 규칙). 예: `isHighVolatility` → `highVolatility` | C팀 명세 머리말 🆕 11/18 |
+| 불리언 필드 이름 | Java DTO의 `boolean isXxx` 필드는 JSON에서 **`is`가 빠진 `xxx`**로 나간다(Lombok·Jackson 규칙). 예: `isHighVolatility` → `highVolatility` | C팀 명세 머리말 |
 | 탈퇴 회원 | 행을 지우지 않고 상태만 `WITHDRAWN`으로 바꾼다. 개인정보는 정해진 값으로 덮어쓴다. 탈퇴 회원은 이미 받은 토큰으로도 401 `UNAUTHORIZED` | DDL v0.3.2 W1, A팀 명세 0장 |
 
 ### 1-1. 오류 code 목록 — A팀 범위 (우찬 명세 5장)
@@ -96,11 +96,13 @@
 
 | HTTP | code | 언제 |
 |---|---|---|
-| 400 | `INVALID_INPUT` | 예측 기간이 3·6·12가 아님(`forecastMonths`), 빈 POST 본문(`monthlyIncomes`), 금액 음수(그 필드), DSR 연소득 0(`annualIncome`), 점수 0~1000 밖(`score`), 🟡 시뮬레이터 입력 오류(`changes.<키>`) |
-| 401 | `UNAUTHORIZED` | DIAG-07-1·08-1 토큰 없음·만료 |
+| 400 | `INVALID_INPUT` | 예측 기간이 3·6·12가 아님(`forecastMonths`), 빈 POST 본문(`monthlyIncomes`), 금액 음수(그 필드), DSR 연소득 0(`annualIncome`), 점수 0~1000 밖(`score`), 시뮬레이터 입력 오류(`changes.<키>`, ML-04 422 포함), DIAG-09 조건 오류(조건 이름, ML-03 4xx 포함) 🆕 11/19 |
+| 401 | `UNAUTHORIZED` | DIAG-07-1·08-1·09, SIM-01·02 토큰 없음·만료 🆕 11/19 |
 | 404 | `NOT_FOUND` | 저장된 소득 없음(DIAG-07-1·08-1), 점수대·등급 자료 없음(SIM-04) |
-| 409 | `VERSION_MISMATCH` | 🟡 SIM-02: ML-04가 모르는 모델 버전 (Spring 미구현) |
-| 503 | `MODEL_NOT_READY` | 🟡 SIM-02: 모델 준비 안 됨, 연결 실패, 타임아웃, 그 밖의 5xx (Spring 미구현) |
+| 404 | `ASSESSMENT_NOT_FOUND` | SIM-01·02, DIAG-09: 점수가 나온(SCORED) 평가가 하나도 없음 — 리포트(RPT-02)와 같은 코드 🆕 11/19 |
+| 409 | `VERSION_MISMATCH` | SIM-02: ML-04가 출발 평가의 모델 버전을 계산할 수 없음 → "점수를 다시 산출한 뒤 이용" 안내 🆕 11/19 |
+| 409 | `INPUT_INCOMPLETE` | DIAG-09: 입력 기준월·출생연도 없음, 소득이 직군에 필요한 개월 수보다 적음(점수 산출과 같은 문구) 🆕 11/19 |
+| 503 | `MODEL_NOT_READY` | SIM-02·DIAG-09: 실제 모델 파일 없음, 연결 실패, 타임아웃, 그 밖의 5xx. 저장하지 않으므로 `MODEL_ERROR` 기록 없음 🆕 11/19 |
 
 - 커뮤니티(동주, PR #80) 오류 code: 403 `NOT_OWNER`(남의 글 수정·삭제), 404 `POST_NOT_FOUND`·`TARGET_NOT_FOUND`·`REPORT_NOT_FOUND`, 409 `OWN_CONTENT`(본인 글 신고)·`DUPLICATE_REPORT`·`POST_HIDDEN`·`STATUS_CHANGED`·`ALREADY_HANDLED`, 429 `DAILY_LIMIT_EXCEEDED`(하루 3번 초과).
 
@@ -117,15 +119,19 @@
 | AUTH-03 | `GET /api/auth/me` | N-01-2 역할별 첫 화면 이동 (로그인 정보) | `APP_USER` | USER·ADMIN | ✅ |
 | AUTH-04 | `POST /api/auth/social/exchange` | N-01-6 소셜 로그인 (코드 교환) | `USER_SOCIAL_ACCOUNT` | 없음 | ✅ |
 | AUTH-05 | `POST /api/auth/social/link` | N-01-6 소셜 로그인 (계정 연결) | `USER_SOCIAL_ACCOUNT` | 없음 | ✅ |
-| AUTH-06 | `POST /api/auth/signup` | N-02-1 가입 정보 입력·형식 검사, N-02-2 필수 동의, N-02-4 계정 생성·개인정보 암호화 저장 | `APP_USER`, `USER_CONSENT` | 없음 | ✅ |
+| AUTH-06 | `POST /api/auth/signup` | N-02-1 가입 정보 입력·형식 검사, N-02-2 필수 동의, N-02-4 계정 생성·개인정보 암호화 저장. 🆕 11/19 휴대폰 인증 필수(`phoneVerificationToken`), 이름 한글 2~20자, 닉네임 2~7자 | `APP_USER`, `USER_CONSENT` | 없음 | ✅ |
 | AUTH-07 | `POST /api/auth/email/send` | N-02-3 이메일 인증코드 발송·확인 (발송) | `VERIFICATION_CODE` | 없음 | ✅ |
 | AUTH-08 | `POST /api/auth/email/verify` | N-02-3 이메일 인증코드 발송·확인 (확인) | `VERIFICATION_CODE` | 없음 | ✅ |
 | AUTH-09 | `POST /api/auth/find-id` | N-03-1 아이디 찾기 (관리자 계정은 찾지 않음) | `APP_USER`(HMAC 조회) | 없음 | ✅ |
 | AUTH-10 | `POST /api/auth/password/reset` | N-03-2 비밀번호 찾기 본인 확인, N-03-3 비밀번호 재설정 (관리자 아이디는 "없는 계정"과 같은 404) | `APP_USER`, `VERIFICATION_CODE` | 없음 | ✅ |
 | AUTH-11 | `POST /api/auth/admin/verify-code` | 관리자 로그인 2단계 인증 (6자리 번호). 통과 `{ token, user }`, 임시 비밀번호면 `{ passwordChangeRequired, passwordSetupToken }` | `VERIFICATION_CODE`(`ADMIN_LOGIN`) | 없음(challengeToken) | ✅ |
 | AUTH-12 | `POST /api/auth/admin/password-setup` | 관리자 첫 비밀번호 설정 `{ passwordSetupToken, newPassword }` → `{ token, user }` | `APP_USER` | 없음(setup 토큰) | ✅ (새 경로) |
+| AUTH-13 | `POST /api/auth/nickname/check` | N-02-1 닉네임 중복 확인 `{ nickname }` → `{ available }` (주소에 닉네임을 남기지 않으려고 POST, 가입 때 서버가 다시 막음) | `APP_USER` | 없음 | ✅ (FP-219, PR #89) 🆕 11/19 |
+| AUTH-14 | `POST /api/auth/phone/send` | N-02-3 휴대폰 인증번호 발송 `{ phone, purpose }` → `{ expiresInSeconds }` (`purpose`는 `SIGNUP`만, 실제 문자 발송 없음 — 개발용 로그·고정 번호) | `VERIFICATION_CODE`(`PHONE`) | 없음 | ✅ (FP-219, PR #89) 🆕 11/19 |
+| AUTH-15 | `POST /api/auth/phone/verify` | N-02-3 휴대폰 인증번호 확인 `{ phone, code, purpose }` → `{ verificationToken }` (10분, AUTH-06 `phoneVerificationToken`에 넣음) | `VERIFICATION_CODE`(`PHONE`) | 없음 | ✅ (FP-219, PR #89) 🆕 11/19 |
 
 - `user` = `{ userId, name, role, jobType, hasScore }`. AUTH-11·12의 토큰 필드 이름은 `token`(AUTH-01은 `accessToken`), 화면은 둘 다 받는다.
+- AUTH-13~15 요청·응답·오류 상세는 [A팀 명세서](api_spec_a.md) 1장. 휴대폰 번호는 원문 없이 HMAC과 인증번호 해시만 저장한다. 🆕 11/19
 
 ### 2-2. 마이페이지 — 담당 우찬 (FP-77)
 
@@ -186,16 +192,16 @@
 | DIAG-04 | `POST /api/diagnosis/scenario/recalculate` | N-17-3 공통 재계산 틀, N-17-4 상환 여력 재계산 | 위 + `FACT_POLICY_RATE` | USER | 광희 (FP-167) | 🟡 (프론트 mock만 있음) |
 | DIAG-05 | `GET /api/finance/policy-rates` | N-17-2 시나리오 입력 (기준금리) | `FACT_POLICY_RATE` | USER | 동주 | 🟡 |
 | DIAG-06 | `POST /api/diagnosis/dsr/calculate` | N-20-4 DSR 계산·위험 단계 (요청 본문 `{ annualIncome, annualDebtService }`) | — | USER | 광희 (FP-166) | ✅ |
-| DIAG-07 | `POST /api/diagnosis/income-volatility` | N-22-3 변동성 지표 계산(월 소득 표준편차 `standardDeviation` 포함 🆕 11/18), N-22-4 성수기·비수기 소득 격차 계산, N-22-5 소득 부족 달 확인 (요청 본문으로 계산, DB 안 읽음) | — | USER | 광희 (FP-203) | ✅ |
+| DIAG-07 | `POST /api/diagnosis/income-volatility` | N-22-3 변동성 지표 계산(월 소득 표준편차 `standardDeviation` 포함), N-22-4 성수기·비수기 소득 격차 계산, N-22-5 소득 부족 달 확인 (요청 본문으로 계산, DB 안 읽음) | — | USER | 광희 (FP-203) | ✅ |
 | DIAG-07-1 | `GET /api/diagnosis/income-volatility` | N-22-1 저장 데이터 조회 + N-22-3·4·5 (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM` | USER | 광희 (FP-203) | ✅ |
-| DIAG-08 | `POST /api/diagnosis/cash-flow/forecast` | N-21-5 현금흐름 전망 계산, N-21-6 최근 12개월 적자 개월 수 계산, N-21-7 성수기·비수기 소득 격차 계산, N-21-9 과거 월 실적 `months[]`(요청의 `past12MonthsHistory`를 같은 모양으로 돌려줌 🆕 11/18) (요청 본문으로 계산, DB 안 읽음) | — | USER | 광희 (FP-203) | ✅ |
-| DIAG-08-1 | `GET /api/diagnosis/cash-flow/forecast` | N-21-1 저장 데이터 조회 + N-21-2 전망 조건(쿼리, `incomeVariationPct`·`fixedExpenseAmount`·`paymentStatus` 추가 🆕 11/18) + N-21-5·6·7 + N-21-9 과거 월 실적 `months[]`(최대 12개 🆕 11/18) (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM`, `USER_LOAN` | USER | 광희 (FP-203) | ✅ |
-| DIAG-09 | `POST /api/diagnosis/cash-flow/expected-score` | N-21-8 예상 대안 점수 재계산 (FastAPI ML-03 호출, 저장 안 함 — O-6 확정) | 읽기만 | USER | 광희 + 범영 | 🟡 |
+| DIAG-08 | `POST /api/diagnosis/cash-flow/forecast` | N-21-5 현금흐름 전망 계산, N-21-6 최근 12개월 적자 개월 수 계산, N-21-7 성수기·비수기 소득 격차 계산, N-21-9 과거 월 실적 `months[]`(요청의 `past12MonthsHistory`를 같은 모양으로 돌려줌) (요청 본문으로 계산, DB 안 읽음) | — | USER | 광희 (FP-203) | ✅ |
+| DIAG-08-1 | `GET /api/diagnosis/cash-flow/forecast` | N-21-1 저장 데이터 조회 + N-21-2 전망 조건(쿼리, `incomeVariationPct`·`fixedExpenseAmount`·`paymentStatus` 추가) + N-21-5·6·7 + N-21-9 과거 월 실적 `months[]`(최대 12개) (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM`, `USER_LOAN` | USER | 광희 (FP-203) | ✅ |
+| DIAG-09 | `POST /api/diagnosis/cash-flow/expected-score` | N-21-8 예상 대안 점수 재계산 (FastAPI ML-03을 ACTIVE 모델로 1번 호출, 저장 안 함 — O-6 확정). 응답 `expectedScore`·`scoreDiff`·`modelVersion`·`baseModelVersion` | 읽기만 (`ASSESSMENT` 최근 SCORED, 입력 표) | USER | 광희 (FP-170) | ✅ (PR #93) 🆕 11/19 |
 | ~~DIAG-10~~ | ~~`GET /api/commercial/dongs/{admDongCode}`~~ | N-24-2 소상공인 상권 분석, N-24-3 상권 분석 차트, N-24-5 행정동 상세 창 | — (상권 표 5개는 DDL에서 제거, 11/14) | USER | C조 | ⛔ **API 만들지 않음** — 화면이 정적 JSON(`frontend/public/data/market/`)을 읽는다(N-24 결정) |
 | ~~DIAG-11~~ | ~~`GET /api/commercial/heatmap`~~ | N-24-4 상권 공간 시각화 (지도 히트맵) | 위와 같음 | USER | C조 | ⛔ 위와 같음 |
 
-- C팀(광희) API의 요청·응답 상세와 오류 문구는 [api_spec_c.md](api_spec_c.md)에 있다. 🆕 11/18
-- DIAG-08-1 화면 조건이 범위 밖이면 400 `INVALID_INPUT`(`fieldErrors[0].field` = 쿼리 이름). `paymentStatus`는 지금 값만 검사하고 계산에 쓰지 않는다(DIAG-09 예상 점수에서 쓸 예정). 🆕 11/18
+- C팀(광희) API의 요청·응답 상세와 오류 문구는 [api_spec_c.md](api_spec_c.md)에 있다.
+- DIAG-08-1 화면 조건이 범위 밖이면 400 `INVALID_INPUT`(`fieldErrors[0].field` = 쿼리 이름). `paymentStatus`는 지금 값만 검사하고 계산에 쓰지 않는다. DIAG-09도 아직 반영하지 않는다(`paymentStatusApplied: false`). '밀림' 반영 방식(제안: 최근 1년 연체 횟수 +1)은 팀 결정 대기. 🆕 11/19
 - `/api/income`이 프론트 코드에 1번 나온다. 어느 기능의 경로인지 확인이 필요하다.
 - DIAG-07-1·08-1은 회원 번호를 URL로 받지 않고 `Authorization: Bearer` 토큰의 회원만 조회한다. 토큰이 없으면 401 `UNAUTHORIZED`다. 공통 규칙(1장)의 "내 데이터는 `/api/members/me/**`"와 경로가 달라 Q-8에서 정한다.
 - DIAG-07-1·08-1 저장 데이터 규칙: 기준월 = `USER_INCOME_MONTH`의 가장 늦은 `BASE_MONTH`(DDL 11/10 결정). 지출·대출도 같은 달 값을 쓴다(그 달에 행이 없으면 0). 급여소득자는 월급 1행을 12개월로 펼친다.
@@ -207,8 +213,8 @@
 
 | ID | 메서드 · 경로 | 기능 | 주요 표 | 인증 | 상태 |
 |---|---|---|---|---|---|
-| SIM-01 | `GET /api/simulation/credit-care/base` | N-18-1 저장 데이터 조회, N-18-10 내 실제 값으로 되돌리기 (입력 10개의 원래 값. 10번째 공과금 미납 개월 수 ✅ 11/17 확정) | `ASSESSMENT.FEATURE_SNAPSHOT`, `USER_CREDIT_PROFILE` | USER | 🟡 (FP-170에서 구현 예정) |
-| SIM-02 | `POST /api/simulation/credit-care/recalculate` | N-18-4 공통 재계산 틀, N-18-5 모델 점수 재계산, N-18-6 부도 확률 변화 계산, N-18-8 감점 요인 상위 3개 안내, N-18-9 결과 표시 | 읽기만 (FastAPI **ML-04** 호출) | USER | 🟡 Spring 미구현 (FP-170) / ✅ mock — ML-04 형식 |
+| SIM-01 | `GET /api/simulation/credit-care/base` | N-18-1 저장 데이터 조회, N-18-10 내 실제 값으로 되돌리기 (입력 10개의 원래 값과 출발 점수·등급. 피처값 전체는 보내지 않음) | `ASSESSMENT`(최근 SCORED의 `FEATURE_SNAPSHOT`) | USER | ✅ (FP-170, PR #93) 🆕 11/19 |
+| SIM-02 | `POST /api/simulation/credit-care/recalculate` | N-18-4 공통 재계산 틀, N-18-5 모델 점수 재계산, N-18-6 부도 확률 변화 계산, N-18-8 감점 요인 상위 3개 안내, N-18-9 결과 표시 | 읽기만 (FastAPI **ML-04** 호출) | USER | ✅ (FP-170, PR #93) 🆕 11/19 |
 | SIM-03 | `GET`·`POST /api/simulation/loans/recommend` | N-18-7 같은 점수대 금리·한도·상품 조회 | `SCORE_BAND_OFFER`, `LOAN_PRODUCT` | USER | ✅ mock (담당 확인 필요, Q-9) |
 | SIM-04 | `GET /api/simulation/score-band-offer?score=` | N-18-7 같은 점수대 참고 금리·한도·등급 (상품 없음, 더미 데이터 표시 `dummyNotice`) | `SCORE_BAND_OFFER`, `SCORE_GRADE_BAND` (ACTIVE 버전) | USER | ✅ (FP-208) |
 
@@ -219,7 +225,7 @@
   4. 바꿀 수 있는 입력은 10개로 확정(공과금 미납 개월 수 `UTILITY_LATE_MONTHS` 포함, 11/17 범영). 통신비 정시 납부 범위는 0~12개월이다(B팀 명세서 4-4).
 - ✅ 11/17 광희 확인: SIM-02는 ML-04 규칙(10개 키, 모르는 키 422, 카드 한도·사용액 함께, 바뀌지 않은 값은 보내지 않음)에 맞춰 처음부터 만든다. ML-04 422의 `fieldErrors`는 공통 `INVALID_INPUT`으로 바꿔 화면에 전달한다.
 - ✅ 11/17 범영 결정: **입력 범위 검사는 Spring SIM-02가 화면 범위로 먼저 한다.** FastAPI ML-04는 지금 범위를 검사하지 않고 그대로 계산한다(소수는 정수로 자름).
-- SIM-02 범위: 10개 키 모두 0 이상 정수, `TELECOM_ON_TIME_MONTHS`·`UTILITY_LATE_MONTHS`는 0~12. 나머지 상한은 화면 슬라이더 범위가 정해지면 추가한다. `EASYPAY_MONTHLY_COUNT`는 **월 횟수 그대로** 보낸다. 🟡 FastAPI ML-04가 지금은 × 12로 12개월 값을 만들지만, 변환 방식은 피처 정의서 9장에서 아직 정하지 않았다(코드 TODO). 🆕 11/18 `null`은 키를 뺀 것과 같다.
+- SIM-02 범위: 10개 키 모두 0 이상 정수, `TELECOM_ON_TIME_MONTHS`·`UTILITY_LATE_MONTHS`는 0~12. 나머지 상한은 화면 슬라이더 범위가 정해지면 추가한다. `EASYPAY_MONTHLY_COUNT`는 **월 횟수 그대로** 보낸다. 🟡 FastAPI ML-04가 지금은 × 12로 12개월 값을 만들지만, 변환 방식은 피처 정의서 9장에서 아직 정하지 않았다(코드 TODO). `null`은 키를 뺀 것과 같다.
 - SIM-02 응답 = ML-04 응답에서 `requestId`·`shap`을 빼고 감점 요인에 `featureName`을 더한다(그 평가의 `FEATURE_SET_VERSION`으로 `DIM_FEATURE` 조회. Mock `FS-DRAFT` 39개 / 실제 `FS-V1` 38개).
 - SIM-02 오류 전달: ML-04 422 → 400 `INVALID_INPUT`, 503 `MODEL_NOT_READY` → 503, 409 `VERSION_MISMATCH` → 409(점수를 다시 산출하라는 안내), 연결 실패·타임아웃·그 밖의 5xx → 503 `MODEL_NOT_READY`. 시뮬레이터는 저장하지 않으므로 NOT_SCORABLE로 저장하지 않는다.
 - SIM-04는 금리·한도·등급만 돌려주는 실제 API다. SIM-03(상품 3개 포함)을 만들 때는 SIM-04의 서비스(`ScoreBandOfferService.findOffer`)를 재사용한다.
@@ -248,7 +254,7 @@
 | COMM-06 | `GET`·`POST /api/board/posts/{postId}/comments` | N-06-3 댓글 작성·조회 (1000자) | `BOARD_COMMENT` | USER | ✅ (PR #80) |
 | COMM-07 | `POST /api/reports` | N-06-4 신고하기 진입, N-33-1 신고 접수, N-33-2 기준 건수 자동 숨김 (본인 글 불가, 같은 대상 중복 불가, 하루 3번, '기타'만 상세 500자) | `CONTENT_REPORT`, `APP_SETTING` | USER | ✅ (PR #80) |
 
-- 게시글 본문은 DDL C9로 `CLOB` → `VARCHAR2(1300 CHAR)`(PR #80). 기존 DB는 `docs/spec/sql/alter_board_post_content_varchar2.sql`. **공용 DB 적용은 시연(11/18) 이후 DB 담당(범영)이 한다.** CLOB 상태의 DB에서도 글쓰기·검색·수정·삭제가 동작하는 것을 11/17 로컬에서 확인했다.
+- 게시글 본문은 DDL C9로 `CLOB` → `VARCHAR2(1300 CHAR)`(PR #80). 기존 DB는 `docs/spec/sql/alter_board_post_content_varchar2.sql`. 공용 DB는 11/18 적용 완료(범영). 🆕 11/19 CLOB 상태의 DB에서도 글쓰기·검색·수정·삭제가 동작하는 것을 11/17 로컬에서 확인했다.
 - 탈퇴 회원 글은 그대로 두고 작성자만 "탈퇴한 회원"으로 표시한다. 알림(D-25)은 넣지 않았다.
 
 ### 2-9. 도움말·AI — 담당 광희 (FP-179)
@@ -299,7 +305,7 @@
 
 - FastAPI는 DB를 읽거나 쓰지 않는다. 저장은 Spring이 한다. 상세는 B팀 명세서 4장에 있다.
 - **모델 선택 (PR #74):** Spring이 보내는 모델 버전(= DB `MODEL_REGISTRY`의 ACTIVE)으로 FastAPI가 계산기를 고른다. `DEV-DUMMY` → Mock(`FS-DRAFT` 39개), `LGBM-BASE-0.1` → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`. 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503 `MODEL_NOT_READY`.
-- **모델 파일 확인 (PR #77):** `fastapi_server/artifacts/SHA256SUMS.txt`가 있으면 서버가 켜질 때 모델 파일 해시를 대조하고, 다르면 열지 않는다. 공용 DB는 시연(11/18)까지 `DEV-DUMMY`이고, 실제 모델 전환은 시연 이후 DB 담당이 한다(FP-216). `/v1/health`의 해시 확인 표시(`hashVerified`)는 2차 후보(FP-215).
+- **모델 파일 확인 (PR #77):** `fastapi_server/artifacts/SHA256SUMS.txt`가 있으면 서버가 켜질 때 모델 파일 해시를 대조하고, 다르면 열지 않는다. 공용 DB는 11/18 17:52 `LGBM-BASE-0.1`로 전환 완료, 학습 데이터·모델 파일 기록 등록(FP-216, PR #88). 🆕 11/19 `/v1/health`의 해시 확인 표시(`hashVerified`)는 2차 후보(FP-215).
 
 ### 2-12. 내부 연동: Spring → 가상 기관(mock 서버) — A팀
 
