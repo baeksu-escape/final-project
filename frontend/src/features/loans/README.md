@@ -4,7 +4,7 @@ UI 출처는 Claude Artifact `5unyCwrGcxS3WrWFUk9qid`, 버전 `1794641606-4f83`�
 
 ## 연결과 API
 
-- `/loans`: `loans/pages/LoanProductsPage.jsx`, `/loans/:productId`: `LoanProductDetailPage.jsx`. 라우트 파라미터 이름은 `productId`지만 값은 productCode다.
+- `/loans`: `loans/pages/LoanProductsPage.jsx`, `/loans/:productId`: `LoanProductDetailPage.jsx`. 라우트 파라미터 이름도 `productCode`다.
 - 공용 카드: `loans/components/LoanProductCard.jsx`, props `product`, `score`, `workerTypeCode`. 시뮬레이터 추천도 이 카드를 쓴다.
 - `loans/api/loanCatalog.js`: `getLoanProducts()`, `getLoanProduct(productCode)`, `matchesLoanScore(product, score)`, `useLoanFavorites(userId)`(반환 `{ favorites, toggleFavorite, available }`).
 
@@ -27,6 +27,7 @@ UI 출처는 Claude Artifact `5unyCwrGcxS3WrWFUk9qid`, 버전 `1794641606-4f83`�
 |---|---|---|
 | productCode | 서버 | 목록 key·상세 주소·즐겨찾기 키 |
 | name / providerName / description | 서버 | |
+| summary | 서버 | 상세 배너 한 줄 소개(비면 배너 문단 생략). 아래 "상품 설명" 카드는 description |
 | rateMinPct / rateMaxPct | 서버 | 금리 범위 표시 |
 | limitAmount | 서버 | 원 단위 최대 한도 |
 | minScore | 서버 | 0 또는 NULL이면 점수 조건 없음 |

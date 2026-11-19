@@ -10,12 +10,12 @@ import '../styles/loans.css'
 
 // N-37-2·N-37-3 선택 상품을 표시한다. 신청은 외부 전송 없이 안내 모달만 연다.
 export default function LoanProductDetailPage() {
-  const { productId } = useParams()
+  const { productCode } = useParams()
   // N-37-2 목록에서 들어왔으면 필터가 담긴 목록 주소로, 그 밖(시뮬레이터 등)에서는 기본 목록으로 돌아간다.
   const from = useLocation().state?.from
   const listPath = typeof from === 'string' && from.startsWith(PATHS.LOANS) ? from : PATHS.LOANS
   const { user } = useAuth()
-  const { products, score, gradeBandCode, loading, error, scoreNotice, scoreError, reload } = useLoanCatalog(user?.userId, productId)
+  const { products, score, gradeBandCode, loading, error, scoreNotice, scoreError, reload } = useLoanCatalog(user?.userId, productCode)
   const { favorites, toggleFavorite, available } = useLoanFavorites(user?.userId)
   const [applying, setApplying] = useState(false)
   const product = products[0]
@@ -24,7 +24,7 @@ export default function LoanProductDetailPage() {
   if (!product) return <div className="loans-page"><h1>상품을 찾을 수 없습니다.</h1><Link to={listPath}>대출 상품 목록으로</Link></div>
   return <div className="loans-page">
     <Link to={listPath}>‹ 대출 상품 목록</Link>
-    <header className={`loan-detail-banner loan-banner--${product.providerTheme}`}><span>{product.providerName} · 예시 상품</span><h1>{product.name}</h1><p>{product.description}</p></header>
+    <header className={`loan-detail-banner loan-banner--${product.providerTheme}`}><span>{product.providerName} · 예시 상품</span><h1>{product.name}</h1>{product.summary && <p>{product.summary}</p>}</header>
     <Notice>더미 상품 · 실제 상품 아님. UI 시연용 임시 자료입니다. 금리·한도는 같은 점수대의 참고 정보이며 실제 심사·승인 결과가 아닙니다.</Notice>
     <div className="loan-detail-facts">
       <div><span>금리</span><strong>연 {product.rateMinPct.toFixed(1)}~{product.rateMaxPct.toFixed(1)}%</strong></div>
