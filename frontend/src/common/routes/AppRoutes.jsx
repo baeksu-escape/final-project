@@ -26,6 +26,7 @@ import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import DataInputPage from '../../features/dataInput/pages/DataInputPage.jsx'
 import JobSelectPage from '../../features/dataInput/pages/JobSelectPage.jsx'
 import CreditReportPage from '../../features/credit/pages/CreditReportPage.jsx'
+import SimulationPage from '../../features/simulation/pages/SimulationPage.jsx'
 import MarketPage from '../../features/market/pages/MarketPage.jsx'
 import AdminReportsPage from '../../features/admin/pages/AdminReportsPage.jsx'
 import LoungePage from '../../features/community/pages/LoungePage.jsx'
@@ -68,7 +69,7 @@ export default function AppRoutes() {
               <Route path={PATHS.SCENARIO} element={<PlaceholderPage title="시나리오 테스트" nId="N-17" />} />
               <Route path={PATHS.CASH_FLOW} element={<PlaceholderPage title="현금흐름·소득 변동성" nId="N-21·N-22" />} />
               <Route path={PATHS.MARKET} element={<MarketPage />} />
-              <Route path={PATHS.SIMULATOR} element={<PlaceholderPage title="신용케어 시뮬레이터" nId="N-18" />} />
+              <Route path={PATHS.SIMULATOR} element={<SimulationPage />} />
             </Route>
             {/* 점수 없이도 여는 화면 */}
             <Route path={PATHS.LOANS} element={<LoanProductsPage />} />

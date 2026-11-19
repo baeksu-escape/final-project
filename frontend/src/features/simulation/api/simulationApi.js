@@ -1,3 +1,59 @@
+import { INPUT_KEYS, describeSimulationError, fromCreditCareBase, toSimulationChanges, validateInputs } from '../adapters/simulationAdapter.js'
+
+// N-18-1 SIM-01로 회원의 시뮬레이터 입력 10개 현재값과 현재 대안 점수를 불러온다. 실패는 안내 문구가 담긴 오류로 바꿔 던진다.
+export async function getSimulationInputs(userId) {
+  if (userId == null) throw new Error('로그인 정보가 없어 값을 불러올 수 없습니다.')
+  try {
+    return fromCreditCareBase(await getCreditCareBase())
+  } catch (error) {
+    throw new Error(describeSimulationError(error), { cause: error })
+  }
+}
+
+// N-18-5 바꾼 값 10개로 예상 점수를 다시 구한다. 결과는 저장하지 않고 기존 평가를 덮어쓰지 않는다.
+export async function recalculateSimulation({ userId, currentScore, baseline, values }) {
+  if (userId == null) throw new Error('로그인 정보가 없어 계산할 수 없습니다.')
+  // 요청 전에 화면과 같은 규칙으로 먼저 막는다(음수·NULL·소수·범위 밖 거부). 브라우저 안의 검사이며 서버 검증을 대신하지 않는다.
+  if (!(Number.isInteger(currentScore) && currentScore >= 0 && currentScore <= 1000)) throw new Error('현재 점수는 0~1000 정수여야 합니다.')
+  if (!hasExactInputKeys(values)) throw new Error('계산 입력은 정해진 10개 항목이어야 합니다(누락·추가 항목 거부).')
+  const valuesError = validateInputs(values, baseline)
+  if (valuesError) throw new Error(valuesError)
+  if (!hasExactInputKeys(baseline) || validateInputs(baseline, baseline)) throw new Error('저장된 내 실제 값이 비었거나 올바르지 않아 시연 계산을 할 수 없습니다.')
+  // N-18-5 SIM-02 재계산과 N-18-7 SIM-04 점수대 참고 금리·한도를 부른다. 서버 오류 코드는 안내 문구로 바꿔 던진다.
+  let response, beforeOffer, afterOffer
+  try {
+    response = await recalculateCreditCare({ changes: toSimulationChanges(values, baseline) })
+    ;[beforeOffer, afterOffer] = await Promise.all([
+      getScoreBandOfferInfo(response.before.score),
+      getScoreBandOfferInfo(response.after.score),
+    ])
+  } catch (error) {
+    throw new Error(describeSimulationError(error), { cause: error })
+  }
+  const side = (score, offer) => ({
+    score: score.score,
+    gradeCode: score.gradeBandCode,
+    defaultProbability: score.defaultProb,
+    interestRatePct: offer.expectedAvgRate,
+    limitAmount: offer.expectedLimitAmount,
+  })
+  return {
+    current: side(response.before, beforeOffer),
+    changed: side(response.after, afterOffer),
+    financialImpact: response.delta.financialEffect,
+    alternativeImpact: response.delta.alternativeEffect,
+    source: response.modelVersion,
+    topReductionFactors: response.topReductionFactors,
+  }
+}
+
+// 입력 묶음이 정해진 10개 키만 정확히 가졌는지 본다.
+function hasExactInputKeys(input) {
+  if (!input || typeof input !== 'object') return false
+  const keys = Object.keys(input)
+  return keys.length === INPUT_KEYS.length && INPUT_KEYS.every((key) => Object.hasOwn(input, key))
+}
+
 import { apiGet, apiPost } from '../../../common/api/client.js'
 // mock 모드에서 쓸 응답을 자동 등록한다 (VITE_USE_MOCK=false면 등록돼도 무시됨)
 import '../mocks/simulationMockHandlers.js'
@@ -33,4 +89,3 @@ export function getCreditCareBase() {
 export function recalculateCreditCare(payload) {
   return apiPost(SIMULATION_API.RECALCULATE_CREDIT_CARE, payload)
 }
-
