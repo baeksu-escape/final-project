@@ -1,6 +1,6 @@
 import { Card } from '../../../common/components/index.js'
 import { DIST_BIN_COUNT } from '../config/marketConfig.js'
-import { binOf, formatMetric, histogram, scoreOf } from '../utils/marketStats.js'
+import { formatMetric, heatOf, histogram } from '../utils/marketStats.js'
 
 const W = 300
 const H = 120
@@ -34,7 +34,7 @@ export default function DongDistribution({ metric, stats, rows }) {
               width={W / DIST_BIN_COUNT - 2}
               height={bh}
               rx="2"
-              className={`market-chart__bar market-bin--${binOf(scoreOf(center, stats, metric))}`}
+              className={`market-chart__bar market-heat--${heatOf(center, stats)}`}
             >
               <title>{`${formatMetric(metric, bin.from)} ~ ${formatMetric(metric, bin.to)}: ${bin.count}곳`}</title>
             </rect>

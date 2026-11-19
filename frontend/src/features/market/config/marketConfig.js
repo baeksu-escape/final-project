@@ -10,7 +10,16 @@ export const MAP_METRICS = Object.freeze([
   { key: 'livingPopYoY', signed: true, desc: '작년 같은 분기와 비교한 생활인구 변화' },
 ])
 
-// 서울 평균에서 떨어진 정도(표준편차 단위, 좋은 쪽이 +)에 따른 색 구간. 색 값은 market.css의 --market-* 변수.
+// 지도 밖에서 쓰는 지표의 뜻(상세 창 지표 카드 설명). 지도 지표 5개의 뜻은 위 MAP_METRICS.desc.
+export const OTHER_METRICS = Object.freeze([
+  { key: 'storeCount', desc: '이 동에 있는 이 업종 점포 수' },
+  { key: 'salesPerStore', desc: '점포 한 곳의 3개월(분기) 평균 추정 매출' },
+])
+
+// 지도 색 단계 수 — 행정동 값을 작은 값부터 5등분해 연한 빨강(낮음) → 진한 빨강(높음)으로 칠한다(1차 시연 후속).
+export const HEAT_STEPS = 5
+
+// 서울 평균에서 떨어진 정도(표준편차 단위, 좋은 쪽이 +)에 따른 구간. 지도 색이 아니라 "평균보다 좋음·나쁨" 글자 판정에 쓴다.
 export const HEAT_BINS = Object.freeze([
   { key: 'neg3', min: -Infinity, max: -1.5 },
   { key: 'neg2', min: -1.5, max: -0.75 },
@@ -37,3 +46,10 @@ export const DIST_BIN_COUNT = 14
 // 분포 막대 범위(하위·상위 백분위). 밖의 값은 양 끝 막대에 모은다
 export const DIST_RANGE = Object.freeze([0.05, 0.95])
 export const RANK_LIST_SIZE = 5
+
+// 행정동 상세 창 탭(1차 시연 후속 — 한 화면에 다 보이면 읽기 어려워 셋으로 나눴다)
+export const DETAIL_TABS = Object.freeze([
+  { value: 'summary', label: '요약' },
+  { value: 'trend', label: '추이·순위' },
+  { value: 'categories', label: '업종 순위' },
+])

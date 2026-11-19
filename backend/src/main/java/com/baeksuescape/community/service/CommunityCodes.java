@@ -32,6 +32,7 @@ public final class CommunityCodes {
     public static final String REPORT_IN_REVIEW = "IN_REVIEW";
     public static final String REPORT_DONE = "DONE";
     public static final String REPORT_REJECTED = "REJECTED";
+    // 숨김 유지 — FP-224부터 새 처리에는 쓰지 않는다. 이전 처리 기록(CONTENT_REPORT.RESULT_CODE)에 남아 있어 값은 지우지 않는다.
     public static final String RESULT_KEEP_HIDDEN = "KEEP_HIDDEN";
     public static final String RESULT_DELETE = "DELETE";
     public static final String RESULT_REJECT = "REJECT";
