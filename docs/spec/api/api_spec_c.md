@@ -6,6 +6,7 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
+> - 🆕 11/19 (광희, FP-170 추가 수정) 저장 데이터를 읽는 API 5개를 팀 공통 규칙대로 `/api/members/me/**`로 옮기고 옛 경로를 지웠다(우찬 님 합의): SIM-01 `credit-care-base`, SIM-02 `credit-care-recalculate`, DIAG-07-1 `income-volatility`, DIAG-08-1 `cash-flow-forecast`, DIAG-09 `cash-flow-expected-score`. 로그인 확인은 보안 설정이 한다(토큰 없음 401, 관리자 403). SIM-01에 `topReductionFactors`, DIAG-08-1에 기준값 3개(`baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`)를 추가했다(경환 님 요청).
 > - 🆕 11/18 (광희, FP-170) SIM-01 `credit-care/base`·DIAG-09 `cash-flow/expected-score` 추가, SIM-02 Spring 구현(출발 평가 = 최근 SCORED, 404 `ASSESSMENT_NOT_FOUND`).
 
 ---
@@ -14,8 +15,8 @@
 
 | 메서드 | 경로 | 용도 | 데이터 출처 |
 |---|---|---|---|
-| GET | `/api/diagnosis/income-volatility` | DIAG-07-1 · N-22 소득 변동성 진단 (로그인 회원) | DB(저장 데이터) |
-| GET | `/api/diagnosis/cash-flow/forecast?…조건` | DIAG-08-1 · N-21 현금흐름 전망 (로그인 회원) | DB + 쿼리 조건 |
+| GET | `/api/members/me/income-volatility` 🆕 11/19 | DIAG-07-1 · N-22 소득 변동성 진단 (로그인 회원) | DB(저장 데이터) |
+| GET | `/api/members/me/cash-flow-forecast?…조건` 🆕 11/19 | DIAG-08-1 · N-21 현금흐름 전망 (로그인 회원) | DB + 쿼리 조건 |
 | POST | `/api/diagnosis/income-volatility` | DIAG-07 · N-22 계산만 (값을 본문으로 받음) | 요청 본문 |
 | POST | `/api/diagnosis/cash-flow/forecast` | DIAG-08 · N-21 계산만 (값을 본문으로 받음) | 요청 본문 |
 
@@ -23,9 +24,10 @@
 
 - **화면은 GET을 쓴다.** POST는 FP-183에서 만든 계산 전용 경로로, 지우지 않고 남겨 둔다.
 - **GET은 로그인한 회원 본인 것만 조회한다.** 회원은 `Authorization: Bearer <토큰>`에서 찾고, 주소로 회원 번호를 받지 않는다(11/17 변경, 이전의 `?userId=` 쿼리는 없어졌다. 보내도 무시한다).
-- `/api/diagnosis/**`는 아직 임시 개방 경로라 보안 설정이 막지 않으므로 컨트롤러가 직접 401을 낸다. TODO(A조 협의): 임시 개방 목록에서 빼면 보안 설정이 먼저 막는다.
+- 🆕 11/19 저장 데이터를 읽는 GET은 팀 공통 규칙(내 데이터 = `/api/members/me/**`)대로 옮겼다. 옛 GET 경로(`/api/diagnosis/income-volatility`, `/api/diagnosis/cash-flow/forecast`)는 지웠다. 같은 주소의 POST(DIAG-07·08)는 그대로이고, 그 주소로 GET을 보내면 405다.
+- 🆕 11/19 로그인 확인은 보안 설정이 한다(`/api/members/me/**` = `ROLE_USER`). 토큰이 없으면 401, 관리자 계정이면 403이다. 요청 본문만 쓰는 POST는 임시 개방 경로(`/api/diagnosis/**`)에 남는다.
 - 오류:
-  - 로그인 토큰이 없거나 쓸 수 없으면(만료·잠금·탈퇴) `401 UNAUTHORIZED` "로그인이 필요합니다."
+  - 로그인 토큰이 없거나 쓸 수 없으면(만료·잠금·탈퇴) `401 UNAUTHORIZED` "로그인이 필요합니다." 관리자 계정이면 `403 FORBIDDEN` 🆕 11/19
   - 저장된 소득이 없으면 `404 NOT_FOUND`
   - 예측 기간(`forecastMonths`)이 3·6·12가 아니면 `400 INVALID_INPUT` (GET 쿼리·POST 본문 공통)
   - GET 현금흐름의 화면 조건이 범위 밖이면 `400 INVALID_INPUT`, `fieldErrors[0].field` = 쿼리 이름 (11/17 추가): `incomeVariationPct`가 0~200 정수가 아님 "소득 변동 폭은 0~200% 정수여야 합니다.", `fixedExpenseAmount`가 음수 "월 고정 지출은 0 이상의 원 단위 정수여야 합니다.", `paymentStatus`가 `ON_TIME`·`DELAYED`가 아님 "납부 상태를 선택해 주세요." DB를 읽기 전에 검사한다.
@@ -45,7 +47,7 @@
 
 - 기준월은 DDL 11/10 결정대로 `USER_INCOME_MONTH`의 가장 늦은 `BASE_MONTH` 하나로 정하고, 지출·대출도 같은 달 값을 쓴다(테이블마다 최신 달을 따로 잡으면 서로 다른 달 값이 섞이므로, 11/17 리뷰 반영).
 
-### GET `/api/diagnosis/income-volatility` (DIAG-07-1)
+### GET `/api/members/me/income-volatility` (DIAG-07-1) 🆕 11/19 경로 이동
 
 요청: 쿼리 없음, `Authorization: Bearer <토큰>`
 
@@ -101,7 +103,7 @@
 }
 ```
 
-### GET `/api/diagnosis/cash-flow/forecast` (DIAG-08-1)
+### GET `/api/members/me/cash-flow-forecast` (DIAG-08-1) 🆕 11/19 경로 이동
 
 요청 쿼리 (N-21-2 전망 조건):
 
@@ -143,8 +145,13 @@
 | `months[].baseMonth` | 문자열 | 기준월 `"YYYY-MM"` | N-21-9 |
 | `months[].incomeAmount` | 정수 | 그 달 소득. 급여소득자는 월급을 12개월로 펼친 값 | N-21-9 |
 | `months[].expenseAmount` | 정수 | 월 지출 합계. 지출은 월별이 아니라 평소 월 금액 하나만 저장되므로 매달 같은 값 | N-21-9 |
+| `baseFixedExpenseAmount` 🆕 11/19 | 정수 | 저장된 월 고정지출(FIXED 합계). 화면 고정지출 슬라이더의 처음 값. 조건(`fixedExpenseAmount`)을 보내도 저장값 그대로다 | N-21-1·2 |
+| `baseOtherExpenseAmount` 🆕 11/19 | 정수 | 기타 지출 = 월 지출 합계 − 고정지출(할부·정기결제·기타) | N-21-1·2 |
+| `baseMonthlyLoanPayment` 🆕 11/19 | 정수 | 저장된 월 대출 원리금 합계 | N-21-1·2 |
 
 - 저장된 소득이 12개월보다 적은 자영업자·프리랜서는 `months`도 그만큼 짧다.
+- 🆕 11/19 **월 지출 합계에는 대출 원리금이 들어 있지 않다.** 지출 항목(`USER_EXPENSE_ITEM`의 고정·할부·정기결제·기타)만 더하고, 원리금은 대출(`USER_LOAN`)에서 따로 읽는다. 그래서 화면이 월 지출을 `forecastExpense + forecastLoanPayment`로 계산해도 중복되지 않는다.
+- 🆕 11/19 기준값 3개는 저장 데이터 조회(GET)에만 있다. POST(DIAG-08)는 저장값이 없어 `null`이다.
 - POST `/api/diagnosis/cash-flow/forecast`(DIAG-08)도 요청의 `past12MonthsHistory`를 같은 모양의 `months`로 돌려준다.
 
 예시 (회원 2번으로 로그인, `?incomeChangePercent=-10&forecastMonths=3`):
@@ -178,7 +185,10 @@
     { "baseMonth": "2026-06", "incomeAmount": 1327643, "expenseAmount": 1315514 },
     { "baseMonth": "2026-07", "incomeAmount": 1686835, "expenseAmount": 1315514 },
     { "baseMonth": "2026-08", "incomeAmount": 2061303, "expenseAmount": 1315514 }
-  ]
+  ],
+  "baseFixedExpenseAmount": 1315514,
+  "baseOtherExpenseAmount": 0,
+  "baseMonthlyLoanPayment": 0
 }
 ```
 
@@ -208,7 +218,7 @@
   - 회원 번호는 넘기지 않는다. 공통 `client.js`가 로그인 토큰을 붙인다.
 - mock 모드(`VITE_USE_MOCK`)에서는 로그인한 mock 회원이 누구든 위 예시와 같은 회원 2번 값을 돌려준다(로그인하지 않았으면 401). 전망 mock은 쿼리 조건을 반영해 계산한다.
 
-### POST `/api/diagnosis/cash-flow/expected-score` (DIAG-09, N-21-8, FP-170) 🆕 11/18
+### POST `/api/members/me/cash-flow-expected-score` (DIAG-09, N-21-8, FP-170) 🆕 11/18 · 🆕 11/19 경로 이동
 
 전망 조건 중 소득·지출 변화를 저장된 입력에 반영해 예상 대안 점수를 FastAPI ML-03으로 **다시 구한다. 저장하지 않는다**(O-6).
 
@@ -249,6 +259,7 @@
   |---|---|---|
   | 400 | `INVALID_INPUT` | 조건 검사 실패(필드 = 이름). ML-03이 입력을 거절(4xx)하면 "입력값을 확인해 주세요." |
   | 401 | `UNAUTHORIZED` | 토큰 없음 |
+  | 403 | `FORBIDDEN` | 🆕 11/19 관리자 계정(`/api/members/me/**`는 `ROLE_USER` 전용) |
   | 404 | `ASSESSMENT_NOT_FOUND` | 점수가 나온 평가가 하나도 없음(리포트와 같은 코드) |
   | 409 | `INPUT_INCOMPLETE` | 저장된 입력 기준월이 없거나 출생연도가 없음(점수 산출과 같은 문구). 🆕 11/19 소득이 직군에 필요한 개월 수(자영업자·프리랜서 12, 급여소득자 1)보다 적거나 같은 달이 겹치면 ML-03을 부르지 않고 "소득을 필요한 개월 수만큼 입력해 주세요."(점수 산출과 같음, 0원으로 채워 계산하지 않음) |
   | 503 | `MODEL_NOT_READY` | ML-03 연결 실패·시간 초과·5xx. 저장하지 않으므로 MODEL_ERROR 기록을 남기지 않는다 |
@@ -407,7 +418,9 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/api/simulation/credit-care/base` | 출발 평가의 점수와 입력 10개의 원래 값. \[내 실제 값으로 되돌리기\](N-18-10)도 이 값을 쓴다 |
+| GET | `/api/members/me/credit-care-base` 🆕 11/19 | 출발 평가의 점수와 입력 10개의 원래 값, 감점 요인 상위 3개. \[내 실제 값으로 되돌리기\](N-18-10)도 이 값을 쓴다 |
+
+- 🆕 11/19 옛 경로 `/api/simulation/credit-care/base`는 지웠다(팀 공통 규칙: 내 데이터 = `/api/members/me/**`).
 
 - **출발 평가**(SIM-01·02 공통, 범영 11/18): 점수가 나온(`GRADE_STATUS_CODE = 'SCORED'`) 가장 최근 평가다. 최신 평가가 산출 불가(예: FastAPI가 잠깐 꺼져 MODEL_ERROR)여도 그 앞의 SCORED 평가를 쓴다. SCORED 평가가 하나도 없을 때만 404 `ASSESSMENT_NOT_FOUND`(리포트와 같은 코드)다.
 - 저장된 피처값(`FEATURE_SNAPSHOT`)은 개인 금융 정보라 **통째로 보내지 않는다**. 아래 10개 값만 보낸다.
@@ -427,11 +440,20 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
     "TELECOM_ON_TIME_MONTHS": 6, "UTILITY_LATE_MONTHS": 2, "EASYPAY_MONTHLY_COUNT": 5, "DELINQ_COUNT_12M": 1,
     "CASH_ADVANCE_MONTHS": 3, "NEW_LOAN_COUNT_3M": 1, "LOAN_BALANCE_AMT": 30000000, "PRIVATE_LENDER_LOAN_BALANCE_AMT": 0,
     "CARD_LIMIT_AMT": 5000000, "CARD_MONTHLY_SPEND_AMT": 3000000
-  }
+  },
+  "topReductionFactors": [
+    { "rank": 1, "featureCode": "CL0631905", "featureName": "카드 한도 사용률", "featureValue": 60.0, "shapScore": -12, "recoverScore": null }
+  ]
 }
 ```
-- 오류: 401 `UNAUTHORIZED`(토큰 없음), 404 `ASSESSMENT_NOT_FOUND`
-- 프론트: `simulationApi.js`의 `getCreditCareBase()`. mock은 SIM-02 mock의 출발 값과 같은 숫자를 돌려준다(위 예시).
+- 🆕 11/19 `topReductionFactors`(N-18-8, 경환 님 요청): 첫 화면의 "내 점수를 가장 많이 깎은 요인 3가지" 카드용이다.
+  - 출발 평가 때 저장한 요인(`ASSESSMENT_FACTOR`)에서 고른다. **모델을 다시 부르지 않는다.**
+  - 모양은 SIM-02와 같다. 고르는 규칙도 ML-04와 같다: 감점(`shapScore < 0`)이면서 시뮬레이터로 바꿀 수 있는(`DIM_FEATURE.SIMULATABLE_YN = 'Y'`) 항목을 감점이 큰 순서로(같으면 이름 순) 최대 3개 고른다.
+  - `shapScore`는 저장값 그대로다(음수 = 감점, SIM-02와 같은 부호).
+  - `recoverScore`는 저장돼 있지 않아 `null`이다. `featureValue`는 숫자로 바꿀 수 없으면 `null`, `featureName`이 비면 `featureCode`를 넣는다.
+  - 감점 요인이 없으면 `[]`다.
+- 오류: 401 `UNAUTHORIZED`(토큰 없음), 403 `FORBIDDEN`(관리자 계정) 🆕 11/19, 404 `ASSESSMENT_NOT_FOUND`
+- 프론트: `simulationApi.js`의 `getCreditCareBase()`. mock은 SIM-02 mock의 출발 값과 같은 숫자를 돌려주고, 감점 요인도 SIM-02 mock과 같은 규칙으로 출발 값에서 고른다.
 
 ## N-18-5·8 시뮬레이터 점수 재계산 (SIM-02, 담당 광희) — FP-170 Spring 구현
 
@@ -439,7 +461,9 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| POST | `/api/simulation/credit-care/recalculate` | 로그인 회원의 최근 평가에서 출발해 바꾼 값으로 점수를 다시 구한다(저장 안 함) |
+| POST | `/api/members/me/credit-care-recalculate` 🆕 11/19 | 로그인 회원의 최근 평가에서 출발해 바꾼 값으로 점수를 다시 구한다(저장 안 함) |
+
+- 🆕 11/19 옛 경로 `/api/simulation/credit-care/recalculate`는 지웠다.
 
 요청: 회원·출발 평가는 Spring이 로그인 정보로 찾는다. 화면은 바꾼 값만 보낸다.
 ```json
@@ -483,7 +507,7 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 - 카드 한쪽만 → `changes.CARD_LIMIT_AMT` "카드 한도와 월 카드 사용액은 함께 보내야 합니다."
 - ML-04가 422를 주면 Spring이 같은 공통 형식(400)으로 바꾼다.
 
-그 밖의 오류: 401 `UNAUTHORIZED`(토큰 없음), 404 `ASSESSMENT_NOT_FOUND`(점수가 나온 평가가 없음).
+그 밖의 오류: 401 `UNAUTHORIZED`(토큰 없음), 403 `FORBIDDEN`(관리자 계정) 🆕 11/19, 404 `ASSESSMENT_NOT_FOUND`(점수가 나온 평가가 없음).
 
 ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시뮬레이터는 결과를 저장하지 않으므로 NOT_SCORABLE로 저장하지 않고 오류를 그대로 알린다.
 
