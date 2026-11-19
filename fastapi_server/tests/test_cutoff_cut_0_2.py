@@ -55,6 +55,12 @@ class ChangeSqlTests(unittest.TestCase):
         found = [(code, int(low), int(high)) for code, low, high in re.findall(r"'(CAUTION|STANDARD|GOOD)'(?: AS GRADE_BAND_CODE)?, (\d+)(?: AS MIN_SCORE)?, (\d+)", text)]
         self.assertEqual(found, CUT_0_2)
 
+    def test_rolls_back_both_steps_on_error(self):
+        # 두 번째 MERGE가 실패해도 첫 번째(버전 행)만 커밋되지 않도록 오류 종료 때 ROLLBACK한다(SQL*Plus는 종료 시 기본이 COMMIT).
+        self.assertIn("WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK\n", CHANGE_SQL)
+        self.assertIn("WHENEVER OSERROR EXIT FAILURE ROLLBACK\n", CHANGE_SQL)
+        self.assertLess(CHANGE_SQL.index("WHENEVER SQLERROR"), CHANGE_SQL.index("MERGE INTO SCORE_CUTOFF_VERSION"))
+
     def test_does_not_touch_cut_0_1_or_activate_cut_0_2(self):
         statements = "\n".join(line for line in CHANGE_SQL.splitlines() if not line.startswith("--"))
         self.assertNotIn("'CUT-0.1'", statements)

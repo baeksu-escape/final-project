@@ -6,8 +6,8 @@
 -- (팀이 전환 시점을 정한 뒤 FastAPI 상수와 함께 따로 한다. ACTIVE는 동시에 1개만 허용된다).
 -- 이미 같은 버전·구간이 있으면 넣지 않으므로 다시 실행해도 된다. CUT-0.1은 건드리지 않는다.
 -- SQL*Plus/SQLcl/SQL Developer에서 대상 스키마 소유자로 실행한다. 공용 DB 실행은 DB 담당이 한다.
-WHENEVER SQLERROR EXIT SQL.SQLCODE
-WHENEVER OSERROR EXIT FAILURE
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
+WHENEVER OSERROR EXIT FAILURE ROLLBACK
 
 MERGE INTO SCORE_CUTOFF_VERSION t
 USING (SELECT 'CUT-0.2' AS CUTOFF_VERSION,
