@@ -407,7 +407,7 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/api/simulation/credit-care/base` | 출발 평가의 점수와 입력 10개의 원래 값. [내 실제 값으로 되돌리기](N-18-10)도 이 값을 쓴다 |
+| GET | `/api/simulation/credit-care/base` | 출발 평가의 점수와 입력 10개의 원래 값. \[내 실제 값으로 되돌리기\](N-18-10)도 이 값을 쓴다 |
 
 - **출발 평가**(SIM-01·02 공통, 범영 11/18): 점수가 나온(`GRADE_STATUS_CODE = 'SCORED'`) 가장 최근 평가다. 최신 평가가 산출 불가(예: FastAPI가 잠깐 꺼져 MODEL_ERROR)여도 그 앞의 SCORED 평가를 쓴다. SCORED 평가가 하나도 없을 때만 404 `ASSESSMENT_NOT_FOUND`(리포트와 같은 코드)다.
 - 저장된 피처값(`FEATURE_SNAPSHOT`)은 개인 금융 정보라 **통째로 보내지 않는다**. 아래 10개 값만 보낸다.

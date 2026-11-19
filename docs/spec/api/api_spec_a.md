@@ -5,7 +5,7 @@
 > - **원본:** 우찬 님 「A팀 API 명세 — 반영 요청(11/16)」. develop `bfe6b94`(PR #50·#52·#53 병합 후)의 실제 Spring Controller·DTO에서 뽑은 내용이다. 🆕 11/18 이 파일로 옮겼다(그 전에는 정의서에 요약만 있었다). 그 뒤 코드가 바뀌면 A팀이 이 파일을 고친다.
 > - 🆕 최근 변경 (11/18, FP-219): AUTH-06 가입 요청에 휴대폰 인증 토큰 추가·이름·닉네임 규칙, 닉네임 중복 확인·휴대폰 인증번호 발송·확인 API(AUTH-13~15) 추가
 > - 11/18 확인: 아래 경로는 모두 develop `5ff443c` 코드에 있다.
-> - AUTH-13~15와 AUTH-06 변경은 FP-219 브랜치 코드 기준(병합 전) 🆕 11/18
+> - AUTH-13~15와 AUTH-06 변경은 FP-219(PR #89, 11/19 develop 병합) 코드 기준. ID는 API 정의서 2-1에서 확정 🆕 11/19
 > - 상태 표시: ✅ 구현·develop 병합 · 🟡 새로 만든 경로(원래 명세에 없던 것) · ↗ 다른 팀 담당(그 팀 명세서를 본다)
 > - 프론트 코드의 `TODO(D-20) docs/spec/api/api_spec_a.md가 정해지면 …` 주석은 이 파일을 가리킨다.
 
@@ -42,9 +42,9 @@
 | AUTH-10 | `POST /api/auth/password/reset` | `{ loginId, email, emailVerificationToken, newPassword }` | `{}` | 없음 | ✅ (관리자 아이디는 "없는 계정"과 같은 404) |
 | AUTH-11 | `POST /api/auth/admin/verify-code` | `{ challengeToken, code }` | 통과: `{ token, user, passwordChangeRequired: false }`<br>임시 비밀번호: `{ passwordChangeRequired: true, passwordSetupToken }` | 없음(challengeToken) | ✅ |
 | AUTH-12 🟡 | `POST /api/auth/admin/password-setup` | `{ passwordSetupToken, newPassword }` | `{ token, user }` | 없음(setup 토큰) | ✅ |
-| AUTH-13 🆕 11/18 | `POST /api/auth/nickname/check` | `{ nickname }` | `{ available }` | 없음 | 🟡 새 경로(ID는 정의서 반영 때 확정) |
-| AUTH-14 🆕 11/18 | `POST /api/auth/phone/send` | `{ phone, purpose }` | `{ expiresInSeconds }` | 없음 | 🟡 새 경로(ID는 정의서 반영 때 확정) |
-| AUTH-15 🆕 11/18 | `POST /api/auth/phone/verify` | `{ phone, code, purpose }` | `{ verificationToken }` | 없음 | 🟡 새 경로(ID는 정의서 반영 때 확정) |
+| AUTH-13 | `POST /api/auth/nickname/check` | `{ nickname }` | `{ available }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) |
+| AUTH-14 | `POST /api/auth/phone/send` | `{ phone, purpose }` | `{ expiresInSeconds }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) |
+| AUTH-15 | `POST /api/auth/phone/verify` | `{ phone, code, purpose }` | `{ verificationToken }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) |
 
 - `user` = `{ userId, name, role, jobType, hasScore }`
 - AUTH-11·12의 토큰 필드 이름은 `token`이다(AUTH-01은 `accessToken`). 화면은 둘 다 받는다.
