@@ -4,7 +4,9 @@ import com.baeksuescape.finance.dto.CashFlowConditionRequest;
 import com.baeksuescape.finance.dto.CashFlowForecastRequest;
 import com.baeksuescape.finance.dto.CashFlowForecastResponse;
 import com.baeksuescape.finance.dto.IncomeVolatilityRequest;
+import com.baeksuescape.finance.dto.ExpectedScoreResponse;
 import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
+import com.baeksuescape.finance.service.ExpectedScoreService;
 import com.baeksuescape.finance.service.IncomeVolatilityService;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.security.AuthUser;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class IncomeVolatilityController {
 
     private final IncomeVolatilityService incomeVolatilityService;
+    private final ExpectedScoreService expectedScoreService;
 
     /**
      * N-22 소득 변동성 종합 진단 API (N-22-3, N-22-4, N-22-5).
@@ -67,6 +70,16 @@ public class IncomeVolatilityController {
     public ResponseEntity<CashFlowForecastResponse> forecastSavedCashFlow(@AuthenticationPrincipal AuthUser user,
                                                                           @ModelAttribute CashFlowConditionRequest condition) {
         return ResponseEntity.ok(incomeVolatilityService.forecastSavedCashFlow(requireLoginUserId(user), condition));
+    }
+
+    /**
+     * N-21-8 DIAG-09 예상 대안 점수 — 전망 조건(N-21-2)의 소득·지출 변화를 저장된 입력에 반영해 ML-03으로 다시 구한다(저장 안 함).
+     * 본문은 현금흐름 전망 쿼리와 같은 이름을 쓴다. 점수가 나온 평가가 없으면 404 ASSESSMENT_NOT_FOUND.
+     */
+    @PostMapping("/cash-flow/expected-score")
+    public ResponseEntity<ExpectedScoreResponse> expectedScore(@AuthenticationPrincipal AuthUser user,
+                                                               @RequestBody(required = false) CashFlowConditionRequest condition) {
+        return ResponseEntity.ok(expectedScoreService.expectedScore(requireLoginUserId(user), condition));
     }
 
     /**
