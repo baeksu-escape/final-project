@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { Button, Notice, SegmentedControl } from '../../../common/components/index.js'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
@@ -12,7 +12,11 @@ export default function LoanProductsPage() {
   const { user } = useAuth()
   const { products, score, loading, error, scoreNotice, scoreError, reload } = useLoanCatalog(user?.userId)
   const { favorites } = useLoanFavorites(user?.userId)
-  const [filter, setFilter] = useState('all')
+  // N-37-1 필터는 주소 쿼리(?filter=)에 담아 새로고침·뒤로 가기에도 유지한다. 'all'이거나 모르는 값이면 전체이고 쿼리를 두지 않는다.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const queryFilter = searchParams.get('filter')
+  const filter = ['score', 'job', 'favorites'].includes(queryFilter) ? queryFilter : 'all'
+  const setFilter = (value) => setSearchParams(value === 'all' ? {} : { filter: value }, { replace: true })
   const filtered = products.filter((product) => filter === 'score' ? matchesLoanScore(product, score)
     : filter === 'job' ? product.workerTypeCodes.includes(user?.jobType)
       : filter === 'favorites' ? favorites.includes(product.productCode) : true)
