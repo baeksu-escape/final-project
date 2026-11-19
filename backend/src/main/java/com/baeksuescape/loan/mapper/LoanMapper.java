@@ -26,6 +26,12 @@ public interface LoanMapper {
     // 모든 상품의 특징 문구 (표시 순서대로)
     List<FeatureRow> selectFeatures();
 
+    // N-37-2 상세: 한 상품의 대상 직군 (WORKER_TYPE_CODE 순)
+    List<WorkerTypeRow> selectWorkerTypesByProductId(@Param("productId") long productId);
+
+    // N-37-2 상세: 한 상품의 특징 문구 (표시 순서대로)
+    List<FeatureRow> selectFeaturesByProductId(@Param("productId") long productId);
+
     // 상품 코드로 상품 번호. 없으면 null
     Long selectProductIdByCode(@Param("productCode") String productCode);
 

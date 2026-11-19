@@ -4,7 +4,7 @@ UI 출처는 Claude Artifact `5unyCwrGcxS3WrWFUk9qid`, 버전 `1794641606-4f83`�
 
 ## 연결과 API
 
-- `/loans`: `loans/pages/LoanProductsPage.jsx`, `/loans/:productId`: `LoanProductDetailPage.jsx`. 라우트 파라미터 이름도 `productCode`다.
+- `/loans`: `loans/pages/LoanProductsPage.jsx`, `/loans/:productCode`: `LoanProductDetailPage.jsx`. 라우트 파라미터 이름도 `productCode`다.
 - 공용 카드: `loans/components/LoanProductCard.jsx`, props `product`, `score`, `workerTypeCode`. 시뮬레이터 추천도 이 카드를 쓴다.
 - `loans/api/loanCatalog.js`: `getLoanProducts()`, `getLoanProduct(productCode)`, `matchesLoanScore(product, score)`, `useLoanFavorites(userId)`(반환 `{ favorites, toggleFavorite, available }`).
 
