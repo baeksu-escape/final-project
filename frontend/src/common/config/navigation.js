@@ -14,6 +14,7 @@ export const PATHS = Object.freeze({
   MARKET: '/market',
   SIMULATOR: '/simulator',
   LOANS: '/loans',
+  LOAN_DETAIL: '/loans/:productId',
   COMPARISON: '/comparison',
   LOUNGE: '/lounge',
   MY_PAGE: '/mypage',
