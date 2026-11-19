@@ -1,4 +1,4 @@
-package com.baeksuescape.finance.dto;
+package com.baeksuescape.finance.dto.cashflow;
 
 /**
  * FP-170 N-21-8 DIAG-09 현금흐름 조건별 예상 대안 점수.

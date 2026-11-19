@@ -22,7 +22,7 @@ SELECT USER FROM DUAL;
 ## 3. 완료 확인
 
 - FS-DRAFT 피처 시드: `TOTAL_CNT=39`, `ALT_CNT=20`, `SIM_CNT=9`; FS-V1 38개를 합친 `DIM_FEATURE`는 77행
-- 테이블 수: 47개, `99_check.sql`의 기대 행 수와 실제 행 수 일치
+- 테이블 수: 48개, `99_check.sql`의 기대 행 수와 실제 행 수 일치
 
 피처 시드 SQL은 2번 파일이 자동 실행하므로 따로 실행하지 않는다. 오류나 불일치가 있으면 재실행·초기화하지 말고 결과를 DB 담당자에게 전달한다.
 
@@ -37,6 +37,7 @@ SELECT USER FROM DUAL;
 - 기존 DB의 게시글 본문 열 변경(`BOARD_POST.CONTENT` CLOB → `VARCHAR2(1300 CHAR)`, DDL C9)은 [게시글 본문 변경 SQL](alter_board_post_content_varchar2.sql)을 사용한다. 글 데이터는 유지하고, 1300자를 넘는 글이 있으면 자르지 않고 멈춘다. 다시 실행해도 된다.
 - 실제 모델 LGBM-BASE-0.1의 학습 데이터·모델 파일 기록(N-25 근거)은 [모델 기록 SQL](register_model_lgbm_base_0_1.sql)을 사용한다. `DATASET_VERSION` 1행과 `MODEL_ARTIFACT` 2행만 넣고 ACTIVE는 바꾸지 않는다. 다시 실행해도 되며, 적용 후 `99_check.sql`의 두 표 기대값 0과 다르게 나오는 것은 정상이다.
 - 위 모델 기록의 `METRICS_JSON`에 두 모델 AUC를 같은 라벨로 맞춘 값(`same_label_comparison`, N-25·정의서 C20)을 더할 때는 [같은 라벨 AUC SQL](update_model_metrics_same_label_lgbm_base_0_1.sql)을 사용한다. 모델 기록 SQL을 먼저 실행해야 하며(없으면 멈춤), `AUC_VALID`·해시는 바꾸지 않는다. 다시 실행해도 된다.
+- 기존 DB에 평가 표본 표를 추가할 때는 [평가 표본 표 생성 SQL](create_model_eval_sample.sql)로 빈 표 `MODEL_EVAL_SAMPLE`(DDL C10, N-25)을 만들고, 필요한 DB에만 [평가 표본 적재 SQL](load_model_eval_sample_lgbm_base_0_1.sql)(3,085행)을 한 번 실행한다. 기본 시드(`run_seed_only.sql`)에는 넣지 않으며, 적재한 DB에서는 `99_check.sql`의 `MODEL_EVAL_SAMPLE` 기대값 0과 실제 3,085가 다른 것이 정상이다.
 
 ## 참고
 

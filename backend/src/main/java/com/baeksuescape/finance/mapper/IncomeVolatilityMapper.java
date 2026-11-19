@@ -1,6 +1,6 @@
 package com.baeksuescape.finance.mapper;
 
-import com.baeksuescape.finance.dto.IncomeMonthRow;
+import com.baeksuescape.finance.dto.cashflow.IncomeMonthRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

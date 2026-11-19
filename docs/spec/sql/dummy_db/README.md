@@ -17,7 +17,7 @@
 ## 완료 확인
 
 - FS-DRAFT 피처 시드 출력: `TOTAL_CNT=39`, `ALT_CNT=20`, `SIM_CNT=9`; FS-V1은 38개
-- `99_check.sql`: 테이블 47개, 두 세트 합계 `DIM_FEATURE` 77행
+- `99_check.sql`: 테이블 48개, 두 세트 합계 `DIM_FEATURE` 77행
 - 각 테이블의 기대 행 수와 실제 행 수가 일치
 
 오류나 불일치가 있으면 재실행하거나 `run_all.sql`로 초기화하지 말고, 실행 결과를 DB 담당자에게 전달한다.

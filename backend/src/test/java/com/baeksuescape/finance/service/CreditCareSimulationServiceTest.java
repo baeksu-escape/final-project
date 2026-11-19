@@ -30,9 +30,9 @@ import com.baeksuescape.assessment.client.PredictionClient.SimulationFailedExcep
 import com.baeksuescape.assessment.dto.AssessmentRows.AssessmentRow;
 import com.baeksuescape.assessment.dto.AssessmentRows.FeatureRow;
 import com.baeksuescape.assessment.mapper.AssessmentMapper;
-import com.baeksuescape.finance.dto.CreditCareBaseResponse;
-import com.baeksuescape.finance.dto.CreditCareSimulationRequest;
-import com.baeksuescape.finance.dto.CreditCareSimulationResponse;
+import com.baeksuescape.finance.dto.simulation.CreditCareBaseResponse;
+import com.baeksuescape.finance.dto.simulation.CreditCareSimulationRequest;
+import com.baeksuescape.finance.dto.simulation.CreditCareSimulationResponse;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
 import com.baeksuescape.user.dto.DataInputRows.CreditRow;

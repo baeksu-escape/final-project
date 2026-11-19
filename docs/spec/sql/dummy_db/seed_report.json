@@ -1,6 +1,6 @@
 {
-  "ddl_sha256": "29d46469c3a418eda3c0a3e6fd2efd8183a34a4d9b5d9c0d5f093c1868a5ab3d",
-  "table_count": 47,
+  "ddl_sha256": "1a19b7d0a8282b38e24e8f0e3548a3fe61dfe8885cd23b2d44d22f32ed1a1776",
+  "table_count": 48,
   "rows": {
     "DIM_WORKER_TYPE": 3,
     "DIM_ROLE": 2,
@@ -27,6 +27,7 @@
     "DATASET_CLEANING_LOG": 0,
     "MODEL_REGISTRY": 2,
     "MODEL_ARTIFACT": 0,
+    "MODEL_EVAL_SAMPLE": 0,
     "ASSESSMENT": 0,
     "ASSESSMENT_FACTOR": 0,
     "SCORE_BAND_OFFER": 3,
