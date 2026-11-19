@@ -20,8 +20,7 @@ export default function MarketSummary({ metric, category, stats, rows, scopeRows
         서울 평균은 <b className="market-num">{formatMetric(metric, stats.seoul)}</b>입니다. {metric.desc}입니다.
       </p>
       <p>
-        평균보다 나쁜 동이 <b className="market-num market-text--bad">{bad}곳</b>, 좋은 동이{' '}
-        <b className="market-num market-text--good">{good}곳</b>입니다.
+        평균보다 나쁜 동이 <b className="market-num">{bad}곳</b>, 좋은 동이 <b className="market-num">{good}곳</b>입니다.
       </p>
       {gu !== ALL_GU && guIndex >= 0 && (
         <p>
