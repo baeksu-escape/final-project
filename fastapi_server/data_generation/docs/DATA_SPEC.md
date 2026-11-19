@@ -16,6 +16,8 @@
 | 버전 | `package_version`(코드·문서 패키지)와 `data_version`(생성 데이터 스냅샷)을 구분한다. 버전은 `provenance.json`에 있다 |
 | 집단 | `cohort` ∈ `legacy`(기존 12,000명), `no_credit`, `short_history`, `sparse_history`, `young_established` |
 
+기존 집단 12,000명은 원본 학원 생성기(n=155,746, seed 20260918) 결과에서 HAC_CD 1·2·7(급여소득자·자영업자·프리랜서)만 남긴 뒤 단순 무작위 추출(seed 20261029, `extension_config.json`의 `rows`·`seed`)한 것이다. 층화하지 않았다. 12,000명은 UI 초안의 규모에 맞춘 초기값이며, 생성 품질을 확인한 뒤 늘릴 수 있다(늘리면 데이터 버전을 올린다).
+
 ## 라벨
 
 | 라벨 | 파일 | 정의 |
