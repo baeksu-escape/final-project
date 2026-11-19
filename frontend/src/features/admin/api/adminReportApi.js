@@ -27,7 +27,7 @@ export function fetchAdminReport(reportId) {
   return apiGet(ADMIN_REPORT_API.adminReport(reportId))
 }
 
-// N-34-3 처리 결과 저장 — { resultCode: KEEP_HIDDEN|DELETE|REJECT, memo } → { resultCode, targetStatus, handledCount }
+// N-34-3 처리 결과 저장 — { resultCode: DELETE|REJECT, memo } → { resultCode, targetStatus, handledCount } (FP-224: KEEP_HIDDEN은 400)
 export function processReport(reportId, payload) {
   return apiPatch(ADMIN_REPORT_API.adminReport(reportId), payload)
 }

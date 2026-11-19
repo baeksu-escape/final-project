@@ -9,6 +9,7 @@ export const DIAGNOSIS_API = Object.freeze({
   CALCULATE_FINANCIAL_HEALTH: '/api/diagnosis/financial-health/calculate',
   INCOME_VOLATILITY: '/api/diagnosis/income-volatility',
   CASH_FLOW_FORECAST: '/api/diagnosis/cash-flow/forecast',
+  EXPECTED_SCORE: '/api/diagnosis/cash-flow/expected-score',
 })
 
 // N-22 로그인한 회원의 저장된 최근 12개월 소득으로 변동성 지표·성수기·비수기 격차·소득 부족 달을 조회한다.
@@ -26,6 +27,14 @@ export function getCashFlowForecast(condition = {}) {
   })
   const query = params.toString()
   return apiGet(query ? `${DIAGNOSIS_API.CASH_FLOW_FORECAST}?${query}` : DIAGNOSIS_API.CASH_FLOW_FORECAST)
+}
+
+// N-21-8 전망 조건(소득 변동 폭·소득 변화율·월 고정 지출·지출 변화율)으로 예상 대안 점수를 다시 구한다(DIAG-09, 저장 안 함).
+// condition은 getCashFlowForecast와 같은 이름의 숫자 값이다. 납부 상태는 아직 점수에 반영되지 않는다(paymentStatusApplied: false).
+// 응답: { currentScore, currentGradeBandCode, expectedScore, expectedGradeBandCode, scoreDiff, modelVersion, baseModelVersion, baseRequestId, paymentStatusApplied }
+// modelVersion(예상 점수 모델)과 baseModelVersion(현재 점수 모델)이 다르면 scoreDiff에 모델 차이도 섞인다.
+export function getExpectedScore(condition = {}) {
+  return apiPost(DIAGNOSIS_API.EXPECTED_SCORE, condition)
 }
 
 // N-20-4 연소득 및 연원리금 상환액 기반 DSR 비율 및 위험 단계 계산

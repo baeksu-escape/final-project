@@ -24,6 +24,11 @@ export const EMAIL_PURPOSES = Object.freeze({
   CHANGE_EMAIL: 'CHANGE_EMAIL',
 })
 
+// 휴대폰 인증을 어디에 쓰는지 서버에 알려 주는 값. 지금은 회원가입만 쓴다(11/18 1차 시연 후속).
+export const PHONE_PURPOSES = Object.freeze({
+  SIGNUP: 'SIGNUP',
+})
+
 // 서버가 오류 종류를 알려 줄 때 쓰는 코드(error.data.code).
 export const AUTH_ERROR_CODES = Object.freeze({
   ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',

@@ -5,16 +5,19 @@ import { requestPasswordReset } from '../api/authFeatureApi.js'
 import { EMAIL_PURPOSES } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
-import EmailVerification from '../components/EmailVerification.jsx'
 import PasswordRuleList from '../components/PasswordRuleList.jsx'
-import { validateNewPassword } from '../validation.js'
+import SplitEmailField from '../components/SplitEmailField.jsx'
+import { resolveEmailDomain } from '../emailParts.js'
+import { joinEmail, validateNewPassword } from '../validation.js'
 import '../auth.css'
 
 // N-03 비밀번호 찾기 화면 — ① 아이디·이메일 인증 → ② 새 비밀번호 재설정 → ③ 완료 순서로 진행한다.
+// 11/18 화면 확인 후속: 이메일은 회원가입과 같은 한 줄 칸(SplitEmailField: 앞부분 @ 도메인 선택 [인증코드 받기])으로 받는다.
 export default function FindPasswordPage() {
   const [step, setStep] = useState('verify')
   const [loginId, setLoginId] = useState('')
-  const [email, setEmail] = useState('')
+  // 이메일 앞부분·도메인 선택·직접 입력 도메인. 합친 값(email)으로 인증한다.
+  const [emailParts, setEmailParts] = useState({ emailLocal: '', emailDomainChoice: '', emailCustomDomain: '' })
   const [verification, setVerification] = useState(null) // { loginId, email, verificationToken }
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
@@ -22,6 +25,7 @@ export default function FindPasswordPage() {
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
 
+  const email = joinEmail(emailParts.emailLocal, resolveEmailDomain(emailParts.emailDomainChoice, emailParts.emailCustomDomain))
   // 인증받은 뒤 아이디나 이메일을 바꾸면 인증이 풀린 것으로 본다.
   const verified = verification !== null && verification.loginId === loginId.trim() && verification.email === email
 
@@ -102,9 +106,11 @@ export default function FindPasswordPage() {
       <h1 className="auth-page__title">비밀번호 찾기</h1>
       <div className="auth-form find-password-form">
         <TextInput label="아이디" value={loginId} onChange={setLoginId} autoComplete="username" />
-        <TextInput label="이메일" type="email" value={email} onChange={setEmail} autoComplete="email" />
-        <EmailVerification
-          email={email}
+        <SplitEmailField
+          local={emailParts.emailLocal}
+          domainChoice={emailParts.emailDomainChoice}
+          customDomain={emailParts.emailCustomDomain}
+          onChange={(patch) => setEmailParts((prev) => ({ ...prev, ...patch }))}
           purpose={EMAIL_PURPOSES.RESET_PASSWORD}
           extraBody={{ loginId: loginId.trim() }}
           disabled={!loginId.trim()}

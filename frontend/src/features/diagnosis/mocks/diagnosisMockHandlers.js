@@ -6,6 +6,7 @@ import {
   evaluateHealthLevel,
   HEALTH_RISK_THRESHOLDS,
   SAMPLE_CASH_FLOW_BASE,
+  SAMPLE_EXPECTED_SCORE_BASE,
   SAMPLE_INCOME_VOLATILITY,
   SAMPLE_MONTHLY_INCOMES,
 } from './diagnosisMockData.js'
@@ -221,6 +222,57 @@ function handleCashFlowForecast({ query, token }) {
   }
 }
 
+// N-21-8 DIAG-09 예상 대안 점수 mock — 본문은 현금흐름 전망 조건과 같은 이름이다. 검사·문구는 실제 API와 같다.
+// 점수는 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"의 mock 규칙이다(진짜 모델 아님). 납부 상태는 실제 API처럼 점수에 쓰지 않는다.
+function handleExpectedScore({ body, token }) {
+  requireMockUser(token) // 실제 API처럼 로그인하지 않았으면 401
+  const condition = body ?? {}
+  const invalid = (field, message) =>
+    new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors: [{ field, message }] })
+  const readPercent = (field) => {
+    const value = condition[field]
+    if (value === undefined || value === null) return 0
+    if (typeof value !== 'number' || !Number.isFinite(value)) throw invalid(field, '숫자로 입력해 주세요.')
+    return value
+  }
+  const incomeChangePercent = readPercent('incomeChangePercent')
+  const expenseChangePercent = readPercent('expenseChangePercent')
+  const { incomeVariationPct = null, fixedExpenseAmount = null, paymentStatus = null } = condition
+  if (incomeVariationPct !== null && !(Number.isInteger(incomeVariationPct) && incomeVariationPct >= 0 && incomeVariationPct <= 200)) {
+    throw invalid('incomeVariationPct', '소득 변동 폭은 0~200% 정수여야 합니다.')
+  }
+  if (fixedExpenseAmount !== null && !(Number.isSafeInteger(fixedExpenseAmount) && fixedExpenseAmount >= 0)) {
+    throw invalid('fixedExpenseAmount', '월 고정 지출은 0 이상의 원 단위 정수여야 합니다.')
+  }
+  if (paymentStatus !== null && !['ON_TIME', 'DELAYED'].includes(paymentStatus)) {
+    throw invalid('paymentStatus', '납부 상태를 선택해 주세요.')
+  }
+
+  // 소득 변동 폭은 평균을 바꾸지 않으므로(0원 아래로 잘리는 달 제외) mock 점수에는 변화율만 쓴다.
+  const { monthlyTotalExpense, monthlyFixedExpense } = SAMPLE_CASH_FLOW_BASE
+  const baseExpense = fixedExpenseAmount === null ? monthlyTotalExpense : fixedExpenseAmount + (monthlyTotalExpense - monthlyFixedExpense)
+  const expenseRatioPct = ((baseExpense * (1 + expenseChangePercent / 100)) / monthlyTotalExpense - 1) * 100
+  const base = SAMPLE_EXPECTED_SCORE_BASE
+  const expectedScore = Math.min(1000, Math.max(0, Math.round(
+    base.score + incomeChangePercent * base.incomePointPerPercent - expenseRatioPct * base.expensePointPerPercent,
+  )))
+  const gradeOf = (score) => {
+    if (score >= base.gradeCutoffs.good) return 'GOOD'
+    return score >= base.gradeCutoffs.standard ? 'STANDARD' : 'CAUTION'
+  }
+  return {
+    currentScore: base.score,
+    currentGradeBandCode: gradeOf(base.score),
+    expectedScore,
+    expectedGradeBandCode: gradeOf(expectedScore),
+    scoreDiff: expectedScore - base.score,
+    modelVersion: base.modelVersion,
+    baseModelVersion: base.modelVersion, // mock은 현재·예상 점수를 같은 모델로 본다(다르면 화면이 모델 변경 안내)
+    baseRequestId: base.baseRequestId,
+    paymentStatusApplied: false,
+  }
+}
+
 // mock 핸들러 등록
 registerMockHandlers({
   'POST /api/diagnosis/dsr/calculate': handleDsrCalculate,
@@ -228,5 +280,6 @@ registerMockHandlers({
   'POST /api/diagnosis/financial-health/calculate': handleFinancialHealth,
   'GET /api/diagnosis/income-volatility': handleIncomeVolatility,
   'GET /api/diagnosis/cash-flow/forecast': handleCashFlowForecast,
+  'POST /api/diagnosis/cash-flow/expected-score': handleExpectedScore,
 })
 
