@@ -73,7 +73,7 @@ export const SAMPLE_EXPECTED_SCORE_BASE = Object.freeze({
   expensePointPerPercent: 0.5, // 월 지출이 1% 늘 때 −0.5점
 })
 
-// N-22 GET /api/diagnosis/income-volatility 응답 예시. 불리언은 실제 응답처럼 is 없이 highVolatility로 쓴다.
+// N-22 GET /api/members/me/income-volatility 응답 예시. 불리언은 실제 응답처럼 is 없이 highVolatility로 쓴다.
 export const SAMPLE_INCOME_VOLATILITY = Object.freeze({
   meanIncome: 2099498,
   medianIncome: 1903317,

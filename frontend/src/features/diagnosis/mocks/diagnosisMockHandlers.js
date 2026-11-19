@@ -219,6 +219,10 @@ function handleCashFlowForecast({ query, token }) {
       incomeAmount: income,
       expenseAmount: monthlyTotalExpense,
     })),
+    // N-21-1·2 화면 조건의 처음 값(FP-170 11/19) — 조건을 적용하기 전 저장값. 기타 지출 = 합계 − 고정, 원리금은 지출에 없다.
+    baseFixedExpenseAmount: monthlyFixedExpense,
+    baseOtherExpenseAmount: monthlyTotalExpense - monthlyFixedExpense,
+    baseMonthlyLoanPayment: monthlyLoanPayment,
   }
 }
 
@@ -278,8 +282,8 @@ registerMockHandlers({
   'POST /api/diagnosis/dsr/calculate': handleDsrCalculate,
   'POST /api/diagnosis/scenario/recalculate': handleScenarioRecalculate,
   'POST /api/diagnosis/financial-health/calculate': handleFinancialHealth,
-  'GET /api/diagnosis/income-volatility': handleIncomeVolatility,
-  'GET /api/diagnosis/cash-flow/forecast': handleCashFlowForecast,
-  'POST /api/diagnosis/cash-flow/expected-score': handleExpectedScore,
+  'GET /api/members/me/income-volatility': handleIncomeVolatility,
+  'GET /api/members/me/cash-flow-forecast': handleCashFlowForecast,
+  'POST /api/members/me/cash-flow-expected-score': handleExpectedScore,
 })
 
