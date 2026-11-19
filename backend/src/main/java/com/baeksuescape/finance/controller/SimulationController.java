@@ -1,9 +1,9 @@
 package com.baeksuescape.finance.controller;
 
-import com.baeksuescape.finance.dto.CreditCareBaseResponse;
-import com.baeksuescape.finance.dto.CreditCareSimulationRequest;
-import com.baeksuescape.finance.dto.CreditCareSimulationResponse;
-import com.baeksuescape.finance.dto.ScoreBandOfferResponse;
+import com.baeksuescape.finance.dto.simulation.CreditCareBaseResponse;
+import com.baeksuescape.finance.dto.simulation.CreditCareSimulationRequest;
+import com.baeksuescape.finance.dto.simulation.CreditCareSimulationResponse;
+import com.baeksuescape.finance.dto.simulation.ScoreBandOfferResponse;
 import com.baeksuescape.finance.service.CreditCareSimulationService;
 import com.baeksuescape.finance.service.ScoreBandOfferService;
 import com.baeksuescape.global.exception.ApiException;

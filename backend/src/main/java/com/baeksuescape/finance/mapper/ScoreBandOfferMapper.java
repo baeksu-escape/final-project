@@ -1,7 +1,7 @@
 package com.baeksuescape.finance.mapper;
 
-import com.baeksuescape.finance.dto.GradeBandRow;
-import com.baeksuescape.finance.dto.ScoreBandOfferRow;
+import com.baeksuescape.finance.dto.simulation.GradeBandRow;
+import com.baeksuescape.finance.dto.simulation.ScoreBandOfferRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

@@ -1,4 +1,4 @@
-package com.baeksuescape.finance.dto;
+package com.baeksuescape.finance.dto.simulation;
 
 import java.time.OffsetDateTime;
 import java.util.Map;
