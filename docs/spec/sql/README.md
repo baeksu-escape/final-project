@@ -40,6 +40,7 @@
 | 기존 DB에 모형 성능 비교용 평가 표본 표 `MODEL_EVAL_SAMPLE`(DDL C10, N-25) 추가 | [create_model_eval_sample.sql](create_model_eval_sample.sql) | 고객별 기존·대안 모델 점수와 정답 라벨을 담는 빈 표만 만든다. `MODEL_REGISTRY`·`DIM_WORKER_TYPE`이 있는 스키마에서 한 번 실행하고, 같은 표가 있으면 오류로 멈춘다. 새로 DDL을 실행하는 DB에는 필요 없다 |
 | 모형 성능 비교용 평가 표본 적재(`MODEL_EVAL_SAMPLE` 3,085행) | [load_model_eval_sample_lgbm_base_0_1.sql](load_model_eval_sample_lgbm_base_0_1.sql) | 위 표를 만든 뒤 한 번만 실행한다(이 모델 버전의 행이 있으면 오류로 멈춤). 기본 시드(`run_seed_only.sql`)에는 넣지 않는다. 적용한 DB에서는 `99_check.sql`의 `MODEL_EVAL_SAMPLE` 기대값 0과 실제 3,085가 다르게 나오는 것이 정상. 원본 CSV는 `#파일공유` |
 | 실제 모델 전환 뒤 문제가 생겨 Mock으로 되돌리기 | [rollback_model_to_dev_dummy.sql](rollback_model_to_dev_dummy.sql) | 저장된 평가는 지우지 않는다(평가마다 자기 모델 버전이 남음). 다시 실행해도 된다 |
+| 정책금리(한국은행 기준금리, 2024.01~2026.10 월별) 넣기(N-17, FP-153) | [add_policy_rate_bok_base_rate.sql](add_policy_rate_bok_base_rate.sql) | 새 DB·기존 DB 모두 이 파일로 넣는다(DDL에는 데이터가 없다). DDL → `run_seed_only.sql` 다음에 실행한다. `FACT_POLICY_RATE` 34행(월 값을 그 달 마지막 날로)이며 다시 실행해도 같은 결과다. 새 달 값은 같은 형식으로 행을 더해 다시 실행한다. `99_check.sql`의 `FACT_POLICY_RATE` 기대값 0은 기본 시드만 적용한 상태 기준이라, 이 파일을 실행한 뒤에는 EXPECTED=0, ACTUAL=34로 보이는 것이 정상이다. 적재된 행 수와 최신 기준금리는 이 파일 마지막의 확인 쿼리로 본다 |
 | 옛 DDL로 만든 DB에서 미사용 상권 테이블 5개 제거 | [drop_unused_market_tables.sql](drop_unused_market_tables.sql) | N-24의 JSON 전환에 따라 상권 전용 표·데이터만 제거한다. 공공통계 표는 유지한다 |
 | 버려도 되는 별도 실험용 스키마를 완전히 초기화 | `dummy_db/run_all.sql` | **대상 테이블을 삭제하고 재생성한 뒤 시드를 적재한다. 기존 데이터가 삭제된다** |
 | 기존 회원 데이터나 시드를 일부 수정·보정 | 담당자와 별도 변경 SQL 검토 | `run_seed_only.sql`은 병합·갱신·재적재 도구가 아니다. `run_all.sql`로 해결하지 않는다 |
