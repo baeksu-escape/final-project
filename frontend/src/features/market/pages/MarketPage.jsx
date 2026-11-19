@@ -145,21 +145,28 @@ export default function MarketPage() {
             단순화한 모식도입니다. 행정동 중심점으로 나눈 칸이라 실제 동 경계와 다릅니다. 동을 누르면 상세가 열리고, 끌어서 옮기거나 휠로 확대할 수 있습니다.
           </p>
         </Card>
-        <div className="market-side">
-          <MarketSummary
-            metric={metric}
-            category={category}
-            stats={stats}
-            rows={rows}
-            scopeRows={scopeRows}
-            guRows={guRows}
-            gu={gu}
-            storeTotal={storeTotal}
-          />
-          <GuAverageChart metric={metric} rows={guRows} gu={gu} onSelectGu={(name) => setGu(name ?? ALL_GU)} />
-          <DongDistribution metric={metric} stats={stats} rows={scopeRows} />
-          <DongRankList metric={metric} rows={scopeRows} onOpen={setOpenCode} />
-        </div>
+        {/* 1차 시연 후속: 정보가 많아 읽기 어렵다는 의견에 따라 지역 비교 카드 4개는 기본으로 접어 둔다(브라우저 기본 details) */}
+        <details className="market-more">
+          <summary>
+            지역 비교 자세히 보기
+            <span className="market-hint">요약 · 구별 평균 · 행정동 분포 · 주의할 동·좋은 동</span>
+          </summary>
+          <div className="market-side">
+            <MarketSummary
+              metric={metric}
+              category={category}
+              stats={stats}
+              rows={rows}
+              scopeRows={scopeRows}
+              guRows={guRows}
+              gu={gu}
+              storeTotal={storeTotal}
+            />
+            <GuAverageChart metric={metric} rows={guRows} gu={gu} onSelectGu={(name) => setGu(name ?? ALL_GU)} />
+            <DongDistribution metric={metric} stats={stats} rows={scopeRows} />
+            <DongRankList metric={metric} rows={scopeRows} onOpen={setOpenCode} />
+          </div>
+        </details>
       </div>
 
       <div className="market-footnote">
