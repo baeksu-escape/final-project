@@ -1,11 +1,11 @@
 import { Card } from '../../../common/components/index.js'
-import { binOf, formatMetric } from '../utils/marketStats.js'
+import { formatMetric } from '../utils/marketStats.js'
 
 const WIDTH = 300
 const ROW_H = 19
 
 // N-24-3 구별 평균 가로 막대 — 25개 구를 좋은 구가 위로 오게 그린다. 막대를 누르면 그 구를 고른다.
-// rows: 구별 평균(나쁜 순) { gu, value, score }
+// rows: 구별 평균(나쁜 순) { gu, value, score, heat }. 막대 색은 지도와 같은 빨강 5단계(값이 클수록 진함).
 export default function GuAverageChart({ metric, rows, gu, onSelectGu }) {
   const height = rows.length * ROW_H + 6
   const mid = metric.signed ? 170 : 66
@@ -46,7 +46,7 @@ export default function GuAverageChart({ metric, rows, gu, onSelectGu }) {
                 width={Math.max(1, Math.abs(len))}
                 height="13"
                 rx="2"
-                className={`market-chart__bar market-bin--${binOf(row.score)}${selected ? ' market-chart__bar--on' : ''}`}
+                className={`market-chart__bar market-heat--${row.heat}${selected ? ' market-chart__bar--on' : ''}`}
               />
               <text x={(metric.signed ? Math.max(mid, mid + len) : mid + len) + 4} y={y + 12} fontSize="11" className="market-chart__value">
                 {formatMetric(metric, row.value)}
