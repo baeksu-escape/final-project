@@ -3,7 +3,7 @@
 # TEST는 읽자마자 버리고 파일에 넣지 않는다(최종 평가 FP-144 때 같은 형식으로 따로 만든다).
 # 같은 라벨끼리 비교하려고 라벨마다 두 모델을 TRAIN으로 새로 학습한다(정의서 10장 C20). 서버에 올린 모델 두 개(기존=연체 라벨, 대안=비금융 효과 라벨)는 같은 설정이라 그대로 재현된다.
 # 실행(fastapi_server 폴더에서): python -m training.export_eval_scores --data-dir <학습 데이터 폴더>
-# 결과: eval_scores.csv(Git 제외, #파일공유로 전달)와 설명 파일 eval_scores.meta.json. 서비스 연결·DB 적재는 하지 않는다.
+# 결과: eval_scores.csv(Git 제외, #파일공유로 전달)와 설명 파일 eval_scores.meta.json. --sql-out을 주면 MODEL_EVAL_SAMPLE 적재용 SQL도 만든다(DB 적용은 DB 담당).
 import argparse
 import json
 import sys
@@ -35,6 +35,11 @@ EXPOSURE_COLUMN = "eval_future_credit_exposure"
 EVAL_SPLITS = {"legacy": [config.VALID_SPLIT], "thinfile": [config.TRAIN_SPLIT, config.VALID_SPLIT]}
 OUTPUT_COLUMNS = ["customer_id", "group", "segment", "data_split", *LABEL_COLUMNS.values(), *SCORE_COLUMNS.values()]
 DEFAULT_OUT_PATH = config.DEFAULT_OUT_DIR / "eval_scores.csv"
+# MODEL_EVAL_SAMPLE(DDL C10) 적재용: CSV의 직군 이름을 DIM_WORKER_TYPE 코드로, 집단은 대문자 코드로 바꾼다.
+SEGMENT_TO_WORKER_TYPE = {"wage": "EMPLOYEE", "selfemp": "SELF_EMPLOYED", "freelance": "FREELANCER"}
+LOAD_COLUMNS = ["MODEL_VERSION", "SPLIT_CODE", "GROUP_CODE", "CUSTOMER_REF", "WORKER_TYPE_CODE",
+                "LABEL_ANY_DELINQUENCY_12M", "LABEL_NONFIN_EFFECT_12M",
+                "SCORE_LEGACY_DELINQ", "SCORE_ALT_DELINQ", "SCORE_LEGACY_NONFIN", "SCORE_ALT_NONFIN"]
 
 
 def log_odds(model, frame: pd.DataFrame, features: list) -> np.ndarray:
@@ -103,6 +108,50 @@ def count_summary(rows: pd.DataFrame) -> dict:
     return summary
 
 
+def render_load_sql(rows: pd.DataFrame, model_version: str, csv_sha256: str) -> str:
+    """평가 점수 행을 MODEL_EVAL_SAMPLE에 넣는 SQL 글로 바꾼다. 이미 그 모델 버전의 행이 있으면 멈추고(한 번만 적재), 500행마다 커밋한다."""
+    counts = rows.groupby(["group", "data_split"], sort=False).size()
+    count_text = ", ".join(f"{group}/{split} {int(count)}" for (group, split), count in counts.items())
+    lines = [
+        "-- ====================================================================",
+        "-- N-25 모형 성능 비교용 평가 표본 적재 — MODEL_EVAL_SAMPLE(DDL C10)에 고객별 기존·대안 모델 점수와 정답 라벨을 넣는다 (FP-235)",
+        f"-- 모델 버전 {model_version}, 행 수: {len(rows)}, 집단/분할별: {count_text}",
+        f"-- 원본: training/export_eval_scores.py가 만든 eval_scores.csv(SHA-256 {csv_sha256}). CSV는 Git에 없고 #파일공유로 전달한다.",
+        "-- 기존 집단은 VALID만, 씬파일은 노출 1인(eval_future_credit_exposure = 1) TRAIN+VALID이며 TEST는 없다(최종 평가 FP-144).",
+        "-- 점수 4개: 연체 라벨로 학습·평가한 기존·대안, 비금융 효과 라벨로 학습·평가한 기존·대안(0~1000). 서버 모델은 SCORE_LEGACY_DELINQ와 SCORE_ALT_NONFIN뿐이다.",
+        "-- 한 번만 실행한다: 이 모델 버전의 행이 이미 있으면 오류로 멈춘다(다시 넣으려면 먼저 해당 행을 지운다). 표가 없으면 create_model_eval_sample.sql을 먼저 실행한다.",
+        "-- SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다. 공용 DB는 DB 담당이 실행한다.",
+        "-- ====================================================================",
+        "SET DEFINE OFF",
+        "WHENEVER SQLERROR EXIT FAILURE ROLLBACK",
+        "DECLARE",
+        "    v_cnt PLS_INTEGER;",
+        "BEGIN",
+        f"    SELECT COUNT(*) INTO v_cnt FROM MODEL_REGISTRY WHERE MODEL_VERSION = '{model_version}';",
+        "    IF v_cnt <> 1 THEN",
+        f"        RAISE_APPLICATION_ERROR(-20114, 'MODEL_REGISTRY에 {model_version} 행이 없습니다. add_fs_v1_feature_set.sql을 먼저 실행하세요');",
+        "    END IF;",
+        f"    SELECT COUNT(*) INTO v_cnt FROM MODEL_EVAL_SAMPLE WHERE MODEL_VERSION = '{model_version}';",
+        "    IF v_cnt > 0 THEN",
+        f"        RAISE_APPLICATION_ERROR(-20115, '이미 {model_version} 평가 표본이 ' || v_cnt || '행 있습니다. 다시 넣으려면 먼저 지우세요');",
+        "    END IF;",
+        "END;",
+        "/",
+    ]
+    column_text = ", ".join(LOAD_COLUMNS)
+    for number, row in enumerate(rows.itertuples(index=False), 1):
+        values = [f"'{model_version}'", f"'{row.data_split}'", f"'{row.group.upper()}'", f"'{row.customer_id}'", f"'{SEGMENT_TO_WORKER_TYPE[row.segment]}'",
+                  str(int(getattr(row, LABEL_COLUMNS["delinq"]))), str(int(getattr(row, LABEL_COLUMNS["nonfin"])))]
+        values += [str(int(getattr(row, column))) for column in SCORE_COLUMNS.values()]
+        lines.append(f"INSERT INTO MODEL_EVAL_SAMPLE ({column_text}) VALUES ({', '.join(values)});")
+        if number % 500 == 0:
+            lines.append("COMMIT;")
+    lines += ["COMMIT;", "",
+              "-- 확인: 집단·분할별 행 수가 위 머리말과 같아야 한다.",
+              "SELECT GROUP_CODE, SPLIT_CODE, COUNT(*) AS ROW_COUNT FROM MODEL_EVAL_SAMPLE GROUP BY GROUP_CODE, SPLIT_CODE ORDER BY GROUP_CODE, SPLIT_CODE;", ""]
+    return "\n".join(lines)
+
+
 def check_shipped(models: dict, legacy_valid: pd.DataFrame, model_dir: Path) -> dict:
     """서버에 올린 모델 파일과 같은 모델이 재현됐는지 VALID 점수가 같은지로 확인한다(파일이 없으면 확인 못 함으로 적는다)."""
     result = {}
@@ -124,6 +173,7 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT_PATH, help="저장할 CSV 경로")
     parser.add_argument("--model-dir", type=Path, default=config.DEFAULT_OUT_DIR, help="서버 모델 파일(.joblib) 폴더, 재현 확인용")
     parser.add_argument("--skip-thinfile", action="store_true", help="thinfile 집단을 빼고 기존 집단만 낸다")
+    parser.add_argument("--sql-out", type=Path, default=None, help="MODEL_EVAL_SAMPLE 적재용 SQL을 저장할 경로(주면 CSV와 함께 만든다)")
     parser.add_argument("--thinfile-valid-only", action="store_true", help="thinfile도 VALID 행만 낸다(thinfile을 학습에 쓰는 모델일 때)")
     args = parser.parse_args()
 
@@ -166,6 +216,10 @@ def main() -> None:
     }
     args.out.with_suffix(".meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    if args.sql_out is not None:
+        args.sql_out.parent.mkdir(parents=True, exist_ok=True)
+        args.sql_out.write_text(render_load_sql(rows, config.MODEL_VERSION, meta["file_sha256"]), encoding="utf-8", newline="\n")
+        print(f"적재 SQL 저장: {args.sql_out}")
     print(f"저장: {args.out} ({len(rows)}행, TEST 없음)")
     for group, info in counts.items():
         print(f"  {group}: {info['rows']}행 {info['by_split']} {info['by_segment']} 양성 {info['positives']}")
