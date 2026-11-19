@@ -61,8 +61,9 @@ import '../mocks/simulationMockHandlers.js'
 // N-18 신용케어 시뮬레이터 API 경로 정의
 export const SIMULATION_API = Object.freeze({
   RECOMMEND_LOANS: '/api/simulation/loans/recommend',
-  RECALCULATE_CREDIT_CARE: '/api/simulation/credit-care/recalculate',
-  CREDIT_CARE_BASE: '/api/simulation/credit-care/base',
+  // 내 평가로 계산하는 SIM-01·02는 팀 공통 규칙대로 /api/members/me 아래에 있다(FP-170 11/19 이동).
+  RECALCULATE_CREDIT_CARE: '/api/members/me/credit-care-recalculate',
+  CREDIT_CARE_BASE: '/api/members/me/credit-care-base',
   SCORE_BAND_OFFER: '/api/simulation/score-band-offer',
 })
 
@@ -77,7 +78,8 @@ export function recommendLoans(score, jobType) {
 }
 
 // N-18-1·10 입력 10개의 내 실제 값과 출발 점수(SIM-01). [내 실제 값으로 되돌리기]도 이 값을 쓴다.
-// 응답: { baseRequestId, assessedAt, score, gradeBandCode, values: { TELECOM_ON_TIME_MONTHS: 8, ... } } — 값이 없으면 null.
+// 응답: { baseRequestId, assessedAt, score, gradeBandCode, values: { TELECOM_ON_TIME_MONTHS: 8, ... }, topReductionFactors } — 값이 없으면 null.
+// topReductionFactors(N-18-8): 출발 평가의 감점 요인 최대 3개, SIM-02와 같은 모양. recoverScore는 null, 없으면 [].
 export function getCreditCareBase() {
   return apiGet(SIMULATION_API.CREDIT_CARE_BASE)
 }

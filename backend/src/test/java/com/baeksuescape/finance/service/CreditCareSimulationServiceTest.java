@@ -28,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import com.baeksuescape.assessment.client.PredictionClient;
 import com.baeksuescape.assessment.client.PredictionClient.SimulationFailedException;
 import com.baeksuescape.assessment.dto.AssessmentRows.AssessmentRow;
+import com.baeksuescape.assessment.dto.AssessmentRows.FactorRow;
 import com.baeksuescape.assessment.dto.AssessmentRows.FeatureRow;
 import com.baeksuescape.assessment.mapper.AssessmentMapper;
 import com.baeksuescape.finance.dto.simulation.CreditCareBaseResponse;
@@ -48,6 +49,7 @@ class CreditCareSimulationServiceTest {
 
     private static final long USER_ID = 2L;
     private static final String BASE_REQUEST_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    private static final long ASSESSMENT_ID = 10L;
 
     private AssessmentMapper assessmentMapper;
     private FinancialInputMapper inputMapper;
@@ -65,6 +67,7 @@ class CreditCareSimulationServiceTest {
 
     private static AssessmentRow scoredRow() {
         AssessmentRow row = new AssessmentRow();
+        row.setAssessmentId(ASSESSMENT_ID);
         row.setRequestId(BASE_REQUEST_ID);
         row.setModelVersion("DEV-DUMMY");
         row.setFeatureSetVersion("FS-DRAFT");
@@ -132,6 +135,62 @@ class CreditCareSimulationServiceTest {
         assertNull(values.get("TELECOM_ON_TIME_MONTHS"));
         assertNull(values.get("EASYPAY_MONTHLY_COUNT"));
         assertNull(values.get("CARD_LIMIT_AMT"));
+    }
+
+    // 저장된 요인 1행 (ASSESSMENT_FACTOR + DIM_FEATURE 조인 결과)
+    private static FactorRow factor(String code, String name, String value, int shapScore, String simulatableYn) {
+        FactorRow row = new FactorRow();
+        row.setAssessmentId(ASSESSMENT_ID);
+        row.setFeatureCode(code);
+        row.setFeatureName(name);
+        row.setFeatureValue(value);
+        row.setShapScore(shapScore);
+        row.setSimulatableYn(simulatableYn);
+        return row;
+    }
+
+    @Test
+    @DisplayName("SIM-01 N-18-8: 저장된 요인에서 시뮬레이터로 바꿀 수 있는 감점 요인을 감점이 큰 순서로 3개 고른다 (ML-04와 같은 규칙)")
+    void baseTopReductionFactors() {
+        when(assessmentMapper.selectLatestScored(USER_ID)).thenReturn(scoredRow());
+        when(assessmentMapper.selectFactors(ASSESSMENT_ID)).thenReturn(List.of(
+                factor("income_cv", "소득 변동계수", "0.33", -40, "N"),          // 시뮬레이터로 못 바꿈 → 제외
+                factor("CL0631905", "카드 한도 사용률", "30.0", -12, "Y"),
+                factor("telecom_on_time_streak", "통신비 연속 납부", "8", 15, "Y"),  // 가산 → 제외
+                factor("DQ1200001", "연체 건수", "1", -20, "Y"),
+                factor("L22000900", "신규 대출", "1", -12, "Y"),               // -12 동점 → 이름 순(신규 < 카드)
+                factor("LA0099212", "대부업 잔액", "0", -5, "Y")));            // 4번째 → 잘림
+
+        List<CreditCareSimulationResponse.ReductionFactor> factors = service.base(USER_ID).topReductionFactors();
+
+        assertEquals(3, factors.size());
+        assertEquals(List.of("DQ1200001", "L22000900", "CL0631905"),
+                factors.stream().map(CreditCareSimulationResponse.ReductionFactor::featureCode).toList());
+        CreditCareSimulationResponse.ReductionFactor first = factors.get(0);
+        assertEquals(1, first.rank());
+        assertEquals("연체 건수", first.featureName());
+        assertEquals(1.0, first.featureValue());
+        assertEquals(-20, first.shapScore(), "감점은 SIM-02와 같이 음수 그대로다");
+        assertNull(first.recoverScore(), "회복 점수는 저장돼 있지 않다");
+        assertEquals(3, factors.get(2).rank());
+        verify(predictionClient, never()).simulate(any());
+    }
+
+    @Test
+    @DisplayName("SIM-01 N-18-8: 이름이 비면 피처 코드로 채우고, 숫자가 아닌 값은 null, 감점 요인이 없으면 빈 목록")
+    void baseTopReductionFactorsEdgeCases() {
+        List<CreditCareSimulationResponse.ReductionFactor> factors = CreditCareSimulationService.topReductionFactors(List.of(
+                factor("DQ1200001", null, "없음", -3, "Y"),
+                factor("CL0631905", " ", null, -2, "Y")));
+        assertEquals("DQ1200001", factors.get(0).featureName());
+        assertNull(factors.get(0).featureValue());
+        assertEquals("CL0631905", factors.get(1).featureName());
+        assertNull(factors.get(1).featureValue());
+
+        assertTrue(CreditCareSimulationService.topReductionFactors(List.of(factor("DQ1200001", "연체 건수", "0", 10, "Y"))).isEmpty());
+
+        when(assessmentMapper.selectLatestScored(USER_ID)).thenReturn(scoredRow());
+        assertTrue(service.base(USER_ID).topReductionFactors().isEmpty(), "저장된 요인이 없으면 []");
     }
 
     @Test
