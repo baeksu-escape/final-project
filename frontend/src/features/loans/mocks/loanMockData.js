@@ -18,16 +18,13 @@ const seedLoans = [
   {"i": 16, "c": "LP016", "n": "캐피탈 신용대출 스탠다드", "p": "가상캐피탈 A", "d": "할부와 리스를 다루는 금융사를 가정한 캐피탈 신용대출 예시입니다.\n원금을 매달 같은 금액씩 갚는 방식이며 금리 범위가 높은 편이라 상환 계획을 먼저 확인해야 합니다.\n시연용 수치로 금리는 연 9.46~19.44%, 한도는 최대 4,600만 원, 기간은 12~60개월입니다.", "t": "모든 직군 대상(시연용)", "jobs": ["EMPLOYEE", "SELF_EMPLOYED", "FREELANCER"], "rt": [9.46, 19.44], "lm": 46000000, "term": "12~60개월(시연)", "way": "원금균등", "min": 0, "feats": ["직군 구분 없이 신청 가능", "시연용 가상 상품"], "docs": ["신분증 사본", "소득 증빙"]},
   {"i": 17, "c": "LP017", "n": "캐피탈 신용대출 라이트", "p": "가상캐피탈 B", "d": "캐피탈 신용대출을 가볍게 비교해 보도록 만든 예시입니다.\n원금균등 상환이라 시간이 지날수록 월 부담이 줄고, 금리 상한이 높아 조건을 꼼꼼히 살펴야 합니다.\n시연용 수치로 금리는 연 8.81~19.64%, 한도는 최대 3,600만 원, 기간은 12~60개월입니다.", "t": "모든 직군 대상(시연용)", "jobs": ["EMPLOYEE", "SELF_EMPLOYED", "FREELANCER"], "rt": [8.81, 19.64], "lm": 36000000, "term": "12~60개월(시연)", "way": "원금균등", "min": 0, "feats": ["직군 구분 없이 신청 가능", "시연용 가상 상품"], "docs": ["신분증 사본", "소득 증빙"]}
 ];
-export const CATALOG_VERSION = 'seed-v1-17'
-// 가상은행·가상신협은 bank, 가상저축은행·가상카드·가상캐피탈은 savings 배너 테마를 쓴다.
-const providerTheme = (name) => (name.startsWith('가상은행') || name.startsWith('가상신협') ? 'bank' : 'savings')
-// N-37-1 시드 값을 화면 전용 계약으로 옮긴다. productId는 숫자 PRODUCT_ID이며 상세 주소에서는 문자열과 비교한다.
+// N-37-1 시드 값을 LOAN-01·02 응답 모양으로 옮긴다. productId는 숫자 PRODUCT_ID, productCode는 API 경로 키다.
 export const MOCK_LOAN_PRODUCTS = seedLoans.map((item) => ({
-  productId: item.i, productCode: item.c, dbProductId: item.i, idSource: 'seed', catalogVersion: CATALOG_VERSION,
-  name: item.n, providerName: item.p, providerTheme: providerTheme(item.p), description: item.d, eligibility: item.t,
-  minScore: item.min, maxScore: 1000,
+  productId: item.i, productCode: item.c,
+  name: item.n, providerName: item.p, description: item.d, eligibility: item.t,
+  minScore: item.min,
   workerTypeCodes: item.jobs,
-  interestRate: item.rt, rateMinPct: item.rt[0], rateMaxPct: item.rt[1],
-  limitAmount: item.lm, termMonths: null, termText: item.term,
+  rateMinPct: item.rt[0], rateMaxPct: item.rt[1],
+  limitAmount: item.lm, termText: item.term,
   repaymentMethod: item.way, features: item.feats, requiredDocuments: item.docs,
 }))

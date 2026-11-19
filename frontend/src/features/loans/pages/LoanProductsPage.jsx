@@ -15,10 +15,10 @@ export default function LoanProductsPage() {
   const [filter, setFilter] = useState('all')
   const filtered = products.filter((product) => filter === 'score' ? matchesLoanScore(product, score)
     : filter === 'job' ? product.workerTypeCodes.includes(user?.jobType)
-      : filter === 'favorites' ? favorites.includes(product.productId) : true)
+      : filter === 'favorites' ? favorites.includes(product.productCode) : true)
   // N-37-1 필터 결과의 복사본만 정렬한다. 즐겨찾기 우선·같은 그룹은 점수 조건 충족 우선이며 동률은 카탈로그 순서를 유지한다.
   const shown = [...filtered].sort((left, right) =>
-    Number(favorites.includes(right.productId)) - Number(favorites.includes(left.productId))
+    Number(favorites.includes(right.productCode)) - Number(favorites.includes(left.productCode))
     || Number(matchesLoanScore(right, score)) - Number(matchesLoanScore(left, score)))
   return <div className="loans-page">
     <header className="loans-heading"><div><h1>대출 상품</h1><p>{score == null ? '내 점수 조건을 확인하고 참고 상품을 살펴보세요.' : `내 대안 점수 ${score}점으로 살펴보는 참고 상품입니다.`}</p></div></header>
@@ -31,7 +31,7 @@ export default function LoanProductsPage() {
     {loading ? <p role="status">상품을 불러오는 중입니다.</p> : error ? <Notice type="warn">{error} <Button onClick={reload}>다시 시도</Button></Notice> : <>
       {scoreError && <Notice type="warn">{scoreError} <Button onClick={reload}>점수 다시 불러오기</Button></Notice>}
       {scoreNotice && <Notice>{scoreNotice}</Notice>}
-      {shown.length ? <div className="loan-grid">{shown.map((product) => <LoanProductCard key={product.productId} product={product} score={score} workerTypeCode={user?.jobType} />)}</div>
+      {shown.length ? <div className="loan-grid">{shown.map((product) => <LoanProductCard key={product.productCode} product={product} score={score} workerTypeCode={user?.jobType} />)}</div>
         : <p className="loan-empty">{filter === 'favorites' ? '즐겨찾기한 상품이 없습니다. 상품 카드의 ☆을 눌러 모아 보세요.' : '조건에 맞는 상품이 없습니다.'}</p>}
     </>}
   </div>
