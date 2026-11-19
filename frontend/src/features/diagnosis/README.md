@@ -15,7 +15,7 @@ UI 원본은 `5unyCwrGcxS3WrWFUk9qid`의 `1794641606-4f83` 버전으로 앞선 F
 
 - `getAssetDebtData(userId, workerTypeCode)`: `totalAssetAmount`, `annualIncomeAmount`, `totalDebtAmount`, `annualPaymentAmount`, `loans`, `peer`, `assumptions`.
 - 대출 행은 `loanId`, `loanTypeName`, `balanceAmount`, `annualRatePct`, `rateTypeCode`, `remainingMonths`, `monthlyPaymentAmount`. 표는 원본 UI 열(종류·잔액·금리·방식·월 상환)만 사용한다.
-- `getCashFlowData(userId, workerTypeCode)`: 정확히 12개 연속 월의 `months[{baseMonth,incomeAmount}]`, `fixedExpenseAmount`, `otherExpenseAmount`, `monthlyPaymentAmount`, `currentScore`.
+- `getCashFlowData(userId)`: DIAG-08-1 응답에서 정확히 12개 연속 월의 `months[{baseMonth,incomeAmount}]`와 기준값 `baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`를 읽어 화면 이름 `fixedExpenseAmount`·`otherExpenseAmount`·`monthlyPaymentAmount`로 옮긴다(서버 값이며 mock 아님). 저장값이 없으면 null을 유지하고 예측은 불가로 표시한다. `currentScore`는 이 응답에 없다.
 - `forecastCashFlow({userId,baseline,conditions})`: 조건은 `incomeVariationPct`, `fixedExpenseAmount`, `paymentStatus`, `months`. 결과는 `forecastMonths`, `monthlyExpenseAmount`, `cumulativeSurplusAmount`, `tightestMonth`, `scorePath`, `currentScore`, `endScore`, `source`.
 - 금액은 정수 원 단위, 비율은 %, 점수는 0~1000이다. 미입력은 NULL을 유지한다. UI와 mock 요청 입구에서 형식·범위 검사를 하며 실제 서버 검증을 의미하지 않는다.
 - `VITE_USE_MOCK=false`는 미연결 오류를 표시한다. 자동 mock 대체나 외부 전송·저장은 없다.

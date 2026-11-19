@@ -13,19 +13,17 @@ export async function getAssetDebtData(userId, workerTypeCode) {
   return data
 }
 
-// N-21-1 DIAG-08-1 응답의 월별 실적(months)을 기준 자료로 쓴다.
-// 서버에 없는 값(고정·기타 지출 분리, 월 상환액 기준값)은 한곳(mockOnlyCashFields)에서 브라우저 mock으로 채운다.
-export async function getCashFlowData(userId, workerTypeCode) {
+// N-21-1·2 DIAG-08-1 응답의 월별 실적(months)과 기준 고정·기타 지출·월 상환액을 기준 자료로 쓴다.
+// 서버 이름(baseFixedExpenseAmount 등)을 화면 이름으로 옮기며, 저장값이 없으면(null) 0으로 채우지 않고 null로 둔다.
+export async function getCashFlowData(userId) {
   requireUser(userId)
   const server = await getCashFlowForecast({ forecastMonths: 3 })
-  return adaptCashFlowData({ months: server?.months, ...mockOnlyCashFields(workerTypeCode) })
-}
-
-// N-21 서버가 아직 주지 않는 현금흐름 기준값을 브라우저 mock에서 가져온다(실제 회원 자료가 아님).
-// TODO(광희 요청 11/19): DIAG-08-1 응답에 기준 고정지출·기타지출 분리값(fixedExpenseAmount, otherExpenseAmount)과 월 상환액 기준값(monthlyPaymentAmount)을 추가해 달라고 요청.
-function mockOnlyCashFields(workerTypeCode) {
-  const { fixedExpenseAmount, otherExpenseAmount, monthlyPaymentAmount, assumptions } = createFinanceMockData(workerTypeCode).cash
-  return { fixedExpenseAmount, otherExpenseAmount, monthlyPaymentAmount, assumptions }
+  return adaptCashFlowData({
+    months: server?.months,
+    fixedExpenseAmount: server?.baseFixedExpenseAmount ?? null,
+    otherExpenseAmount: server?.baseOtherExpenseAmount ?? null,
+    monthlyPaymentAmount: server?.baseMonthlyLoanPayment ?? null,
+  })
 }
 
 // N-16-3 화면의 세 입력을 검증하고, 시연 상환 추정(연 원리금)을 만든 뒤 비율·단계는 DIAG-03(재무 건전성 계산 API)으로 구한다.
