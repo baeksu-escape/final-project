@@ -149,8 +149,9 @@ class AdminReportServiceTest {
         verify(reportMapper).closeOpenReports("POST", 1L, "DONE", "DELETE", ADMIN, null, NOW);
     }
 
+    // FP-224: 숨김 유지가 빠져서, 아직 보이는 댓글을 관리자가 내리려면 삭제한다. 댓글은 기록 표가 없어 상태만 바뀐다.
     @Test
-    void 숨김_유지는_아직_보이는_댓글도_숨긴다() {
+    void 아직_보이는_댓글도_삭제하면_지우고_처리_완료로_닫는다() {
         given(reportMapper.selectReport(5L)).willReturn(report(5, "COMMENT", 9, "ABUSE", "RECEIVED", "VISIBLE", NOW));
         CommentRow comment = new CommentRow();
         comment.setCommentId(9L);
@@ -159,12 +160,12 @@ class AdminReportServiceTest {
         comment.setStatusCode("VISIBLE");
         given(boardMapper.selectComment(9L)).willReturn(comment);
         given(reportMapper.countOpenByTarget("COMMENT", 9L)).willReturn(1);
-        given(boardMapper.updateCommentStatus(9L, "VISIBLE", "HIDDEN_BY_REPORT", NOW)).willReturn(1);
+        given(boardMapper.updateCommentStatus(9L, "VISIBLE", "DELETED", NOW)).willReturn(1);
 
-        ReportDtos.ReportProcessed result = service.process(ADMIN, 5L, new ReportDtos.ReportProcess("KEEP_HIDDEN", null));
+        ReportDtos.ReportProcessed result = service.process(ADMIN, 5L, new ReportDtos.ReportProcess("DELETE", null));
 
-        assertThat(result.targetStatus()).isEqualTo("HIDDEN_BY_REPORT");
-        verify(reportMapper).closeOpenReports("COMMENT", 9L, "DONE", "KEEP_HIDDEN", ADMIN, null, NOW);
+        assertThat(result.targetStatus()).isEqualTo("DELETED");
+        verify(reportMapper).closeOpenReports("COMMENT", 9L, "DONE", "DELETE", ADMIN, null, NOW);
     }
 
     @Test
