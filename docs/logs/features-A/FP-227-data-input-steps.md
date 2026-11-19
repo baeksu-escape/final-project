@@ -119,6 +119,39 @@
 - **확인:** `npm run lint` 오류 0, `npm run build` 성공, `mvnw test` 374건 통과. 화면은 사람이 mock 모드로 확인한다(이 작업에서는 브라우저를 조작하지 않았다).
 - **문서 반영 필요(문서 담당):** 기능 정의서 N-05(7단계, 입력 완료 현황 = 단계 리모컨), N-04-8·N-05-1(저장 전 직군 변경 허용). API 정의서 `api_definition.md` 84·144행의 MEM-05 설명도 바꿔야 한다(이 작업에서는 고치지 않음).
 
+## 11/19 v1.2·v1.3 (화면만)
+- 대출은 "보유한 대출이 없습니다."를 체크하지 않았으면 줄이 늘 1개 이상 보인다(`minRows`, `withMinimumRows`).
+- "없음"·"신용 이력이 없어요"를 체크하면 칸을 숨기지 않고 잠근다(값은 보관하고, `해당 없음` 표시). 요청 본문 모양은 같다.
+
+## 11/19 v1.4 — 자산 4종 저장(DDL C11), 버튼 배치, 카드·신용 빈 칸 통과 오류
+- **DB(DDL v0.3.2 C11, 조장 결정 11/19):** `USER_ASSET_SNAPSHOT`의 `TOTAL_ASSET_AMT` 앞에 열 4개를 추가했다.
+  - 열: `DEPOSIT_AMT`·`INVESTMENT_AMT`·`REAL_ESTATE_AMT`·`OTHER_ASSET_AMT` (NUMBER(15), NULL 허용).
+  - 제약: CHECK `CK_UAS_DEPOSIT_AMT`·`CK_UAS_INVESTMENT_AMT`·`CK_UAS_REAL_ESTATE_AMT`·`CK_UAS_OTHER_ASSET_AMT` (>= 0).
+  - 총자산 열은 그대로 두고 4종 합계를 계속 저장한다. 재무 건전성 진단(C팀)과 입력 완료 판단이 이 열을 쓴다.
+  - 표 수는 48 그대로다.
+  - 기존 DB는 새 파일 `docs/spec/sql/alter_user_asset_snapshot_breakdown.sql`을 한 번 실행한다. 기존 행의 4종은 NULL로 남는다.
+- **DDL 짝꿍 파일:**
+  - `dummy_db/01_create_tables.sql`을 원본과 바이트까지 같게 맞췄다(`cmp` 출력 없음).
+  - `seed_report.json`의 `ddl_sha256`을 `ff1f759b…0dac`로 바꿨다.
+  - `docs/spec/sql/README.md` 상황별 표에 한 행을 추가했다.
+  - 기준 데이터 INSERT·시드 행 수는 바뀌지 않았다.
+- **서버(`FinancialInputService`·`FinancialInputMapper.xml`·`DataInputRows.AssetRow`):**
+  - 저장: 4종을 그대로 저장한다(빈 칸 NULL, 0은 0). 총자산은 `totalAsset()` 그대로다.
+  - 조회: 4종 중 하나라도 있으면 4종을 그대로 돌려준다. 모두 NULL인 옛 행은 `otherAmount`에 총자산을 넣는다.
+  - 입력 완료 판단과 점수 산출 입력은 그대로다.
+  - 시험 4개를 추가했다(4종 그대로, 일부만 입력, 옛 행, 모두 비움).
+- **명세:** `api_spec_a.md` INP-02 `assets`·INP-01 응답 설명, 머리말 최근 변경, 6장 "2차로 넘긴 것"에서 자산 항목을 반영함으로 바꿨다.
+- **화면:**
+  - 요청 본문 이름이 서버 `Assets`와 같아 바꾸지 않았다. mock은 저장한 본문을 그대로 돌려주므로 4종이 이미 돌아온다.
+  - 버튼 줄은 `data-input-form__actions`(-start/-end)다. [이전]은 왼쪽 끝이고, [다음]·[저장하기]·[점수 산출하기]는 왼쪽 입력 열의 오른쪽 끝이다.
+  - 카드·신용 6칸은 체크하지 않으면 필수다(설명 끝에 "해당 없는 항목은 0을 입력해 주세요."). 서버 검사는 그대로 두었다.
+- **확인:**
+  - `npm run lint` 오류 0, `npm run build` 성공.
+  - `mvnw test` 397건 통과.
+  - DB 도구 시험 52건: `bcrypt` 없음 1건만 실패했다(PC 환경 문제, README 안내대로).
+  - 공용 DB·로컬 DB에는 아무것도 실행하지 않았다.
+- **공용 DB 적용:** 병합한 뒤 DB 담당(범영)이 `alter_user_asset_snapshot_breakdown.sql`을 한 번 실행한다. 로컬 DB는 각자 실행한다.
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

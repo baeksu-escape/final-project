@@ -218,6 +218,28 @@
   align-self: flex-start;
 }
 
+/* FP-227 단계 아래 버튼 줄 — 왼쪽 입력 열 너비 안에서 [이전]은 왼쪽 끝, 주 버튼은 오른쪽 끝(가운데는 비움).
+   좁아서 줄이 넘쳐도 오른쪽 묶음은 margin-left: auto로 오른쪽에 붙고 버튼끼리 겹치지 않는다. */
+.data-input-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.data-input-form__actions-start,
+.data-input-form__actions-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.data-input-form__actions-end {
+  margin-left: auto;
+}
+
 /* 고칠 항목 개수 · 덮어쓰기 안내 — 데모 .warnbox */
 .data-input-form__error-summary,
 .data-input-form__overwrite-notice {

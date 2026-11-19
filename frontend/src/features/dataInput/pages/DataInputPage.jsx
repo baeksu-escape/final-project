@@ -440,12 +440,17 @@ export default function DataInputPage() {
               기준월 {values.baseMonth}에 저장한 입력이 있습니다. 지금 저장하면 기존 입력을 덮어씁니다.
             </p>
           )}
-          <div className="l-row">
-            {step > 0 && <Button onClick={handlePrev}>이전</Button>}
-            {step === 0 && !saved && <Button onClick={handleBackToJobSelect}>이전</Button>}
-            <Button variant="primary" type="submit" disabled={pending || errorCount > 0}>
-              {step === LAST_INPUT_STEP ? (pending ? '저장 중…' : '저장하기') : '다음'}
-            </Button>
+          {/* FP-227 버튼 줄 — 왼쪽 입력 열 안에서 [이전]은 왼쪽 끝, 주 버튼([다음]·[저장하기])은 오른쪽 끝. [이전]이 없어도 주 버튼은 오른쪽이다. */}
+          <div className="data-input-form__actions">
+            <div className="data-input-form__actions-start">
+              {step > 0 && <Button onClick={handlePrev}>이전</Button>}
+              {step === 0 && !saved && <Button onClick={handleBackToJobSelect}>이전</Button>}
+            </div>
+            <div className="data-input-form__actions-end">
+              <Button variant="primary" type="submit" disabled={pending || errorCount > 0}>
+                {step === LAST_INPUT_STEP ? (pending ? '저장 중…' : '저장하기') : '다음'}
+              </Button>
+            </div>
           </div>
         </form>
       )}
@@ -464,11 +469,15 @@ export default function DataInputPage() {
             onImported={handleAltImported}
             onDisconnected={handleAltDisconnected}
           />
-          <div className="l-row">
-            <Button onClick={handlePrev}>이전</Button>
-            <Button variant="primary" onClick={handleAltDataNext}>
-              다음
-            </Button>
+          <div className="data-input-form__actions">
+            <div className="data-input-form__actions-start">
+              <Button onClick={handlePrev}>이전</Button>
+            </div>
+            <div className="data-input-form__actions-end">
+              <Button variant="primary" onClick={handleAltDataNext}>
+                다음
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -486,19 +495,24 @@ export default function DataInputPage() {
               {calculateError}
             </p>
           )}
-          <div className="l-row">
-            <Button onClick={handlePrev}>이전</Button>
-            <button
-              type="button"
-              className="data-input-page__calculate"
-              onClick={handleCalculateScore}
-              disabled={calculating || !isInputComplete(status, user.jobType)}
-            >
-              {calculating ? '산출 중…' : SCORE_STEP_TITLE}
-            </button>
-            <Link to={PATHS.REPORT} className="data-input-page__next-link">
-              신용 리포트로 이동
-            </Link>
+          {/* 7단계 버튼 줄 — [이전] 왼쪽 끝, [신용 리포트로 이동]·[점수 산출하기](주 버튼)는 오른쪽 끝. */}
+          <div className="data-input-form__actions">
+            <div className="data-input-form__actions-start">
+              <Button onClick={handlePrev}>이전</Button>
+            </div>
+            <div className="data-input-form__actions-end">
+              <Link to={PATHS.REPORT} className="data-input-page__next-link">
+                신용 리포트로 이동
+              </Link>
+              <button
+                type="button"
+                className="data-input-page__calculate"
+                onClick={handleCalculateScore}
+                disabled={calculating || !isInputComplete(status, user.jobType)}
+              >
+                {calculating ? '산출 중…' : SCORE_STEP_TITLE}
+              </button>
+            </div>
           </div>
         </div>
       )}

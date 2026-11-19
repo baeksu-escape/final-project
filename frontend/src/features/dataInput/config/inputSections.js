@@ -132,14 +132,15 @@ const hasNoCreditHistory = (value) => value?.noCreditHistory === true
 
 // D-29 카드·신용 이용(11/06 확정 UI 순서) — 신용평가사 API 대신 회원이 직접 입력해 USER_CREDIT_PROFILE(SOURCE_CODE='MANUAL')에 저장한다.
 // 입력 완료 현황(completionItems.js 6항목)에는 넣지 않는다. 최근 3개월 최장 연체일수 칸은 두지 않는다(O-16).
+// FP-227 "신용 이력이 없어요"를 체크하지 않았으면 6칸 모두 필수다(해당 없으면 0). 체크하면 잠겨 검사하지 않는다. 서버 검사는 바꾸지 않았다(화면에서만 막는다).
 const CREDIT_PROFILE_SECTION = {
   key: 'creditProfile',
   title: '카드·신용 이용',
-  description: '신용카드와 대출 이용 기록을 입력해 주세요. 신용카드·대출을 써 본 적이 없으면 아래 항목을 체크해 주세요.',
+  description: '신용카드와 대출 이용 기록을 입력해 주세요. 신용카드·대출을 써 본 적이 없으면 아래 항목을 체크해 주세요. 해당 없는 항목은 0을 입력해 주세요.',
   kind: 'fields',
   fields: [
-    { key: 'cardLimitAmount', label: '카드 한도(모든 카드 합계)', input: 'money', validate: balanceAmountRule, disabledWhen: hasNoCreditHistory },
-    { key: 'cardMonthlySpendAmount', label: '월 카드 사용액(모든 카드 합계)', input: 'money', validate: cardSpendRule, disabledWhen: hasNoCreditHistory },
+    { key: 'cardLimitAmount', label: '카드 한도(모든 카드 합계)', input: 'money', validate: balanceAmountRule, required: true, disabledWhen: hasNoCreditHistory },
+    { key: 'cardMonthlySpendAmount', label: '월 카드 사용액(모든 카드 합계)', input: 'money', validate: cardSpendRule, required: true, disabledWhen: hasNoCreditHistory },
     {
       key: 'delinquencyCount12m',
       label: '최근 1년 연체(30일 이상)',
@@ -149,6 +150,7 @@ const CREDIT_PROFILE_SECTION = {
       max: VALIDATION_LIMITS.CREDIT_COUNT_MAX,
       step: 1,
       validate: numberRule({ max: VALIDATION_LIMITS.CREDIT_COUNT_MAX, integer: true, unit: '회' }),
+      required: true,
       disabledWhen: hasNoCreditHistory,
     },
     {
@@ -160,6 +162,7 @@ const CREDIT_PROFILE_SECTION = {
       max: VALIDATION_LIMITS.CASH_ADVANCE_MONTHS_MAX,
       step: 1,
       validate: numberRule({ max: VALIDATION_LIMITS.CASH_ADVANCE_MONTHS_MAX, integer: true, unit: '개월' }),
+      required: true,
       disabledWhen: hasNoCreditHistory,
     },
     {
@@ -171,9 +174,10 @@ const CREDIT_PROFILE_SECTION = {
       max: VALIDATION_LIMITS.CREDIT_COUNT_MAX,
       step: 1,
       validate: numberRule({ max: VALIDATION_LIMITS.CREDIT_COUNT_MAX, integer: true, unit: '건' }),
+      required: true,
       disabledWhen: hasNoCreditHistory,
     },
-    { key: 'privateLenderLoanBalanceAmount', label: '대부업 대출 잔액', input: 'money', validate: balanceAmountRule, disabledWhen: hasNoCreditHistory },
+    { key: 'privateLenderLoanBalanceAmount', label: '대부업 대출 잔액', input: 'money', validate: balanceAmountRule, required: true, disabledWhen: hasNoCreditHistory },
     { key: 'noCreditHistory', label: '신용 이력이 없어요', input: 'checkbox' },
   ],
 }
