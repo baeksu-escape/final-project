@@ -38,7 +38,9 @@
   - DDL 변경 체크리스트: 사본 `cmp` 일치, `seed_report.json`의 `ddl_sha256`이 LF 정규화 DDL 해시와 일치, `99_check.sql`·`00_drop_all.sql`·`seed_report.json`의 표 순서가 생성기(`parse_ddl`)가 읽은 DDL 순서와 같음.
   - DB 도구 테스트 52개 통과(건너뜀 3, 임시 가상환경에 `cryptography`·`pandas`·`bcrypt` 설치), FastAPI 테스트 143개 통과(새 13개 포함).
   - 적재 SQL 안의 행 수·집단/분할별 건수·코드·점수 범위·키 중복 없음을 코드로 확인. 가장 긴 줄이 SQL*Plus 한 줄 제한(2,499자) 안(INSERT 한 줄 약 330자). 파일 크기 약 1.0MB(기존 시드 1~3MB와 비슷).
-- 확인 못 함: **Oracle에서 실행**(생성 SQL, 적재 SQL, 빈 스키마에서 `avenue_ddl.sql` 전체 실행과 `run_seed_only.sql`의 표 수 48 확인은 SQL Developer로 사용자가 해야 함), 공용 DB 적용(범영), 동주 님 API에서 이 표를 읽는 모습, 생성기를 팀 키로 다시 돌려 묶음을 만드는 것(경환).
+  - 로컬 Oracle(SQL Developer, 11/19 사용자 확인): 기존 DB에서 `create_model_eval_sample.sql` → `load_model_eval_sample_lgbm_base_0_1.sql` 실행으로 3,085행 적재(LEGACY/VALID 1,800, THINFILE/TRAIN 1,057, THINFILE/VALID 228). 별도로 `00_drop_all.sql` → `avenue_ddl.sql` 전체 → `run_seed_only.sql` → `99_check.sql` 순서로 빈 스키마에서 실행해 표 48개 확인. 최신 develop(PR #97·#98) 병합 후 FastAPI 테스트 143개·DB 도구 테스트 52개(건너뜀 3) 통과.
+  - `99_check.sql` 마지막 쿼리(코멘트 없는 열) 239행은 기존 DDL의 값과 같다(열 416개 중 코멘트 177개). `MODEL_EVAL_SAMPLE`의 열은 모두 코멘트가 있다.
+- 확인 못 함: 공용 DB 적용(범영), 동주 님 API에서 이 표를 읽는 모습, 생성기를 팀 키로 다시 돌려 묶음을 만드는 것(경환).
 
 ## 다음 사람이 알아야 할 것
 - 공용 DB 적용은 병합 후 DB 담당(범영)이 한다. 순서는 생성 SQL → 적재 SQL이고, 적용한 DB의 `99_check.sql`에서 `MODEL_EVAL_SAMPLE`은 기대값 0과 실제 3,085가 다르게 나오는 것이 정상이다.
