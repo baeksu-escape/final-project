@@ -39,6 +39,8 @@ SELECT USER FROM DUAL;
 - 위 모델 기록의 `METRICS_JSON`에 두 모델 AUC를 같은 라벨로 맞춘 값(`same_label_comparison`, N-25·정의서 C20)을 더할 때는 [같은 라벨 AUC SQL](update_model_metrics_same_label_lgbm_base_0_1.sql)을 사용한다. 모델 기록 SQL을 먼저 실행해야 하며(없으면 멈춤), `AUC_VALID`·해시는 바꾸지 않는다. 다시 실행해도 된다.
 - 기존 DB에 평가 표본 표를 추가할 때는 [평가 표본 표 생성 SQL](create_model_eval_sample.sql)로 빈 표 `MODEL_EVAL_SAMPLE`(DDL C10, N-25)을 만들고, 필요한 DB에만 [평가 표본 적재 SQL](load_model_eval_sample_lgbm_base_0_1.sql)(3,085행)을 한 번 실행한다. 기본 시드(`run_seed_only.sql`)에는 넣지 않으며, 적재한 DB에서는 `99_check.sql`의 `MODEL_EVAL_SAMPLE` 기대값 0과 실제 3,085가 다른 것이 정상이다.
 
+- N-17 시나리오용 한국은행 기준금리(2024.01~2026.10)가 필요하면 DDL을 적용한 스키마에서 [기준금리 적재 SQL](add_policy_rate_bok_base_rate.sql)을 실행한다. 기본 시드도 넣는 경우 시드를 먼저 실행한다. 빈 표에 적용하면 월말 기준 34행이 들어가며 다시 실행해도 같은 결과다. 기본 시드 상태를 검사하는 `99_check.sql`에서 적재 후 `FACT_POLICY_RATE`의 `EXPECTED=0`, `ACTUAL=34`는 정상이다. 적재 행 수와 최신 기준금리는 적재 SQL 마지막의 확인 쿼리로 확인한다.
+
 ## 참고
 
 DDL을 변경할 때는 확인 명령을 포함한 [DDL 변경 체크리스트](REFERENCE.md#ddl-변경-체크리스트-pr-64)를 따른다. 상권·알림 테이블 결정과 생성 코드 보존 이유는 [DB 참고](REFERENCE.md)에 정리되어 있다.
