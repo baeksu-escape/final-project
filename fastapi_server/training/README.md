@@ -42,6 +42,24 @@ python -m training.train --data-dir <학습 데이터 폴더>
 
 기존 모델은 `label_any_delinquency_12m`, 대안 모델은 `label_nonfin_effect_12m`이 정답이라 서로 다른 라벨의 AUC를 그대로 빼지 않는다. `python -m training.compare_labels`가 두 모델을 두 라벨에서 각각 평가해 같은 라벨끼리 비교한다. 해석과 한계는 정의서 2-1, 10장 C20.
 
+## N-25 행 단위 평가 점수 파일
+
+`python -m training.export_eval_scores`가 관리자 모형 비교 화면(FP-185)과 API(FP-184)가 컷오프별 지표·ROC를 계산할 행 데이터를 `eval_scores.csv`와 설명 파일 `eval_scores.meta.json`으로 만든다(`artifacts/`, Git 제외, `#파일공유`로 전달). `--out`으로 경로를, `--skip-thinfile`로 씬파일 집단 제외를, `--thinfile-valid-only`로 씬파일도 VALID만 쓰도록 고른다.
+
+| 열 | 내용 |
+|---|---|
+| `customer_id`, `group`, `segment`, `data_split` | 고객, 집단(`legacy` 기존 집단 / `thinfile` 씬파일 집단), 직군 이름(`wage`·`selfemp`·`freelance`), 분할(`legacy`는 `VALID`만, `thinfile`은 `TRAIN`과 `VALID`) |
+| `label_any_delinquency_12m`, `label_nonfin_effect_12m` | 정답 라벨 둘 다(1이 불량) |
+| `score_legacy_delinq`, `score_alt_delinq` | 연체 라벨로 학습·평가한 기존·대안 모델의 0~1000 점수(높을수록 좋음) |
+| `score_legacy_nonfin`, `score_alt_nonfin` | 비금융 효과 라벨로 학습·평가한 기존·대안 모델의 점수 |
+
+- **같은 라벨끼리 비교한다**: 라벨마다 두 모델을 기존 집단 TRAIN으로 새로 학습한다(정의서 C20). 서버에 올린 모델은 `score_legacy_delinq`(= `legacy.joblib`)와 `score_alt_nonfin`(= `alternative.joblib`)뿐이고, 스크립트가 `artifacts/`의 파일과 점수가 같은지 확인해 설명 파일에 적는다. 나머지 두 열은 비교용 실험 모델이다.
+- **평가 행**: 기존 집단은 VALID 1,800행만 쓴다. 씬파일 집단은 이 모델들이 학습하지 않은 집단이라 TRAIN 행도 평가에 써도 누수가 없어서 TRAIN+VALID 1,285행을 쓴다(VALID만으로는 양성이 연체 22건, 비금융 효과 14건뿐이라 지표가 흔들린다). 씬파일을 학습에 쓰는 모델이 생기면 TRAIN 행이 누수가 되므로 `--thinfile-valid-only`로 바꾼다.
+- **씬파일은 `eval_future_credit_exposure = 1`인 고객만** 넣는다(0인 고객은 라벨이 항상 0이라 제외, 정의서 5장). 라벨 생성 방식이 기존 집단과 달라 집단별로 따로 본다.
+- **점수 환산**은 서비스와 같다(명세서 O-3, `training/explain.py`의 `to_score`). 컷오프는 이 점수에 건다.
+- **TEST는 들어 있지 않다.** 최종 평가(FP-144) 때 같은 스크립트로 TEST용 파일을 따로 만든다.
+- **한계**: 시드 하나(11)의 값이다. 연체 라벨에서 기존 집단의 대안 모델 AUC는 시드 11(0.6183)이 5개 시드 중 가장 높고 평균은 0.5991이라 기존 모델(0.6049)과 구분되지 않는다. AUC는 `METRICS_JSON`의 5개 시드 평균(`same_label_comparison`)을 쓰고 이 파일은 컷오프별 지표·ROC에 쓰는 것을 권한다. 정수 점수 기준이라 확률 기준과 소수 넷째 자리가 다를 수 있다. 연체 라벨에는 대안 데이터 효과를 넣지 않았고(데이터 생성 설계) 비금융 효과 라벨은 설계로 넣은 효과가 반영된 라벨이라, 어느 쪽도 실제 개선의 근거가 아니다. 합성 데이터이며 실제 신용평가 결과가 아니다.
+
 ## 모델 입력·출력 규격 (FP-135)
 
 서비스(FP-141)가 모델을 부를 때 지킬 규격이다. 원본은 이 표와 `config.py`이며(`*.meta.json`은 Git 제외), 같은 규격을 `interface.py`의 `to_model_input(feature_dict, model_name)`이 구현한다. 시험은 `tests/test_training_interface.py`.
