@@ -23,17 +23,19 @@
 | `backend/src/test/.../help/mapper/GlossaryMapperIT.java` | 새 파일. `-Ddb.it=true`일 때만, 시험 행 2개를 넣고 롤백 |
 | `frontend/src/features/ai/api/glossaryApi.js` | 새 파일. `getGlossary()` |
 | `frontend/src/features/ai/mocks/glossaryMockHandlers.js` | 새 파일. 시드 문구 5개, 로그인 안 했으면 401 |
-| `docs/spec/sql/seed_glossary_term.sql` | 새 파일. 용어 20개 `MERGE`(다시 실행 가능) |
+| `docs/spec/sql/add_glossary_term.sql` | 새 파일. 용어 20개 `MERGE`(다시 실행 가능). 처음 이름 `seed_glossary_term.sql`을 SQL 폴더 규칙(기존 DB용은 `add_*`)에 맞춰 바꿈 |
+| `docs/spec/sql/README.md` | 「먼저 내 상황에 맞는 경로를 고른다」 표에 한 행 추가(체크리스트 6) |
 | `docs/spec/api/api_spec_c.md` | 「N-30-1 금융 용어 사전」 절, 최근 변경 |
 
 ## DB·API 변경
 - DB
   - 표 구조 변경은 없다.
-  - 기준 데이터 SQL `seed_glossary_term.sql`을 새로 만들었다(`GLOSSARY_TERM` 20행). 아직 어느 DB에도 적용하지 않았다.
+  - 기준 데이터 SQL `add_glossary_term.sql`을 새로 만들었다(`GLOSSARY_TERM` 20행). 아직 어느 DB에도 적용하지 않았다.
   - 적용하면 `dummy_db/99_check.sql`의 `GLOSSARY_TERM` 기대값(0)과 실제 값이 달라지는 것이 정상이다.
 - API: `GET /api/glossary` 추가(HELP-01, 로그인 필요, 응답 `{ terms: [{ term, easyText, explanation }] }`)
 - 영향을 받는 기능·팀원
-  - 경환·범영 님: 시드 SQL을 공용·로컬 DB에 적용할지, 나중에 dummy_db 생성기에 넣을지 확인 필요
+  - 범영 님(DB 담당): 병합 후 공용 DB에 `add_glossary_term.sql` 실행(체크리스트 9). 로컬 DB는 각자 실행
+  - 경환 님(더미 DB 생성기): 나중에 생성기·`99_check.sql`에 넣을지는 선택(지금은 별도 파일로 충분)
   - 화면 담당: 툴팁·챗봇에서 `features/ai/api/glossaryApi.js`의 `getGlossary()`를 쓸 수 있다
   - 범영·우찬 님: API 정의서 HELP-01 상태 🟡 → ✅ 반영
 
@@ -49,7 +51,7 @@
 ## 다음 사람이 알아야 할 것
 - N-31(AI 요약)·N-32(챗봇)도 `com.baeksuescape.help`에 둔다.
 - 툴팁(N-30-2)은 N-30에 적힌 6개 탭에서만 보인다. 상권 분석·대출 상품·신용 라운지·관리자·마이 페이지에는 두지 않는다.
-- 용어·문구를 바꾸려면 `seed_glossary_term.sql`을 고치고 다시 실행하면 된다(같은 용어는 덮어씀).
+- 용어·문구를 바꾸려면 `add_glossary_term.sql`을 고치고 다시 실행하면 된다(같은 용어는 덮어씀).
 
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)

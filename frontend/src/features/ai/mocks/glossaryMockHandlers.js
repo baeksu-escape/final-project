@@ -1,4 +1,4 @@
-// N-30-1 용어 사전 mock 핸들러 — 응답 모양은 실제 HELP-01(GET /api/glossary)과 같고, 용어는 시드 SQL(seed_glossary_term.sql)에서 몇 개만 옮겼다.
+// N-30-1 용어 사전 mock 핸들러 — 응답 모양은 실제 HELP-01(GET /api/glossary)과 같고, 용어는 시드 SQL(add_glossary_term.sql)에서 몇 개만 옮겼다.
 import { registerMockHandlers, requireMockUser } from '../../../common/mocks/mockHandlers.js'
 
 // 시드와 같은 문구 일부 (용어 이름 순서)

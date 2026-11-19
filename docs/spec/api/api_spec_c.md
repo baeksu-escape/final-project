@@ -6,7 +6,7 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
-> - 🆕 11/19 (광희, FP-180) N-30-1 용어 사전 `GET /api/glossary`(HELP-01) 추가, 기준 데이터 `docs/spec/sql/seed_glossary_term.sql`(20개).
+> - 🆕 11/19 (광희, FP-180) N-30-1 용어 사전 `GET /api/glossary`(HELP-01) 추가, 기준 데이터 `docs/spec/sql/add_glossary_term.sql`(20개).
 > - 🆕 11/19 (광희, FP-170 추가 수정) 저장 데이터를 읽는 API 5개를 팀 공통 규칙대로 `/api/members/me/**`로 옮기고 옛 경로를 지웠다(우찬 님 합의): SIM-01 `credit-care-base`, SIM-02 `credit-care-recalculate`, DIAG-07-1 `income-volatility`, DIAG-08-1 `cash-flow-forecast`, DIAG-09 `cash-flow-expected-score`. 로그인 확인은 보안 설정이 한다(토큰 없음 401, 관리자 403). SIM-01에 `topReductionFactors`, DIAG-08-1에 기준값 3개(`baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`)를 추가했다(경환 님 요청).
 > - 🆕 11/18 (광희, FP-170) SIM-01 `credit-care/base`·DIAG-09 `cash-flow/expected-score` 추가, SIM-02 Spring 구현(출발 평가 = 최근 SCORED, 404 `ASSESSMENT_NOT_FOUND`).
 
@@ -532,7 +532,7 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 - 인증: 로그인 필요(보안 설정 "그 밖의 `/api/**`"). 토큰이 없으면 `401 UNAUTHORIZED`다. 회원 데이터를 읽지 않으므로 관리자 계정도 부를 수 있다.
 - 요청 값은 없다. 사전 전체를 **용어 이름 순서**(`ORDER BY TERM`)로 한 번에 돌려준다(수십 행).
 - 사전이 비어 있어도 오류가 아니라 `{ "terms": [] }`다. 화면은 사전에 없는 말을 원래 말 그대로 보여 준다.
-- 기준 데이터: [`docs/spec/sql/seed_glossary_term.sql`](../sql/seed_glossary_term.sql)(합성 교육용 문구 20개, 다시 실행해도 됨). dummy_db 생성기에는 아직 들어 있지 않다. 공용·로컬 DB 적용은 경환·범영 님 확인 후 한다.
+- 기준 데이터: [`docs/spec/sql/add_glossary_term.sql`](../sql/add_glossary_term.sql)(합성 교육용 문구 20개, 다시 실행해도 됨). dummy_db 생성기에는 들어 있지 않아 DDL·시드 다음에 따로 실행한다. 공용 DB 실행은 병합 후 DB 담당(범영)이 한다.
 
 응답 `200`:
 
