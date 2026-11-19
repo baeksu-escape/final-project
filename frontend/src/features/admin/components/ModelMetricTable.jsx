@@ -15,7 +15,8 @@ function diffOf(metric, legacyValue, altValue) {
 }
 
 // N-25-2 성능 지표 비교 표 — 지표 6개를 기존·대안·차이로 나란히 보여 준다. 대안이 나쁜 지표도 그대로 '나빠짐'으로 표시한다.
-export default function ModelMetricTable({ legacy, alternative }) {
+// aucNote: AUC 출처(예: '5개 시드 평균') — AUC 행 이름 옆에 작게 붙인다(11/19).
+export default function ModelMetricTable({ legacy, alternative, aucNote }) {
   return (
     <div className="data-table-wrap">
       <table className="data-table">
@@ -38,7 +39,10 @@ export default function ModelMetricTable({ legacy, alternative }) {
             const diff = diffOf(metric, legacy[metric.key], alternative[metric.key])
             return (
               <tr key={metric.key}>
-                <td>{metric.label}</td>
+                <td>
+                  {metric.label}
+                  {metric.key === 'auc' && aucNote && <span className="hint"> · {aucNote}</span>}
+                </td>
                 <td className="is-num num">{formatValue(metric.type, legacy[metric.key])}</td>
                 <td className="is-num num">
                   <b>{formatValue(metric.type, alternative[metric.key])}</b>

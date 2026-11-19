@@ -9,16 +9,12 @@ const toX = (fpr) => PAD + fpr * PLOT
 const toY = (tpr) => 20 + (1 - tpr) * PLOT
 const toPolyline = (points) => points.map(({ fpr, tpr }) => `${toX(fpr).toFixed(1)},${toY(tpr).toFixed(1)}`).join(' ')
 
-// N-25-3 ROC 곡선 — 기존·대안 모형의 곡선과 AUC를 한 그림에 그린다. 공통 차트에 x·y 곡선이 없어 SVG로 직접 그린다.
-// legacy·alternative: { auc, points: [{ fpr, tpr }] } (ADM-02 응답), groupLabel: 화면 낭독용 집단 이름
-export default function RocCurveChart({ legacy, alternative, groupLabel }) {
+// N-25-3 ROC 곡선 — 기존·대안 모형의 곡선을 한 그림에 그린다. 공통 차트에 x·y 곡선이 없어 SVG로 직접 그린다.
+// 곡선은 평가 표(시드 1개)로 그리고 AUC 숫자는 비교 표(5개 시드 평균)에만 둔다 — 한 화면에 서로 다른 AUC가 보이지 않게(11/19).
+// legacy·alternative: { points: [{ fpr, tpr }] } (ADM-02 응답), caption: 화면 낭독용 집단·라벨 이름
+export default function RocCurveChart({ legacy, alternative, caption }) {
   return (
-    <svg
-      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-      width="100%"
-      role="img"
-      aria-label={`${groupLabel} ROC 곡선, 기존 AUC ${legacy.auc.toFixed(3)}, 대안 AUC ${alternative.auc.toFixed(3)}`}
-    >
+    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={`${caption} ROC 곡선, 기존과 대안 모형 비교`}>
       <rect x={PAD} y={20} width={PLOT} height={PLOT} fill="none" stroke="var(--line2)" />
       {GRID.map((v) => (
         <g key={v}>
@@ -37,10 +33,10 @@ export default function RocCurveChart({ legacy, alternative, groupLabel }) {
         참 양성률
       </text>
       <text x={toX(1) - 4} y={toY(0.07)} fontSize="11" fill="var(--mut)" textAnchor="end">
-        기존 {legacy.auc.toFixed(3)}
+        기존 모형
       </text>
       <text x={toX(1) - 4} y={toY(0.13)} fontSize="11" fill="var(--vio)" textAnchor="end">
-        대안 {alternative.auc.toFixed(3)}
+        대안 모형
       </text>
     </svg>
   )
