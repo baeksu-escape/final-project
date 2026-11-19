@@ -11,6 +11,7 @@
 > 1. 2-1 **FP-219(우찬, PR #89)** 반영: AUTH-13 닉네임 중복 확인, AUTH-14·15 휴대폰 인증번호 발송·확인 추가, AUTH-06 가입에 휴대폰 인증 필수
 > 2. 2-5·2-6 **FP-170(광희, PR #93)** 반영: SIM-01·SIM-02·DIAG-09 Spring 구현 ✅ (출발 평가 = 최근 SCORED, 저장 안 함)
 > 3. 1-2 오류 표: SIM·DIAG-09 오류 정리, "Spring 미구현" 표시 삭제
+> 4. 🆕 11/19 (FP-218, 우찬) Q-8 결정 반영: DIAG-07-1·08-1·09, SIM-01·02 경로를 `/api/members/me/**`로 고침(FP-170 이동분), Q-8 해결
 >
 > 이전 변경 (11/18): 저장소 `docs/spec/api/`로 이관, PR #83(DIAG-07 표준편차·DIAG-08 `months[]`·전망 조건) 반영, 간편결제 × 12 🟡 정정, `isXxx` 필드 규칙
 > 이전 변경 (11/17): A팀 명세(우찬) 반영(공통 규칙·오류 code·AUTH-11·12·ADM-07-1·ADM-ME-1~3), INP-03 `utility`, RPT-01 `{ requestId }`·`ALT_DATA_EMPTY`, 시뮬레이터 입력 10개 확정, C조 광희 재무 계산 API(PR #78), 커뮤니티(PR #80), ML-01~04 실제 모델 연결(PR #74·#77), Jira 번호 정정
@@ -193,17 +194,17 @@
 | DIAG-05 | `GET /api/finance/policy-rates` | N-17-2 시나리오 입력 (기준금리) | `FACT_POLICY_RATE` | USER | 동주 | 🟡 |
 | DIAG-06 | `POST /api/diagnosis/dsr/calculate` | N-20-4 DSR 계산·위험 단계 (요청 본문 `{ annualIncome, annualDebtService }`) | — | USER | 광희 (FP-166) | ✅ |
 | DIAG-07 | `POST /api/diagnosis/income-volatility` | N-22-3 변동성 지표 계산(월 소득 표준편차 `standardDeviation` 포함), N-22-4 성수기·비수기 소득 격차 계산, N-22-5 소득 부족 달 확인 (요청 본문으로 계산, DB 안 읽음) | — | USER | 광희 (FP-203) | ✅ |
-| DIAG-07-1 | `GET /api/diagnosis/income-volatility` | N-22-1 저장 데이터 조회 + N-22-3·4·5 (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM` | USER | 광희 (FP-203) | ✅ |
+| DIAG-07-1 | `GET /api/members/me/income-volatility` 🆕 11/19 경로 이동 | N-22-1 저장 데이터 조회 + N-22-3·4·5 (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM` | USER | 광희 (FP-203) | ✅ |
 | DIAG-08 | `POST /api/diagnosis/cash-flow/forecast` | N-21-5 현금흐름 전망 계산, N-21-6 최근 12개월 적자 개월 수 계산, N-21-7 성수기·비수기 소득 격차 계산, N-21-9 과거 월 실적 `months[]`(요청의 `past12MonthsHistory`를 같은 모양으로 돌려줌) (요청 본문으로 계산, DB 안 읽음) | — | USER | 광희 (FP-203) | ✅ |
-| DIAG-08-1 | `GET /api/diagnosis/cash-flow/forecast` | N-21-1 저장 데이터 조회 + N-21-2 전망 조건(쿼리, `incomeVariationPct`·`fixedExpenseAmount`·`paymentStatus` 추가) + N-21-5·6·7 + N-21-9 과거 월 실적 `months[]`(최대 12개) (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM`, `USER_LOAN` | USER | 광희 (FP-203) | ✅ |
-| DIAG-09 | `POST /api/diagnosis/cash-flow/expected-score` | N-21-8 예상 대안 점수 재계산 (FastAPI ML-03을 ACTIVE 모델로 1번 호출, 저장 안 함 — O-6 확정). 응답 `expectedScore`·`scoreDiff`·`modelVersion`·`baseModelVersion` | 읽기만 (`ASSESSMENT` 최근 SCORED, 입력 표) | USER | 광희 (FP-170) | ✅ (PR #93) 🆕 11/19 |
+| DIAG-08-1 | `GET /api/members/me/cash-flow-forecast` 🆕 11/19 경로 이동 | N-21-1 저장 데이터 조회 + N-21-2 전망 조건(쿼리, `incomeVariationPct`·`fixedExpenseAmount`·`paymentStatus` 추가) + N-21-5·6·7 + N-21-9 과거 월 실적 `months[]`(최대 12개) (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM`, `USER_LOAN` | USER | 광희 (FP-203) | ✅ |
+| DIAG-09 | `POST /api/members/me/cash-flow-expected-score` 🆕 11/19 경로 이동 | N-21-8 예상 대안 점수 재계산 (FastAPI ML-03을 ACTIVE 모델로 1번 호출, 저장 안 함 — O-6 확정). 응답 `expectedScore`·`scoreDiff`·`modelVersion`·`baseModelVersion` | 읽기만 (`ASSESSMENT` 최근 SCORED, 입력 표) | USER | 광희 (FP-170) | ✅ (PR #93) 🆕 11/19 |
 | ~~DIAG-10~~ | ~~`GET /api/commercial/dongs/{admDongCode}`~~ | N-24-2 소상공인 상권 분석, N-24-3 상권 분석 차트, N-24-5 행정동 상세 창 | — (상권 표 5개는 DDL에서 제거, 11/14) | USER | C조 | ⛔ **API 만들지 않음** — 화면이 정적 JSON(`frontend/public/data/market/`)을 읽는다(N-24 결정) |
 | ~~DIAG-11~~ | ~~`GET /api/commercial/heatmap`~~ | N-24-4 상권 공간 시각화 (지도 히트맵) | 위와 같음 | USER | C조 | ⛔ 위와 같음 |
 
 - C팀(광희) API의 요청·응답 상세와 오류 문구는 [api_spec_c.md](api_spec_c.md)에 있다.
 - DIAG-08-1 화면 조건이 범위 밖이면 400 `INVALID_INPUT`(`fieldErrors[0].field` = 쿼리 이름). `paymentStatus`는 지금 값만 검사하고 계산에 쓰지 않는다. DIAG-09도 아직 반영하지 않는다(`paymentStatusApplied: false`). '밀림' 반영 방식(제안: 최근 1년 연체 횟수 +1)은 팀 결정 대기. 🆕 11/19
 - `/api/income`이 프론트 코드에 1번 나온다. 어느 기능의 경로인지 확인이 필요하다.
-- DIAG-07-1·08-1은 회원 번호를 URL로 받지 않고 `Authorization: Bearer` 토큰의 회원만 조회한다. 토큰이 없으면 401 `UNAUTHORIZED`다. 공통 규칙(1장)의 "내 데이터는 `/api/members/me/**`"와 경로가 달라 Q-8에서 정한다.
+- DIAG-07-1·08-1·09, SIM-01·02는 회원 번호를 URL로 받지 않고 `Authorization: Bearer` 토큰의 회원만 조회한다. 🆕 11/19 Q-8 결정으로 공통 규칙(1장)대로 `/api/members/me/**`에 두어 ROLE_USER가 적용된다(토큰 없음 401, 관리자 토큰 403).
 - DIAG-07-1·08-1 저장 데이터 규칙: 기준월 = `USER_INCOME_MONTH`의 가장 늦은 `BASE_MONTH`(DDL 11/10 결정). 지출·대출도 같은 달 값을 쓴다(그 달에 행이 없으면 0). 급여소득자는 월급 1행을 12개월로 펼친다.
 - DIAG-08·08-1 예측 기간 `forecastMonths`는 3·6·12개월만 받는다(없거나 0이면 6, 그 밖은 400). 전망은 마지막 입력월 다음 달부터 시작한다.
 - 상환 부담률(N-16-1)과 DSR(N-20-4)은 함수 하나를 함께 쓴다(`FinancialHealthCalculator.calculateRepaymentBurdenRatio`). 위험 단계는 기준 **이상**이면 그 단계다: DSR 30/40, 자산 대비 부채 40/60, 순자산 대비 부채 70/100. N-21-7과 N-22-4의 성수기·비수기 격차도 함수 하나를 함께 쓴다(`IncomeVolatilityCalculator.calculatePeakOffPeakGap`).
@@ -213,8 +214,8 @@
 
 | ID | 메서드 · 경로 | 기능 | 주요 표 | 인증 | 상태 |
 |---|---|---|---|---|---|
-| SIM-01 | `GET /api/simulation/credit-care/base` | N-18-1 저장 데이터 조회, N-18-10 내 실제 값으로 되돌리기 (입력 10개의 원래 값과 출발 점수·등급. 피처값 전체는 보내지 않음) | `ASSESSMENT`(최근 SCORED의 `FEATURE_SNAPSHOT`) | USER | ✅ (FP-170, PR #93) 🆕 11/19 |
-| SIM-02 | `POST /api/simulation/credit-care/recalculate` | N-18-4 공통 재계산 틀, N-18-5 모델 점수 재계산, N-18-6 부도 확률 변화 계산, N-18-8 감점 요인 상위 3개 안내, N-18-9 결과 표시 | 읽기만 (FastAPI **ML-04** 호출) | USER | ✅ (FP-170, PR #93) 🆕 11/19 |
+| SIM-01 | `GET /api/members/me/credit-care-base` 🆕 11/19 경로 이동 | N-18-1 저장 데이터 조회, N-18-10 내 실제 값으로 되돌리기 (입력 10개의 원래 값과 출발 점수·등급. 피처값 전체는 보내지 않음) | `ASSESSMENT`(최근 SCORED의 `FEATURE_SNAPSHOT`) | USER | ✅ (FP-170, PR #93) 🆕 11/19 |
+| SIM-02 | `POST /api/members/me/credit-care-recalculate` 🆕 11/19 경로 이동 | N-18-4 공통 재계산 틀, N-18-5 모델 점수 재계산, N-18-6 부도 확률 변화 계산, N-18-8 감점 요인 상위 3개 안내, N-18-9 결과 표시 | 읽기만 (FastAPI **ML-04** 호출) | USER | ✅ (FP-170, PR #93) 🆕 11/19 |
 | SIM-03 | `GET`·`POST /api/simulation/loans/recommend` | N-18-7 같은 점수대 금리·한도·상품 조회 | `SCORE_BAND_OFFER`, `LOAN_PRODUCT` | USER | ✅ mock (담당 확인 필요, Q-9) |
 | SIM-04 | `GET /api/simulation/score-band-offer?score=` | N-18-7 같은 점수대 참고 금리·한도·등급 (상품 없음, 더미 데이터 표시 `dummyNotice`) | `SCORE_BAND_OFFER`, `SCORE_GRADE_BAND` (ACTIVE 버전) | USER | ✅ (FP-208) |
 
@@ -337,6 +338,6 @@
 | Q-5 | RPT-05(N-13 백분위) 담당. ~~DIAG-03(N-16 건전성)~~ ✅ 광희(FP-166) | 팀 전체 |
 | Q-6 | 🟡 경로 전체 확정 (각 담당) | 각 팀 |
 | Q-7 | 오류 응답 형식(D-20)과 타임아웃(D-18). 지금은 A팀 임시 형식을 따르고, 광희(1-2)·동주(PR #80)도 같은 `{ code, message, fieldErrors }`를 쓴다 | 팀 전체 |
-| Q-8 | DIAG-07-1·08-1을 지금 경로(`/api/diagnosis/**`, 토큰 회원)로 둘지, 공통 규칙대로 `/api/members/me/…`에 둘지. 지금 `/api/diagnosis/**`는 임시 개방 경로라 컨트롤러가 직접 401을 낸다 | 광희·A조(공통 설정) |
+| ~~Q-8~~ | ~~DIAG-07-1·08-1을 지금 경로로 둘지, `/api/members/me/…`에 둘지~~ ✅ **해결 (11/19):** 저장 데이터를 읽는 API는 `/api/members/me/**`, 본문 계산은 기능별 경로. FP-170에서 5개 이동·옛 경로 삭제. 기준은 decisions.md 1-1 | — |
 | Q-9 | SIM-03 `loans/recommend`와 2-7 대출 상품(LOAN-01~05) 담당 (광희인지 A조인지) | 광희·A조 |
 | Q-10 | ADM-03(N-26 관리자 통계) 담당과 Jira 번호. 정의서에 있던 FP-191은 커뮤니티 카드였다. 비교 통계는 FP-159(광희) | 광희·동주 |

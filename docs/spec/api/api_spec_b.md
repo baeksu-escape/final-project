@@ -346,7 +346,7 @@ Spring이 시작할 때 한 번 부른다. 세 버전이 DB에 있는지 확인�
 
 ### 4-4. ML-04 `POST /v1/assessments/simulate` — N-18 신용케어 시뮬레이터 (저장 안 함)
 
-C팀 SIM-02 `POST /api/simulation/credit-care/recalculate`가 부른다.
+C팀 SIM-02 `POST /api/members/me/credit-care-recalculate`가 부른다. 🆕 11/19 경로 이동(FP-170, Q-8)
 - **흐름:** C팀 Spring이 로그인 회원의 최신 `SCORED` 평가에서 `FEATURE_SNAPSHOT`과 버전을 읽어 출발점으로 보낸다.
   - 화면이 보낸 `currentScore`는 쓰지 않는다. 화면 값이 조작돼도 결과가 바뀌지 않고, 리포트의 SHAP과 같은 기준이 된다.
 
