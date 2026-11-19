@@ -220,11 +220,11 @@ function registerReportRoutes(reportId) {
       requireAdmin(token)
       const report = findReport()
       const resultCode = body?.resultCode
-      if (!['KEEP_HIDDEN', 'DELETE', 'REJECT'].includes(resultCode)) invalid('resultCode', '처리 결과를 골라 주세요.')
+      // FP-224: 서버처럼 삭제·반려만 받는다(숨김 유지는 400)
+      if (!['DELETE', 'REJECT'].includes(resultCode)) invalid('resultCode', '처리 결과는 삭제·반려 중에서 골라 주세요.')
       const open = targetReports(report.targetType, report.targetId).filter((r) => OPEN_STATUSES.includes(r.statusCode))
       if (!open.length) fail(409, 'ALREADY_HANDLED', '이미 처리된 신고입니다.')
       const { row } = targetInfo(report.targetType, report.targetId)
-      if (resultCode === 'KEEP_HIDDEN' && row.status === VISIBLE) row.status = HIDDEN
       if (resultCode === 'DELETE') row.status = DELETED
       if (resultCode === 'REJECT' && row.status === HIDDEN) row.status = VISIBLE
       const memo = String(body?.memo ?? '').trim() || null

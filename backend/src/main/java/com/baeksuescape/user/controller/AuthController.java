@@ -14,6 +14,7 @@ import com.baeksuescape.user.dto.AuthRequests;
 import com.baeksuescape.user.dto.AuthResponses;
 import com.baeksuescape.user.service.AuthService;
 import com.baeksuescape.user.service.EmailVerificationService;
+import com.baeksuescape.user.service.PhoneVerificationService;
 
 import jakarta.validation.Valid;
 
@@ -25,10 +26,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final EmailVerificationService emailVerification;
+    private final PhoneVerificationService phoneVerification;
 
-    public AuthController(AuthService authService, EmailVerificationService emailVerification) {
+    public AuthController(AuthService authService, EmailVerificationService emailVerification, PhoneVerificationService phoneVerification) {
         this.authService = authService;
         this.emailVerification = emailVerification;
+        this.phoneVerification = phoneVerification;
     }
 
     // AUTH-01 N-01-1 로그인. 일반 사용자는 { accessToken, user }, 관리자는 { twoFactorRequired, challengeToken, maskedEmail }(FP-80).
@@ -65,6 +68,24 @@ public class AuthController {
     @PostMapping("/email/verify")
     public AuthResponses.EmailVerified verifyEmailCode(@Valid @RequestBody AuthRequests.EmailVerify request) {
         return emailVerification.verify(request);
+    }
+
+    // N-02-1 닉네임 중복 확인(11/18 1차 시연 후속) — { nickname } → { available }. 닉네임을 주소에 남기지 않으려고 POST로 받는다.
+    @PostMapping("/nickname/check")
+    public AuthResponses.NicknameAvailability checkNickname(@RequestBody AuthRequests.NicknameCheck request) {
+        return authService.checkNickname(request);
+    }
+
+    // N-02 휴대폰 인증번호 발송(11/18 1차 시연 후속) — { phone, purpose } → { expiresInSeconds }
+    @PostMapping("/phone/send")
+    public AuthResponses.PhoneSent sendPhoneCode(@Valid @RequestBody AuthRequests.PhoneSend request) {
+        return phoneVerification.send(request);
+    }
+
+    // N-02 휴대폰 인증번호 확인(11/18 1차 시연 후속) — { phone, code, purpose } → { verificationToken }
+    @PostMapping("/phone/verify")
+    public AuthResponses.PhoneVerified verifyPhoneCode(@Valid @RequestBody AuthRequests.PhoneVerify request) {
+        return phoneVerification.verify(request);
     }
 
     // AUTH-09 N-03-1 아이디 찾기

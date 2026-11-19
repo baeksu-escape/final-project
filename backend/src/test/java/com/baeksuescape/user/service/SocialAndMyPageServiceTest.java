@@ -62,7 +62,8 @@ class SocialAndMyPageServiceTest {
     @BeforeEach
     void setUp() {
         UserViewFactory views = new UserViewFactory(userMapper, CRYPTO);
-        AuthService auth = new AuthService(userMapper, consentMapper, socialMapper, emailVerification, store, views, tokenProvider,
+        // 휴대폰 인증(PhoneVerificationService)은 가입에서만 쓰므로 간편 로그인·마이 페이지 시험에서는 비워 둔다.
+        AuthService auth = new AuthService(userMapper, consentMapper, socialMapper, emailVerification, null, store, views, tokenProvider,
                 ENCODER, CRYPTO, HMAC, CLOCK, null,
                 new SystemLogService(mock(SystemLogMapper.class), TransactionOperations.withoutTransaction(), CLOCK));
         social = new SocialLoginService(properties, store, socialMapper, userMapper, auth);

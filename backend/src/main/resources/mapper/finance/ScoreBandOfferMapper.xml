@@ -4,7 +4,7 @@
 <!-- N-18-7 점수대별 참고 금리·한도(SCORE_BAND_OFFER)와 등급(SCORE_GRADE_BAND) 조회 (FP-170) -->
 <mapper namespace="com.baeksuescape.finance.mapper.ScoreBandOfferMapper">
 
-    <resultMap id="scoreBandOfferRowMap" type="com.baeksuescape.finance.dto.ScoreBandOfferRow">
+    <resultMap id="scoreBandOfferRowMap" type="com.baeksuescape.finance.dto.simulation.ScoreBandOfferRow">
         <result property="minScore" column="MIN_SCORE"/>
         <result property="maxScore" column="MAX_SCORE"/>
         <result property="rateMinPct" column="RATE_MIN_PCT"/>
@@ -14,7 +14,7 @@
         <result property="baseDate" column="BASE_DATE"/>
     </resultMap>
 
-    <resultMap id="gradeBandRowMap" type="com.baeksuescape.finance.dto.GradeBandRow">
+    <resultMap id="gradeBandRowMap" type="com.baeksuescape.finance.dto.simulation.GradeBandRow">
         <result property="gradeBandCode" column="GRADE_BAND_CODE"/>
         <result property="cutoffVersion" column="CUTOFF_VERSION"/>
     </resultMap>

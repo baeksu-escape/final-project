@@ -1,6 +1,12 @@
 /* N-24 상권 분석 화면 전용 스타일 — 'Avenue 기능 데모 v2'의 서울 상권 히트맵 기준.
-   색·글꼴은 tokens.css 변수를 쓰고, 히트맵 7색만 데모 값을 이 파일에 둔다(두 테마 공통). */
+   색·글꼴은 tokens.css 변수를 쓰고, 상권 전용 색(지도 빨강 5단계, 판정 7색, 매출 보라)만 이 파일에 둔다(두 테마 공통).
+   1차 시연 후속: 지도·범례·구별 평균·분포·상하위 동은 빨강 5단계(값이 클수록 진함), 판정 7색은 배지 글자 판정에만 남긴다. */
 .market-page {
+  --market-heat1: #fde0dc;
+  --market-heat2: #f9a99d;
+  --market-heat3: #f26b5b;
+  --market-heat4: #d63a2f;
+  --market-heat5: #9e1b18;
   --market-neu: #45ad78;
   --market-neg1: #f2a3b6;
   --market-neg2: #ee7495;
@@ -30,6 +36,14 @@
 .market-bin--pos3 { --bin: var(--market-pos3); }
 .market-bin--none { --bin: var(--market-none); }
 
+/* 지도 색 단계 — 값이 클수록 진한 빨강. 진한 두 단계 위 글자는 흰색(--bin-fg) */
+.market-heat--1 { --bin: var(--market-heat1); }
+.market-heat--2 { --bin: var(--market-heat2); }
+.market-heat--3 { --bin: var(--market-heat3); }
+.market-heat--4 { --bin: var(--market-heat4); --bin-fg: #fff; }
+.market-heat--5 { --bin: var(--market-heat5); --bin-fg: #fff; }
+.market-heat--none { --bin: var(--market-none); }
+
 /* 공통 글자 */
 .market-tag {
   font: 600 11px var(--f-d);
@@ -47,9 +61,6 @@
   font-family: var(--f-d);
   font-variant-numeric: tabular-nums;
 }
-
-.market-text--bad { color: var(--market-neg2); }
-.market-text--good { color: var(--market-pos2); }
 
 .market-page p {
   margin: 0;
@@ -84,6 +95,19 @@
 
 .market-filters__row--region {
   align-items: flex-end;
+}
+
+/* 고른 지표의 뜻 한 줄(1차 시연 후속) — 지표 칩과 같은 들여쓰기 */
+.market-filters__desc {
+  padding-left: 52px;
+  font-size: 13px;
+  color: var(--fg2);
+}
+
+@media (max-width: 640px) {
+  .market-filters__desc {
+    padding-left: 0;
+  }
 }
 
 .market-filters__label {
@@ -297,6 +321,52 @@
   background: var(--bin);
 }
 
+/* 범례 설명 줄(색 뜻·구간 경계) — 한 줄 전체를 쓴다 */
+.market-legend__desc {
+  flex-basis: 100%;
+}
+
+/* 지도 아래 지역 비교 카드 4개 접기(1차 시연 후속) — 기본은 접혀 있고 제목 줄을 누르면 펼친다 */
+.market-more {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.market-more > summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 14px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.market-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.market-more > summary::before {
+  content: '▸';
+  color: var(--mut);
+}
+
+.market-more[open] > summary::before {
+  content: '▾';
+}
+
+.market-more > summary:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: -2px;
+  border-radius: 14px;
+}
+
+.market-more > .market-side {
+  padding: 0 14px 14px;
+}
+
 /* SVG 차트 */
 .market-chart__axis { stroke: var(--line2); }
 .market-chart__grid { stroke: var(--line); }
@@ -412,7 +482,7 @@
   padding: 3px 10px;
   border-radius: 999px;
   background: var(--bin);
-  color: #0b1222;
+  color: var(--bin-fg, #0b1222);
   font-size: 12px;
   font-weight: 600;
 }
@@ -454,6 +524,19 @@
 .market-kpi__cmp {
   font-size: 11.5px;
   color: var(--mut2);
+}
+
+/* 지표 카드의 뜻 한 줄(1차 시연 후속) */
+.market-kpi__desc {
+  font-size: 11.5px;
+  color: var(--mut);
+}
+
+/* 상세 창 탭과 탭 내용 */
+.market-detail__tab {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .market-detail__panels {

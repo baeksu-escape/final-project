@@ -1,6 +1,6 @@
 import { Card } from '../../../common/components/index.js'
 import { RANK_LIST_SIZE } from '../config/marketConfig.js'
-import { binOf, formatMetric, worstAndBest } from '../utils/marketStats.js'
+import { formatMetric, worstAndBest } from '../utils/marketStats.js'
 
 // N-24-3 주의할 동·좋은 동 — 고른 범위에서 지표가 가장 나쁜 5곳과 좋은 5곳. 누르면 행정동 상세 창(N-24-5)을 연다.
 // 점포가 적은 동은 비율이 크게 튀므로 값 옆에 점포 수를 함께 보여 준다.
@@ -16,7 +16,7 @@ export default function DongRankList({ metric, rows, onOpen }) {
           <button type="button" className="market-rank__item" onClick={() => onOpen(row.dong.code)}>
             <span className="market-num market-hint">{i + 1}</span>
             <span>
-              <i className={`market-dot market-bin--${binOf(row.score)}`} aria-hidden="true" />
+              <i className={`market-dot market-heat--${row.heat}`} aria-hidden="true" />
               {row.dong.name} <span className="market-hint">{row.dong.gu}</span>
             </span>
             <span className="market-rank__value">

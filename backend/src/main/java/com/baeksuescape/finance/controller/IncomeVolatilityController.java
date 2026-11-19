@@ -1,19 +1,12 @@
 package com.baeksuescape.finance.controller;
 
-import com.baeksuescape.finance.dto.CashFlowConditionRequest;
-import com.baeksuescape.finance.dto.CashFlowForecastRequest;
-import com.baeksuescape.finance.dto.CashFlowForecastResponse;
-import com.baeksuescape.finance.dto.IncomeVolatilityRequest;
-import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastRequest;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse;
+import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityRequest;
+import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityResponse;
 import com.baeksuescape.finance.service.IncomeVolatilityService;
-import com.baeksuescape.global.exception.ApiException;
-import com.baeksuescape.global.security.AuthUser;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * N-22 소득 변동성 진단 및 N-21 현금흐름 전망 REST 컨트롤러.
- * 프론트엔드 재무 진단 탭의 소득 변동성 화면과 현금흐름 시뮬레이터에 진단 결과를 제공한다.
+ * 여기에는 요청 본문 값만으로 계산하는 API를 둔다. 저장 데이터로 계산하는 DIAG-07-1·08-1·09는 MemberFinanceController(/api/members/me)에 있다.
  */
 @RestController
 @RequestMapping("/api/diagnosis")
@@ -48,37 +41,6 @@ public class IncomeVolatilityController {
     public ResponseEntity<CashFlowForecastResponse> forecastCashFlow(@RequestBody CashFlowForecastRequest request) {
         CashFlowForecastResponse response = incomeVolatilityService.forecastCashFlow(request);
         return ResponseEntity.ok(response);
-    }
-
-    /**
-     * N-22 소득 변동성 진단 API — 저장 데이터 기반 (N-22-1, N-22-3~5).
-     * 로그인한 회원(토큰)의 최근 12개월 소득과 월 고정지출로 계산한다. 주소로 회원 번호를 받지 않는다(남의 정보 조회 방지).
-     */
-    @GetMapping("/income-volatility")
-    public ResponseEntity<IncomeVolatilityResponse> diagnoseSavedIncomeVolatility(@AuthenticationPrincipal AuthUser user) {
-        return ResponseEntity.ok(incomeVolatilityService.diagnoseSavedIncomeVolatility(requireLoginUserId(user)));
-    }
-
-    /**
-     * N-21 현금흐름 전망 API — 저장 데이터 기반 (N-21-1, N-21-5~7).
-     * 로그인한 회원(토큰)의 소득·월 지출 합계·월 원리금에 쿼리로 받은 전망 조건(N-21-2)을 적용한다.
-     */
-    @GetMapping("/cash-flow/forecast")
-    public ResponseEntity<CashFlowForecastResponse> forecastSavedCashFlow(@AuthenticationPrincipal AuthUser user,
-                                                                          @ModelAttribute CashFlowConditionRequest condition) {
-        return ResponseEntity.ok(incomeVolatilityService.forecastSavedCashFlow(requireLoginUserId(user), condition));
-    }
-
-    /**
-     * 토큰에서 꺼낸 로그인 회원 번호. 토큰이 없거나 쓸 수 없으면 401이다.
-     * /api/diagnosis/**는 아직 임시 개방 경로라 보안 설정이 막지 않으므로 여기서 직접 확인한다.
-     * TODO(A조 협의) 임시 개방 목록에서 /api/diagnosis/**를 빼면 보안 설정이 먼저 막는다.
-     */
-    private long requireLoginUserId(AuthUser user) {
-        if (user == null) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요합니다.");
-        }
-        return user.userId();
     }
 }
 
