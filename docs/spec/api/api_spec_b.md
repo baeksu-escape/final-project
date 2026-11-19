@@ -8,10 +8,11 @@
 - **장 번호는 바꾸지 않는다.** 코드 주석이 "B팀 명세서 4-3"처럼 이 번호를 가리킨다.
 - 상태 표시: ✅ 확정 · 🟡 임시값·제안(설정 한 곳에 둔다) · ⛔ 미정(9장)
 
-> **🆕 최근 변경 (11/18)** — 바뀐 곳에 🆕 11/18 표시
-> 1. **저장소로 옮김:** 공유 링크로만 보던 문서를 `docs/spec/api/api_spec_b.md`로 옮겼다. 이제 이 파일이 원본이다. 장 번호는 그대로다
-> 2. 4-4 간편결제 × 12 정정: "확정"이 아니라 🟡 임시(피처 정의서 9장 미정, `fastapi_server/pipeline/simulation.py` TODO)
+> **🆕 최근 변경 (11/19, FP-234)** — 바뀐 곳에 🆕 11/19 표시
+> 1. 4장 머리말 정정: ML-04는 ACTIVE가 아니라 **출발 평가에 저장된 모델 버전**을 보낸다(광희 FP-170 PR #93 요청). ML-03만 ACTIVE
+> 2. 4장 머리말: 공용 DB 실제 모델 전환 완료(11/18, FP-216) 반영
 >
+> 이전 변경 (11/18): 저장소 `docs/spec/api/api_spec_b.md`로 이관(장 번호 그대로), 4-4 간편결제 × 12 🟡 정정
 > 이전 변경 (11/17): ML-04 10번째 키 `UTILITY_LATE_MONTHS`, ML-04 범위 검사는 Spring SIM-02가 먼저, RPT-02·03 `modelFeatures`, 실제 모델 연결(FP-141, PR #74)·`supportedModelVersions`, 모델 파일 해시 대조(PR #77), SIM-02 오류 전달 규칙(광희 PR #78)
 > 이전 변경 (11/16): O-13(입력 부족 409)·O-15(`NO_LOAN_YN`)·O-3·O-6·O-9·O-14 확정, `creditProfile` null·`payerTypeCode`, 4xx 재시도 안 함, 입력 최신성 6개월, 빈 목록 `ALT_DATA_EMPTY`
 > 이전 변경 (11/13): 피처 정의서 v1.0 반영(피처 코드 39개, `creditProfile` 짝, ML-04 키 10개), rank 동점 이름순
@@ -230,10 +231,11 @@
 - 주소: 1차 개발·시연은 **한 PC**에서 `http://localhost:8000` (Spring 설정 `avenue.prediction.base-url`, 비우면 이 값). 외부에는 열지 않는다. Docker 내부망 `http://fastapi:8000`은 2차 개발 후보(미확정).
 - ⛔ 내부 인증 헤더 여부(O-8)
 - **모델 선택 (FP-141, PR #74)**
-  - Spring은 DB `MODEL_REGISTRY`의 ACTIVE 모델 버전을 ML-03 `expectedModelVersion`·ML-04 `baseAssessment.modelVersion`으로 보낸다. **DB의 ACTIVE가 스위치**다.
+  - ML-03: Spring은 DB `MODEL_REGISTRY`의 **ACTIVE** 모델 버전을 `expectedModelVersion`으로 보낸다. **DB의 ACTIVE가 스위치**다.
+  - ML-04: Spring SIM-02는 ACTIVE가 아니라 **출발 평가(최근 SCORED)에 저장된** `MODEL_VERSION`을 `baseAssessment.modelVersion`으로 보낸다. 저장된 피처값과 같은 모델로 다시 계산해야 하기 때문이다(4-4, FP-170 PR #93). 🆕 11/19 정정
   - `DEV-DUMMY`(또는 버전 없음) → Mock(`FS-DRAFT` 39개), `LGBM-BASE-0.1` → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`
   - 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503 `MODEL_NOT_READY`(11/17 범영·재욱 합의)
-  - 공용 DB는 시연(11/18)까지 `DEV-DUMMY`. 전환은 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`, 되돌리기는 `rollback_model_to_dev_dummy.sql`(PR #77, 절차: `fastapi_server/README.md`)
+  - 🆕 11/19 공용 DB는 **11/18 17:52 `LGBM-BASE-0.1`로 전환 완료**(FP-216). 학습 데이터·모델 파일 기록은 `docs/spec/sql/register_model_lgbm_base_0_1.sql`(PR #88). 전환은 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`, 되돌리기는 `rollback_model_to_dev_dummy.sql`(PR #77, 절차: `fastapi_server/README.md`)
 
 ### 4-1. ML-01 `GET /v1/health`
 ```json
@@ -367,7 +369,7 @@ C팀 SIM-02 `POST /api/simulation/credit-care/recalculate`가 부른다.
   - 공과금 미납 개월 수 `UTILITY_LATE_MONTHS`(0~12) — 10번째 입력
   - 화면 항목을 피처로 바꾸는 규칙은 FastAPI가 가진다. 바꾸지 않은 항목은 빼거나 null로 보낸다(**null = 키를 뺀 것과 같음**, 단 카드는 둘 다 null이거나 둘 다 값).
   - **범위 검사:** FastAPI는 범위를 검사하지 않고 그대로 계산한다(소수는 정수로 자름). 음수·상한 초과는 **Spring SIM-02가 화면 범위로 먼저 막는다**(11/17 범영 결정, 광희 확인).
-  - 키 ↔ 피처 (정의서 8-2): `TELECOM_ON_TIME_MONTHS` → `telecom_on_time_streak`(0~12개월), `DELINQ_COUNT_12M` → `DQ1200001`, `CASH_ADVANCE_MONTHS` → `CF1231605`, `NEW_LOAN_COUNT_3M` → `L22000900`, `EASYPAY_MONTHLY_COUNT` → `dp_payment_count_12m`(Spring은 월 횟수 그대로 보낸다. 🟡 FastAPI가 지금은 × 12로 바꾸지만 변환 방식은 피처 정의서 9장 미정 — 🆕 11/18 정정, 이전 판의 "확정"은 잘못), `CARD_LIMIT_AMT`·`CARD_MONTHLY_SPEND_AMT` → `CL0631905`, `LOAN_BALANCE_AMT` → `debt_balance_krw`, `PRIVATE_LENDER_LOAN_BALANCE_AMT` → `LA0099212`, `UTILITY_LATE_MONTHS` → `utility_late_months`(0~12)
+  - 키 ↔ 피처 (정의서 8-2): `TELECOM_ON_TIME_MONTHS` → `telecom_on_time_streak`(0~12개월), `DELINQ_COUNT_12M` → `DQ1200001`, `CASH_ADVANCE_MONTHS` → `CF1231605`, `NEW_LOAN_COUNT_3M` → `L22000900`, `EASYPAY_MONTHLY_COUNT` → `dp_payment_count_12m`(Spring은 월 횟수 그대로 보낸다. 🟡 FastAPI가 지금은 × 12로 바꾸지만 변환 방식은 피처 정의서 9장 미정 — 정정, 이전 판의 "확정"은 잘못), `CARD_LIMIT_AMT`·`CARD_MONTHLY_SPEND_AMT` → `CL0631905`, `LOAN_BALANCE_AMT` → `debt_balance_krw`, `PRIVATE_LENDER_LOAN_BALANCE_AMT` → `LA0099212`, `UTILITY_LATE_MONTHS` → `utility_late_months`(0~12)
   - 통신비 정시 납부를 바꿀 때 `telecom_late_months`도 함께 바꿀지는 정의서 9장 미정이다.
 - `baseAssessment.modelVersion`으로 계산기를 고른다(4장 머리말 "모델 선택"). 이 서버가 계산할 수 없는 버전이면 409 `VERSION_MISMATCH`, 실제 모델 파일이 없으면 503 `MODEL_NOT_READY`
 - SIM-02가 ML-04 오류를 화면에 전달하는 규칙(422 → 400, 503·연결 실패 → 503, 409 → 409)은 [API 정의서](api_definition.md) 2-6(C조 광희, PR #78)에 있다.
