@@ -16,7 +16,7 @@ export const FORM_VALIDATORS = [checkListRules]
 function checkListRules(values, sections) {
   const errors = {}
   for (const section of sections) {
-    if (section.kind !== 'list') continue
+    if (section.kind !== 'list' || isListLocked(values, section)) continue
     const rows = values[section.key]
     if (section.maxItems && rows.length > section.maxItems) {
       errors[errorKeyOf(section.key)] = section.maxItemsMessage
@@ -28,6 +28,11 @@ function checkListRules(values, sections) {
     }
   }
   return errors
+}
+
+// FP-227 줄 섹션이 "없음" 체크(예: 보유한 대출이 없습니다.)로 잠겼는지 본다.
+function isListLocked(values, section) {
+  return Boolean(section.noItemsLabel && values.noItems?.[section.key])
 }
 
 // 오류 key를 만든다 — 칸 섹션은 '섹션.칸', 줄 섹션은 '섹션.줄id.칸', 섹션 전체 오류는 '섹션'.
@@ -60,6 +65,8 @@ export function validateFinancialInput(values, sections, { checkRequired = true,
   for (const section of sections) {
     const value = values[section.key]
     if (section.kind === 'list') {
+      // FP-227 "없음" 체크로 잠근 줄은 보내지 않으므로 검사하지 않는다.
+      if (isListLocked(values, section)) continue
       if (checkRequired && section.minItems && value.length < section.minItems) {
         errors[errorKeyOf(section.key)] = section.minItemsMessage ?? REQUIRED_MESSAGE
       }

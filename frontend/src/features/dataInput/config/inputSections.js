@@ -36,6 +36,8 @@ const balanceAmountRule = amountRule(VALIDATION_LIMITS.BALANCE_AMOUNT_MAX)
 //   N-05-2 list 전용 — fixedMonths: 기준월로 끝나는 이 개월 수만큼 줄을 미리 채운다(줄 추가·삭제 없음). readOnly 칸은 입력 칸을 그리지 않는다.
 //   isComplete(saved): 입력 완료 현황에서 이 섹션의 완료 조건이 따로 있을 때 쓴다.
 //   N-05-8 list 전용 — noItemsLabel: 줄이 없어도 완료로 볼 수 있게 하는 체크 문구(대출이 없는 사용자용)
+//     체크하면 줄은 지우지 않고 잠근다(FP-227). 잠긴 줄은 검사하지 않고, 요청 본문에는 줄 없이(items: []) noItems: true로 보낸다.
+//   FP-227 list 전용 — minRows: "없음" 체크가 풀려 있으면 늘 보일 최소 줄 수. 줄이 모자라면 빈 줄을 채운다(inputValues.js withMinimumRows).
 
 // 이 화면의 모든 입력에 함께 보내는 기준월(YYYY-MM).
 export const BASE_MONTH_FIELD = Object.freeze({
@@ -184,6 +186,8 @@ export const COMMON_SECTIONS = Object.freeze([
     description: '보유한 대출을 한 건에 한 줄씩 추가해 주세요. 대출이 없으면 아래 항목을 체크해 주세요.',
     kind: 'list',
     noItemsLabel: '보유한 대출이 없습니다.',
+    // FP-227 "보유한 대출이 없습니다."를 체크하지 않았으면 대출 줄이 늘 1개 이상 보인다(마지막 줄을 지우면 빈 줄이 다시 생긴다).
+    minRows: 1,
     addLabel: '대출 추가',
     emptyMessage: '추가한 대출이 없습니다.',
     itemFields: [

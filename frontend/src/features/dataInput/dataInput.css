@@ -245,6 +245,15 @@
   font-size: 12.5px;
 }
 
+/* FP-227 "없음"·"신용 이력이 없어요" 체크로 잠긴 영역 — 숨기지 않고 흐리게만 보여 준다(새 색 없이 투명도만). 칸·버튼은 disabled다. */
+.input-section__locked {
+  opacity: 0.6;
+}
+
+.input-section__locked button:disabled {
+  cursor: not-allowed;
+}
+
 .input-section__summary {
   font-family: var(--f-d);
   font-variant-numeric: tabular-nums;
@@ -264,7 +273,7 @@
   min-width: 0;
 }
 
-/* 입력 완료 현황 — 항목마다 완료/입력 필요 칩 */
+/* 입력 완료 현황 = 단계 리모컨(FP-227) — 단계마다 동그라미(완료 초록 채움 · 미완료 빈 동그라미 · 지금 단계 강조) */
 .input-status__saved-at {
   color: var(--mut2);
   font-size: 12.5px;
@@ -309,6 +318,43 @@
 .input-status__hint {
   color: var(--warn);
   font-size: 12px;
+}
+
+/* 지금 단계 — 굵은 글자 + 강조색 테두리의 빈 동그라미(끝낸 단계로 돌아온 경우는 초록 채움을 그대로 둔다) */
+.input-status__item--current {
+  color: var(--fg);
+  font-weight: 700;
+}
+
+.input-status__item--current:not(.input-status__item--done)::before {
+  border-width: 2px;
+  border-color: var(--acc);
+}
+
+/* 줄마다 누르는 버튼 — 버튼 기본 모양을 지우고 글자만 보이게 한다 */
+.input-status__step {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.input-status__step:not([aria-disabled='true']):not([aria-current='step']):hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+/* 누를 수 없는 줄 — 흐리게(이유는 title로 보여 준다) */
+.input-status__step[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.input-status__step[aria-current='step'] {
+  cursor: default;
 }
 
 /* ===== 대안 데이터 불러오기 (N-05-6·N-05-9) — 5종을 카드로 나란히 ===== */

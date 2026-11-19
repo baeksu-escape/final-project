@@ -125,6 +125,19 @@
            AND WORKER_TYPE_CODE IS NULL
     </update>
 
+    <!-- FP-227 N-05-1 저장 전 직군 변경: 바뀌기 전 직군을 WHERE에 넣어, 동시에 두 요청이 와도 한쪽만 바뀐다. -->
+    <update id="updateWorkerTypeFrom">
+        UPDATE APP_USER
+           SET WORKER_TYPE_CODE = #{toCode}, UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+           AND WORKER_TYPE_CODE = #{fromCode}
+    </update>
+
+    <!-- FP-227 직군 변경 잠금: 점수 산출 결과(SCORED·NOT_SCORABLE)와 관계없이 평가가 하나라도 있으면 막는다(ASSESSMENT는 읽기만 한다). -->
+    <select id="countAssessments" resultType="int">
+        SELECT COUNT(*) FROM ASSESSMENT WHERE USER_ID = #{userId}
+    </select>
+
     <!-- 회원 단위 쓰기 잠금: 같은 회원의 쓰기 트랜잭션 맨 앞에서 부른다. 다른 트랜잭션은 커밋·롤백까지 여기서 기다린다. -->
     <select id="lockUser" resultType="java.lang.Long">
         SELECT USER_ID FROM APP_USER WHERE USER_ID = #{userId} FOR UPDATE
