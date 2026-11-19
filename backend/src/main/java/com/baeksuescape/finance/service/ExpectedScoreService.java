@@ -181,9 +181,11 @@ public class ExpectedScoreService {
         Map<String, Object> alt = result.get("alternative") instanceof Map ? (Map<String, Object>) result.get("alternative") : Map.of();
         Integer expected = alt.get("score") instanceof Number n ? (int) Math.round(n.doubleValue()) : null;
         Integer diff = expected == null || current.getAltScore() == null ? null : expected - current.getAltScore();
+        // 현재 점수를 낸 모델(baseModelVersion)을 함께 보내, 예상 점수 모델과 다르면 화면이 "모델이 바뀌어 차이가 클 수 있음"을 안내한다(경환 11/19).
         // 납부 상태(DELAYED)를 어느 피처에 반영할지 정해지기 전이라 점수에 쓰지 않았다는 것을 화면에 알린다
         return new ExpectedScoreResponse(current.getAltScore(), current.getAltGradeBandCode(), expected,
-                (String) alt.get("gradeBandCode"), diff, (String) result.get("modelVersion"), current.getRequestId(), false);
+                (String) alt.get("gradeBandCode"), diff, (String) result.get("modelVersion"), current.getModelVersion(),
+                current.getRequestId(), false);
     }
 
     private static double amount(Object value) {

@@ -216,7 +216,7 @@
 
   | 필드 | 형식 | 점수에 쓰는 방법 |
   |---|---|---|
-  | `incomeVariationPct` | 정수 0~200 | 각 달 소득 = 평균 + (그 달 − 평균) × %. 생략하면 100%(저장된 소득 그대로) |
+  | `incomeVariationPct` | 정수 0~200 | 각 달 소득 = 평균 + (그 달 − 평균) × %. 생략하면 100%(저장된 소득 그대로). ⚠️ 🆕 11/19 현금흐름 전망(DIAG-08-1)은 생략하면 0%(매달 평균)라 기본값이 다르다. DIAG-09를 0%로 하면 조건 없이도 소득이 평평해져 점수가 바뀌고, DIAG-08-1을 100%로 하면 기존 결과가 바뀌어 각각 유지한다. **전망과 예상 점수를 함께 보여 줄 때는 두 API에 같은 값을 보낸다**(화면은 항상 보냄, 경환 11/19 합의) |
   | `incomeChangePercent` | 소수 | 위 결과 × (1 + %/100). 0원 아래는 0, 원 단위 반올림. 급여소득자(1개월)는 이 값만 적용된다 |
   | `fixedExpenseAmount` | 정수 ≥ 0 | 저장된 FIXED 항목들의 비율을 지킨 채 합계를 이 값으로 맞춘다(반올림 차이는 마지막 항목). FIXED 항목이 없으면 FIXED 1행을 더한다 |
   | `expenseChangePercent` | 소수 | 위 결과의 모든 지출 항목 × (1 + %/100) |
@@ -232,14 +232,16 @@
   |---|---|---|
   | `currentScore`, `currentGradeBandCode` | 정수, 문자열 | 점수가 나온 최근 평가의 대안 점수·등급 |
   | `expectedScore`, `expectedGradeBandCode` | 정수, 문자열 | 바꾼 조건으로 다시 구한 대안 점수·등급 |
-  | `scoreDiff` | 정수 | `expectedScore − currentScore`. 마지막 진단 뒤 입력을 고쳤다면 그 차이도 섞인다 |
+  | `scoreDiff` | 정수 | `expectedScore − currentScore`. 조건만의 효과가 아니다: 마지막 진단 뒤 **입력을 고쳤거나**, 🆕 11/19 그 사이 **모델이 바뀌었다면**(`modelVersion` ≠ `baseModelVersion`) 그 차이도 섞인다. 모델 호출을 1번으로 유지하려고 고른 한계다(경환 11/19 합의) |
   | `modelVersion` | 문자열 | 예상 점수를 계산한 모델(ACTIVE) |
+  | `baseModelVersion` | 문자열 | 🆕 11/19 현재 점수를 낸 모델. `modelVersion`과 다르면 화면이 "모델이 바뀌어 점수 차이가 클 수 있습니다"를 안내한다 |
   | `baseRequestId` | 문자열 | 현재 점수를 가져온 평가 |
   | `paymentStatusApplied` | 불리언 | 납부 상태가 점수에 반영됐는지. 지금은 항상 `false` |
 
   ```json
   { "currentScore": 588, "currentGradeBandCode": "CAUTION", "expectedScore": 578, "expectedGradeBandCode": "CAUTION",
-    "scoreDiff": -10, "modelVersion": "DEV-DUMMY", "baseRequestId": "00000000-0000-4000-8000-000000000588", "paymentStatusApplied": false }
+    "scoreDiff": -10, "modelVersion": "DEV-DUMMY", "baseModelVersion": "DEV-DUMMY",
+    "baseRequestId": "00000000-0000-4000-8000-000000000588", "paymentStatusApplied": false }
   ```
 - 오류:
 

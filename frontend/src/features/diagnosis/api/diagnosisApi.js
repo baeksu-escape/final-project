@@ -31,7 +31,8 @@ export function getCashFlowForecast(condition = {}) {
 
 // N-21-8 전망 조건(소득 변동 폭·소득 변화율·월 고정 지출·지출 변화율)으로 예상 대안 점수를 다시 구한다(DIAG-09, 저장 안 함).
 // condition은 getCashFlowForecast와 같은 이름의 숫자 값이다. 납부 상태는 아직 점수에 반영되지 않는다(paymentStatusApplied: false).
-// 응답: { currentScore, currentGradeBandCode, expectedScore, expectedGradeBandCode, scoreDiff, modelVersion, baseRequestId, paymentStatusApplied }
+// 응답: { currentScore, currentGradeBandCode, expectedScore, expectedGradeBandCode, scoreDiff, modelVersion, baseModelVersion, baseRequestId, paymentStatusApplied }
+// modelVersion(예상 점수 모델)과 baseModelVersion(현재 점수 모델)이 다르면 scoreDiff에 모델 차이도 섞인다.
 export function getExpectedScore(condition = {}) {
   return apiPost(DIAGNOSIS_API.EXPECTED_SCORE, condition)
 }

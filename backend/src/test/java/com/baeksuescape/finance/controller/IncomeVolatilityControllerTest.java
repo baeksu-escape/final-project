@@ -221,7 +221,7 @@ class IncomeVolatilityControllerTest {
         verifyNoInteractions(expectedScoreService);
 
         when(expectedScoreService.expectedScore(eq(2L), any())).thenReturn(new ExpectedScoreResponse(588, "CAUTION", 571,
-                "CAUTION", -17, "DEV-DUMMY", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", false));
+                "CAUTION", -17, "LGBM-BASE-0.1", "DEV-DUMMY", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", false));
 
         mockMvc.perform(loggedIn(post("/api/diagnosis/cash-flow/expected-score")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -232,6 +232,8 @@ class IncomeVolatilityControllerTest {
                 .andExpect(jsonPath("$.expectedScore").value(571))
                 .andExpect(jsonPath("$.expectedGradeBandCode").value("CAUTION"))
                 .andExpect(jsonPath("$.scoreDiff").value(-17))
+                .andExpect(jsonPath("$.modelVersion").value("LGBM-BASE-0.1"))
+                .andExpect(jsonPath("$.baseModelVersion").value("DEV-DUMMY"))
                 .andExpect(jsonPath("$.baseRequestId").value("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"))
                 .andExpect(jsonPath("$.paymentStatusApplied").value(false));
 

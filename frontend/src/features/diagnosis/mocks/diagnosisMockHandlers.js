@@ -267,6 +267,7 @@ function handleExpectedScore({ body, token }) {
     expectedGradeBandCode: gradeOf(expectedScore),
     scoreDiff: expectedScore - base.score,
     modelVersion: base.modelVersion,
+    baseModelVersion: base.modelVersion, // mock은 현재·예상 점수를 같은 모델로 본다(다르면 화면이 모델 변경 안내)
     baseRequestId: base.baseRequestId,
     paymentStatusApplied: false,
   }

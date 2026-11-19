@@ -192,6 +192,7 @@ class ExpectedScoreServiceTest {
         row.setRequestId("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
         row.setAltScore(588);
         row.setAltGradeBandCode("CAUTION");
+        row.setModelVersion("DEV-DUMMY");   // 현재 점수는 옛 모델로, 예상 점수는 ACTIVE(REAL-V1)로 낸 상황
         return row;
     }
 
@@ -210,6 +211,7 @@ class ExpectedScoreServiceTest {
         assertEquals(571, response.expectedScore());
         assertEquals(-17, response.scoreDiff());
         assertEquals("REAL-V1", response.modelVersion());
+        assertEquals("DEV-DUMMY", response.baseModelVersion(), "현재 점수를 낸 모델을 함께 보내 화면이 모델 변경을 안내할 수 있다");
         assertFalse(response.paymentStatusApplied());
 
         ArgumentCaptor<String> requestIds = ArgumentCaptor.forClass(String.class);
