@@ -1,4 +1,4 @@
-/* N-10 메인(홍보) 페이지 — 데모 v2의 .hero·.promo·.lay·promoChart를 옮겼다. 색은 tokens.css 변수만 쓴다. */
+/* N-10 메인(홍보) 페이지 — 데모 v2의 .hero·.promo·.lay를 옮겼다. 전후 점수 게이지는 신용 리포트 credit.css 클래스를 그대로 쓴다(FP-226). 색은 tokens.css 변수만 쓴다. */
 
 .landing-page {
   display: flex;
@@ -37,7 +37,7 @@
   text-decoration: none;
 }
 
-/* 홍보 그래프 — 전후 카드 2장, 좁으면 1열 */
+/* 서비스 효과 예시 — 머리(태그·제목) + 두 모델 점수 카드 + 광고 안내 문구 */
 .landing-page__promo {
   display: flex;
   flex-direction: column;
@@ -56,36 +56,9 @@
   font-weight: 700;
 }
 
+/* 두 모델 카드(FP-226) — 안쪽 l-g2가 신용 리포트 [점수 비교]처럼 300px 기준으로 나란히 놓였다가 좁으면 위아래로 쌓인다. */
 .landing-page__promo-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
-  gap: 14px;
-}
-
-.landing-page__promo-card {
-  gap: 6px;
-}
-
-.landing-page__promo-score {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.landing-page__promo-number {
-  font-size: 22px;
-}
-
-.landing-page__promo-card--before .landing-page__promo-grade {
-  color: var(--bad);
-}
-
-.landing-page__promo-card--after .landing-page__promo-number {
-  color: var(--mint);
-}
-
-.landing-page__promo-card--after .landing-page__promo-grade {
-  color: var(--info);
+  --min: 300px;
 }
 
 /* 주요 기능 카드 3개 — 좁으면 1열 */
@@ -111,55 +84,4 @@
   .landing-page__features {
     grid-template-columns: minmax(0, 1fr);
   }
-}
-
-/* N-10-2 추이 그래프(PromoTrendChart) — before는 회색, after는 민트 */
-.promo-chart {
-  --promo-line: var(--mut2);
-  width: 100%;
-  max-width: 100%;
-  height: auto;
-}
-
-.promo-chart--after {
-  --promo-line: var(--mint);
-}
-
-.promo-chart__grid {
-  stroke: var(--line);
-}
-
-.promo-chart__grid--standard {
-  stroke-dasharray: 4 3;
-}
-
-.promo-chart__label {
-  fill: var(--mut2);
-  font-size: 10px;
-}
-
-.promo-chart__area {
-  fill: var(--promo-line);
-  fill-opacity: 0.14;
-}
-
-.promo-chart__line {
-  fill: none;
-  stroke: var(--promo-line);
-  stroke-width: 2.4;
-}
-
-.promo-chart__dot {
-  fill: var(--promo-line);
-}
-
-.promo-chart__mark {
-  fill: none;
-  stroke: var(--promo-line);
-  stroke-width: 2;
-}
-
-.promo-chart__mark-label {
-  fill: var(--promo-line);
-  font-size: 10.5px;
 }
