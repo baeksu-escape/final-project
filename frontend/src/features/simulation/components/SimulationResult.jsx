@@ -35,7 +35,8 @@ export default function SimulationResult({ currentScore, result, stale }) {
           <tr><th scope="row">예상 부도 확률</th><td>{probText(current.defaultProbability)}</td><td>{probText(changed.defaultProbability)}</td></tr>
         </tbody>
       </table>
-      {stale && <p className="sim-warn">위 결과는 이전 조건 기준입니다. 지금 입력으로 다시 계산되면 바뀝니다.</p>}
+      {/* 안내 줄 자리는 항상 차지하고, 이전 조건 기준일 때만 보이게 한다(결과 카드가 흔들리지 않게). */}
+      <p className={stale ? 'sim-warn' : 'sim-warn sim-reserve'}>위 결과는 이전 조건 기준입니다. 지금 입력으로 다시 계산되면 바뀝니다.</p>
       <p className="sim-hint">금리·한도·부도 확률은 같은 점수대의 참고 정보이며 시연용 계산식으로 구한 값입니다(N-18). 실제 점수와 평가에는 반영되지 않습니다.</p>
     </Card>
   )

@@ -120,15 +120,38 @@ export function toSimulationChanges(values, baseline) {
   return Object.fromEntries(keys.filter((key) => values[key] != null).map((key) => [API_CHANGE_KEYS[key], values[key]]))
 }
 
+// 범위·정수 위반 시 validateInputs가 돌려주는 일반 문구. 칸 옆 항목별 오류가 있어 화면에는 따로 보여 주지 않는다.
+export const RANGE_INPUT_MESSAGE = '입력은 화면 범위 안의 0 이상 정수여야 합니다.'
+
+// 값이 비었을 때 validateInputs가 돌려주는 일반 문구. 칸 옆 "값을 입력해 주세요."가 있어 화면에는 따로 보여 주지 않는다.
+export const MISSING_INPUT_MESSAGE = '입력하지 않은 값이 있습니다. 값이 있는 칸은 모두 채워야 계산할 수 있습니다.'
+// invalid 상태에서 Notice에 보여 주지 않을 일반 문구 목록(항목별 오류가 칸 옆에 표시된다).
+export const HIDDEN_INVALID_MESSAGES = [RANGE_INPUT_MESSAGE, MISSING_INPUT_MESSAGE]
+
 // 계산 요청 전에 값을 확인한다. 저장된 값이 없던 항목(baseline이 null)은 비어 있어도 되고, 바꾸지 않은 값은 슬라이더 범위 밖이어도 통과한다.
 // 문제가 있으면 안내 문구를, 없으면 빈 문자열을 돌려준다.
 export function validateInputs(values, baseline = null) {
   const absent = (key) => values[key] === null || values[key] === undefined
   const missing = INPUT_KEYS.filter((key) => absent(key) && !(baseline && baseline[key] == null))
-  if (missing.length) return '입력하지 않은 값이 있습니다. 값이 있는 칸은 모두 채워야 계산할 수 있습니다.'
+  if (missing.length) return MISSING_INPUT_MESSAGE
   const invalid = INPUT_KEYS.some((key) => !absent(key) && !(baseline && values[key] === baseline[key] && isStoredValue(values[key])) && !isValidValue(key, values[key]))
-  if (invalid) return '입력은 화면 범위 안의 0 이상 정수여야 합니다.'
+  if (invalid) return RANGE_INPUT_MESSAGE
   return ''
+}
+
+// N-18-2·3 칸 옆에 보여 줄 항목별 오류를 { 항목 key: 문구 }로 돌려준다. 판정 규칙은 validateInputs와 같고 문제가 없는 항목은 담지 않는다.
+export function getInputErrors(values, baseline = null) {
+  const errors = {}
+  for (const key of INPUT_KEYS) {
+    const value = values?.[key]
+    const field = [...SLIDER_FIELDS, ...MONEY_FIELDS].find((item) => item.key === key)
+    if (value === null || value === undefined) {
+      if (!(baseline && baseline[key] == null)) errors[key] = '값을 입력해 주세요.'
+    } else if (!(baseline && value === baseline[key] && isStoredValue(value)) && !isValidValue(key, value)) {
+      errors[key] = field.max === undefined ? '0 이상 정수로 입력해 주세요.' : `${field.min}~${field.max}${field.unit} 사이 정수로 입력해 주세요.`
+    }
+  }
+  return errors
 }
 
 // 두 입력 묶음이 10개 값 모두 같은지 본다(계산 필요 안내용).

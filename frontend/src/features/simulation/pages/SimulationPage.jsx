@@ -5,7 +5,7 @@ import { Button, Card, MoneyInput, Notice, NumberInput, Slider, Toast } from '..
 import { PATHS } from '../../../common/config/navigation.js'
 import { getLoanProducts, matchesLoanScore } from '../../loans/api/loanCatalog.js'
 import LoanProductCard from '../../loans/components/LoanProductCard.jsx'
-import { MONEY_FIELDS, SLIDER_FIELDS, sameInputs, selectRecommendations } from '../adapters/simulationAdapter.js'
+import { MONEY_FIELDS, SLIDER_FIELDS, HIDDEN_INVALID_MESSAGES, getInputErrors, sameInputs, selectRecommendations } from '../adapters/simulationAdapter.js'
 import { useSimulation } from '../api/useSimulation.js'
 import DeductionList from '../components/DeductionList.jsx'
 import SimulationResult from '../components/SimulationResult.jsx'
@@ -31,6 +31,8 @@ export default function SimulationPage() {
   // 저장된 값이 없는 금액 칸은 비활성이다. 카드 한도·월 사용액은 둘 다 있어야 바꿀 수 있다(서버 규칙).
   const moneyDisabled = (key) => sim.baseline?.[key] == null
     || ((key === 'cardLimitAmount' || key === 'cardMonthlyUsage') && (sim.baseline.cardLimitAmount == null || sim.baseline.cardMonthlyUsage == null))
+  // N-18 문제가 있는 항목만 해당 칸 옆에 오류를 보여 준다(슬라이더에는 넘기지 않는다).
+  const inputErrors = getInputErrors(values, sim.baseline)
   const usageRatio = Number.isInteger(values.cardLimitAmount) && values.cardLimitAmount > 0 && Number.isInteger(values.cardMonthlyUsage)
     ? `${Math.round(values.cardMonthlyUsage / values.cardLimitAmount * 100)}%` : '—'
 
@@ -65,17 +67,14 @@ export default function SimulationPage() {
           <div className="sim-slider-grid">
             {SLIDER_FIELDS.map((field) => (
               <div key={field.key} id={`sim-field-${field.key}`} className={fieldClass(field.key)}>
-                {/* 슬라이더와 숫자 칸이 같은 값을 함께 바꾼다. 미입력(null)이나 범위 밖 값이면 슬라이더는 숨겨 0으로 보이지 않게 한다. */}
-                {/* 저장된 값이 없는 항목은 비활성이다. 슬라이더 범위를 넘는 실제 값은 끝값에 두고 실제 값을 함께 보여 준다. */}
-                {sim.baseline?.[field.key] == null
-                  ? <p className="sim-hint">{field.label}: 값 없음 · 저장된 값이 없어 이 항목은 바꿀 수 없습니다.</p>
-                  : Number.isInteger(values[field.key]) && values[field.key] >= 0
-                    ? <Slider label={field.label} min={field.min} max={field.max} unit={field.unit}
-                      value={Math.min(field.max, values[field.key])} onChange={(v) => sim.setValue(field.key, v)}
-                      formatValue={inSliderRange(values[field.key], field) ? undefined : () => `실제 값 ${values[field.key]}${field.unit}`} />
-                    : <p className="sim-hint">{field.label}: {values[field.key] == null ? '미입력 · 아래 칸에 직접 입력해 주세요.' : '범위 밖 값입니다.'}</p>}
+                {/* 슬라이더와 숫자 칸이 같은 값을 함께 바꾼다. 값이 비어 있어도 슬라이더는 보이고 위치만 0에 둔다(실제 값은 null 그대로). 저장된 값이 없는 항목은 비활성이다. */}
+                {sim.baseline?.[field.key] == null && <p className="sim-hint">{field.label}: 값 없음 · 저장된 값이 없어 이 항목은 바꿀 수 없습니다.</p>}
+                <Slider label={field.label} min={field.min} max={field.max} unit={field.unit}
+                  value={sliderValue(values[field.key], field)} onChange={(v) => sim.setValue(field.key, v)}
+                  disabled={sim.baseline?.[field.key] == null}
+                  formatValue={() => sliderText(values[field.key], field, sim.baseline?.[field.key] == null)} />
                 <NumberInput label={`${field.label} 직접 입력`} min={field.min} max={field.max} step={1} unit={field.unit}
-                  value={values[field.key] ?? null} onChange={(v) => sim.setValue(field.key, v)} disabled={sim.baseline?.[field.key] == null} />
+                  value={values[field.key] ?? null} onChange={(v) => sim.setValue(field.key, v)} disabled={sim.baseline?.[field.key] == null} error={inputErrors[field.key]} />
                 <span className="sim-hint">{field.min}{field.unit} ~ {field.max}{field.unit} · 지금 {sim.baseline?.[field.key] ?? '값 없음'}{sim.baseline?.[field.key] == null ? '' : field.unit}{sim.baseline?.[field.key] > field.max ? ` (슬라이더 범위 밖 · 실제 값 ${sim.baseline[field.key]}${field.unit})` : ''}</span>
               </div>
             ))}
@@ -84,15 +83,15 @@ export default function SimulationPage() {
             {MONEY_FIELDS.map((field) => (
               <div key={field.key} id={`sim-field-${field.key}`} className={fieldClass(field.key)}>
                 <MoneyInput label={field.label} value={values[field.key]} onChange={(v) => sim.setValue(field.key, v)}
-                  disabled={moneyDisabled(field.key)} placeholder={moneyDisabled(field.key) ? '값 없음' : '미입력'} />
+                  disabled={moneyDisabled(field.key)} error={inputErrors[field.key]} placeholder={moneyDisabled(field.key) ? '값 없음' : '미입력'} />
               </div>
             ))}
           </div>
           <p className="sim-hint">카드 사용 비율 {usageRatio}</p>
           <div className="sim-row">
-            <span className={sim.status === 'invalid' || sim.status === 'error' ? 'sim-warn' : 'sim-hint'} role="status">{statusText(sim.status, Boolean(sim.result))}</span>
+            <span className={sim.status === 'invalid' || sim.status === 'error' ? 'sim-warn sim-status' : 'sim-hint sim-status'} role="status">{statusText(sim.status, Boolean(sim.result))}</span>
           </div>
-          {sim.calcError && <Notice type="warn">{sim.calcError}{sim.status === 'error' && <> <Button size="sm" onClick={sim.retry}>다시 계산</Button></>}</Notice>}
+          {sim.calcError && !(sim.status === 'invalid' && HIDDEN_INVALID_MESSAGES.includes(sim.calcError)) && <Notice type="warn">{sim.calcError}{sim.status === 'error' && <> <Button size="sm" onClick={sim.retry}>다시 계산</Button></>}</Notice>}
         </Card>
         <SimulationResult currentScore={sim.currentScore} result={sim.result} stale={stale} />
       </div>
@@ -108,9 +107,16 @@ export default function SimulationPage() {
   )
 }
 
-// 슬라이더로 보여 줄 수 있는 값인지(0 이상 정수, 범위 안) 본다.
-function inSliderRange(value, field) {
-  return Number.isInteger(value) && value >= field.min && value <= field.max
+// 슬라이더 위치: 범위 안 정수는 그대로, 범위 밖은 끝값, 비어 있거나 올바르지 않으면 0(최소값)에 둔다. 화면 위치일 뿐 실제 값은 바꾸지 않는다.
+function sliderValue(value, field) {
+  return Number.isInteger(value) ? Math.min(field.max, Math.max(field.min, value)) : field.min
+}
+
+// 슬라이더 옆 값 표시: 저장값 없음, 비었거나 올바르지 않음, 범위 밖 실제 값을 구분해 0으로 보이지 않게 한다.
+function sliderText(value, field, missing) {
+  if (missing) return '값 없음'
+  if (!Number.isInteger(value) || value < field.min) return '—'
+  return value > field.max ? `실제 값 ${value}${field.unit}` : `${value}${field.unit}`
 }
 
 // N-18-4 자동 계산 상태 안내 문구.
