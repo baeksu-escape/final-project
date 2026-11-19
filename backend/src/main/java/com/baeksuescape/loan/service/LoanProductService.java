@@ -49,16 +49,16 @@ public class LoanProductService {
         return new LoanDtos.ProductList(items);
     }
 
-    // N-37-2 상품 하나. 없으면 404 PRODUCT_NOT_FOUND
+    // N-37-2 상품 하나. 그 상품의 직군·특징만 따로 읽는다. 없으면 404 PRODUCT_NOT_FOUND
     public LoanDtos.Product detail(String productCode) {
         ProductRow row = loanMapper.selectProductByCode(productCode);
         if (row == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "PRODUCT_NOT_FOUND", "대출 상품을 찾을 수 없습니다.");
         }
-        List<String> workerTypes = loanMapper.selectWorkerTypes().stream()
-                .filter(w -> w.getProductId().equals(row.getProductId())).map(WorkerTypeRow::getWorkerTypeCode).toList();
-        List<String> features = loanMapper.selectFeatures().stream()
-                .filter(f -> f.getProductId().equals(row.getProductId())).map(FeatureRow::getFeatureText).toList();
+        List<String> workerTypes = loanMapper.selectWorkerTypesByProductId(row.getProductId()).stream()
+                .map(WorkerTypeRow::getWorkerTypeCode).toList();
+        List<String> features = loanMapper.selectFeaturesByProductId(row.getProductId()).stream()
+                .map(FeatureRow::getFeatureText).toList();
         return toProduct(row, workerTypes, features);
     }
 

@@ -3,6 +3,8 @@ package com.baeksuescape.loan.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -112,8 +114,8 @@ class LoanProductServiceTest {
     @Test
     void 상세는_그_상품의_직군과_특징만_담는다() {
         given(loanMapper.selectProductByCode("LP001")).willReturn(product(1, "LP001", 780, "신분증 사본·소득 증빙"));
-        given(loanMapper.selectWorkerTypes()).willReturn(List.of(worker(1, "EMPLOYEE"), worker(2, "FREELANCER")));
-        given(loanMapper.selectFeatures()).willReturn(List.of(feature(1, "특징1"), feature(2, "다른 상품")));
+        given(loanMapper.selectWorkerTypesByProductId(1L)).willReturn(List.of(worker(1, "EMPLOYEE")));
+        given(loanMapper.selectFeaturesByProductId(1L)).willReturn(List.of(feature(1, "특징1")));
 
         LoanDtos.Product detail = service.detail("LP001");
 
@@ -121,6 +123,22 @@ class LoanProductServiceTest {
         assertThat(detail.features()).containsExactly("특징1");
         assertThat(detail.requiredDocuments()).containsExactly("신분증 사본", "소득 증빙");
         assertThat(detail.cautionText()).isEqualTo("더미 상품 · 실제 상품 아님");
+    }
+
+    @Test
+    void 상세는_전체_직군_특징_조회를_부르지_않고_그_상품_것만_읽는다() {
+        given(loanMapper.selectProductByCode("LP001")).willReturn(product(1, "LP001", 780, "신분증 사본"));
+        given(loanMapper.selectWorkerTypesByProductId(1L)).willReturn(List.of());
+        given(loanMapper.selectFeaturesByProductId(1L)).willReturn(List.of());
+
+        LoanDtos.Product detail = service.detail("LP001");
+
+        verify(loanMapper, never()).selectWorkerTypes();
+        verify(loanMapper, never()).selectFeatures();
+        verify(loanMapper).selectWorkerTypesByProductId(1L);
+        verify(loanMapper).selectFeaturesByProductId(1L);
+        assertThat(detail.workerTypeCodes()).containsExactly("EMPLOYEE", "SELF_EMPLOYED", "FREELANCER");
+        assertThat(detail.features()).isEmpty();
     }
 
     @Test
