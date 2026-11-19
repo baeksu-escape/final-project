@@ -38,6 +38,7 @@ import com.baeksuescape.user.service.AuthErrors;
 import com.baeksuescape.user.service.AuthService;
 import com.baeksuescape.user.service.EmailVerificationService;
 import com.baeksuescape.user.service.MyPageService;
+import com.baeksuescape.user.service.PhoneVerificationService;
 import com.baeksuescape.user.service.social.SocialLoginService;
 
 // FP-87 회원·인증·마이페이지 API 계약 — 경로·상태·JSON 키가 프론트 mock(authMockHandlers·socialLoginMockHandlers·myPageMockHandlers)과 같은지 본다.
@@ -58,6 +59,8 @@ class UserApiContractTest {
     private AuthService authService;
     @MockBean
     private EmailVerificationService emailVerification;
+    @MockBean
+    private PhoneVerificationService phoneVerification;
     @MockBean
     private SocialLoginService socialLoginService;
     @MockBean
@@ -152,6 +155,32 @@ class UserApiContractTest {
         mvc.perform(json(post("/api/auth/email/verify"), "{\"email\":\"a@example.com\",\"code\":\"123456\",\"purpose\":\"SIGNUP\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.verificationToken").value("verified-1"));
+    }
+
+    // 11/18 1차 시연 후속: 닉네임 중복 확인·휴대폰 인증은 로그인 없이 부르고, JSON 키는 프론트 mock(authMockHandlers.js)과 같다.
+    @Test
+    void 닉네임_중복_확인은_토큰_없이_available을_준다() throws Exception {
+        given(authService.checkNickname(any())).willReturn(new AuthResponses.NicknameAvailability(true));
+        mvc.perform(json(post("/api/auth/nickname/check"), "{\"nickname\":\"테스트닉\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(true));
+    }
+
+    @Test
+    void 휴대폰_인증_발송과_확인은_토큰_없이_부르고_이메일과_같은_모양이다() throws Exception {
+        given(phoneVerification.send(any())).willReturn(new AuthResponses.PhoneSent(300));
+        given(phoneVerification.verify(any())).willReturn(new AuthResponses.PhoneVerified("phone-verified-1"));
+        mvc.perform(json(post("/api/auth/phone/send"), "{\"phone\":\"01012345678\",\"purpose\":\"SIGNUP\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expiresInSeconds").value(300));
+        mvc.perform(json(post("/api/auth/phone/verify"), "{\"phone\":\"01012345678\",\"code\":\"123456\",\"purpose\":\"SIGNUP\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verificationToken").value("phone-verified-1"));
+        // 빈 칸은 400 INVALID_INPUT(칸별 오류)
+        mvc.perform(json(post("/api/auth/phone/send"), "{\"purpose\":\"SIGNUP\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("phone"));
     }
 
     @Test

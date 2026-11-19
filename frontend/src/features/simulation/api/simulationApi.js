@@ -58,6 +58,7 @@ import '../mocks/simulationMockHandlers.js'
 export const SIMULATION_API = Object.freeze({
   RECOMMEND_LOANS: '/api/simulation/loans/recommend',
   RECALCULATE_CREDIT_CARE: '/api/simulation/credit-care/recalculate',
+  CREDIT_CARE_BASE: '/api/simulation/credit-care/base',
   SCORE_BAND_OFFER: '/api/simulation/score-band-offer',
 })
 
@@ -71,7 +72,13 @@ export function recommendLoans(score, jobType) {
   return apiGet(`${SIMULATION_API.RECOMMEND_LOANS}?score=${score}&jobType=${jobType}`)
 }
 
-// N-18-5·8 바꾼 값으로 예상 대안 점수·금융/대안 영향·감점 요인 3개를 다시 구한다(SIM-02, Spring 미구현이라 지금은 mock).
+// N-18-1·10 입력 10개의 내 실제 값과 출발 점수(SIM-01). [내 실제 값으로 되돌리기]도 이 값을 쓴다.
+// 응답: { baseRequestId, assessedAt, score, gradeBandCode, values: { TELECOM_ON_TIME_MONTHS: 8, ... } } — 값이 없으면 null.
+export function getCreditCareBase() {
+  return apiGet(SIMULATION_API.CREDIT_CARE_BASE)
+}
+
+// N-18-5·8 바꾼 값으로 예상 대안 점수·금융/대안 영향·감점 요인 3개를 다시 구한다(SIM-02, FastAPI ML-04 호출, 저장 안 함).
 // payload: { changes: { TELECOM_ON_TIME_MONTHS: 12, ... } } — ML-04 키 10개 중 바꾼 것만. 카드 한도·월 사용액은 함께 보낸다.
 export function recalculateCreditCare(payload) {
   return apiPost(SIMULATION_API.RECALCULATE_CREDIT_CARE, payload)

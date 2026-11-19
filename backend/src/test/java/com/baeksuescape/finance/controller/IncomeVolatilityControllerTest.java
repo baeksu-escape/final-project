@@ -2,8 +2,11 @@ package com.baeksuescape.finance.controller;
 
 import com.baeksuescape.finance.dto.CashFlowConditionRequest;
 import com.baeksuescape.finance.dto.CashFlowForecastResponse;
+import com.baeksuescape.finance.dto.ExpectedScoreResponse;
 import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
+import com.baeksuescape.finance.service.ExpectedScoreService;
 import com.baeksuescape.finance.service.IncomeVolatilityService;
+import org.springframework.http.MediaType;
 import com.baeksuescape.global.security.JwtTokenProvider;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +37,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,6 +56,9 @@ class IncomeVolatilityControllerTest {
 
     @MockBean
     private IncomeVolatilityService incomeVolatilityService;
+
+    @MockBean
+    private ExpectedScoreService expectedScoreService;
 
     @Autowired
     private JwtTokenProvider tokenProvider;
@@ -203,5 +210,38 @@ class IncomeVolatilityControllerTest {
         assertEquals(100, captor.getValue().getIncomeVariationPct());
         assertEquals(1000000L, captor.getValue().getFixedExpenseAmount());
         assertEquals("ON_TIME", captor.getValue().getPaymentStatus());
+    }
+
+    @Test
+    @DisplayName("POST /api/diagnosis/cash-flow/expected-score (DIAG-09): 토큰 없으면 401, 본문 조건이 전달되고 JSON 필드 이름이 고정된다")
+    void postExpectedScore() throws Exception {
+        mockMvc.perform(post("/api/diagnosis/cash-flow/expected-score")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(expectedScoreService);
+
+        when(expectedScoreService.expectedScore(eq(2L), any())).thenReturn(new ExpectedScoreResponse(588, "CAUTION", 571,
+                "CAUTION", -17, "LGBM-BASE-0.1", "DEV-DUMMY", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", false));
+
+        mockMvc.perform(loggedIn(post("/api/diagnosis/cash-flow/expected-score")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"incomeVariationPct\":0,\"incomeChangePercent\":-10,\"fixedExpenseAmount\":500000,"
+                                + "\"paymentStatus\":\"DELAYED\"}"), 2L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentScore").value(588))
+                .andExpect(jsonPath("$.expectedScore").value(571))
+                .andExpect(jsonPath("$.expectedGradeBandCode").value("CAUTION"))
+                .andExpect(jsonPath("$.scoreDiff").value(-17))
+                .andExpect(jsonPath("$.modelVersion").value("LGBM-BASE-0.1"))
+                .andExpect(jsonPath("$.baseModelVersion").value("DEV-DUMMY"))
+                .andExpect(jsonPath("$.baseRequestId").value("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"))
+                .andExpect(jsonPath("$.paymentStatusApplied").value(false));
+
+        ArgumentCaptor<CashFlowConditionRequest> captor = ArgumentCaptor.forClass(CashFlowConditionRequest.class);
+        verify(expectedScoreService).expectedScore(eq(2L), captor.capture());
+        assertEquals(0, captor.getValue().getIncomeVariationPct());
+        assertEquals(-10.0, captor.getValue().getIncomeChangePercent());
+        assertEquals(500000L, captor.getValue().getFixedExpenseAmount());
+        assertEquals("DELAYED", captor.getValue().getPaymentStatus());
     }
 }

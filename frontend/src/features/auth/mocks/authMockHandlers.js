@@ -2,13 +2,24 @@ import { ApiError } from '../../../common/api/ApiError.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { MOCK_USERS, toMockToken } from '../../../common/mocks/mockUsers.js'
 import { ROLES } from '../../../common/config/roles.js'
-import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, EMAIL_PURPOSES, LOGIN_FAILED_MESSAGE } from '../authConstants.js'
-import { isValidEmail, isValidPassword, normalizePhone, validateBirthYear, validateNickname } from '../validation.js'
+import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, EMAIL_PURPOSES, LOGIN_FAILED_MESSAGE, PHONE_PURPOSES } from '../authConstants.js'
+import {
+  SIGNUP_PENDING_MESSAGES,
+  isValidEmail,
+  isValidPassword,
+  isValidPhone,
+  normalizePhone,
+  validateBirthYear,
+  validateName,
+  validateNickname,
+} from '../validation.js'
 import {
   DEMO_ACCOUNT_CONTACTS,
   LOCKED_DEMO_ACCOUNT,
   MOCK_EMAIL_CODE,
   MOCK_EMAIL_CODE_TTL_SECONDS,
+  MOCK_PHONE_CODE,
+  MOCK_PHONE_CODE_TTL_SECONDS,
 } from './authMockData.js'
 import { mockLinkKeys } from './socialLoginMockData.js'
 import { startAdminLoginChallenge } from '../../admin/mocks/adminLoginChallenges.js'
@@ -20,7 +31,20 @@ const accounts = [
 ]
 const sentCodes = new Map() // '목적:이메일' → 만료 시각
 const verifications = new Map() // 인증 토큰 → { purpose, email, loginId }
+const sentPhoneCodes = new Map() // '목적:휴대폰(숫자만)' → 만료 시각
+const phoneVerifications = new Map() // 휴대폰 인증 토큰 → { purpose, phone }
 let sequence = 0
+
+// 칸 하나의 400 오류(서버와 같은 모양: data.fieldErrors [{ field, message }]).
+function fieldError(field, message) {
+  return new ApiError(400, message, { fieldErrors: [{ field, message }] })
+}
+
+// 휴대폰 인증 토큰이 목적·번호와 맞는지 확인한다. 틀리면 휴대폰 칸 오류. 맞으면 부르는 쪽이 가입을 마친 뒤 지운다(한 번만 사용).
+function assertPhoneVerification(token, { purpose, phone }) {
+  const saved = phoneVerifications.get(token)
+  if (!saved || saved.purpose !== purpose || saved.phone !== phone) throw fieldError('phone', SIGNUP_PENDING_MESSAGES.phone)
+}
 
 // 아이디·비밀번호 찾기에서 계정이 없을 때 쓰는 문구. 어느 항목이 틀렸는지는 알려 주지 않는다.
 const NO_MATCH_MESSAGE = '입력한 정보와 일치하는 계정이 없습니다.'
@@ -88,6 +112,14 @@ export function withdrawMockAccount(account) {
   })
   verifications.forEach((saved, key) => {
     if (saved.email === email) verifications.delete(key)
+  })
+  // 휴대폰으로 보낸 인증번호·인증 토큰도 지운다(서버 deleteForWithdrawal이 휴대폰 HMAC으로도 지우는 것과 같다).
+  const { phone } = account
+  sentPhoneCodes.forEach((_, key) => {
+    if (phone && key.endsWith(`:${phone}`)) sentPhoneCodes.delete(key)
+  })
+  phoneVerifications.forEach((saved, key) => {
+    if (phone && saved.phone === phone) phoneVerifications.delete(key)
   })
   Object.assign(account, {
     accountStatus: WITHDRAWN_STATUS,
@@ -171,10 +203,49 @@ registerMockHandlers({
     return { verificationToken }
   },
 
+  // N-02-1 닉네임 중복 확인 — 형식이 틀리면 400(칸별 오류), 아니면 계정 목록(탈퇴 표시값 포함)의 닉네임과 비교한다.
+  'POST /api/auth/nickname/check': ({ body }) => {
+    const nicknameError = validateNickname(body?.nickname)
+    if (nicknameError) throw fieldError('nickname', nicknameError)
+    const nickname = body.nickname.trim()
+    return { available: !accounts.some((item) => item.nickname === nickname) }
+  },
+
+  // N-02 휴대폰 인증번호 발송 — 이메일 발송 mock과 같은 구조. 실제 문자는 보내지 않고 고정 코드(MOCK_PHONE_CODE)를 쓴다.
+  'POST /api/auth/phone/send': ({ body }) => {
+    const phone = normalizePhone(body?.phone)
+    if (!isValidPhone(phone)) throw fieldError('phone', '휴대폰 번호 형식이 올바르지 않습니다. 예) 010-1234-5678')
+    if (body.purpose !== PHONE_PURPOSES.SIGNUP) throw fieldError('purpose', '인증 목적이 올바르지 않습니다.')
+    sentPhoneCodes.set(`${body.purpose}:${phone}`, Date.now() + MOCK_PHONE_CODE_TTL_SECONDS * 1000)
+    return { expiresInSeconds: MOCK_PHONE_CODE_TTL_SECONDS }
+  },
+
+  // N-02 휴대폰 인증번호 확인 — 맞으면 가입 요청에 붙일 휴대폰 인증 토큰을 준다.
+  'POST /api/auth/phone/verify': ({ body }) => {
+    const phone = normalizePhone(body?.phone)
+    const key = `${body?.purpose}:${phone}`
+    const expiresAt = sentPhoneCodes.get(key)
+    if (!expiresAt || expiresAt < Date.now() || body.code !== MOCK_PHONE_CODE) {
+      throw new ApiError(400, '인증번호가 올바르지 않거나 만료되었습니다.')
+    }
+    sentPhoneCodes.delete(key)
+    sequence += 1
+    const verificationToken = `mock-phone-verified-${sequence}`
+    phoneVerifications.set(verificationToken, { purpose: body.purpose, phone })
+    return { verificationToken }
+  },
+
   // N-02 회원가입 — 직군은 받지 않으므로 jobType은 null로 만든다(로그인 후 직군 선택 화면으로 간다).
   'POST /api/auth/signup': ({ body }) => {
     if (body?.agreeCreditInfo !== true) throw new ApiError(400, '필수 동의 항목에 동의해 주세요.')
     if (!isValidPassword(body.password)) throw new ApiError(400, '비밀번호 규칙을 지켜 주세요.')
+    // 이름은 완성형 한글 2~20자 — 화면과 같은 규칙(validateName)이다.
+    const nameError = validateName(body.name)
+    if (nameError) throw fieldError('name', nameError)
+    // 휴대폰은 필수이고, 형식이 맞아야 한다(인증 토큰은 중복 검사 뒤에 쓴다).
+    const phone = normalizePhone(body.phone)
+    if (!isValidPhone(phone)) throw fieldError('phone', '휴대폰 번호 형식이 올바르지 않습니다. 예) 010-1234-5678')
+    if (!body.phoneVerificationToken) throw fieldError('phone', SIGNUP_PENDING_MESSAGES.phone)
     // N-02-1 출생연도 — 화면과 같은 규칙(validateBirthYear)으로 다시 검사하고, 어기면 칸별 오류로 돌려준다.
     const birthYearError = validateBirthYear(body.birthYear)
     if (birthYearError) throw new ApiError(400, birthYearError, { fieldErrors: [{ field: 'birthYear', message: birthYearError }] })
@@ -196,7 +267,10 @@ registerMockHandlers({
     if (body.socialLinkKey !== undefined && !mockLinkKeys.has(body.socialLinkKey)) {
       throw new ApiError(400, '소셜 로그인을 처음부터 다시 진행해 주세요.')
     }
+    // 휴대폰 토큰을 먼저 본다. 여기서 막히면 이메일 인증 토큰은 쓰지 않은 채로 남아 다시 가입할 수 있다.
+    assertPhoneVerification(body.phoneVerificationToken, { purpose: PHONE_PURPOSES.SIGNUP, phone })
     consumeVerification(body.emailVerificationToken, { purpose: EMAIL_PURPOSES.SIGNUP, email: body.email })
+    phoneVerifications.delete(body.phoneVerificationToken)
     mockLinkKeys.delete(body.socialLinkKey)
     const userId = createMockUserId(body.loginId)
     accounts.push({
@@ -205,7 +279,7 @@ registerMockHandlers({
       locked: false,
       createdAt: new Date().toISOString(), // N-04-1 마이페이지 가입일로 쓴다.
       email: body.email,
-      phone: normalizePhone(body.phone),
+      phone,
       ageGroup: body.ageGroup,
       birthYear: Number(body.birthYear),
       nickname,

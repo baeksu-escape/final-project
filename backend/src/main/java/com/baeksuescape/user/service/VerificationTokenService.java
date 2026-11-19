@@ -24,6 +24,8 @@ public class VerificationTokenService {
 
     public static final Duration LIFETIME = Duration.ofMinutes(10);
     private static final String TYPE = "email-verification";
+    // N-02 휴대폰 인증 토큰(11/18 1차 시연 후속). 종류가 달라서 이메일 인증 토큰과 서로 대신 쓸 수 없다. target은 휴대폰 HMAC이다.
+    private static final String PHONE_TYPE = "phone-verification";
 
     // 토큰에서 꺼낸 값.
     public record Claim(long verificationId, String purposeCode, String targetHmac) {
@@ -38,9 +40,28 @@ public class VerificationTokenService {
     }
 
     public String issue(long verificationId, String purposeCode, String targetHmac) {
+        return issue(TYPE, verificationId, purposeCode, targetHmac);
+    }
+
+    // 서명·만료·종류가 맞으면 값을 꺼낸다. 아니면 빈 값.
+    public Optional<Claim> parse(String token) {
+        return parse(TYPE, token);
+    }
+
+    // N-02 휴대폰 인증 토큰 발급(종류 phone-verification).
+    public String issuePhone(long verificationId, String purposeCode, String phoneHmac) {
+        return issue(PHONE_TYPE, verificationId, purposeCode, phoneHmac);
+    }
+
+    // N-02 휴대폰 인증 토큰 확인. 이메일 인증 토큰을 넣으면 빈 값이다.
+    public Optional<Claim> parsePhone(String token) {
+        return parse(PHONE_TYPE, token);
+    }
+
+    private String issue(String type, long verificationId, String purposeCode, String targetHmac) {
         Instant now = clock.instant();
         return Jwts.builder()
-                .claim("typ", TYPE)
+                .claim("typ", type)
                 .claim("vid", verificationId)
                 .claim("purpose", purposeCode)
                 .claim("target", targetHmac)
@@ -50,8 +71,7 @@ public class VerificationTokenService {
                 .compact();
     }
 
-    // 서명·만료·종류가 맞으면 값을 꺼낸다. 아니면 빈 값.
-    public Optional<Claim> parse(String token) {
+    private Optional<Claim> parse(String type, String token) {
         if (token == null || token.isBlank()) return Optional.empty();
         try {
             Claims claims = Jwts.parser()
@@ -60,7 +80,7 @@ public class VerificationTokenService {
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
-            if (!TYPE.equals(claims.get("typ", String.class))) return Optional.empty();
+            if (!type.equals(claims.get("typ", String.class))) return Optional.empty();
             Number vid = claims.get("vid", Number.class);
             String purpose = claims.get("purpose", String.class);
             String target = claims.get("target", String.class);

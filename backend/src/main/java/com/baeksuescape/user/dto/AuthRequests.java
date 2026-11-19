@@ -18,6 +18,7 @@ public final class AuthRequests {
     //   ageGroup: 프론트가 birthYear로 계산해 함께 보내지만 서버는 쓰지 않는다(프론트 TODO(D-20)와 같음).
     //   agreeCreditInfo: 지금 화면의 체크 하나. 시연용 임시로 필수 동의 2개(이용약관·개인정보)를 함께 기록한다.
     //   agreeMarketing: 선택 동의(새 필드). 화면에 아직 없어 보내지 않으면 미동의로 기록한다.
+    //   phoneVerificationToken: 휴대폰 인증 확인(phone/verify)에서 받은 토큰. 필수(11/18 1차 시연 후속).
     public record Signup(
             String loginId,
             String name,
@@ -30,7 +31,25 @@ public final class AuthRequests {
             Boolean agreeCreditInfo,
             Boolean agreeMarketing,
             String emailVerificationToken,
-            String socialLinkKey) {
+            String socialLinkKey,
+            String phoneVerificationToken) {
+    }
+
+    // N-02-1 닉네임 중복 확인. 형식 검사는 서비스가 칸별 오류로 한다(화면과 같은 문구).
+    public record NicknameCheck(String nickname) {
+    }
+
+    // N-02 휴대폰 인증번호 발송. purpose: SIGNUP
+    public record PhoneSend(
+            @NotBlank(message = "휴대폰 번호를 입력해 주세요.") String phone,
+            @NotBlank(message = "인증 목적이 필요합니다.") String purpose) {
+    }
+
+    // N-02 휴대폰 인증번호 확인
+    public record PhoneVerify(
+            @NotBlank(message = "휴대폰 번호를 입력해 주세요.") String phone,
+            @NotBlank(message = "인증번호를 입력해 주세요.") String code,
+            @NotBlank(message = "인증 목적이 필요합니다.") String purpose) {
     }
 
     // AUTH-07 인증코드 발송. purpose: SIGNUP | RESET_PASSWORD | CHANGE_EMAIL

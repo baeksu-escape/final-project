@@ -27,6 +27,10 @@ public class AvenueProperties implements InitializingBean {
     // 이메일 인증코드 보내는 방식. LOG: 서버 로그에만 남김(개발용) / FIXED: 정해진 코드 / SMTP: 실제 메일
     public enum EmailMode { LOG, FIXED, SMTP }
 
+    // 휴대폰 인증번호 보내는 방식(11/18 1차 시연 후속). LOG: 서버 로그에만 남김(개발용, 기본) / FIXED: 정해진 번호.
+    // TODO(2차: 실제 문자 발송 업체 연동 — 업체·키는 팀 결정) 업체를 정하면 모드를 하나 더 둔다.
+    public enum PhoneMode { LOG, FIXED }
+
     // 소셜 로그인 방식. DEV: 개발용 가짜 제공자 / REAL: 실제 OAuth 제공자
     public enum SocialMode { DEV, REAL }
 
@@ -38,6 +42,7 @@ public class AvenueProperties implements InitializingBean {
     public static class Auth {
         private Jwt jwt = new Jwt();
         private Email email = new Email();
+        private Phone phone = new Phone();
         private Social social = new Social();
         // 다른 팀 경로를 인증 없이 임시로 열어 두는 목록. 그 팀이 로그인을 붙이면 인증 담당이 목록에서 뺀다.
         private List<String> temporaryOpenPaths = new ArrayList<>(List.of("/api/finance/**", "/api/diagnosis/**", "/api/simulation/**"));
@@ -57,6 +62,14 @@ public class AvenueProperties implements InitializingBean {
         private String fixedCode;
         // SMTP 모드에서 보내는 사람 주소
         private String from;
+    }
+
+    // avenue.auth.phone.mode(기본 LOG), avenue.auth.phone.fixed-code(FIXED일 때 필요). 이메일 설정과 같은 모양이다.
+    @Getter
+    @Setter
+    public static class Phone {
+        private PhoneMode mode = PhoneMode.LOG;
+        private String fixedCode;
     }
 
     @Getter
@@ -101,6 +114,9 @@ public class AvenueProperties implements InitializingBean {
         }
         if (auth.getEmail().getMode() == EmailMode.FIXED && isBlank(auth.getEmail().getFixedCode())) {
             throw new IllegalStateException("avenue.auth.email.mode=FIXED이면 avenue.auth.email.fixed-code가 필요합니다");
+        }
+        if (auth.getPhone().getMode() == PhoneMode.FIXED && isBlank(auth.getPhone().getFixedCode())) {
+            throw new IllegalStateException("avenue.auth.phone.mode=FIXED이면 avenue.auth.phone.fixed-code가 필요합니다");
         }
     }
 
