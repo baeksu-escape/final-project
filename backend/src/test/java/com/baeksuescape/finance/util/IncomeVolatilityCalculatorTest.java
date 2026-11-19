@@ -1,8 +1,8 @@
 package com.baeksuescape.finance.util;
 
-import com.baeksuescape.finance.dto.CashFlowForecastResponse;
-import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
-import com.baeksuescape.finance.dto.MonthlyIncomeItem;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse;
+import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityResponse;
+import com.baeksuescape.finance.dto.cashflow.MonthlyIncomeItem;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -94,14 +94,14 @@ class IncomeVolatilityCalculatorTest {
 
         // 1월 소득이 150만원으로 고정지출 200만원보다 적음 (부족액 50만원)
         // 8월 기준으로 1월은 5개월 뒤 (9, 10, 11, 12, 1)
-        com.baeksuescape.finance.dto.DeficitMonthsResult result =
+        com.baeksuescape.finance.dto.cashflow.DeficitMonthsResult result =
                 IncomeVolatilityCalculator.calculateDeficitMonthsWithTimeline(
                         items, java.math.BigDecimal.valueOf(fixedExpense), lastMonth);
 
         assertTrue(result.isHasDeficitWarning(), "소득 부족 달 경고가 발생해야 한다.");
         assertEquals(1, result.getDeficitMonthsCount(), "소득 부족 달은 1건이어야 한다.");
 
-        com.baeksuescape.finance.dto.DeficitMonthsResult.DeficitMonthDetail item = result.getDeficitItems().get(0);
+        com.baeksuescape.finance.dto.cashflow.DeficitMonthsResult.DeficitMonthDetail item = result.getDeficitItems().get(0);
         assertEquals("2026-01", item.getMonthIdentifier());
         assertEquals(0, new java.math.BigDecimal("500000").compareTo(item.getShortfallAmount()), "모자란 금액은 50만원이어야 한다.");
         assertEquals(5, item.getMonthsUntilNext(), "8월 기준 1월은 5개월 뒤에 돌아와야 한다.");
@@ -255,7 +255,7 @@ class IncomeVolatilityCalculatorTest {
         assertEquals(5, r.getMonthsUntilNearest());
         assertEquals(1500000L, r.getRecommendedReserveAmount());
 
-        com.baeksuescape.finance.dto.DeficitMonthsResult detail = IncomeVolatilityCalculator.calculateDeficitMonthsWithTimeline(
+        com.baeksuescape.finance.dto.cashflow.DeficitMonthsResult detail = IncomeVolatilityCalculator.calculateDeficitMonthsWithTimeline(
                 createSample12Months(), java.math.BigDecimal.valueOf(3000000L), YearMonth.of(2026, 8));
         assertEquals(0, new java.math.BigDecimal("2500000").compareTo(detail.getTotalShortfallAmount()), "총 부족액 250만");
     }

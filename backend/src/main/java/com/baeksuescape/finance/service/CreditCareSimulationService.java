@@ -2,6 +2,7 @@ package com.baeksuescape.finance.service;
 
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,14 +16,15 @@ import org.springframework.stereotype.Service;
 import com.baeksuescape.assessment.client.PredictionClient;
 import com.baeksuescape.assessment.client.PredictionClient.SimulationFailedException;
 import com.baeksuescape.assessment.dto.AssessmentRows.AssessmentRow;
+import com.baeksuescape.assessment.dto.AssessmentRows.FactorRow;
 import com.baeksuescape.assessment.dto.AssessmentRows.FeatureRow;
 import com.baeksuescape.assessment.mapper.AssessmentMapper;
-import com.baeksuescape.finance.dto.CreditCareBaseResponse;
-import com.baeksuescape.finance.dto.CreditCareSimulationRequest;
-import com.baeksuescape.finance.dto.CreditCareSimulationResponse;
-import com.baeksuescape.finance.dto.CreditCareSimulationResponse.Delta;
-import com.baeksuescape.finance.dto.CreditCareSimulationResponse.ReductionFactor;
-import com.baeksuescape.finance.dto.CreditCareSimulationResponse.ScoreSummary;
+import com.baeksuescape.finance.dto.simulation.CreditCareBaseResponse;
+import com.baeksuescape.finance.dto.simulation.CreditCareSimulationRequest;
+import com.baeksuescape.finance.dto.simulation.CreditCareSimulationResponse;
+import com.baeksuescape.finance.dto.simulation.CreditCareSimulationResponse.Delta;
+import com.baeksuescape.finance.dto.simulation.CreditCareSimulationResponse.ReductionFactor;
+import com.baeksuescape.finance.dto.simulation.CreditCareSimulationResponse.ScoreSummary;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
 import com.baeksuescape.user.dto.DataInputRows.CreditRow;
@@ -44,6 +46,8 @@ public class CreditCareSimulationService {
     static final String EASYPAY = "EASYPAY_MONTHLY_COUNT";
     static final String CARD_LIMIT = "CARD_LIMIT_AMT";
     static final String CARD_SPEND = "CARD_MONTHLY_SPEND_AMT";
+    /** N-18-8 감점 요인은 최대 3개 (ML-04와 같다) */
+    static final int MAX_REDUCTION_FACTORS = 3;
 
     /** 화면 키 → 저장된 피처 코드 (FastAPI simulation.py DIRECT_CHANGES와 같다). 간편결제·카드는 따로 구한다. */
     private static final Map<String, String> DIRECT_FEATURES = orderedMap(
@@ -102,7 +106,45 @@ public class CreditCareSimulationService {
         values.put(CARD_SPEND, credit == null ? null : credit.getCardMonthlySpendAmt());
 
         return new CreditCareBaseResponse(base.getRequestId(), users.toOffset(base.getAssessedAt()), base.getAltScore(),
-                base.getAltGradeBandCode(), values);
+                base.getAltGradeBandCode(), values,
+                topReductionFactors(assessmentMapper.selectFactors(base.getAssessmentId())));
+    }
+
+    /**
+     * N-18-8 SIM-01 감점 요인 상위 3개 — 출발 평가 때 저장한 요인(ASSESSMENT_FACTOR)에서 고른다(모델을 다시 부르지 않는다).
+     * 고르는 규칙은 ML-04(simulation.py _top_reduction_factors)와 같다: 시뮬레이터로 바꿀 수 있는 감점 요인을 감점이 큰 순서로, 같으면 이름 순.
+     * 회복 점수는 저장돼 있지 않아 null이다. 이름이 비면 화면이 형식 오류로 보므로 피처 코드로 채운다.
+     */
+    static List<ReductionFactor> topReductionFactors(List<FactorRow> rows) {
+        List<FactorRow> candidates = rows.stream()
+                .filter(row -> row.getShapScore() != null && row.getShapScore() < 0 && "Y".equals(row.getSimulatableYn()))
+                .sorted(Comparator.comparing(FactorRow::getShapScore)
+                        .thenComparing(row -> displayName(row), Comparator.nullsLast(Comparator.naturalOrder())))
+                .limit(MAX_REDUCTION_FACTORS)
+                .toList();
+        List<ReductionFactor> factors = new ArrayList<>();
+        for (FactorRow row : candidates) {
+            factors.add(new ReductionFactor(factors.size() + 1, row.getFeatureCode(), displayName(row),
+                    parseNumber(row.getFeatureValue()), row.getShapScore(), null));
+        }
+        return factors;
+    }
+
+    private static String displayName(FactorRow row) {
+        String name = row.getFeatureName();
+        return name == null || name.isBlank() ? row.getFeatureCode() : name;
+    }
+
+    // 요인값은 문자열로 저장돼 있다. 숫자가 아니면 null이다.
+    private static Double parseNumber(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Double.valueOf(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** N-18-4·5·8 SIM-02: 바꾼 값을 검사하고 ML-04로 다시 계산한다. 실패하면 저장하지 않고 화면에 알린다. */

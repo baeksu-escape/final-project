@@ -36,7 +36,11 @@
 | 데이터가 있는 기존 DB에 게시글 본문 열 변경(`BOARD_POST.CONTENT` CLOB → `VARCHAR2(1300 CHAR)`, DDL C9)만 적용 | [alter_board_post_content_varchar2.sql](alter_board_post_content_varchar2.sql) | 글 데이터는 유지한다. 1300자를 넘는 글이 있으면 자르지 않고 멈춘다. 이미 바뀐 DB에서 다시 실행해도 된다. `CONTENT`는 표의 맨 뒤 열이 된다 |
 | 서비스 모델을 Mock(`DEV-DUMMY`)에서 실제 모델(`LGBM-BASE-0.1`)로 전환 | [activate_model_lgbm_base_0_1.sql](activate_model_lgbm_base_0_1.sql) | **실행 전 FastAPI `/v1/health`가 `"modelLoaded": true`인지 확인**(모델 파일 없이 바꾸면 모든 점수가 503). FS-V1 기준 데이터(위 행)가 없으면 멈추고 아무것도 바꾸지 않는다. 다시 실행해도 된다. 공용 DB는 DB 담당이 팀에 알린 뒤 실행. 절차: `fastapi_server/README.md` 「공용 DB를 실제 모델로 전환하는 절차」 |
 | 실제 모델 LGBM-BASE-0.1의 학습 데이터·모델 파일 기록(N-25 모형 성능 비교 근거) | [register_model_lgbm_base_0_1.sql](register_model_lgbm_base_0_1.sql) | `DATASET_VERSION` 1행(학습 표 해시·12,000행·252열) + `MODEL_ARTIFACT` 2행(모델 파일 해시·검증 AUC). 기록만 하고 ACTIVE는 바꾸지 않는다. 다시 실행해도 된다. 적용 후 `99_check.sql`의 두 표 기대값 0과 다르게 나오는 것은 정상 |
+| 위 모델 파일 두 행의 `METRICS_JSON`에 두 모델 AUC를 같은 라벨로 맞춘 값(`same_label_comparison`) 추가(N-25, 정의서 C20) | [update_model_metrics_same_label_lgbm_base_0_1.sql](update_model_metrics_same_label_lgbm_base_0_1.sql) | 위 기록 SQL을 먼저 실행해야 한다(없으면 멈춤). `AUC_VALID`·해시는 바꾸지 않고 `METRICS_JSON`만 바꾼다. 다시 실행해도 된다. 같은 라벨 값은 라벨마다 두 모델을 새로 학습한 실험값이다 |
+| 기존 DB에 모형 성능 비교용 평가 표본 표 `MODEL_EVAL_SAMPLE`(DDL C10, N-25) 추가 | [create_model_eval_sample.sql](create_model_eval_sample.sql) | 고객별 기존·대안 모델 점수와 정답 라벨을 담는 빈 표만 만든다. `MODEL_REGISTRY`·`DIM_WORKER_TYPE`이 있는 스키마에서 한 번 실행하고, 같은 표가 있으면 오류로 멈춘다. 새로 DDL을 실행하는 DB에는 필요 없다 |
+| 모형 성능 비교용 평가 표본 적재(`MODEL_EVAL_SAMPLE` 3,085행) | [load_model_eval_sample_lgbm_base_0_1.sql](load_model_eval_sample_lgbm_base_0_1.sql) | 위 표를 만든 뒤 한 번만 실행한다(이 모델 버전의 행이 있으면 오류로 멈춤). 기본 시드(`run_seed_only.sql`)에는 넣지 않는다. 적용한 DB에서는 `99_check.sql`의 `MODEL_EVAL_SAMPLE` 기대값 0과 실제 3,085가 다르게 나오는 것이 정상. 원본 CSV는 `#파일공유` |
 | 실제 모델 전환 뒤 문제가 생겨 Mock으로 되돌리기 | [rollback_model_to_dev_dummy.sql](rollback_model_to_dev_dummy.sql) | 저장된 평가는 지우지 않는다(평가마다 자기 모델 버전이 남음). 다시 실행해도 된다 |
+| 정책금리(한국은행 기준금리, 2024.01~2026.10 월별) 넣기(N-17, FP-153) | [add_policy_rate_bok_base_rate.sql](add_policy_rate_bok_base_rate.sql) | 새 DB·기존 DB 모두 이 파일로 넣는다(DDL에는 데이터가 없다). DDL → `run_seed_only.sql` 다음에 실행한다. `FACT_POLICY_RATE` 34행(월 값을 그 달 마지막 날로)이며 다시 실행해도 같은 결과다. 새 달 값은 같은 형식으로 행을 더해 다시 실행한다. `99_check.sql`의 `FACT_POLICY_RATE` 기대값 0은 기본 시드만 적용한 상태 기준이라, 이 파일을 실행한 뒤에는 EXPECTED=0, ACTUAL=34로 보이는 것이 정상이다. 적재된 행 수와 최신 기준금리는 이 파일 마지막의 확인 쿼리로 본다 |
 | 옛 DDL로 만든 DB에서 미사용 상권 테이블 5개 제거 | [drop_unused_market_tables.sql](drop_unused_market_tables.sql) | N-24의 JSON 전환에 따라 상권 전용 표·데이터만 제거한다. 공공통계 표는 유지한다 |
 | 버려도 되는 별도 실험용 스키마를 완전히 초기화 | `dummy_db/run_all.sql` | **대상 테이블을 삭제하고 재생성한 뒤 시드를 적재한다. 기존 데이터가 삭제된다** |
 | 기존 회원 데이터나 시드를 일부 수정·보정 | 담당자와 별도 변경 SQL 검토 | `run_seed_only.sql`은 병합·갱신·재적재 도구가 아니다. `run_all.sql`로 해결하지 않는다 |
@@ -46,7 +50,7 @@
 
 ## 일반적인 최초 준비 순서
 
-1. 대상 Oracle 개발 스키마와 DDL 버전을 확인한다. 기준은 현재 `avenue_ddl.sql`의 Oracle 21c·47개 테이블이다(상권 5개 표 제거·빈 알림 표 추가 후). 이미 사용 중인 DB라면 위 표의 ALTER·보정 경로를 먼저 검토한다.
+1. 대상 Oracle 개발 스키마와 DDL 버전을 확인한다. 기준은 현재 `avenue_ddl.sql`의 Oracle 21c·48개 테이블이다(상권 5개 표 제거·빈 알림 표·평가 표본 표 추가 후). 이미 사용 중인 DB라면 위 표의 ALTER·보정 경로를 먼저 검토한다.
 2. 빈 스키마에서 원본 `avenue_ddl.sql`을 실행한다. 테이블과 DDL에 내장된 기준 데이터가 생성된다. 최신 구조가 이미 있다면 생략한다.
 3. 같은 스키마에서 `dummy_db/run_seed_only.sql`을 실행한다. SQL Developer의 스크립트 실행(F5) 또는 SQL*Plus에서 해당 파일을 실행하며, 함께 제공된 시드 파일의 상대 위치를 유지한다.
 4. 마지막에 실행되는 `99_check.sql`의 기대·실제 테이블 수와 행 수를 직접 확인한다. 이는 결과 출력이며 모든 불일치를 자동 오류로 바꾸는 검사는 아니다. 생성 당시 기준은 `seed_report.json`에서 확인한다.
@@ -62,7 +66,7 @@ C조 담당자의 결정과 사용자 승인에 따라 상권 분석은 DB·API 
 
 기준 DDL에서 `DIM_ADM_DONG`, `DIM_SERVICE_CATEGORY`, `FACT_DONG_SALES`, `FACT_DONG_STORE`, `FACT_DONG_LIVING_POP`과 전용 FK·인덱스를 제거했다. C8 지도 코드 열은 추가하지 않는다. `FACT_HFS_STAT`, `FACT_HFS_WORKER_STAT`, `FACT_INDUSTRY_AGE_INCOME`, `FACT_POLICY_RATE`는 다른 기능용이므로 유지한다.
 
-기존 DB의 상권 표는 DDL 파일을 수정해도 자동으로 사라지지 않는다. 전용 삭제 SQL은 수동 적용용이며 `run_all.sql`·`run_seed_only.sql`에 자동 연결하지 않는다. 최신 초기화 묶음은 47개 표를 대상으로 하므로, 옛 상권 표를 제거하려면 전용 SQL을 별도로 실행해야 한다. 실제 Oracle 삭제 확인은 별도다.
+기존 DB의 상권 표는 DDL 파일을 수정해도 자동으로 사라지지 않는다. 전용 삭제 SQL은 수동 적용용이며 `run_all.sql`·`run_seed_only.sql`에 자동 연결하지 않는다. 최신 초기화 묶음은 48개 표를 대상으로 하므로, 옛 상권 표를 제거하려면 전용 SQL을 별도로 실행해야 한다. 실제 Oracle 삭제 확인은 별도다.
 
 ## 생성 코드와 설계 근거를 남기는 이유
 

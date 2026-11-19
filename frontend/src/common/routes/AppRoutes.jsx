@@ -30,6 +30,8 @@ import MarketPage from '../../features/market/pages/MarketPage.jsx'
 import AdminReportsPage from '../../features/admin/pages/AdminReportsPage.jsx'
 import ModelPerformancePage from '../../features/admin/pages/ModelPerformancePage.jsx'
 import LoungePage from '../../features/community/pages/LoungePage.jsx'
+import LoanProductsPage from '../../features/loans/pages/LoanProductsPage.jsx'
+import LoanProductDetailPage from '../../features/loans/pages/LoanProductDetailPage.jsx'
 
 // 앱 전체 라우트. 다른 팀은 자기 화면의 element 한 줄만 바꾼다(가드·경로 구조는 그대로 둔다).
 export default function AppRoutes() {
@@ -70,7 +72,8 @@ export default function AppRoutes() {
               <Route path={PATHS.SIMULATOR} element={<PlaceholderPage title="신용케어 시뮬레이터" nId="N-18" />} />
             </Route>
             {/* 점수 없이도 여는 화면 */}
-            <Route path={PATHS.LOANS} element={<PlaceholderPage title="대출 상품" nId="N-37" />} />
+            <Route path={PATHS.LOANS} element={<LoanProductsPage />} />
+            <Route path={PATHS.LOAN_DETAIL} element={<LoanProductDetailPage />} />
             <Route path={PATHS.COMPARISON} element={<PlaceholderPage title="비교 분석" nId="N-13·N-26" />} />
             <Route path={PATHS.LOUNGE} element={<LoungePage />} />
             <Route path={DATA_INPUT_PATHS.DATA_INPUT} element={<DataInputPage />} />

@@ -192,7 +192,41 @@ function handleCreditCareBase() {
     score,
     gradeBandCode,
     values,
+    topReductionFactors: baseReductionFactors(),
   }
+}
+
+// N-18-8 SIM-01 출발 평가의 감점 요인 상위 3개 mock — SIM-02 mock과 같은 감점 규칙을 출발 값에 적용한다.
+// 실제 서버는 저장된 요인(ASSESSMENT_FACTOR)에서 고르고 회복 점수는 저장돼 있지 않아 null이다.
+function baseReductionFactors() {
+  const rows = SIMULATION_FEATURES.map((feature) => ({
+    featureCode: feature.featureCode,
+    featureName: feature.featureName,
+    featureValue: feature.base * (feature.featureScale ?? 1),
+    penalty: penaltyOf(feature.base, feature.best, feature.pointPerUnit),
+  }))
+  const card = SIMULATION_CARD
+  const utilization = cardUtilization(card.baseLimit, card.baseSpend)
+  if (utilization !== null) {
+    rows.push({
+      featureCode: card.featureCode,
+      featureName: card.featureName,
+      featureValue: utilization,
+      penalty: penaltyOf(utilization, card.best, card.pointPerUnit),
+    })
+  }
+  return rows
+    .filter((row) => Math.round(row.penalty) < 0)
+    .sort((a, b) => a.penalty - b.penalty || a.featureName.localeCompare(b.featureName))
+    .slice(0, 3)
+    .map((row, index) => ({
+      rank: index + 1,
+      featureCode: row.featureCode,
+      featureName: row.featureName,
+      featureValue: row.featureValue,
+      shapScore: Math.round(row.penalty),
+      recoverScore: null,
+    }))
 }
 
 // N-18-7 같은 점수대 참고 금리·한도 mock — 백엔드와 같이 점수가 0~1000 밖이면 400 INVALID_INPUT(fieldErrors에 score)을 낸다.
@@ -224,7 +258,7 @@ registerMockHandlers({
   'GET /api/simulation/score-band-offer': handleScoreBandOffer,
   'GET /api/simulation/loans/recommend': handleLoanRecommend,
   'POST /api/simulation/loans/recommend': handleLoanRecommend,
-  'GET /api/simulation/credit-care/base': handleCreditCareBase,
-  'POST /api/simulation/credit-care/recalculate': handleCreditCareRecalculate,
+  'GET /api/members/me/credit-care-base': handleCreditCareBase,
+  'POST /api/members/me/credit-care-recalculate': handleCreditCareRecalculate,
 })
 

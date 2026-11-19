@@ -1,12 +1,12 @@
 package com.baeksuescape.finance.service;
 
-import com.baeksuescape.finance.dto.CashFlowConditionRequest;
-import com.baeksuescape.finance.dto.CashFlowForecastRequest;
-import com.baeksuescape.finance.dto.CashFlowForecastResponse;
-import com.baeksuescape.finance.dto.IncomeMonthRow;
-import com.baeksuescape.finance.dto.IncomeVolatilityRequest;
-import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
-import com.baeksuescape.finance.dto.MonthlyIncomeItem;
+import com.baeksuescape.finance.dto.cashflow.CashFlowConditionRequest;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastRequest;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse;
+import com.baeksuescape.finance.dto.cashflow.IncomeMonthRow;
+import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityRequest;
+import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityResponse;
+import com.baeksuescape.finance.dto.cashflow.MonthlyIncomeItem;
 import com.baeksuescape.finance.mapper.IncomeVolatilityMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,8 +19,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -225,6 +223,7 @@ class IncomeVolatilityServiceTest {
     void testForecastSavedCashFlow() {
         when(mapper.selectRecentIncomeMonths(2L)).thenReturn(freelancerRows());
         when(mapper.selectLatestTotalExpense(2L)).thenReturn(1315514L);
+        when(mapper.selectLatestFixedExpense(2L)).thenReturn(1100000L);
         when(mapper.selectLatestLoanMonthlyPayment(2L)).thenReturn(200000L);
 
         CashFlowConditionRequest condition = CashFlowConditionRequest.builder()
@@ -243,8 +242,10 @@ class IncomeVolatilityServiceTest {
         assertEquals(1889548L - 1315514L - 200000L, first.getNetCashFlow());
         assertEquals(3884117L - 1327643L, response.getPeakOffPeakGap(), "N-21-7은 N-22-4와 같은 격차여야 한다.");
 
-        // 고정지출을 따로 보내지 않았으므로 저장된 고정지출(FIXED)은 읽지 않는다.
-        verify(mapper, never()).selectLatestFixedExpense(2L);
+        // N-21-1·2 기준값(FP-170 11/19): 저장된 고정지출, 나머지 지출(합계 − 고정), 월 원리금. 고정지출을 보내지 않았으므로 전망 지출은 합계 그대로다.
+        assertEquals(1100000L, response.getBaseFixedExpenseAmount());
+        assertEquals(1315514L - 1100000L, response.getBaseOtherExpenseAmount());
+        assertEquals(200000L, response.getBaseMonthlyLoanPayment());
 
         // N-21-9 과거 월 실적: 저장된 12개월 소득 그대로, 지출은 월 지출 합계(매달 같은 값)
         assertEquals(12, response.getMonths().size());
@@ -279,6 +280,10 @@ class IncomeVolatilityServiceTest {
         assertEquals(1184486L, response.getMonthlyForecasts().get(0).getForecastExpense());
         // 과거 실적의 지출은 저장값(월 지출 합계) 그대로다.
         assertEquals(1500000L, response.getMonths().get(0).getExpenseAmount());
+        // 기준값은 화면 조건(고정지출 100만)을 적용하기 전의 저장값이다.
+        assertEquals(1315514L, response.getBaseFixedExpenseAmount());
+        assertEquals(184486L, response.getBaseOtherExpenseAmount());
+        assertEquals(200000L, response.getBaseMonthlyLoanPayment());
     }
 
     @Test
