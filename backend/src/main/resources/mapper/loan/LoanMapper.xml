@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- N-37 대출 상품 목록·상세·즐겨찾기 (LOAN_PRODUCT, LOAN_PRODUCT_WORKER_TYPE, LOAN_PRODUCT_FEATURE, LOAN_PRODUCT_FAVORITE, DDL v0.3.2) -->
+<mapper namespace="com.baeksuescape.loan.mapper.LoanMapper">
+
+    <sql id="productColumns">
+        PRODUCT_ID AS productId, PRODUCT_CODE AS productCode, PROVIDER_NAME AS providerName, PRODUCT_NAME AS productName,
+        SUMMARY AS summary, DESCRIPTION AS description, RATE_MIN_PCT AS rateMinPct, RATE_MAX_PCT AS rateMaxPct,
+        LIMIT_MAX_AMT AS limitMaxAmt, TERM_TEXT AS termText, REPAYMENT_METHOD AS repaymentMethod, MIN_ALT_SCORE AS minAltScore,
+        ELIGIBILITY_TEXT AS eligibilityText, REQUIRED_DOCUMENTS AS requiredDocuments, CAUTION_TEXT AS cautionText,
+        DUMMY_YN AS dummyYn
+    </sql>
+
+    <!-- N-37-1 전체 상품 -->
+    <select id="selectProducts" resultType="com.baeksuescape.loan.dto.LoanRows$ProductRow">
+        SELECT <include refid="productColumns"/>
+          FROM LOAN_PRODUCT
+         ORDER BY PRODUCT_ID
+    </select>
+
+    <!-- N-37-2 상품 한 개 -->
+    <select id="selectProductByCode" resultType="com.baeksuescape.loan.dto.LoanRows$ProductRow">
+        SELECT <include refid="productColumns"/>
+          FROM LOAN_PRODUCT
+         WHERE PRODUCT_CODE = #{productCode}
+    </select>
+
+    <select id="selectWorkerTypes" resultType="com.baeksuescape.loan.dto.LoanRows$WorkerTypeRow">
+        SELECT PRODUCT_ID AS productId, WORKER_TYPE_CODE AS workerTypeCode
+          FROM LOAN_PRODUCT_WORKER_TYPE
+         ORDER BY PRODUCT_ID, WORKER_TYPE_CODE
+    </select>
+
+    <select id="selectFeatures" resultType="com.baeksuescape.loan.dto.LoanRows$FeatureRow">
+        SELECT PRODUCT_ID AS productId, FEATURE_TEXT AS featureText
+          FROM LOAN_PRODUCT_FEATURE
+         ORDER BY PRODUCT_ID, DISPLAY_ORDER
+    </select>
+
+    <select id="selectProductIdByCode" resultType="long">
+        SELECT PRODUCT_ID FROM LOAN_PRODUCT WHERE PRODUCT_CODE = #{productCode}
+    </select>
+
+    <!-- 내 즐겨찾기 상품 코드, 최근에 담은 순 -->
+    <select id="selectFavoriteCodes" resultType="string">
+        SELECT P.PRODUCT_CODE
+          FROM LOAN_PRODUCT_FAVORITE F
+          JOIN LOAN_PRODUCT P ON P.PRODUCT_ID = F.PRODUCT_ID
+         WHERE F.USER_ID = #{userId}
+         ORDER BY F.CREATED_AT DESC, P.PRODUCT_ID
+    </select>
+
+    <!-- 이미 담았으면 넣지 않는다(0행). 시각은 서버 Clock 값 -->
+    <insert id="insertFavorite">
+        INSERT INTO LOAN_PRODUCT_FAVORITE (USER_ID, PRODUCT_ID, CREATED_AT)
+        SELECT #{userId}, #{productId}, #{now} FROM DUAL
+         WHERE NOT EXISTS (SELECT 1 FROM LOAN_PRODUCT_FAVORITE WHERE USER_ID = #{userId} AND PRODUCT_ID = #{productId})
+    </insert>
+
+    <delete id="deleteFavorite">
+        DELETE FROM LOAN_PRODUCT_FAVORITE WHERE USER_ID = #{userId} AND PRODUCT_ID = #{productId}
+    </delete>
+</mapper>

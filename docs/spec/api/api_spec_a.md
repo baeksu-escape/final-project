@@ -3,7 +3,8 @@
 > A팀(우찬·경환) API의 요청·응답 상세다. 관리: A팀. 작성 규칙은 [README](README.md) 3장, 전체 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > - **원본:** 우찬 님 「A팀 API 명세 — 반영 요청(11/16)」. develop `bfe6b94`(PR #50·#52·#53 병합 후)의 실제 Spring Controller·DTO에서 뽑은 내용이다. 🆕 11/18 이 파일로 옮겼다(그 전에는 정의서에 요약만 있었다). 그 뒤 코드가 바뀌면 A팀이 이 파일을 고친다.
-> - 🆕 최근 변경 (11/18, FP-219): AUTH-06 가입 요청에 휴대폰 인증 토큰 추가·이름·닉네임 규칙, 닉네임 중복 확인·휴대폰 인증번호 발송·확인 API(AUTH-13~15) 추가
+> - 🆕 최근 변경 (11/19, FP-90): 7장 대출 상품 LOAN-01~05 추가(경환), 5장 오류 code에 `PRODUCT_NOT_FOUND`
+> - 이전 변경 (11/18, FP-219): AUTH-06 가입 요청에 휴대폰 인증 토큰 추가·이름·닉네임 규칙, 닉네임 중복 확인·휴대폰 인증번호 발송·확인 API(AUTH-13~15) 추가
 > - 11/18 확인: 아래 경로는 모두 develop `5ff443c` 코드에 있다.
 > - AUTH-13~15와 AUTH-06 변경은 FP-219(PR #89, 11/19 develop 병합) 코드 기준. ID는 API 정의서 2-1에서 확정 🆕 11/19
 > - 상태 표시: ✅ 구현·develop 병합 · 🟡 새로 만든 경로(원래 명세에 없던 것) · ↗ 다른 팀 담당(그 팀 명세서를 본다)
@@ -158,6 +159,7 @@
 | 403 | `RECENT_LOGIN_REQUIRED` | 간편 로그인 전용 계정 탈퇴 10분 초과 |
 | 403 | `SOCIAL_ADMIN_NOT_ALLOWED` | 관리자 계정 간편 로그인 연결 |
 | 404 | `NOT_FOUND`, `ACCOUNT_NOT_FOUND` | 대상 없음 |
+| 404 | `PRODUCT_NOT_FOUND` | 없는 대출 상품 코드 (LOAN-02·04·05) 🆕 11/19 |
 | 409 | `DUPLICATE_LOGIN_ID`, `DUPLICATE_EMAIL`, `DUPLICATE_NICKNAME`, `NICKNAME_UNAVAILABLE` | 중복 |
 | 409 | `JOB_TYPE_REQUIRED`, `JOB_TYPE_ALREADY_SELECTED` | 직군 선택 전 저장 / 직군 재선택 |
 | 409 | `CONSENT_REQUIRED` | 동의 없이 불러오기 |
@@ -173,3 +175,121 @@
 - 관리자 2단계 인증의 이메일 외 수단(TOTP 등), 1회용 토큰 저장소(DB·Redis), `VERIFICATION_CODE.PURPOSE_CODE`에 `ADMIN_STEP_UP` 추가(DDL 제안)
 - 자산 4칸 개별 저장(DDL 열 필요), 금융(대출) 불러오기, 간편 로그인 재인증 화면
 - N-19 지난달 대비 알림(D-25로 1차 제외), N-01-5 시연 계정 [채우기](UI 초안용이라 제외)
+
+## 7. 대출 상품 (LOAN) — N-37 🆕 11/19
+
+> 담당: 경환(FP-90, PR #101). 코드: `backend/.../loan/`, `resources/mapper/loan/LoanMapper.xml`. 계약 테스트: `LoanApiContractTest`. 정의서 2-7의 LOAN-01~05와 같은 ID다.
+
+| ID | 메서드 · 경로 | 요청 | 응답 | 인증 | 상태 |
+|---|---|---|---|---|---|
+| LOAN-01 | `GET /api/loan-products` | — | `{ items: [상품] }` | 로그인 | ✅ (FP-90, PR #101) |
+| LOAN-02 | `GET /api/loan-products/{productCode}` | 경로 `productCode` | 상품 1개 | 로그인 | ✅ (FP-90, PR #101) |
+| LOAN-03 | `GET /api/members/me/favorite-loan-products` | — | `{ items: [productCode] }` | USER | ✅ (FP-90, PR #101) |
+| LOAN-04 | `PUT /api/members/me/favorite-loan-products/{productCode}` | 경로 `productCode` | `{}` | USER | ✅ (FP-90, PR #101) |
+| LOAN-05 | `DELETE /api/members/me/favorite-loan-products/{productCode}` | 경로 `productCode` | `{}` | USER | ✅ (FP-90, PR #101) |
+
+### 7-1. LOAN-01 대출 상품 목록 · N-37-1
+
+- `GET /api/loan-products`, 요청 값 없음. 인증: 로그인(`/api/**` 규칙). 응답은 `items` 배열이고 한 칸의 모양은 아래 "상품 필드"와 같다. 상품이 없으면 `items: []`.
+- 시드 17종 전부를 `PRODUCT_ID` 순으로 준다. 필터(전체·지금 점수로 가능·내 직군·즐겨찾기)와 정렬은 화면이 한다.
+
+**상품 필드** (LOAN-01 `items[]`, LOAN-02 응답 공통)
+
+| 필드 | 형식 | 설명 | N-ID |
+|---|---|---|---|
+| `productId` | number | 상품 번호(`LOAN_PRODUCT.PRODUCT_ID`) | N-37-1 |
+| `productCode` | string | 상품 코드(예: `LP001`). 상세·즐겨찾기 경로에 쓴다 | N-37-1 |
+| `name` | string | 상품명 | N-37-1 |
+| `providerName` | string | 사업자명(가상 기관) | N-37-1 |
+| `summary` | string | 한 줄 설명 | N-37-1 |
+| `description` | string | 상품 설명(줄바꿈 `\n` 포함) | N-37-2 |
+| `eligibility` | string | 대상 설명(`ELIGIBILITY_TEXT`) | N-37-1 |
+| `rateMinPct`, `rateMaxPct` | number | 연 금리 범위(%) | N-37-1 |
+| `limitAmount` | number | 최대 한도(원) | N-37-1 |
+| `minScore` | number \| null | 신청 가능 최소 대안 점수. `null`이면 점수 조건 없음 | N-37-1 |
+| `workerTypeCodes` | string[] | 대상 직군 코드(`EMPLOYEE`·`FREELANCER`·`SELF_EMPLOYED` 중, 코드순). 직군 행이 없는 상품은 3개 모두 | N-37-1 |
+| `termText` | string \| null | 대출 기간 문구 | N-37-2 |
+| `repaymentMethod` | string \| null | 상환 방식 | N-37-2 |
+| `requiredDocuments` | string[] | 필요 서류. DB의 '·' 구분 문자열을 나눈 배열, 없으면 `[]` | N-37-2 |
+| `features` | string[] | 신청 조건과 특징(표시 순서), 없으면 `[]` | N-37-2 |
+| `cautionText` | string \| null | 유의 사항 | N-37-2 |
+| `dummyYn` | boolean | 더미 상품 표시. DB `DUMMY_YN`이 `N`이 아니면 `true` | N-37 |
+
+**응답 예시** (합성 시드 값)
+
+```json
+{
+  "items": [
+    {
+      "productId": 1,
+      "productCode": "LP001",
+      "name": "든든 일반 신용대출",
+      "providerName": "가상은행 A",
+      "summary": "직군에 관계없이 쓸 수 있는 시연용 신용대출입니다.",
+      "description": "급여소득자·자영업자·프리랜서가 함께 비교해 볼 수 있는 일반 신용대출 예시입니다.\n직군을 가리지 않는 기본형이라 처음 대출 조건을 가늠해 볼 때 기준으로 삼기 좋습니다.",
+      "eligibility": "모든 직군 대상(시연용)",
+      "rateMinPct": 4.51,
+      "rateMaxPct": 9.76,
+      "limitAmount": 95000000,
+      "minScore": 780,
+      "workerTypeCodes": ["EMPLOYEE", "FREELANCER", "SELF_EMPLOYED"],
+      "termText": "12~60개월(시연)",
+      "repaymentMethod": "원리금균등",
+      "requiredDocuments": ["신분증 사본", "소득 증빙"],
+      "features": ["직군 구분 없이 신청 가능", "시연용 가상 상품"],
+      "cautionText": "더미 상품 · 실제 상품 아님",
+      "dummyYn": true
+    }
+  ]
+}
+```
+
+| HTTP | code | 언제 |
+|---|---|---|
+| 401 | `UNAUTHORIZED` | 토큰 없음·만료 |
+
+### 7-2. LOAN-02 대출 상품 상세 · N-37-2
+
+- `GET /api/loan-products/{productCode}`. 인증: 로그인. 응답은 위 "상품 필드" 객체 하나(`items`로 감싸지 않는다).
+- 응답 예시: 7-1의 `items[0]` 객체.
+
+| HTTP | code | 언제 |
+|---|---|---|
+| 401 | `UNAUTHORIZED` | 토큰 없음·만료 |
+| 404 | `PRODUCT_NOT_FOUND` | 없는 상품 코드 |
+
+### 7-3. LOAN-03 내 즐겨찾기 목록 · N-37-3, N-04-5
+
+- `GET /api/members/me/favorite-loan-products`. 인증: USER(`/api/members/me/**`). 대상은 토큰의 회원이다.
+
+| 필드 | 형식 | 설명 | N-ID |
+|---|---|---|---|
+| `items` | string[] | 즐겨찾기한 상품 코드, 최근에 담은 순. 없으면 `[]` | N-04-5 |
+
+```json
+{ "items": ["LP003", "LP001"] }
+```
+
+| HTTP | code | 언제 |
+|---|---|---|
+| 401 | `UNAUTHORIZED` | 토큰 없음·만료 |
+| 403 | `FORBIDDEN` | USER가 아닌 역할(관리자 토큰) |
+
+### 7-4. LOAN-04·05 즐겨찾기 추가·해제 · N-37-3
+
+- `PUT /api/members/me/favorite-loan-products/{productCode}`(추가), `DELETE …/{productCode}`(해제). 요청 본문 없음. 인증: USER. 응답은 둘 다 200 `{}`.
+- 멱등이다. 이미 담았는데 PUT을 해도, 담지 않았는데 DELETE를 해도 200이다. 동시에 두 번 눌러 같은 줄이 겹쳐도 성공으로 본다.
+
+| HTTP | code | 언제 |
+|---|---|---|
+| 401 | `UNAUTHORIZED` | 토큰 없음·만료 |
+| 403 | `FORBIDDEN` | USER가 아닌 역할(관리자 토큰) |
+| 404 | `PRODUCT_NOT_FOUND` | 없는 상품 코드 |
+
+### 7-5. 참고
+
+- 상품은 모두 더미 데이터이며 금리·한도는 "같은 점수대의 참고 정보"다(`dummyYn`). 점수 조건 충족은 실제 대출 가능 여부가 아니다.
+- LOAN-01·02는 내 점수·즐겨찾기 여부를 넣지 않는다. 정의서 1장 "본인 자료는 `/api/members/me/**`" 원칙에 따라 화면이 신용 리포트(점수)와 LOAN-03(즐겨찾기)을 따로 불러 합친다. 점수 조건은 화면이 `minScore`와 비교한다(`null`이면 조건 없음).
+- LOAN-01·02는 `/api/**` "로그인 필요" 규칙만 받는다. 관리자 토큰으로도 조회되며 문제가 없다고 보고 막지 않았다. LOAN-03~05는 `/api/members/me/**`라 USER만 된다.
+- SIM-03(`/api/simulation/loans/recommend`)은 만들지 않았다. 시뮬레이터의 상품 추천은 SIM-04(점수대 금리·한도, C조 담당 — API 정의서 2-6)와 LOAN-01을 화면에서 합쳐 대신한다.
+- 새 오류 code는 `PRODUCT_NOT_FOUND` 하나다(5장).
