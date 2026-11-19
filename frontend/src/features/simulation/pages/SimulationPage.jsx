@@ -28,6 +28,9 @@ export default function SimulationPage() {
   // N-18-7 추천과 카드의 충족 표시는 같은 점수(계산 전에는 현재 점수, 계산 후에는 예상 점수)를 쓴다.
   const shownScore = sim.result?.changed.score ?? sim.currentScore
   const recommendations = selectRecommendations(products.items, shownScore, user?.jobType, matchesLoanScore)
+  // 저장된 값이 없는 금액 칸은 비활성이다. 카드 한도·월 사용액은 둘 다 있어야 바꿀 수 있다(서버 규칙).
+  const moneyDisabled = (key) => sim.baseline?.[key] == null
+    || ((key === 'cardLimitAmount' || key === 'cardMonthlyUsage') && (sim.baseline.cardLimitAmount == null || sim.baseline.cardMonthlyUsage == null))
   const usageRatio = Number.isInteger(values.cardLimitAmount) && values.cardLimitAmount > 0 && Number.isInteger(values.cardMonthlyUsage)
     ? `${Math.round(values.cardMonthlyUsage / values.cardLimitAmount * 100)}%` : '—'
 
@@ -63,20 +66,25 @@ export default function SimulationPage() {
             {SLIDER_FIELDS.map((field) => (
               <div key={field.key} id={`sim-field-${field.key}`} className={fieldClass(field.key)}>
                 {/* 슬라이더와 숫자 칸이 같은 값을 함께 바꾼다. 미입력(null)이나 범위 밖 값이면 슬라이더는 숨겨 0으로 보이지 않게 한다. */}
-                {inSliderRange(values[field.key], field)
-                  ? <Slider label={field.label} min={field.min} max={field.max} unit={field.unit}
-                    value={values[field.key]} onChange={(v) => sim.setValue(field.key, v)} />
-                  : <p className="sim-hint">{field.label}: {values[field.key] === null || values[field.key] === undefined ? '미입력 · 아래 칸에 직접 입력해 주세요.' : '범위 밖 값입니다.'}</p>}
+                {/* 저장된 값이 없는 항목은 비활성이다. 슬라이더 범위를 넘는 실제 값은 끝값에 두고 실제 값을 함께 보여 준다. */}
+                {sim.baseline?.[field.key] == null
+                  ? <p className="sim-hint">{field.label}: 값 없음 · 저장된 값이 없어 이 항목은 바꿀 수 없습니다.</p>
+                  : Number.isInteger(values[field.key]) && values[field.key] >= 0
+                    ? <Slider label={field.label} min={field.min} max={field.max} unit={field.unit}
+                      value={Math.min(field.max, values[field.key])} onChange={(v) => sim.setValue(field.key, v)}
+                      formatValue={inSliderRange(values[field.key], field) ? undefined : () => `실제 값 ${values[field.key]}${field.unit}`} />
+                    : <p className="sim-hint">{field.label}: {values[field.key] == null ? '미입력 · 아래 칸에 직접 입력해 주세요.' : '범위 밖 값입니다.'}</p>}
                 <NumberInput label={`${field.label} 직접 입력`} min={field.min} max={field.max} step={1} unit={field.unit}
-                  value={values[field.key] ?? null} onChange={(v) => sim.setValue(field.key, v)} />
-                <span className="sim-hint">{field.min}{field.unit} ~ {field.max}{field.unit} · 지금 {sim.baseline?.[field.key] ?? '미입력'}{sim.baseline?.[field.key] === null ? '' : field.unit}</span>
+                  value={values[field.key] ?? null} onChange={(v) => sim.setValue(field.key, v)} disabled={sim.baseline?.[field.key] == null} />
+                <span className="sim-hint">{field.min}{field.unit} ~ {field.max}{field.unit} · 지금 {sim.baseline?.[field.key] ?? '값 없음'}{sim.baseline?.[field.key] == null ? '' : field.unit}{sim.baseline?.[field.key] > field.max ? ` (슬라이더 범위 밖 · 실제 값 ${sim.baseline[field.key]}${field.unit})` : ''}</span>
               </div>
             ))}
           </div>
           <div className="sim-money-grid">
             {MONEY_FIELDS.map((field) => (
               <div key={field.key} id={`sim-field-${field.key}`} className={fieldClass(field.key)}>
-                <MoneyInput label={field.label} value={values[field.key]} onChange={(v) => sim.setValue(field.key, v)} placeholder="미입력" />
+                <MoneyInput label={field.label} value={values[field.key]} onChange={(v) => sim.setValue(field.key, v)}
+                  disabled={moneyDisabled(field.key)} placeholder={moneyDisabled(field.key) ? '값 없음' : '미입력'} />
               </div>
             ))}
           </div>

@@ -29,14 +29,14 @@ export function adaptCashFlowData(raw) {
   // TODO(광희 요청 11/19): 소득이 12개월보다 적은 회원(자영업자·프리랜서)의 months가 짧을 때 화면이 예측을 어떻게 처리할지 정해 달라고 요청(임의 0 채우기 금지).
   if (raw && Array.isArray(raw.months) && raw.months.length < 12) throw new Error('저장된 소득이 12개월보다 적어 현금흐름을 예측할 수 없습니다.')
   if (!raw || !Array.isArray(raw.months) || raw.months.length !== 12
-    || !['fixedExpenseAmount','otherExpenseAmount','monthlyPaymentAmount','currentScore'].every((key) => Object.hasOwn(raw, key))) throw new Error('현금흐름 기준 자료는 12개월이 필요합니다.')
+    || !['fixedExpenseAmount','otherExpenseAmount','monthlyPaymentAmount'].every((key) => Object.hasOwn(raw, key))) throw new Error('현금흐름 기준 자료는 12개월이 필요합니다.')
   const months = raw.months.map((month) => {
     if (!month || !Object.hasOwn(month, 'incomeAmount') || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month.baseMonth) || !validAmount(month.incomeAmount)) throw new Error('월별 현금흐름 값이 올바르지 않습니다.')
     return { baseMonth: month.baseMonth, incomeAmount: month.incomeAmount ?? null }
   })
   for (let i=1;i<months.length;i++) if (nextMonth(months[i-1].baseMonth) !== months[i].baseMonth) throw new Error('현금흐름 기준 월이 연속되지 않습니다.')
   for (const key of ['fixedExpenseAmount','otherExpenseAmount','monthlyPaymentAmount']) if (!validAmount(raw[key])) throw new Error(`${key} 금액이 올바르지 않습니다.`)
-  if (raw.currentScore !== null && (!Number.isInteger(raw.currentScore) || raw.currentScore < 0 || raw.currentScore > 1000)) throw new Error('currentScore가 올바르지 않습니다.')
+  if (raw.currentScore != null && (!Number.isInteger(raw.currentScore) || raw.currentScore < 0 || raw.currentScore > 1000)) throw new Error('currentScore가 올바르지 않습니다.')
   return { months, fixedExpenseAmount: raw.fixedExpenseAmount ?? null, otherExpenseAmount: raw.otherExpenseAmount ?? null,
     monthlyPaymentAmount: raw.monthlyPaymentAmount ?? null, currentScore: raw.currentScore ?? null,
     assumptions: Array.isArray(raw.assumptions) && raw.assumptions.every((value) => typeof value === 'string') ? raw.assumptions : [] }
@@ -55,6 +55,26 @@ export function adaptCashFlowForecast(raw) {
   return { forecastMonths, monthlyExpenseAmount: first.forecastExpense + first.forecastLoanPayment,
     cumulativeSurplusAmount: raw.totalAccumulatedSurplus,
     tightestMonth: { baseMonth: raw.worstForecastMonth, netAmount: raw.worstNetCashFlow }, source: 'diag-08-1' }
+}
+
+// N-21-8 DIAG-09 응답을 화면 값으로 바꾼다. 점수선은 서버가 끝 점수 1개만 주므로 현재→예상 두 점만 잇고 달마다 점수를 만들지 않는다.
+// 안내 문구: 납부 상태가 점수에 반영되지 않았을 때, 점수를 낸 모델이 바뀌었을 때. 점수 차이를 원인처럼 쓰지 않는다.
+export function adaptExpectedScore(raw) {
+  const isScore = (value) => Number.isInteger(value) && value >= 0 && value <= 1000
+  if (!raw || !isScore(raw.currentScore) || !isScore(raw.expectedScore) || typeof raw.paymentStatusApplied !== 'boolean') throw new Error('예상 점수 응답 형식이 올바르지 않습니다.')
+  const notices = []
+  if (raw.paymentStatusApplied === false) notices.push('납부 상태는 아직 예상 점수에 반영되지 않습니다.')
+  if (raw.modelVersion !== raw.baseModelVersion) notices.push('모델이 바뀌어 점수 차이가 클 수 있습니다.')
+  return { currentScore: raw.currentScore, endScore: raw.expectedScore, scorePath: [{ score: raw.expectedScore }], scoreNotices: notices, scoreError: '' }
+}
+
+// N-21-8 DIAG-09 실패 코드를 점수 영역에만 보여 줄 안내 문구로 바꾼다(전망 결과는 그대로 둔다).
+export function describeExpectedScoreError(error) {
+  const code = error?.data?.code
+  if (error?.status === 404 && code === 'ASSESSMENT_NOT_FOUND') return '저장된 대안 점수가 없어 예상 점수를 계산할 수 없습니다.'
+  if (error?.status === 409 && code === 'INPUT_INCOMPLETE') return error.data?.message ?? '저장된 입력이 부족해 예상 점수를 계산할 수 없습니다.'
+  if (error?.status === 503) return '점수 계산 서버가 준비 중입니다. 잠시 후 다시 시도해 주세요.'
+  return error?.message ?? '예상 점수를 계산하지 못했습니다.'
 }
 
 export function validateForecastConditions(conditions) {

@@ -67,7 +67,7 @@ export function useSimulation(userId) {
   // N-18-2·N-18-3·N-18-9 입력이 바뀔 때마다 이전 예약·응답을 취소하고, 유효하면 0.5초 뒤 최신 값으로 계산을 예약한다.
   const change = (nextValues) => {
     cancelPending()
-    const message = base.currentScore === null ? '현재 대안 점수가 없어 계산할 수 없습니다.' : validateInputs(nextValues)
+    const message = base.currentScore === null ? '현재 대안 점수가 없어 계산할 수 없습니다.' : validateInputs(nextValues, base.baseline)
     if (message) {
       setForm({ ...current, values: nextValues, status: 'invalid', calcError: message })
       return
@@ -107,7 +107,7 @@ export function useSimulation(userId) {
     error: base.error,
     currentScore: base.currentScore,
     baseline: base.baseline,
-    deductions: base.deductions,
+    deductions: current.result?.deductions ?? base.deductions,
     values: current.values,
     applied: current.applied,
     result: current.result,

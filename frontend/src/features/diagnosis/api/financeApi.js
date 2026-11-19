@@ -1,8 +1,8 @@
 import { USE_MOCK } from '../../../common/config/env.js'
-import { adaptAssetDebtData, adaptCashFlowData, adaptCashFlowForecast, validateForecastConditions } from '../adapters/financeAdapter.js'
-import { calculateFinancialHealth, getCashFlowForecast } from './diagnosisApi.js'
+import { adaptAssetDebtData, adaptCashFlowData, adaptCashFlowForecast, adaptExpectedScore, describeExpectedScoreError, validateForecastConditions } from '../adapters/financeAdapter.js'
+import { calculateFinancialHealth, getCashFlowForecast, getExpectedScore } from './diagnosisApi.js'
 import { createFinanceMockData } from '../mocks/financeMockData.js'
-import { forecastCashFlowMock, previewAssetDebtMock } from '../mocks/financeMockCalculations.js'
+import { previewAssetDebtMock } from '../mocks/financeMockCalculations.js'
 
 // N-16-1 회원별 화면 호출 범위를 확인하고 시연 기준값을 반환한다. 실제 API 경로는 정하지 않는다.
 // TODO(광희 요청: DIAG-03-1): 저장된 총자산·연소득·총부채·대출 목록·직군 평균 조회 API가 🟡 미정이라 브라우저 mock 기준값을 유지한다.
@@ -14,7 +14,7 @@ export async function getAssetDebtData(userId, workerTypeCode) {
 }
 
 // N-21-1 DIAG-08-1 응답의 월별 실적(months)을 기준 자료로 쓴다.
-// 서버에 없는 값(고정·기타 지출 분리, 월 상환액 기준값, 현재 점수)은 한곳(mockOnlyCashFields)에서 브라우저 mock으로 채운다.
+// 서버에 없는 값(고정·기타 지출 분리, 월 상환액 기준값)은 한곳(mockOnlyCashFields)에서 브라우저 mock으로 채운다.
 export async function getCashFlowData(userId, workerTypeCode) {
   requireUser(userId)
   const server = await getCashFlowForecast({ forecastMonths: 3 })
@@ -23,10 +23,9 @@ export async function getCashFlowData(userId, workerTypeCode) {
 
 // N-21 서버가 아직 주지 않는 현금흐름 기준값을 브라우저 mock에서 가져온다(실제 회원 자료가 아님).
 // TODO(광희 요청 11/19): DIAG-08-1 응답에 기준 고정지출·기타지출 분리값(fixedExpenseAmount, otherExpenseAmount)과 월 상환액 기준값(monthlyPaymentAmount)을 추가해 달라고 요청.
-// TODO(광희 요청 11/19): 현재 점수(currentScore)와 월별 예상 점수 경로(scorePath, endScore)는 DIAG-09(🟡) 확정 뒤 서버 값으로 교체.
 function mockOnlyCashFields(workerTypeCode) {
-  const { fixedExpenseAmount, otherExpenseAmount, monthlyPaymentAmount, currentScore, assumptions } = createFinanceMockData(workerTypeCode).cash
-  return { fixedExpenseAmount, otherExpenseAmount, monthlyPaymentAmount, currentScore, assumptions }
+  const { fixedExpenseAmount, otherExpenseAmount, monthlyPaymentAmount, assumptions } = createFinanceMockData(workerTypeCode).cash
+  return { fixedExpenseAmount, otherExpenseAmount, monthlyPaymentAmount, assumptions }
 }
 
 // N-16-3 화면의 세 입력을 검증하고, 시연 상환 추정(연 원리금)을 만든 뒤 비율·단계는 DIAG-03(재무 건전성 계산 API)으로 구한다.
@@ -61,20 +60,33 @@ function adaptFinancialHealth(server, local) {
   return { ...local, totalNetAssetAmount: server.netAsset, ratios, overallRisk }
 }
 
-// N-21-4·N-21-5 조건을 검증한 뒤 DIAG-08-1(GET /api/diagnosis/cash-flow/forecast)로 전망을 조회한다.
-// 예상 점수 필드(scorePath·currentScore·endScore)만 서버에 없어 브라우저 mock 값을 붙인다(DIAG-09 대기, TODO는 mockOnlyCashFields 참고).
+// N-21-4·N-21-5·N-21-8 조건을 검증한 뒤 DIAG-08-1로 전망을, DIAG-09로 예상 점수를 같은 조건(소득 변동 폭·월 고정 지출·납부 상태)으로 함께 조회한다.
+// 예상 점수가 실패해도 전망은 그대로 돌려주고, 점수 영역에는 scoreError 안내만 남긴다(전망과 점수 분리).
 export async function forecastCashFlow({ userId, baseline, conditions }) {
   requireUser(userId)
   requireExactKeys(conditions, ['incomeVariationPct', 'fixedExpenseAmount', 'paymentStatus', 'months'])
   const error = validateForecastConditions(conditions)
   if (error) throw new Error(error)
-  const data = adaptCashFlowData(baseline)
-  const server = await getCashFlowForecast({
-    forecastMonths: conditions.months, incomeVariationPct: conditions.incomeVariationPct,
-    fixedExpenseAmount: conditions.fixedExpenseAmount, paymentStatus: conditions.paymentStatus,
-  })
-  const { scorePath, currentScore, endScore } = forecastCashFlowMock(data, { ...conditions })
-  return { ...adaptCashFlowForecast(server), scorePath, currentScore, endScore }
+  adaptCashFlowData(baseline) // 기준 자료 형식 검사(틀리면 오류)
+  const shared = { incomeVariationPct: conditions.incomeVariationPct, fixedExpenseAmount: conditions.fixedExpenseAmount, paymentStatus: conditions.paymentStatus }
+  const [forecast, score] = await Promise.allSettled([
+    getCashFlowForecast({ forecastMonths: conditions.months, ...shared }),
+    getExpectedScore(shared),
+  ])
+  if (forecast.status === 'rejected') throw forecast.reason
+  const scoreResult = score.status === 'fulfilled'
+    ? adaptExpectedScoreSafely(score.value)
+    : { currentScore: null, endScore: null, scorePath: [], scoreNotices: [], scoreError: describeExpectedScoreError(score.reason) }
+  return { ...adaptCashFlowForecast(forecast.value), ...scoreResult }
+}
+
+// N-21-8 예상 점수 응답 형식이 틀려도 전망은 살리고 점수 영역에만 오류 안내를 남긴다.
+function adaptExpectedScoreSafely(raw) {
+  try {
+    return adaptExpectedScore(raw)
+  } catch (error) {
+    return { currentScore: null, endScore: null, scorePath: [], scoreNotices: [], scoreError: error.message }
+  }
 }
 
 // N-21 로그인 회원 식별값이 없으면 호출하지 않는다.
