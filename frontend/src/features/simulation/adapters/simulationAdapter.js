@@ -73,7 +73,7 @@ export function adaptSimulationInputs(raw) {
 }
 
 // N-18-1·10 SIM-01 응답(values: ML-04 키 10개, 없으면 null)을 화면 입력 모양으로 바꾼다. null은 0으로 채우지 않고 그대로 둔다.
-// SIM-01에는 감점 요인이 없어 deductions는 빈 목록이다(감점 요인은 SIM-02 재계산 응답의 topReductionFactors에 있다).
+// SIM-01 응답에 topReductionFactors가 있으면 첫 화면 감점 카드에 쓰고, 없으면 null(재계산 전 안내)이다.
 export function fromCreditCareBase(raw) {
   if (!raw || typeof raw !== 'object' || !raw.values || typeof raw.values !== 'object') throw malformed('응답 본문')
   const inputs = Object.fromEntries(INPUT_KEYS.map((key) => [key, raw.values[API_CHANGE_KEYS[key]] ?? null]))
@@ -81,13 +81,13 @@ export function fromCreditCareBase(raw) {
 }
 
 // N-18-8 서버의 topReductionFactors(rank, featureCode, featureName, featureValue, shapScore, recoverScore)를 감점 카드 모양으로 바꾼다.
-// 필드가 없으면(null) 무시한다. shapScore는 모델 계산상 점수를 낮추는 쪽으로 계산된 크기이며 원인을 뜻하지 않는다.
+// 필드가 없으면(null) 무시한다. 이름이 없으면 코드로 대신 보여 준다(SIM-01·02 공통). shapScore는 모델 계산상 점수를 낮추는 쪽으로 계산된 크기이며 원인을 뜻하지 않는다.
 export function adaptReductionFactors(list) {
   if (list == null) return null
   if (!Array.isArray(list)) throw malformed('topReductionFactors')
   return [...list].sort((a, b) => a.rank - b.rank).slice(0, 3).map((item) => {
-    if (!item?.featureCode || !item.featureName || !Number.isFinite(item.shapScore)) throw malformed('topReductionFactors')
-    return { featureCode: item.featureCode, label: item.featureName, shapScore: item.shapScore, featureValue: item.featureValue ?? null,
+    if (!item?.featureCode || !Number.isFinite(item.shapScore)) throw malformed('topReductionFactors')
+    return { featureCode: item.featureCode, label: typeof item.featureName === 'string' && item.featureName.trim() ? item.featureName : item.featureCode, shapScore: item.shapScore, featureValue: item.featureValue ?? null,
       recoverScore: Number.isFinite(item.recoverScore) ? item.recoverScore : null, editable: false }
   })
 }
