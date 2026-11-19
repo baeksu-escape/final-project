@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.List;
 
@@ -41,6 +42,18 @@ public class CashFlowForecastResponse {
      * 저장 데이터 조회는 소득 기준월까지 최대 12개월이고, 급여소득자는 월급을 12개월로 펼친 값이다.
      */
     private List<PastMonthItem> months;
+
+    /**
+     * N-21-1·N-21-2 저장 데이터 조회(DIAG-08-1)에서 읽은 기준값 (원). 화면 조건(고정지출 슬라이더 등)의 처음 값으로 쓴다.
+     * 기타 지출 = 월 지출 합계 − 고정지출이고, 지출에는 대출 원리금이 들어 있지 않다(원리금은 baseMonthlyLoanPayment).
+     * 요청 본문으로 계산하는 DIAG-08(POST)은 저장값이 없어 null이다.
+     */
+    @Setter
+    private Long baseFixedExpenseAmount;
+    @Setter
+    private Long baseOtherExpenseAmount;
+    @Setter
+    private Long baseMonthlyLoanPayment;
 
     @Getter
     @Builder

@@ -106,12 +106,12 @@ public class IncomeVolatilityService {
         // 2) DB에서 기준값을 읽는다: 월 지출 합계(모든 지출 그룹), 월 원리금 합계, 최근 12개월 소득
         long monthlyTotalExpense = incomeVolatilityMapper.selectLatestTotalExpense(userId);
         long monthlyLoanPayment = incomeVolatilityMapper.selectLatestLoanMonthlyPayment(userId);
+        long storedFixedExpense = incomeVolatilityMapper.selectLatestFixedExpense(userId);
         List<MonthlyIncomeItem> history = loadIncomeHistory(userId, monthlyTotalExpense);
 
         // N-21-2 고정지출을 직접 입력하면 저장된 고정지출(FIXED) 자리만 그 값으로 바꾼다. 과거 실적(months)의 지출은 저장값 그대로다.
         long forecastBaseExpense = monthlyTotalExpense;
         if (cond.getFixedExpenseAmount() != null) {
-            long storedFixedExpense = incomeVolatilityMapper.selectLatestFixedExpense(userId);
             forecastBaseExpense = cond.getFixedExpenseAmount() + (monthlyTotalExpense - storedFixedExpense);
         }
 
@@ -121,7 +121,7 @@ public class IncomeVolatilityService {
                 .average()
                 .orElse(0));
 
-        return IncomeVolatilityCalculator.forecastCashFlow(
+        CashFlowForecastResponse response = IncomeVolatilityCalculator.forecastCashFlow(
                 history,
                 baseMonthlyIncome,
                 forecastBaseExpense,
@@ -133,6 +133,11 @@ public class IncomeVolatilityService {
                 nextMonthAfter(history),
                 cond.getIncomeVariationPct()
         );
+        // N-21-1·2 화면 조건의 처음 값: 저장된 고정지출, 나머지 지출(할부·정기결제·기타), 월 원리금 (조건을 적용하기 전 값)
+        response.setBaseFixedExpenseAmount(storedFixedExpense);
+        response.setBaseOtherExpenseAmount(monthlyTotalExpense - storedFixedExpense);
+        response.setBaseMonthlyLoanPayment(monthlyLoanPayment);
+        return response;
     }
 
     /**

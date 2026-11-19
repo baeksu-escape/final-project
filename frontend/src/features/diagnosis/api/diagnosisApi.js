@@ -7,9 +7,10 @@ export const DIAGNOSIS_API = Object.freeze({
   CALCULATE_DSR: '/api/diagnosis/dsr/calculate',
   RECALCULATE_SCENARIO: '/api/diagnosis/scenario/recalculate',
   CALCULATE_FINANCIAL_HEALTH: '/api/diagnosis/financial-health/calculate',
-  INCOME_VOLATILITY: '/api/diagnosis/income-volatility',
-  CASH_FLOW_FORECAST: '/api/diagnosis/cash-flow/forecast',
-  EXPECTED_SCORE: '/api/diagnosis/cash-flow/expected-score',
+  // 로그인 회원의 저장 데이터로 계산하는 API는 팀 공통 규칙대로 /api/members/me 아래에 있다(FP-170 11/19 이동).
+  INCOME_VOLATILITY: '/api/members/me/income-volatility',
+  CASH_FLOW_FORECAST: '/api/members/me/cash-flow-forecast',
+  EXPECTED_SCORE: '/api/members/me/cash-flow-expected-score',
 })
 
 // N-22 로그인한 회원의 저장된 최근 12개월 소득으로 변동성 지표·성수기·비수기 격차·소득 부족 달을 조회한다.
