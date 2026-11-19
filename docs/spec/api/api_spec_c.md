@@ -248,7 +248,7 @@
   | 400 | `INVALID_INPUT` | 조건 검사 실패(필드 = 이름). ML-03이 입력을 거절(4xx)하면 "입력값을 확인해 주세요." |
   | 401 | `UNAUTHORIZED` | 토큰 없음 |
   | 404 | `ASSESSMENT_NOT_FOUND` | 점수가 나온 평가가 하나도 없음(리포트와 같은 코드) |
-  | 409 | `INPUT_INCOMPLETE` | 저장된 입력 기준월이 없거나 출생연도가 없음(점수 산출과 같은 문구) |
+  | 409 | `INPUT_INCOMPLETE` | 저장된 입력 기준월이 없거나 출생연도가 없음(점수 산출과 같은 문구). 🆕 11/19 소득이 직군에 필요한 개월 수(자영업자·프리랜서 12, 급여소득자 1)보다 적거나 같은 달이 겹치면 ML-03을 부르지 않고 "소득을 필요한 개월 수만큼 입력해 주세요."(점수 산출과 같음, 0원으로 채워 계산하지 않음) |
   | 503 | `MODEL_NOT_READY` | ML-03 연결 실패·시간 초과·5xx. 저장하지 않으므로 MODEL_ERROR 기록을 남기지 않는다 |
 - 프론트: `diagnosisApi.js`의 `getExpectedScore({ incomeVariationPct, incomeChangePercent, fixedExpenseAmount, expenseChangePercent, paymentStatus })`. mock은 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"으로만 계산하며, 진짜 모델 점수가 아니다.
 

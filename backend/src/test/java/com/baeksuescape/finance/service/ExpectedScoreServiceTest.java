@@ -77,6 +77,8 @@ class ExpectedScoreServiceTest {
         expenses.add(expense("FIXED", "통신", 100000L));
         expenses.add(expense("LIVING", "식비", 200000L));
         Map<String, Object> request = new LinkedHashMap<>();
+        // 실제 프리랜서는 12개월이지만, 시험 자료가 3개월이라 필요한 개월 수도 3으로 맞춘다
+        request.put("applicant", new LinkedHashMap<>(Map.of("workerTypeCode", "FREELANCER", "requiredIncomeMonths", 3)));
         request.put("incomeMonths", incomes);
         request.put("expenses", expenses);
         return request;
@@ -238,6 +240,30 @@ class ExpectedScoreServiceTest {
         when(financialInput.load(USER_ID)).thenReturn(new FinancialInputResponse(null, null, null, List.of()));
         assertEquals("INPUT_INCOMPLETE", assertThrows(ApiException.class, () -> service.expectedScore(USER_ID, null)).getCode());
         verify(predictionClient, never()).score(any());
+    }
+
+    @Test
+    @DisplayName("소득이 필요한 개월 수보다 적거나 같은 달이 겹치면 ML-03을 부르지 않고 409 INPUT_INCOMPLETE")
+    @SuppressWarnings("unchecked")
+    void incomeMonthsShort() {
+        readyToScore(current());
+        when(assembler.build(anyString(), eq("REAL-V1"), any(), eq("2026-08"), eq(31))).thenAnswer(invocation -> {
+            Map<String, Object> request = request();
+            ((Map<String, Object>) request.get("applicant")).put("requiredIncomeMonths", 12);
+            return request;
+        });
+
+        ApiException e = assertThrows(ApiException.class, () -> service.expectedScore(USER_ID, null));
+
+        assertEquals(HttpStatus.CONFLICT, e.getStatus());
+        assertEquals("INPUT_INCOMPLETE", e.getCode());
+        assertEquals("소득을 필요한 개월 수만큼 입력해 주세요.", e.getMessage());
+        verify(predictionClient, never()).score(any());
+
+        Map<String, Object> duplicated = request();
+        ((List<Map<String, Object>>) duplicated.get("incomeMonths")).get(1).put("baseMonth", "2026-06");
+        assertThrows(ApiException.class, () -> ExpectedScoreService.checkIncomeMonths(duplicated));
+        ExpectedScoreService.checkIncomeMonths(request());   // 3개월·서로 다른 달이면 통과
     }
 
     @Test

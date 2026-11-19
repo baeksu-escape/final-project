@@ -75,6 +75,7 @@ public class ExpectedScoreService {
         String activeModel = assessmentMapper.selectActiveModelVersion();
 
         Map<String, Object> request = assembler.build(UUID.randomUUID().toString(), activeModel, user, baseMonth, age);
+        checkIncomeMonths(request);   // 소득 개월 수가 모자라면 ML-03이 422로 거절하므로 부르기 전에 409로 알린다
         applyIncomeCondition(request, cond);
         applyExpenseCondition(request, cond);
 
@@ -85,6 +86,21 @@ public class ExpectedScoreService {
             throw toApiException(e);
         }
         return toResponse(current, result);
+    }
+
+    /**
+     * 소득이 직군에 필요한 개월 수(DIM_WORKER_TYPE: 자영업자·프리랜서 12, 급여소득자 1)만큼 서로 다른 달로 있는지 확인한다.
+     * 모자라면 점수 산출(RPT-01)과 같은 409 INPUT_INCOMPLETE. 0원으로 채워 계산하지 않는다(경환 님 요청 ④, 11/19).
+     */
+    @SuppressWarnings("unchecked")
+    static void checkIncomeMonths(Map<String, Object> request) {
+        Map<String, Object> applicant = (Map<String, Object>) request.get("applicant");
+        List<Map<String, Object>> incomes = (List<Map<String, Object>>) request.get("incomeMonths");
+        Object required = applicant == null ? null : applicant.get("requiredIncomeMonths");
+        long distinct = incomes == null ? 0 : incomes.stream().map(m -> m.get("baseMonth")).distinct().count();
+        if (!(required instanceof Integer months) || incomes == null || incomes.size() != months || distinct != months) {
+            throw new ApiException(HttpStatus.CONFLICT, "INPUT_INCOMPLETE", "소득을 필요한 개월 수만큼 입력해 주세요.");
+        }
     }
 
     /**
