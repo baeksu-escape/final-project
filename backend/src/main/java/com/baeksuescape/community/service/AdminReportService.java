@@ -1,7 +1,6 @@
 package com.baeksuescape.community.service;
 
 import static com.baeksuescape.community.service.CommunityCodes.ACTION_DELETE;
-import static com.baeksuescape.community.service.CommunityCodes.ACTION_HIDE;
 import static com.baeksuescape.community.service.CommunityCodes.ACTION_RESTORE;
 import static com.baeksuescape.community.service.CommunityCodes.ACTOR_ADMIN;
 import static com.baeksuescape.community.service.CommunityCodes.DELETED;
@@ -12,7 +11,6 @@ import static com.baeksuescape.community.service.CommunityCodes.REPORT_IN_REVIEW
 import static com.baeksuescape.community.service.CommunityCodes.REPORT_RECEIVED;
 import static com.baeksuescape.community.service.CommunityCodes.REPORT_REJECTED;
 import static com.baeksuescape.community.service.CommunityCodes.RESULT_DELETE;
-import static com.baeksuescape.community.service.CommunityCodes.RESULT_KEEP_HIDDEN;
 import static com.baeksuescape.community.service.CommunityCodes.RESULT_REJECT;
 import static com.baeksuescape.community.service.CommunityCodes.VISIBLE;
 import static com.baeksuescape.community.service.CommunityCodes.WITHDRAWN_NAME;
@@ -86,7 +84,7 @@ public class AdminReportService {
                 target.title(), target.content(), target.nickname(), rows.size(), reasonCounts(rows), lines);
     }
 
-    // N-34-3 처리 결과 저장 — 숨김 유지·삭제는 대상에 반영하고, 반려는 숨김을 푼다. 처리자·시각·메모를 남긴다.
+    // N-34-3 처리 결과 저장 — 삭제는 대상에 반영하고, 반려는 숨김을 푼다(FP-224부터 숨김 유지 없음). 처리자·시각·메모를 남긴다.
     // 알림(신고자·작성자)은 D-25에 따라 만들지 않는다.
     @Transactional
     public ReportDtos.ReportProcessed process(long adminUserId, long reportId, ReportDtos.ReportProcess request) {
@@ -102,10 +100,8 @@ public class AdminReportService {
         String result = request.resultCode();
         String before = target.statusCode();
         String after = before;
-        if (RESULT_KEEP_HIDDEN.equals(result) && VISIBLE.equals(before)) {
-            after = HIDDEN;
-            changeOrFail(type, id, before, after, ACTION_HIDE, adminUserId, reportId, now);
-        } else if (RESULT_DELETE.equals(result) && !DELETED.equals(before)) {
+        // FP-224: 처리 결과는 삭제·반려 두 가지다(숨김 유지는 요청 검사에서 400으로 막는다).
+        if (RESULT_DELETE.equals(result) && !DELETED.equals(before)) {
             after = DELETED;
             changeOrFail(type, id, before, after, ACTION_DELETE, adminUserId, reportId, now);
         } else if (RESULT_REJECT.equals(result) && HIDDEN.equals(before)) {

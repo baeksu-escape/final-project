@@ -50,10 +50,10 @@ public final class ReportDtos {
             String content, String authorNickname, int reportCount, Map<String, Integer> reasonCounts, List<ReportLine> reports) {
     }
 
-    // ADM-13 처리 결과 저장
+    // ADM-13 처리 결과 저장 — FP-224: 새 처리는 삭제(DELETE)·반려(REJECT)만 받는다. 숨김 유지(KEEP_HIDDEN)는 400이다(이전 기록은 DB에 그대로 남는다).
     public record ReportProcess(
             @NotBlank(message = "처리 결과를 골라 주세요.")
-            @Pattern(regexp = "KEEP_HIDDEN|DELETE|REJECT", message = "처리 결과가 올바르지 않습니다.") String resultCode,
+            @Pattern(regexp = "DELETE|REJECT", message = "처리 결과는 삭제·반려 중에서 골라 주세요.") String resultCode,
             @Size(max = 500, message = "처리 메모는 500자까지 쓸 수 있습니다.") String memo) {
     }
 

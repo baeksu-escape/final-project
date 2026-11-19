@@ -50,6 +50,10 @@ public interface AssessmentMapper {
 
     AssessmentRow selectLatest(@Param("userId") long userId);
 
+    // FP-170 N-18·N-21-8 시뮬레이터·예상 점수의 출발 평가 — 점수가 나온(SCORED) 가장 최근 평가 1건과 FEATURE_SNAPSHOT.
+    // 최신이 NOT_SCORABLE이어도 예전 SCORED를 쓴다(범영 11/18). 없으면 null(404 ASSESSMENT_NOT_FOUND).
+    AssessmentRow selectLatestScored(@Param("userId") long userId);
+
     AssessmentRow selectByUserAndRequestId(@Param("userId") long userId, @Param("requestId") String requestId);
 
     // 진단 내역 — 최신순

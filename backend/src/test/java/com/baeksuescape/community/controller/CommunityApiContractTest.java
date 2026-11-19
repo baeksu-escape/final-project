@@ -234,6 +234,12 @@ class CommunityApiContractTest {
         mvc.perform(asAdmin(json(patch("/api/admin/reports/12"), "{\"resultCode\":\"HIDE\"}")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("resultCode"));
+
+        // FP-224: 숨김 유지는 더 받지 않는다(삭제·반려만)
+        mvc.perform(asAdmin(json(patch("/api/admin/reports/12"), "{\"resultCode\":\"KEEP_HIDDEN\"}")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("resultCode"));
     }
 
     @Test

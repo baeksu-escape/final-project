@@ -7,6 +7,10 @@ export const MOCK_EMAIL_CODE = '123456'
 // 인증코드 유효 시간(초).
 export const MOCK_EMAIL_CODE_TTL_SECONDS = 300
 
+// 개발용 고정 휴대폰 인증번호. 실제 문자는 보내지 않는다. 유효 시간은 이메일과 같다.
+export const MOCK_PHONE_CODE = '123456'
+export const MOCK_PHONE_CODE_TTL_SECONDS = 300
+
 // 공통 데모 계정(common/mocks/mockUsers.js)에 붙일 합성 연락처. 아이디·비밀번호 찾기 확인용이며 실제 정보가 아니다.
 // N-02-1 닉네임은 마이페이지 데모 값(myPageMockData.js MY_PAGE_DEMO_PROFILES)과 같다. 가입할 때 닉네임 중복 확인에도 쓴다.
 export const DEMO_ACCOUNT_CONTACTS = Object.freeze({
