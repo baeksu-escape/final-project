@@ -36,6 +36,7 @@ import com.baeksuescape.user.mapper.UserConsentMapper;
 import com.baeksuescape.user.mapper.UserSocialAccountMapper;
 import com.baeksuescape.user.mapper.VerificationCodeMapper;
 import com.baeksuescape.user.service.EmailVerificationService;
+import com.baeksuescape.user.service.PhoneVerificationService;
 
 // FP-93 N-04-7 회원 탈퇴(MEM-07) API — 실제 탈퇴·가입 서비스와 JWT 필터를 타고, DB 대신 계정 한 줄을 기억하는 mock 매퍼를 쓴다.
 // 탈퇴 → 같은 토큰 401, 같은 아이디로 바로 다시 가입을 확인한다. 실제 Oracle 확인은 작업 3에서 한다.
@@ -66,6 +67,9 @@ class WithdrawalApiTest {
     private VerificationCodeMapper verificationMapper;
     @MockBean
     private EmailVerificationService emailVerification;
+    // 11/18 1차 시연 후속: 가입에 휴대폰 인증 토큰이 필요해졌다. 이메일 인증처럼 토큰 확인은 mock으로 대신한다.
+    @MockBean
+    private PhoneVerificationService phoneVerification;
 
     // DB의 APP_USER 한 줄 대신 — updateWithdrawn이 불리면 SQL과 같은 표시값으로 바꾼다.
     private UserAccount account;
@@ -117,11 +121,11 @@ class WithdrawalApiTest {
         return builder.contentType(MediaType.APPLICATION_JSON).content(body);
     }
 
-    // 가입 화면이 보내는 본문(합성 값). 이메일 인증 토큰 확인은 mock으로 대신한다.
+    // 가입 화면이 보내는 본문(합성 값). 이메일·휴대폰 인증 토큰 확인은 mock으로 대신한다.
     private static String signupBody(String email) {
-        return "{\"loginId\":\"" + LOGIN_ID + "\",\"name\":\"홍길동\",\"nickname\":\"새닉네임\",\"phone\":\"\",\"email\":\"" + email
+        return "{\"loginId\":\"" + LOGIN_ID + "\",\"name\":\"홍길동\",\"nickname\":\"새닉네임\",\"phone\":\"01012345678\",\"email\":\"" + email
                 + "\",\"password\":\"newpass99\",\"birthYear\":1990,\"agreeCreditInfo\":true,\"agreeMarketing\":false,"
-                + "\"emailVerificationToken\":\"verified-1\"}";
+                + "\"emailVerificationToken\":\"verified-1\",\"phoneVerificationToken\":\"phone-verified-1\"}";
     }
 
     @Test
