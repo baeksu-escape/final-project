@@ -46,7 +46,7 @@ public final class DataInputRows {
     }
 
     // USER_ASSET_SNAPSHOT — TOTAL_ASSET_AMT NULL은 미입력, NO_LOAN_YN NULL은 대출 미확인(O-15).
-    // DDL C11(FP-227) 자산 4종 열 — 예금·적금, 투자, 부동산·보증금, 기타 자산. NULL은 미입력, C11 전에 저장한 행은 4종이 모두 NULL이다.
+    // DDL C12(FP-227) 자산 4종 열 — 예금·적금, 투자, 부동산·보증금, 기타 자산. NULL은 미입력, C12 전에 저장한 행은 4종이 모두 NULL이다.
     @Getter
     @Setter
     @NoArgsConstructor
