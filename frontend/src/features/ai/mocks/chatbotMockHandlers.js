@@ -1,4 +1,4 @@
-// N-32-1 용어 도우미 질문 버튼 mock 핸들러 — 응답 모양은 실제 HELP-02(GET /api/chatbot/presets)와 같고, 문구는 시드 SQL(seed_chatbot_preset_question.sql)과 같다.
+// N-32-1 용어 도우미 질문 버튼 mock 핸들러 — 응답 모양은 실제 HELP-02(GET /api/chatbot/presets)와 같고, 문구는 시드 SQL(add_chatbot_preset_question.sql)과 같다.
 import { registerMockHandlers, requireMockUser } from '../../../common/mocks/mockHandlers.js'
 
 // 시드와 같은 질문 버튼 4개 (표시 순서대로)
@@ -25,7 +25,7 @@ const SAMPLE_CHATBOT_PRESETS = Object.freeze([
     presetId: 4,
     question: '시뮬레이터 결과와 참고 금리·한도는 실제 대출 심사 결과인가요?',
     answer:
-      '아니요. 신용케어 시뮬레이터는 입력값을 바꿨을 때 모델이 계산한 예상 점수를 보여 줄 뿐 저장되지 않고, 실제 점수가 바뀌지도 않습니다. 함께 보이는 금리·한도도 실제 금융회사의 심사 결과가 아니라, 같은 점수대에 해당하는 더미(예시) 데이터로 만든 참고 정보입니다. 실제 대출 가능 여부와 조건은 금융회사의 심사를 따릅니다.',
+      '아니요. 신용케어 시뮬레이터는 입력값을 바꿨을 때 모델이 계산한 예상 점수를 보여 줄 뿐 저장되지 않고, 실제 점수가 바뀌지도 않습니다. 함께 보이는 금리·한도도 실제 금융회사의 심사 결과가 아니라, 서비스 시연용으로 만든 예시 데이터에서 같은 점수대에 해당하는 값을 보여 주는 참고 정보입니다. 실제 대출 가능 여부와 조건은 금융회사의 심사를 따릅니다.',
   },
 ])
 

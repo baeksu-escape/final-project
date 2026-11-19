@@ -6,7 +6,7 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
-> - 🆕 11/19 (광희, FP-181) N-32-1 용어 도우미 질문 버튼 `GET /api/chatbot/presets`(HELP-02) 추가, 기준 데이터 `docs/spec/sql/seed_chatbot_preset_question.sql`(4개).
+> - 🆕 11/19 (광희, FP-181) N-32-1 용어 도우미 질문 버튼 `GET /api/chatbot/presets`(HELP-02) 추가, 기준 데이터 `docs/spec/sql/add_chatbot_preset_question.sql`(4개).
 > - 🆕 11/19 (광희, FP-170 추가 수정) 저장 데이터를 읽는 API 5개를 팀 공통 규칙대로 `/api/members/me/**`로 옮기고 옛 경로를 지웠다(우찬 님 합의): SIM-01 `credit-care-base`, SIM-02 `credit-care-recalculate`, DIAG-07-1 `income-volatility`, DIAG-08-1 `cash-flow-forecast`, DIAG-09 `cash-flow-expected-score`. 로그인 확인은 보안 설정이 한다(토큰 없음 401, 관리자 403). SIM-01에 `topReductionFactors`, DIAG-08-1에 기준값 3개(`baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`)를 추가했다(경환 님 요청).
 > - 🆕 11/18 (광희, FP-170) SIM-01 `credit-care/base`·DIAG-09 `cash-flow/expected-score` 추가, SIM-02 Spring 구현(출발 평가 = 최근 SCORED, 404 `ASSESSMENT_NOT_FOUND`).
 
@@ -533,7 +533,7 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 - 요청 값은 없다. 질문 버튼 전체를 **표시 순서**(`ORDER BY DISPLAY_ORDER, PRESET_ID`)로 돌려준다.
 - **AI를 부르지 않고 질문 횟수도 줄지 않는다**(N-32-1). 호출 기록(`CHATBOT_QUESTION_LOG`)을 남기지 않는다. 화면은 한 번 받아 두고 버튼을 누를 때 받아 둔 `answer`를 보여 주면 된다.
 - 등록된 버튼이 없으면 오류가 아니라 `{ "presets": [] }`다.
-- 기준 데이터: [`docs/spec/sql/seed_chatbot_preset_question.sql`](../sql/seed_chatbot_preset_question.sql)(합성 교육용 문구 4개, 표시 순서 1~4 기준으로 다시 실행해도 됨). dummy_db 생성기에는 아직 들어 있지 않다. 공용·로컬 DB 적용은 경환·범영 님 확인 후 한다.
+- 기준 데이터: [`docs/spec/sql/add_chatbot_preset_question.sql`](../sql/add_chatbot_preset_question.sql)(합성 교육용 문구 4개, 표시 순서 1~4 기준으로 다시 실행해도 됨). dummy_db 생성기에는 들어 있지 않아 DDL·시드 다음에 따로 실행한다. 공용 DB 실행은 병합 후 DB 담당(범영)이 한다.
 - 자유 질문(HELP-03 `POST /api/chatbot/questions`, N-32-2, 하루 10회)은 아직 없다. Gemini 키·타임아웃(D-18)·넘길 정보(D-21)를 정한 뒤 FP-181 2부에서 만든다.
 
 응답 `200`:

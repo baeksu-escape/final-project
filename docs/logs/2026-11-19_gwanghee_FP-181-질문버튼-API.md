@@ -23,17 +23,19 @@
 | `backend/src/test/.../help/mapper/ChatbotMapperIT.java` | 새 파일. `-Ddb.it=true`일 때만, 시험 행 2개를 넣고 롤백 |
 | `frontend/src/features/ai/api/chatbotApi.js` | 새 파일. `getChatbotPresets()` |
 | `frontend/src/features/ai/mocks/chatbotMockHandlers.js` | 새 파일. 시드와 같은 4개, 로그인 안 했으면 401 |
-| `docs/spec/sql/seed_chatbot_preset_question.sql` | 새 파일. 질문 버튼 4개 `MERGE`(표시 순서 기준, 다시 실행 가능) |
+| `docs/spec/sql/add_chatbot_preset_question.sql` | 새 파일. 질문 버튼 4개 `MERGE`(표시 순서 기준, 다시 실행 가능). 처음 이름 `seed_chatbot_preset_question.sql`을 SQL 폴더 규칙(기존 DB용은 `add_*`)에 맞춰 바꿈. 4번 답의 "더미(예시)"를 "서비스 시연용으로 만든 예시 데이터"로 쉽게 바꿈 |
+| `docs/spec/sql/README.md` | 「먼저 내 상황에 맞는 경로를 고른다」 표에 한 행 추가(체크리스트 6) |
 | `docs/spec/api/api_spec_c.md` | 「N-32-1 용어 도우미 질문 버튼」 절, 최근 변경 |
 
 ## DB·API 변경
 - DB
   - 표 구조 변경은 없다.
-  - 기준 데이터 SQL `seed_chatbot_preset_question.sql`을 새로 만들었다(4행). 아직 어느 DB에도 적용하지 않았다.
+  - 기준 데이터 SQL `add_chatbot_preset_question.sql`을 새로 만들었다(4행). 아직 어느 DB에도 적용하지 않았다.
   - 적용하면 `dummy_db/99_check.sql`의 `CHATBOT_PRESET_QUESTION` 기대값(0)과 실제 값이 달라지는 것이 정상이다.
 - API: `GET /api/chatbot/presets` 추가(HELP-02, 로그인 필요, 응답 `{ presets: [{ presetId, question, answer }] }`)
 - 영향을 받는 기능·팀원
-  - 경환·범영 님: 시드 SQL 적용, dummy_db 생성기 반영 여부 확인
+  - 범영 님(DB 담당): 병합 후 공용 DB에 `add_chatbot_preset_question.sql` 실행(체크리스트 9). 로컬 DB는 각자 실행
+  - 경환 님(더미 DB 생성기): 나중에 생성기·`99_check.sql`에 넣을지는 선택(지금은 별도 파일로 충분)
   - 용어 도우미 화면(FP-207): `getChatbotPresets()`를 쓸 수 있다
   - 범영·우찬 님: API 정의서 HELP-02 상태 🟡 → ✅ 반영
 
