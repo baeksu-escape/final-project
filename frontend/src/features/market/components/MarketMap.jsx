@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ALL_GU } from '../config/marketConfig.js'
-import { binOf, formatMetric, verdictOf } from '../utils/marketStats.js'
+import { formatMetric, verdictOf } from '../utils/marketStats.js'
 
 // 지도 칸의 가로:세로 비율(market.css의 .market-map__svg aspect-ratio와 같게 둔다)
 const ASPECT = 1.6
@@ -27,7 +27,7 @@ function fitGu(geo, gu) {
   return found ? fitBox(found.box, 30) : fitBox([0, 0, geo.w, geo.h], 10)
 }
 
-// N-24-4 상권 공간 시각화 — 미리 계산한 행정동 보로노이 다각형(geo.json)을 지표 색으로 칠한다. 지도 API는 쓰지 않는다.
+// N-24-4 상권 공간 시각화 — 미리 계산한 행정동 보로노이 다각형(geo.json)을 지표 값 크기(빨강 5단계)로 칠한다. 지도 API는 쓰지 않는다.
 // 동을 누르면 상세 창(onOpen), 드래그로 이동, 휠·버튼으로 확대한다. 고른 구 밖의 동은 흐리게 보인다.
 // rows: 서울 전체 동 { dong, value, score, storeCount }
 export default function MarketMap({ geo, rows, metric, category, gu, openCode, onOpen, onReset }) {
@@ -135,7 +135,8 @@ export default function MarketMap({ geo, rows, metric, category, gu, openCode, o
         <g>
           {Object.entries(geo.dongs).map(([code, shape]) => {
             const row = byCode[code]
-            const classes = ['market-map__dong', `market-bin--${binOf(row?.score ?? null)}`]
+            // 1차 시연 후속: 칸 색은 값의 크기(빨강 5단계). 좋고 나쁨은 툴팁·상세 창 글자로 알려 준다.
+            const classes = ['market-map__dong', `market-heat--${row?.heat ?? 'none'}`]
             if (gu !== ALL_GU && row?.dong.gu !== gu) classes.push('market-map__dong--dim')
             if (code === openCode) classes.push('market-map__dong--on')
             return <path key={code} d={shape.path} data-code={code} className={classes.join(' ')} vectorEffect="non-scaling-stroke" />

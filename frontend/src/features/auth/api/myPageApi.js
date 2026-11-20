@@ -2,7 +2,7 @@ import { apiGet, apiPost, apiPut, apiRequest } from '../../../common/api/client.
 // mock 모드에서 쓸 응답을 등록한다(VITE_USE_MOCK=false면 등록돼도 쓰이지 않는다).
 import '../mocks/myPageMockHandlers.js'
 
-// N-04 마이페이지 API 경로. TODO(D-20) api_spec.md가 정해지면 경로와 요청·응답 필드를 맞춘다.
+// N-04 마이페이지 API 경로. TODO(D-20) docs/spec/api/api_spec_a.md가 정해지면 경로와 요청·응답 필드를 맞춘다.
 export const MY_PAGE_API = Object.freeze({
   PROFILE: '/api/members/me/profile',
   PROFILE_UNMASK: '/api/members/me/profile/unmask',

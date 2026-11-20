@@ -1,7 +1,9 @@
 package com.baeksuescape.finance.controller;
 
-import com.baeksuescape.finance.dto.ScoreBandOfferResponse;
+import com.baeksuescape.finance.dto.simulation.ScoreBandOfferResponse;
 import com.baeksuescape.finance.service.ScoreBandOfferService;
+import com.baeksuescape.user.mapper.UserAccountMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -20,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * FP-170 GET /api/simulation/score-band-offer의 쿼리·JSON 필드 이름·오류 상태를 확인하는 API 테스트.
+ * SIM-01·02는 /api/members/me로 옮겨 MemberFinanceControllerTest에서 본다.
  * 보안·공통 예외 처리기까지 실제와 같게 붙이려고 test 프로필(H2)로 전체 컨텍스트를 띄운다.
  */
 @SpringBootTest
@@ -32,6 +37,15 @@ class SimulationControllerTest {
 
     @MockBean
     private ScoreBandOfferService scoreBandOfferService;
+
+    // JWT 필터가 계정 상태를 확인하므로(잠금·탈퇴면 무시) 사용 중인 계정으로 돌려준다.
+    @MockBean
+    private UserAccountMapper userAccountMapper;
+
+    @BeforeEach
+    void setUpAccount() {
+        given(userAccountMapper.selectAccountStatus(anyLong())).willReturn("ACTIVE");
+    }
 
     @Test
     @DisplayName("점수를 넘기면 금리·한도와 dummyNotice(is 없음)가 나간다")

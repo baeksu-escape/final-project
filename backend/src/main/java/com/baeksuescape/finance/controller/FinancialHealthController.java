@@ -1,9 +1,9 @@
 package com.baeksuescape.finance.controller;
 
-import com.baeksuescape.finance.dto.DsrCalculateRequest;
-import com.baeksuescape.finance.dto.DsrCalculateResponse;
-import com.baeksuescape.finance.dto.FinancialHealthRequest;
-import com.baeksuescape.finance.dto.FinancialHealthResponse;
+import com.baeksuescape.finance.dto.health.DsrCalculateRequest;
+import com.baeksuescape.finance.dto.health.DsrCalculateResponse;
+import com.baeksuescape.finance.dto.health.FinancialHealthRequest;
+import com.baeksuescape.finance.dto.health.FinancialHealthResponse;
 import com.baeksuescape.finance.service.FinancialHealthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

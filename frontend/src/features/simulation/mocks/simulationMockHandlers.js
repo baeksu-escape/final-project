@@ -97,7 +97,7 @@ function cardUtilization(limit, spend) {
   return limit > 0 ? Math.round((spend / limit) * 1000) / 10 : null
 }
 
-// N-18-5·8 시뮬레이터 점수 재계산 mock (SIM-02, Spring 미구현) — 응답은 ML-04 모양(requestId·shap 제외, featureName 추가)이다.
+// N-18-5·8 시뮬레이터 점수 재계산 mock (SIM-02) — 응답은 ML-04 모양(requestId·shap 제외, featureName 추가)이다.
 // 출발 평가 예시(588점)에 바꾼 값을 덮어써 간단한 규칙으로 점수를 다시 낸다. 진짜 모델 점수가 아니다.
 function handleCreditCareRecalculate({ body }) {
   const changes = body?.changes ?? {}
@@ -176,12 +176,66 @@ function handleCreditCareRecalculate({ body }) {
   }
 }
 
-// N-18-7 같은 점수대 참고 금리·한도 mock — 백엔드와 같이 점수가 0~1000 밖이면 400을 낸다.
+// N-18-1·10 SIM-01 입력 10개의 내 실제 값 mock — 재계산 mock의 출발 값(base)과 같은 숫자를 돌려준다.
+// 실제 서버는 점수가 나온 최근 평가의 피처값과 그 기준월 카드 직접 입력에서 꺼낸다. 값이 없으면 null이다.
+function handleCreditCareBase() {
+  const values = {}
+  SIMULATION_FEATURES.forEach((feature) => {
+    values[feature.key] = feature.base
+  })
+  values[SIMULATION_CARD.limitKey] = SIMULATION_CARD.baseLimit
+  values[SIMULATION_CARD.spendKey] = SIMULATION_CARD.baseSpend
+  const { score, gradeBandCode } = summarizeScore(SIMULATION_BASE_ASSESSMENT.score)
+  return {
+    baseRequestId: '00000000-0000-4000-8000-000000000588',
+    assessedAt: '2026-11-17T10:00:00+09:00',
+    score,
+    gradeBandCode,
+    values,
+    topReductionFactors: baseReductionFactors(),
+  }
+}
+
+// N-18-8 SIM-01 출발 평가의 감점 요인 상위 3개 mock — SIM-02 mock과 같은 감점 규칙을 출발 값에 적용한다.
+// 실제 서버는 저장된 요인(ASSESSMENT_FACTOR)에서 고르고 회복 점수는 저장돼 있지 않아 null이다.
+function baseReductionFactors() {
+  const rows = SIMULATION_FEATURES.map((feature) => ({
+    featureCode: feature.featureCode,
+    featureName: feature.featureName,
+    featureValue: feature.base * (feature.featureScale ?? 1),
+    penalty: penaltyOf(feature.base, feature.best, feature.pointPerUnit),
+  }))
+  const card = SIMULATION_CARD
+  const utilization = cardUtilization(card.baseLimit, card.baseSpend)
+  if (utilization !== null) {
+    rows.push({
+      featureCode: card.featureCode,
+      featureName: card.featureName,
+      featureValue: utilization,
+      penalty: penaltyOf(utilization, card.best, card.pointPerUnit),
+    })
+  }
+  return rows
+    .filter((row) => Math.round(row.penalty) < 0)
+    .sort((a, b) => a.penalty - b.penalty || a.featureName.localeCompare(b.featureName))
+    .slice(0, 3)
+    .map((row, index) => ({
+      rank: index + 1,
+      featureCode: row.featureCode,
+      featureName: row.featureName,
+      featureValue: row.featureValue,
+      shapScore: Math.round(row.penalty),
+      recoverScore: null,
+    }))
+}
+
+// N-18-7 같은 점수대 참고 금리·한도 mock — 백엔드와 같이 점수가 0~1000 밖이면 400 INVALID_INPUT(fieldErrors에 score)을 낸다.
 function handleScoreBandOffer({ query }) {
   const rawScore = query?.get('score') ?? null
   const score = Number(rawScore)
   if (rawScore === null || rawScore === '' || !Number.isInteger(score) || score < 0 || score > 1000) {
-    throw new ApiError(400, '점수는 0~1000 사이여야 합니다.')
+    const message = '점수는 0~1000 사이여야 합니다.'
+    throw new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors: [{ field: 'score', message }] })
   }
   const band = SCORE_BAND_OFFER_ROWS.find((row) => score >= row.minScore && score <= row.maxScore)
   return {
@@ -204,6 +258,7 @@ registerMockHandlers({
   'GET /api/simulation/score-band-offer': handleScoreBandOffer,
   'GET /api/simulation/loans/recommend': handleLoanRecommend,
   'POST /api/simulation/loans/recommend': handleLoanRecommend,
-  'POST /api/simulation/credit-care/recalculate': handleCreditCareRecalculate,
+  'GET /api/members/me/credit-care-base': handleCreditCareBase,
+  'POST /api/members/me/credit-care-recalculate': handleCreditCareRecalculate,
 })
 

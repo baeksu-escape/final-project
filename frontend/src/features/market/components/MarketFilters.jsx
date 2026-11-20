@@ -17,6 +17,7 @@ export default function MarketFilters({ metrics, metricKey, onMetric, categories
   const listId = useId()
   const [query, setQuery] = useState('')
   const [message, setMessage] = useState('')
+  const selected = metrics.find(({ metric }) => metric.key === metricKey)
 
   const search = () => {
     const dong = findDong(dongs, query)
@@ -48,6 +49,13 @@ export default function MarketFilters({ metrics, metricKey, onMetric, categories
           ))}
         </div>
       </div>
+      {/* 1차 시연 후속: 고른 지표의 뜻을 마우스를 올리지 않아도 보이게 한 줄로 적는다 */}
+      {selected && (
+        <p className="market-filters__desc" role="status">
+          <b>{selected.metric.name}</b> — {selected.metric.desc} · {selected.metric.dir < 0 ? '낮을수록 좋음' : '높을수록 좋음'} · 서울 평균{' '}
+          <span className="market-num">{formatMetric(selected.metric, selected.seoul)}</span>
+        </p>
+      )}
       <div className="market-filters__row">
         <span className="market-filters__label">업종</span>
         <SegmentedControl

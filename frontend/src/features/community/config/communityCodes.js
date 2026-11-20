@@ -27,12 +27,17 @@ export const REPORT_STATUSES = Object.freeze([
   { value: 'REJECTED', label: '반려' },
 ])
 
-// N-34-3 관리자 처리 결과 3개
+// N-34-3 관리자 처리 결과 3개 — 처리 기록·저장 알림의 이름 표시용. 예전에 '숨김 유지'로 처리한 기록도 이름이 보여야 해서 3개를 그대로 둔다.
 export const REPORT_RESULTS = Object.freeze([
   { value: 'KEEP_HIDDEN', label: '숨김 유지', hint: '일반 사용자에게 계속 숨김' },
   { value: 'DELETE', label: '삭제', hint: '글·댓글을 삭제' },
   { value: 'REJECT', label: '반려', hint: '숨김을 풀고 원래대로' },
 ])
+
+// N-34-3 관리자가 고를 수 있는 처리 결과(FP-224) — '숨김 유지'는 화면에서 빼고 서버도 400으로 막는다. DB의 이전 처리 기록은 그대로 둔다.
+// 기본 선택은 되돌릴 수 있는 [반려]다.
+export const REPORT_RESULT_CHOICES = Object.freeze(REPORT_RESULTS.filter((item) => item.value !== 'KEEP_HIDDEN'))
+export const DEFAULT_REPORT_RESULT = 'REJECT'
 
 // N-34-1 기간 필터 — days가 null이면 기간 제한 없음
 export const REPORT_PERIODS = Object.freeze([

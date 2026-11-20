@@ -46,6 +46,18 @@ public final class AuthResponses {
     public record EmailVerified(String verificationToken) {
     }
 
+    // N-02-1 닉네임 중복 확인(11/18 1차 시연 후속)
+    public record NicknameAvailability(boolean available) {
+    }
+
+    // N-02 휴대폰 인증번호 발송 — 이메일 발송 응답과 같은 모양
+    public record PhoneSent(int expiresInSeconds) {
+    }
+
+    // N-02 휴대폰 인증번호 확인 — 이메일 확인 응답과 같은 모양
+    public record PhoneVerified(String verificationToken) {
+    }
+
     // AUTH-09 아이디 찾기
     public record FoundId(String maskedLoginId) {
     }

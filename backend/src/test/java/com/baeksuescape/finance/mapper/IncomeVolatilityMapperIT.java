@@ -1,6 +1,6 @@
 package com.baeksuescape.finance.mapper;
 
-import com.baeksuescape.finance.dto.IncomeMonthRow;
+import com.baeksuescape.finance.dto.cashflow.IncomeMonthRow;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;

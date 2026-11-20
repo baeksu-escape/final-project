@@ -71,7 +71,8 @@
 .lounge-table__no {
   width: 56px;
   color: var(--mut2);
-  text-align: right;
+  /* FP-220 제목 "No"와 번호를 같은 줄에 맞춘다(공통 .data-table th의 왼쪽 정렬보다 앞서게) */
+  text-align: center !important;
   font-family: var(--f-d);
 }
 

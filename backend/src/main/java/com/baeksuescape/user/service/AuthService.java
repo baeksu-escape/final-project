@@ -37,6 +37,7 @@ public class AuthService {
     private final UserConsentMapper consentMapper;
     private final UserSocialAccountMapper socialMapper;
     private final EmailVerificationService emailVerification;
+    private final PhoneVerificationService phoneVerification;
     private final DevSocialStore socialStore;
     private final UserViewFactory userViews;
     private final JwtTokenProvider tokenProvider;
@@ -48,12 +49,14 @@ public class AuthService {
     private final SystemLogService systemLog;
 
     public AuthService(UserAccountMapper userMapper, UserConsentMapper consentMapper, UserSocialAccountMapper socialMapper,
-            EmailVerificationService emailVerification, DevSocialStore socialStore, UserViewFactory userViews, JwtTokenProvider tokenProvider,
-            PasswordEncoder passwordEncoder, PiiCrypto crypto, PiiHmac hmac, Clock clock, AdminAuthService adminAuth, SystemLogService systemLog) {
+            EmailVerificationService emailVerification, PhoneVerificationService phoneVerification, DevSocialStore socialStore,
+            UserViewFactory userViews, JwtTokenProvider tokenProvider, PasswordEncoder passwordEncoder, PiiCrypto crypto, PiiHmac hmac, Clock clock,
+            AdminAuthService adminAuth, SystemLogService systemLog) {
         this.userMapper = userMapper;
         this.consentMapper = consentMapper;
         this.socialMapper = socialMapper;
         this.emailVerification = emailVerification;
+        this.phoneVerification = phoneVerification;
         this.socialStore = socialStore;
         this.userViews = userViews;
         this.tokenProvider = tokenProvider;
@@ -119,7 +122,17 @@ public class AuthService {
         return new AuthResponses.Me(userViews.of(account));
     }
 
-    // AUTH-06 회원가입 — 칸 검사 → 중복(아이디·이메일·닉네임 순) → 간편 로그인 키 → 이메일 인증 토큰 사용 → 계정·동의·간편 로그인 연결 저장을 한 트랜잭션으로 한다.
+    // N-02-1 닉네임 중복 확인(11/18 1차 시연 후속) — 형식이 틀리면 400(nickname 칸 오류), 아니면 쓸 수 있는지만 돌려준다.
+    // '탈퇴'로 시작하는 닉네임은 형식 검사에서 먼저 막으므로 탈퇴 회원의 대체 닉네임('탈퇴'+번호)과 비교할 일이 없다.
+    public AuthResponses.NicknameAvailability checkNickname(AuthRequests.NicknameCheck request) {
+        String nicknameError = AccountRules.nicknameError(request.nickname());
+        if (nicknameError != null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", nicknameError, List.of(new FieldErrorItem("nickname", nicknameError)));
+        }
+        return new AuthResponses.NicknameAvailability(userMapper.countByNickname(request.nickname().strip()) == 0);
+    }
+
+    // AUTH-06 회원가입 — 칸 검사 → 중복(아이디·이메일·닉네임 순) → 간편 로그인 키 → 이메일·휴대폰 인증 토큰 사용 → 계정·동의·간편 로그인 연결 저장을 한 트랜잭션으로 한다.
     @Transactional
     public AuthResponses.Signup signup(AuthRequests.Signup request) {
         LocalDateTime now = LocalDateTime.now(clock);
@@ -140,6 +153,8 @@ public class AuthService {
             socialLink = socialStore.findLinkKey(request.socialLinkKey()).orElseThrow(AuthErrors::socialLinkExpired);
         }
         emailVerification.consume(request.emailVerificationToken(), EmailPurpose.SIGNUP, email, null);
+        // 11/18 1차 시연 후속: 휴대폰 인증 토큰도 한 번 쓴다(토큰의 번호 HMAC·목적 SIGNUP이 가입 번호와 같아야 한다).
+        phoneVerification.consume(request.phoneVerificationToken(), PhonePurpose.SIGNUP, phone);
 
         UserAccount account = new UserAccount();
         account.setLoginId(loginId);
@@ -181,14 +196,16 @@ public class AuthService {
         else if (!AccountRules.isValidLoginId(r.loginId())) {
             errors.add(new FieldErrorItem("loginId", "아이디는 영문 소문자로 시작하는 4~20자 영문 소문자·숫자로 입력해 주세요."));
         }
-        if (isBlank(r.name())) errors.add(new FieldErrorItem("name", "이름을 입력해 주세요."));
-        else if (r.name().strip().length() > AccountRules.NAME_MAX) errors.add(new FieldErrorItem("name", "이름은 50자 이하로 입력해 주세요."));
+        // 11/18 1차 시연 후속: 이름은 완성형 한글 2~20자만 받는다(화면과 같은 문구).
+        String nameError = AccountRules.nameError(r.name());
+        if (nameError != null) errors.add(new FieldErrorItem("name", nameError));
         String nicknameError = AccountRules.nicknameError(r.nickname());
         if (nicknameError != null) errors.add(new FieldErrorItem("nickname", nicknameError));
+        // 11/18 1차 시연 후속: 휴대폰은 필수이고 인증을 거쳐야 한다.
         String phone = AccountRules.normalizePhone(r.phone());
-        if (!phone.isEmpty() && !AccountRules.isValidPhone(phone)) {
-            errors.add(new FieldErrorItem("phone", "휴대폰 번호 형식이 올바르지 않습니다. 예) 010-1234-5678"));
-        }
+        if (phone.isEmpty()) errors.add(new FieldErrorItem("phone", "휴대폰 번호를 입력해 주세요."));
+        else if (!AccountRules.isValidPhone(phone)) errors.add(new FieldErrorItem("phone", "휴대폰 번호 형식이 올바르지 않습니다. 예) 010-1234-5678"));
+        else if (isBlank(r.phoneVerificationToken())) errors.add(new FieldErrorItem("phone", PhoneVerificationService.VERIFICATION_REQUIRED_MESSAGE));
         if (isBlank(r.email())) errors.add(new FieldErrorItem("email", "이메일을 입력해 주세요."));
         else if (!AccountRules.isValidEmail(r.email().strip())) errors.add(new FieldErrorItem("email", "이메일 형식이 올바르지 않습니다. 예) name@example.com"));
         else if (isBlank(r.emailVerificationToken())) errors.add(new FieldErrorItem("email", "이메일 인증을 완료해 주세요."));

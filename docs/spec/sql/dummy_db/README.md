@@ -1,6 +1,6 @@
 # 서비스 DB DDL v0.3.2 더미 시드 — 별도 개발 스키마 권장
 
-**기준 DDL은 `docs/spec/sql/avenue_ddl.sql`의 v0.3.2 기반 개정본(상권 5개 표 제거·빈 알림 표 추가 후 47개 표)이다.** 옛 v2.4 묶음은 11/12 삭제했고 이력은 git에 남아 있다. 폴더·파일 이름에는 버전을 넣지 않고 버전은 문서에 적는다. 별도 Oracle 개발 사용자(스키마)에 적재하는 것을 권장한다.
+**기준 DDL은 `docs/spec/sql/avenue_ddl.sql`의 v0.3.2 기반 개정본(상권 5개 표 제거·빈 알림 표·평가 표본 표 추가 후 48개 표)이다.** 옛 v2.4 묶음은 11/12 삭제했고 이력은 git에 남아 있다. 폴더·파일 이름에는 버전을 넣지 않고 버전은 문서에 적는다. 별도 Oracle 개발 사용자(스키마)에 적재하는 것을 권장한다.
 
 **처음 준비한다면 [DB 구성과 합성 데이터 사용 안내](../README.md)부터 읽는다.** 이 폴더는 서비스 시연용 더미 회원·기관 응답·시드 생성 도구를 보관한다. 모델 학습용 CSV와는 용도가 다르며, 학습 데이터의 생성 과정과 설계 근거는 별도 생성 패키지에 보존한다.
 
@@ -138,7 +138,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 `00_drop_all.sql`은 첫 DROP 전에 USER_TABLES에서 옛 DB 표식(APP_MEMBER·MEMBER_MONTHLY_INPUT·MEMBER_LOAN·EXTERNAL_API_RESPONSE)을 확인하고 하나라도 있으면 오류로 종료한다. 단독 실행에도 WHENEVER SQLERROR EXIT가 적용된다. 표식이 없는 스키마의 공유 테이블까지 자동 식별하는 가드는 아니므로 별도 스키마 원칙은 유지한다.
 
-`99_check.sql`은 현재 개정 DDL 기준 테이블 47개·테이블별 기대 행 수(DIM_FEATURE 77개 = FS-DRAFT 39 + FS-V1 38 포함)·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·CRLF를 LF로 정규화한 DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
+`99_check.sql`은 현재 개정 DDL 기준 테이블 48개·테이블별 기대 행 수(DIM_FEATURE 77개 = FS-DRAFT 39 + FS-V1 38, 등급 구간 버전 2개 CUT-0.1 ACTIVE·CUT-0.2 DRAFT와 구간 6개 포함)·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·CRLF를 LF로 정규화한 DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
 
 테스트(저장소 루트, cryptography가 설치된 Python):
 

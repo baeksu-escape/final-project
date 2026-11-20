@@ -1,13 +1,13 @@
 package com.baeksuescape.finance.util;
 
-import com.baeksuescape.finance.dto.CashFlowForecastResponse;
-import com.baeksuescape.finance.dto.CashFlowForecastResponse.MonthlyForecastItem;
-import com.baeksuescape.finance.dto.CashFlowForecastResponse.PastMonthItem;
-import com.baeksuescape.finance.dto.DeficitMonthsResult;
-import com.baeksuescape.finance.dto.DeficitMonthsResult.DeficitMonthDetail;
-import com.baeksuescape.finance.dto.IncomeVolatilityResponse;
-import com.baeksuescape.finance.dto.IncomeVolatilityResponse.DeficitMonthItem;
-import com.baeksuescape.finance.dto.MonthlyIncomeItem;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse.MonthlyForecastItem;
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse.PastMonthItem;
+import com.baeksuescape.finance.dto.cashflow.DeficitMonthsResult;
+import com.baeksuescape.finance.dto.cashflow.DeficitMonthsResult.DeficitMonthDetail;
+import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityResponse;
+import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityResponse.DeficitMonthItem;
+import com.baeksuescape.finance.dto.cashflow.MonthlyIncomeItem;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
