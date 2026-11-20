@@ -2,12 +2,12 @@ import { GRADE_LABELS } from '../../../common/config/grades.js'
 
 // N-18 서버(또는 mock) 응답을 화면 모델로 바꾸고, 입력을 검증한다. 화면 상태와 API 호출은 여기서 다루지 않는다.
 
-// N-18-2·N-18-3 입력 10개와 화면 범위. 슬라이더 범위는 UI 참고자료 기준이며 금액은 원 단위 0 이상이다.
+// N-18-2·N-18-3 입력 10개와 화면 범위. 슬라이더 범위는 11/20 범영 확정 학습 데이터 최댓값 기준이며 금액은 원 단위 0 이상이다.
 export const SLIDER_FIELDS = [
   { key: 'telecomOnTimeMonths', label: '통신비 정시 납부 기간', min: 0, max: 12, unit: '개월' },
-  { key: 'delinquencyCount', label: '최근 1년 연체 횟수', min: 0, max: 8, unit: '회' },
-  { key: 'cashAdvanceMonths', label: '현금서비스 이용 기간 (최근 12개월)', min: 0, max: 12, unit: '개월' },
-  { key: 'newLoanCount', label: '최근 3개월 신규 대출', min: 0, max: 5, unit: '건' },
+  { key: 'delinquencyCount', label: '최근 1년 연체 횟수', min: 0, max: 6, unit: '회' },
+  { key: 'cashAdvanceMonths', label: '현금서비스 이용 기간 (최근 12개월)', min: 0, max: 10, unit: '개월' },
+  { key: 'newLoanCount', label: '최근 3개월 신규 대출', min: 0, max: 4, unit: '건' },
   { key: 'easyPayMonthlyCount', label: '간편결제 월 이용 건수', min: 0, max: 60, unit: '건' },
   { key: 'utilityUnpaidMonths', label: '공과금 미납 개월 수', min: 0, max: 12, unit: '개월' },
 ]
