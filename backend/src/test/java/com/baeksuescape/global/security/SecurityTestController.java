@@ -5,6 +5,7 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -52,6 +53,18 @@ class SecurityTestController {
     Map<String, Object> conflict() {
         throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_NICKNAME", "이미 사용 중인 닉네임입니다.",
                 java.util.List.of(new FieldErrorItem("nickname", "이미 사용 중인 닉네임입니다.")));
+    }
+
+
+    // FP-143 경로 변수에 든 값이 오류 로그에 남지 않는지 보는 용도(상품 코드·관리자 경로의 회원 번호와 같은 모양)
+    @PostMapping("/api/members/me/__test/items/{code}/conflict")
+    Map<String, Object> conflictWithPathVariable(@PathVariable String code) {
+        throw new ApiException(HttpStatus.NOT_FOUND, "PRODUCT_NOT_FOUND", "상품을 찾을 수 없습니다.");
+    }
+
+    @PostMapping("/api/members/me/__test/items/{code}/boom")
+    Map<String, Object> boomWithPathVariable(@PathVariable String code) {
+        throw new IllegalStateException("boom");
     }
 
     @PostMapping("/api/members/me/__test/boom")

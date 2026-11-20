@@ -4,14 +4,15 @@
 - **범위:** B팀이 맡는 API의 요청·응답 상세. 전체 목록은 [API 정의서](api_definition.md), 문서 관계는 [README](README.md)에 있다.
   - **Spring 공개 API (3장):** RPT-01 점수 산출, RPT-02 내 리포트, RPT-03 지난 평가 상세, MEM-06 진단 내역(응답 매핑만)
   - **Spring → FastAPI 내부 API (4장):** ML-01 ~ ML-04. 화면은 직접 부르지 않는다
-- **기준:** DDL `docs/spec/sql/avenue_ddl.sql`(v0.3.2, 표 47개), 피처 정의서 v1.0 `docs/spec/feature_definition.md`. `features.md`·`decisions.md`와 다르면 DDL을 따른다.
+- **기준:** DDL `docs/spec/sql/avenue_ddl.sql`(v0.3.2, 표 48개 — 11/19 N-25 평가 표본 `MODEL_EVAL_SAMPLE` 추가 🆕 11/20), 피처 정의서 v1.0 `docs/spec/feature_definition.md`. `features.md`·`decisions.md`와 다르면 DDL을 따른다.
 - **장 번호는 바꾸지 않는다.** 코드 주석이 "B팀 명세서 4-3"처럼 이 번호를 가리킨다.
 - 상태 표시: ✅ 확정 · 🟡 임시값·제안(설정 한 곳에 둔다) · ⛔ 미정(9장)
 
-> **🆕 최근 변경 (11/19, FP-234)** — 바뀐 곳에 🆕 11/19 표시
-> 1. 4장 머리말 정정: ML-04는 ACTIVE가 아니라 **출발 평가에 저장된 모델 버전**을 보낸다(광희 FP-170 PR #93 요청). ML-03만 ACTIVE
-> 2. 4장 머리말: 공용 DB 실제 모델 전환 완료(11/18, FP-216) 반영
+> **🆕 최근 변경 (11/20, FP-143)** — 바뀐 곳에 🆕 11/20 표시
+> 1. 기준 DDL 표 48개(N-25 평가 표본 `MODEL_EVAL_SAMPLE`, PR #99)
+> 2. 4-4 SIM-02 경로를 `/api/members/me/credit-care-recalculate`로(PR #103)
 >
+> 이전 변경 (11/19): 4장 머리말 ML-03(ACTIVE)·ML-04(저장된 버전) 구분, 공용 DB 실제 모델 전환 완료 반영
 > 이전 변경 (11/18): 저장소 `docs/spec/api/api_spec_b.md`로 이관(장 번호 그대로), 4-4 간편결제 × 12 🟡 정정
 > 이전 변경 (11/17): ML-04 10번째 키 `UTILITY_LATE_MONTHS`, ML-04 범위 검사는 Spring SIM-02가 먼저, RPT-02·03 `modelFeatures`, 실제 모델 연결(FP-141, PR #74)·`supportedModelVersions`, 모델 파일 해시 대조(PR #77), SIM-02 오류 전달 규칙(광희 PR #78)
 > 이전 변경 (11/16): O-13(입력 부족 409)·O-15(`NO_LOAN_YN`)·O-3·O-6·O-9·O-14 확정, `creditProfile` null·`payerTypeCode`, 4xx 재시도 안 함, 입력 최신성 6개월, 빈 목록 `ALT_DATA_EMPTY`
@@ -232,10 +233,10 @@
 - ⛔ 내부 인증 헤더 여부(O-8)
 - **모델 선택 (FP-141, PR #74)**
   - ML-03: Spring은 DB `MODEL_REGISTRY`의 **ACTIVE** 모델 버전을 `expectedModelVersion`으로 보낸다. **DB의 ACTIVE가 스위치**다.
-  - ML-04: Spring SIM-02는 ACTIVE가 아니라 **출발 평가(최근 SCORED)에 저장된** `MODEL_VERSION`을 `baseAssessment.modelVersion`으로 보낸다. 저장된 피처값과 같은 모델로 다시 계산해야 하기 때문이다(4-4, FP-170 PR #93). 🆕 11/19 정정
+  - ML-04: Spring SIM-02는 ACTIVE가 아니라 **출발 평가(최근 SCORED)에 저장된** `MODEL_VERSION`을 `baseAssessment.modelVersion`으로 보낸다. 저장된 피처값과 같은 모델로 다시 계산해야 하기 때문이다(4-4, FP-170 PR #93). 정정
   - `DEV-DUMMY`(또는 버전 없음) → Mock(`FS-DRAFT` 39개), `LGBM-BASE-0.1` → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`
   - 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503 `MODEL_NOT_READY`(11/17 범영·재욱 합의)
-  - 🆕 11/19 공용 DB는 **11/18 17:52 `LGBM-BASE-0.1`로 전환 완료**(FP-216). 학습 데이터·모델 파일 기록은 `docs/spec/sql/register_model_lgbm_base_0_1.sql`(PR #88). 전환은 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`, 되돌리기는 `rollback_model_to_dev_dummy.sql`(PR #77, 절차: `fastapi_server/README.md`)
+  - 공용 DB는 **11/18 17:52 `LGBM-BASE-0.1`로 전환 완료**(FP-216). 학습 데이터·모델 파일 기록은 `docs/spec/sql/register_model_lgbm_base_0_1.sql`(PR #88). 전환은 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`, 되돌리기는 `rollback_model_to_dev_dummy.sql`(PR #77, 절차: `fastapi_server/README.md`)
 
 ### 4-1. ML-01 `GET /v1/health`
 ```json
@@ -257,7 +258,8 @@ Spring이 시작할 때 한 번 부른다. 세 버전이 DB에 있는지 확인�
 }
 ```
 - `gradeBands`와 `features`가 DB(`SCORE_GRADE_BAND`, `DIM_FEATURE`)와 다르면 Spring이 경고 로그를 남긴다.
-- 실제 모델을 불러왔으면 `LGBM-BASE-0.1` / `FS-V1` / 피처 38개, 아니면 Mock `DEV-DUMMY` / `FS-DRAFT` / 39개를 돌려준다. `supportedModelVersions`는 이 서버가 계산할 수 있는 버전 목록이다.
+- 실제 모델을 불러왔으면 그 묶음의 버전(예: `LGBM-BASE-0.1`) / `FS-V1` / 피처 38개, 아니면 Mock `DEV-DUMMY` / `FS-DRAFT` / 39개를 돌려준다. `supportedModelVersions`는 이 서버가 지금 계산할 수 있는 버전 목록이다: `DEV-DUMMY` + 불러온 묶음의 버전(못 불러왔으면 `DEV-DUMMY`만). 🆕 11/20
+- 🆕 11/20 실제 모델 버전은 코드 상수가 아니라 불러온 묶음의 `meta.json`(`model_version`)에서 정한다(FP-237). 모델을 바꿀 때 코드는 그대로 두고 파일 교체 + DB 등록·전환 SQL만 한다.
 
 ### 4-3. ML-03 `POST /v1/assessments/score` — N-12-2 점수 계산
 
@@ -346,7 +348,7 @@ Spring이 시작할 때 한 번 부른다. 세 버전이 DB에 있는지 확인�
 
 ### 4-4. ML-04 `POST /v1/assessments/simulate` — N-18 신용케어 시뮬레이터 (저장 안 함)
 
-C팀 SIM-02 `POST /api/simulation/credit-care/recalculate`가 부른다.
+C팀 SIM-02 `POST /api/members/me/credit-care-recalculate`가 부른다(11/19 경로 이동, 광희 PR #103 🆕 11/20).
 - **흐름:** C팀 Spring이 로그인 회원의 최신 `SCORED` 평가에서 `FEATURE_SNAPSHOT`과 버전을 읽어 출발점으로 보낸다.
   - 화면이 보낸 `currentScore`는 쓰지 않는다. 화면 값이 조작돼도 결과가 바뀌지 않고, 리포트의 SHAP과 같은 기준이 된다.
 
