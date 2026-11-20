@@ -4,7 +4,11 @@ import { fetchModelPerformance, fetchModelRoc } from '../api/modelPerformanceApi
 import JobRejectBars from '../components/JobRejectBars.jsx'
 import ModelMetricTable from '../components/ModelMetricTable.jsx'
 import RocCurveChart from '../components/RocCurveChart.jsx'
+<<<<<<< HEAD
 import { CUTOFF, DEFAULT_GROUP, DEFAULT_LABEL, MODEL_GROUPS, MODEL_LABELS } from '../modelPerformanceCodes.js'
+=======
+import { AUC_BASIS_LABELS, CUTOFF, DEFAULT_GROUP, DEFAULT_LABEL, MODEL_GROUPS, MODEL_LABELS } from '../modelPerformanceCodes.js'
+>>>>>>> 5a3ee5e0b4a8374d3eb68ddcb44c18ce29f0cb32
 
 // 슬라이더를 끄는 동안 요청이 몰리지 않게, 손을 멈추고 이 시간이 지나면 다시 계산을 요청한다
 const CUTOFF_WAIT_MS = 250
@@ -25,7 +29,8 @@ export default function ModelPerformancePage() {
     const timer = setTimeout(() => {
       fetchModelPerformance({ group, label, cutoff })
         .then((data) => alive && setPerf({ data, error: '' }))
-        .catch((err) => alive && setPerf((prev) => ({ ...prev, error: err.message })))
+        // 실패하면 이전 조건의 숫자를 지운다 — 제목은 새 조건인데 숫자가 남으면 새 결과로 오해한다
+        .catch((err) => alive && setPerf({ data: null, error: err.message }))
     }, CUTOFF_WAIT_MS)
     return () => {
       alive = false
@@ -38,7 +43,7 @@ export default function ModelPerformancePage() {
     let alive = true
     fetchModelRoc({ group, label })
       .then((data) => alive && setRoc({ data, error: '' }))
-      .catch((err) => alive && setRoc((prev) => ({ ...prev, error: err.message })))
+      .catch((err) => alive && setRoc({ data: null, error: err.message }))
     return () => {
       alive = false
     }
@@ -93,7 +98,15 @@ export default function ModelPerformancePage() {
       <div className="l-cols">
         <Card title={`지표 비교 · ${groupInfo.label} · ${labelName} · 컷오프 ${cutoff}점`} className="l-cols__main">
           {data ? (
+<<<<<<< HEAD
             <ModelMetricTable legacy={data.legacy} alternative={data.alternative} aucNote={groupInfo.aucBasis} />
+=======
+            <ModelMetricTable
+              legacy={data.legacy}
+              alternative={data.alternative}
+              aucNote={AUC_BASIS_LABELS[data.aucBasis] ?? groupInfo.aucBasis}
+            />
+>>>>>>> 5a3ee5e0b4a8374d3eb68ddcb44c18ce29f0cb32
           ) : (
             !perf.error && <p className="hint">지표를 계산하는 중입니다…</p>
           )}
