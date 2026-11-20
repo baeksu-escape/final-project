@@ -6,9 +6,10 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
+> - 🆕 11/20 N-17 버틸 수 있는 개월 수의 총자산 사용 비율을 25%에서 15%로 변경했다(D-33 합의).
 > - 🆕 11/20 (광희, FP-239) N-16 자산·부채 저장값 `GET /api/members/me/financial-health`(DIAG-03-1) 추가: 총자산·연소득·총부채·연 원리금·보유 대출 목록, 미입력은 null. 정의서의 옛 경로 `GET /api/diagnosis/health`를 대신한다. 비율은 화면이 이 값으로 DIAG-03 POST를 불러 구한다. 같은 PR에서 DIAG-09 '밀림' 반영: `paymentStatus=DELAYED`면 최근 1년 30일 이상 연체 +1로 예상 점수를 구하고 응답에 `assumedDelinquencyCount`를 추가, `paymentStatusApplied`는 밀림일 때 `true`(범영 11/20 동의).
 > - 🆕 11/20 (동주, FP-160) N-15 같은 직군·연령대 회원 평균 `GET /api/members/me/peer-benchmark`(DIAG-01) 추가. 11/19 팀 결정대로 공공통계 대신 회원 표에서 계산한다. 정의서의 옛 경로 `/api/finance/peer-benchmark`·원천(FACT_*)은 범영 님이 정의서에 반영한다. DIAG-02(`/all`)는 쓰는 화면이 없어 만들지 않았다. PR 리뷰 반영: 미입력 자산·대출은 평균에서 빼고(O-15), 금액별 인원 3개를 추가했으며, 소득은 기준월 포함 최근 12개월만 쓴다.
-> - 🆕 11/20 (광희, FP-167) N-17 시나리오 테스트 API 2개 추가: `GET /api/members/me/scenario-base`(기준값)·`POST /api/members/me/scenario-recalculate`(상환 여력 재계산). 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다. 버틸 수 있는 개월 수의 "총자산 25%"는 임시 가정(팀 결정 대기). 금리 변화는 변동금리 대출의 상환액에만 반영하고 대출마다 금리 하한은 0%다(리뷰 반영, 고정 상환액은 줄지 않음).
+> - 🆕 11/20 (광희, FP-167) N-17 시나리오 테스트 API 2개 추가: `GET /api/members/me/scenario-base`(기준값)·`POST /api/members/me/scenario-recalculate`(상환 여력 재계산). 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다. 버틸 수 있는 개월 수의 총자산 사용 비율 15%는 D-33 11/20 합의다. 금리 변화는 변동금리 대출의 상환액에만 반영하고 대출마다 금리 하한은 0%다(리뷰 반영, 고정 상환액은 줄지 않음).
 > - 🆕 11/19 (광희, FP-180) N-30-1 용어 사전 `GET /api/glossary`(HELP-01) 추가, 기준 데이터 `docs/spec/sql/add_glossary_term.sql`(20개).
 > - 🆕 11/19 (광희, FP-170 추가 수정) 저장 데이터를 읽는 API 5개를 팀 공통 규칙대로 `/api/members/me/**`로 옮기고 옛 경로를 지웠다(우찬 님 합의): SIM-01 `credit-care-base`, SIM-02 `credit-care-recalculate`, DIAG-07-1 `income-volatility`, DIAG-08-1 `cash-flow-forecast`, DIAG-09 `cash-flow-expected-score`. 로그인 확인은 보안 설정이 한다(토큰 없음 401, 관리자 403). SIM-01에 `topReductionFactors`, DIAG-08-1에 기준값 3개(`baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`)를 추가했다(경환 님 요청).
 > - 🆕 11/18 (광희, FP-170) SIM-01 `credit-care/base`·DIAG-09 `cash-flow/expected-score` 추가, SIM-02 Spring 구현(출발 평가 = 최근 SCORED, 404 `ASSESSMENT_NOT_FOUND`).
@@ -371,8 +372,8 @@
   - 월 이자 변화 = Σ 변동금리 잔액 × (max(금리 + 변화, 0) − 금리) ÷ 100 ÷ 12. **대출마다 금리는 0% 아래로 내려가지 않는다.** 합계를 낸 뒤 한 번만 반올림한다(HALF_UP, −0.5원 → −1원. 프론트 mock도 같음)
   - 바뀐 상환액 = 고정 상환액 + max(0, 변동 상환액 + 월 이자 변화). 변동 상환액은 변동금리 대출 월 원리금 합계, 고정 상환액은 전체 월 상환액에서 그것을 뺀 값(고정·`UNKNOWN`)이다. **금리가 내려가도 고정 상환액은 줄지 않는다**
   - 월 잉여 = 소득 − 지출 − 상환액. 상환 부담률 = 연 원리금 ÷ 연소득 × 100(소수 둘째 자리, N-16-1·N-20-4와 같은 함수). 소득이 0 이하면 `null`
-  - 버틸 수 있는 개월 수 = ⌊총자산 × **25%** ÷ 월 부족액⌋. 조건 반영 후 **적자일 때만** 값이 있고, 흑자이거나 총자산 미입력이면 `null`
-    - ⚠️ 25%는 명세에 기준이 없어 시나리오 화면(경환 FP-210)의 가정을 임시로 쓴다(`ScenarioService.SURVIVABLE_ASSET_RATIO_PCT`, TODO 팀 결정). 바뀌면 기존 필드는 두고 필드를 추가하는 방식으로 고친다.
+  - 버틸 수 있는 개월 수 = ⌊총자산 × **15%** ÷ 월 부족액⌋. 조건 반영 후 **적자일 때만** 값이 있고, 흑자이거나 총자산 미입력이면 `null`
+    - 15%는 D-33 11/20 합의다(`ScenarioService.SURVIVABLE_ASSET_RATIO_PCT`).
 - 응답 `200`:
 
   | 필드 | 형식 | 설명 |
@@ -387,7 +388,7 @@
   ```json
   { "current": { "monthlyIncomeAmount": 2099498, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 350000, "monthlySurplusAmount": 433984, "dsrPct": 16.67 },
     "changed": { "monthlyIncomeAmount": 1259699, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 370000, "monthlySurplusAmount": -425815, "dsrPct": 29.37 },
-    "monthlyInterestChangeAmount": 20000, "surplusDiffAmount": -859799, "survivableMonths": 17, "verdict": "SHORTFALL",
+    "monthlyInterestChangeAmount": 20000, "surplusDiffAmount": -859799, "survivableMonths": 10, "verdict": "SHORTFALL",
     "assumptions": ["금리 변화는 변동금리 대출 잔액에만 반영하고, …"] }
   ```
   (예: 변동금리 대출 1,200만 원·연 5%·월 원리금 20만 원(전체 상환액 35만 원 중), 총자산 3,000만 원, `{ "ratePctPoint": 2, "incomePct": -40 }`. 같은 기준값에 `-5`%p면 금리가 0%까지만 내려가 월 이자 −50,000원, 상환액은 고정 15만 원이 남아 30만 원)
