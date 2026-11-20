@@ -1,6 +1,7 @@
 package com.baeksuescape.global.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -11,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Duration;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -129,14 +131,35 @@ class GlobalExceptionHandlerTest {
         assertThat(String.join("\n", logs)).doesNotContain(sensitive, "secret", "010-1234-5678");
     }
 
-    // FP-143 원인 체인이 A→B→A로 돌아도 위치 찾기가 끝난다(무한 루프 방지).
+    // FP-143 원인 체인 탐색: A에 우리 코드 위치가 없으면 원인 B까지 따라가서 찾는다.
     @Test
-    void 원인_체인이_순환해도_위치_찾기가_끝난다() {
-        RuntimeException a = new RuntimeException("a");
-        RuntimeException b = new RuntimeException("b");
+    void 첫_예외에_우리_코드가_없으면_원인까지_따라가_찾는다() {
+        RuntimeException a = exceptionAt(frame("org.example.Library", "call"));
+        RuntimeException b = exceptionAt(frame("com.baeksuescape.sample.Service", "run"));
+        a.initCause(b);
+        b.initCause(a);   // A→B→A 순환이어도 B에서 찾고 끝난다
+        assertThat(GlobalExceptionHandler.firstAppFrame(a)).isEqualTo("Service.run:7");
+    }
+
+    // FP-143 A→B→A 순환이고 어디에도 우리 코드가 없으면, 체인을 끝까지 돌고(무한 루프 없이) 맨 위 위치를 돌려준다.
+    @Test
+    void 원인_체인이_순환하고_우리_코드가_없어도_끝난다() {
+        RuntimeException a = exceptionAt(frame("org.example.Library", "call"));
+        RuntimeException b = exceptionAt(frame("org.example.Other", "work"));
         a.initCause(b);
         b.initCause(a);
-        assertThat(GlobalExceptionHandler.firstAppFrame(a)).contains("GlobalExceptionHandlerTest.원인_체인이_순환해도_위치_찾기가_끝난다");
+        String found = assertTimeoutPreemptively(Duration.ofSeconds(2), () -> GlobalExceptionHandler.firstAppFrame(a));
+        assertThat(found).isEqualTo("org.example.Library.call:7");
+    }
+
+    private static StackTraceElement frame(String className, String method) {
+        return new StackTraceElement(className, method, "Sample.java", 7);
+    }
+
+    private static RuntimeException exceptionAt(StackTraceElement frame) {
+        RuntimeException e = new RuntimeException();
+        e.setStackTrace(new StackTraceElement[] {frame});
+        return e;
     }
 
     private interface Request {

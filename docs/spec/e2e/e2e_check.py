@@ -55,6 +55,16 @@ def read_password(env_file):
     return value
 
 
+def parse_json(raw):
+    """응답 본문(bytes)을 JSON으로 읽는다. 비었거나 JSON이 아니면(200이어도) None — 스크립트가 멈추지 않고 그 항목만 FAIL이 된다."""
+    if not raw:
+        return None
+    try:
+        return json.loads(raw.decode("utf-8", errors="replace"))
+    except ValueError:
+        return None
+
+
 class Api:
     """서버 한 곳(백엔드 또는 FastAPI)에 JSON 요청을 보내는 작은 도우미. 로그인하면 토큰을 들고 다닌다."""
 
@@ -73,14 +83,9 @@ class Api:
         req = urllib.request.Request(self.base + path, data=data, headers=headers, method=method)
         try:
             with urllib.request.urlopen(req, timeout=15) as res:
-                raw = res.read().decode("utf-8")
-                return res.status, (json.loads(raw) if raw else None)
+                return res.status, parse_json(res.read())
         except urllib.error.HTTPError as e:
-            raw = e.read().decode("utf-8", errors="replace")
-            try:
-                return e.code, json.loads(raw)
-            except ValueError:
-                return e.code, None
+            return e.code, parse_json(e.read())
 
     def login(self, login_id, password):
         """로그인해서 토큰을 저장한다. (HTTP 상태, 토큰 있음 여부)를 돌려준다."""
@@ -114,7 +119,11 @@ def check_simulation(sim, report_score):
     if None in (delta.get("financialEffect"), delta.get("alternativeEffect")) or \
             delta.get("total") != (delta.get("financialEffect") or 0) + (delta.get("alternativeEffect") or 0):
         wrong.append(f"delta 나눔 {delta}")
-    for factor in sim.get("topReductionFactors") or []:
+    factors = sim.get("topReductionFactors")
+    if not isinstance(factors, list):
+        wrong.append(f"topReductionFactors가 배열이 아님({type(factors).__name__})")
+        factors = []
+    for factor in factors:
         if not factor.get("featureCode") or not factor.get("featureName") or factor.get("rank") is None \
                 or factor.get("shapScore") is None:
             wrong.append(f"감점 요인 칸 빠짐 rank={factor.get('rank')}")
@@ -141,6 +150,9 @@ def check_expected_score(exp, report_score, request_id):
         wrong.append(f"차이 {exp.get('scoreDiff')} ≠ 예상−현재")
     if exp.get("modelVersion") != REAL_MODEL or exp.get("baseModelVersion") != REAL_MODEL:
         wrong.append(f"모델 {exp.get('modelVersion')}/{exp.get('baseModelVersion')}")
+    # 현금흐름 화면이 "납부 상태 반영 여부" 안내에 쓴다. 있어야 하고 true/false여야 한다(지금 구현은 항상 false).
+    if not isinstance(exp.get("paymentStatusApplied"), bool):
+        wrong.append(f"paymentStatusApplied 없음·형식 다름({exp.get('paymentStatusApplied')!r})")
     return wrong
 
 
