@@ -41,7 +41,8 @@ export default function CashFlowPage() {
               <CashFlowSummary result={result} months={result.forecastMonths.length} />
               {/* N-21-8 예상 점수 실패·참고 안내는 점수 영역에만 보여 주고 전망 결과는 그대로 둔다. */}
               {result.scoreError && <Notice type="warn">{result.scoreError}</Notice>}
-              {(result.scoreNotices ?? []).map((text) => <Notice key={text}>{text}</Notice>)}
+              {/* 안내가 생겨도 화면이 밀리지 않게 한 줄 자리를 둔다. */}
+              <p className="cf-hint cf-neg" aria-live="polite">{result.scoreNotices?.join(' · ') || '\u00a0'}</p>
             </>
           ) : (
             <p className="cf-hint cf-placeholder">{cf.status === 'loading' ? '예측하는 중입니다.' : cf.baselineComplete ? '예측 조건을 확인해 주세요.' : '예측할 수 있는 자료가 아직 없습니다.'}</p>

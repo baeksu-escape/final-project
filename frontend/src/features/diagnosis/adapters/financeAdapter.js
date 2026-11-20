@@ -10,7 +10,7 @@ export function adaptAssetDebtData(raw) {
   }
   if (!Array.isArray(raw.loans)) throw new Error('대출 목록 응답이 올바르지 않습니다.')
   const loans = raw.loans.map((loan) => {
-    const loanKeys = ['loanId','loanTypeName','balanceAmount','annualRatePct','rateTypeCode','remainingMonths','monthlyPaymentAmount']
+    const loanKeys = ['loanTypeName','balanceAmount','annualRatePct','rateTypeCode','remainingMonths','monthlyPaymentAmount']
     if (!loan || typeof loan !== 'object' || !loanKeys.every((key) => Object.hasOwn(loan, key))) throw new Error('대출 항목 응답이 올바르지 않습니다.')
     return {
       loanId: idOrNull(loan.loanId), loanTypeName: stringOrNull(loan.loanTypeName), balanceAmount: amountOrNull(loan.balanceAmount), annualRatePct: finiteOrNull(loan.annualRatePct),
@@ -58,14 +58,14 @@ export function adaptCashFlowForecast(raw) {
 }
 
 // N-21-8 DIAG-09 응답을 화면 값으로 바꾼다. 점수선은 서버가 끝 점수 1개만 주므로 현재→예상 두 점만 잇고 달마다 점수를 만들지 않는다.
-// 안내 문구: 납부 상태가 점수에 반영되지 않았을 때, 점수를 낸 모델이 바뀌었을 때. 점수 차이를 원인처럼 쓰지 않는다.
+// 납부 밀림 가정과 모델 변경을 안내한다. 점수 차이를 원인처럼 쓰지 않는다.
 export function adaptExpectedScore(raw) {
   const isScore = (value) => Number.isInteger(value) && value >= 0 && value <= 1000
   if (!raw || !isScore(raw.currentScore) || !isScore(raw.expectedScore) || typeof raw.paymentStatusApplied !== 'boolean') throw new Error('예상 점수 응답 형식이 올바르지 않습니다.')
   const notices = []
-  if (raw.paymentStatusApplied === false) notices.push('납부 상태는 아직 예상 점수에 반영되지 않습니다.')
+  if (raw.paymentStatusApplied) notices.push('최근 1년 30일 이상 연체 1회 추가로 가정')
   if (raw.modelVersion !== raw.baseModelVersion) notices.push('모델이 바뀌어 점수 차이가 클 수 있습니다.')
-  return { currentScore: raw.currentScore, endScore: raw.expectedScore, scorePath: [{ score: raw.expectedScore }], scoreNotices: notices, scoreError: '' }
+  return { currentScore: raw.currentScore, endScore: raw.expectedScore, paymentStatusApplied: raw.paymentStatusApplied, assumedDelinquencyCount: raw.assumedDelinquencyCount ?? null, scorePath: [{ score: raw.expectedScore }], scoreNotices: notices, scoreError: '' }
 }
 
 // N-21-8 DIAG-09 실패 코드를 점수 영역에만 보여 줄 안내 문구로 바꾼다(전망 결과는 그대로 둔다).

@@ -1,8 +1,6 @@
-import { USE_MOCK } from '../../../common/config/env.js'
 import { apiGet } from '../../../common/api/client.js'
 import { adaptAssetDebtData, adaptCashFlowData, adaptCashFlowForecast, adaptExpectedScore, describeExpectedScoreError, validateForecastConditions } from '../adapters/financeAdapter.js'
-import { calculateFinancialHealth, getCashFlowForecast, getExpectedScore } from './diagnosisApi.js'
-import { createFinanceMockData } from '../mocks/financeMockData.js'
+import { calculateFinancialHealth, getCashFlowForecast, getExpectedScore, getMemberFinancialHealth } from './diagnosisApi.js'
 import { previewAssetDebtMock } from '../mocks/financeMockCalculations.js'
 
 const PEER_BENCHMARK_PATH = '/api/members/me/peer-benchmark'
@@ -12,14 +10,11 @@ export function getPeerBenchmark() {
   return apiGet(PEER_BENCHMARK_PATH)
 }
 
-// N-16-1 회원별 화면 호출 범위를 확인하고 시연 기준값을 반환한다. 실제 API 경로는 정하지 않는다.
-// TODO(광희 요청: DIAG-03-1): 저장된 총자산·연소득·총부채·대출 목록·직군 평균 조회 API가 🟡 미정이라 브라우저 mock 기준값을 유지한다.
-export async function getAssetDebtData(userId, workerTypeCode) {
-  requireMock(userId)
-  const benchmark = await getPeerBenchmark()
-  const data = adaptAssetDebtData({ ...createFinanceMockData(workerTypeCode).asset, peer: benchmark?.sameWorkerType })
-  await mockDelay()
-  return data
+// N-16-1 저장된 자산·부채와 같은 직군 회원 평균을 병렬 조회한다.
+export async function getAssetDebtData(userId) {
+  requireUser(userId)
+  const [health, benchmark] = await Promise.all([getMemberFinancialHealth(), getPeerBenchmark()])
+  return adaptAssetDebtData({ ...health, peer: benchmark?.sameWorkerType, assumptions: ['금액은 저장된 입력값 기준이며 실제 심사 결과가 아닙니다.'] })
 }
 
 // N-21-1·2 DIAG-08-1 응답의 월별 실적(months)과 기준 고정·기타 지출·월 상환액을 기준 자료로 쓴다.
@@ -101,16 +96,7 @@ function requireUser(userId) {
   if (!(typeof userId === 'string' && userId.trim() || Number.isSafeInteger(userId) && userId > 0)) throw new Error('로그인 회원을 확인해 주세요.')
 }
 
-// N-16·N-21 실제 모드에서 mock으로 우회하지 않고 호출 회원의 누락을 차단한다.
-function requireMock(userId) {
-  if (!USE_MOCK) throw new Error('이번 진단 화면은 mock 시연용이며 실제 API는 연결되지 않았습니다.')
-  if (arguments.length && !(typeof userId === 'string' && userId.trim() || Number.isSafeInteger(userId) && userId > 0)) throw new Error('로그인 회원을 확인해 주세요.')
-}
-
 // N-16-3·N-21-4 누락·추가된 입력 필드는 자동 보정하지 않는다.
 function requireExactKeys(value, keys) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length !== keys.length || keys.some((key) => !Object.hasOwn(value, key))) throw new Error('입력 필드를 확인해 주세요.')
 }
-
-// N-16·N-21 비동기 화면 상태를 확인하기 위한 짧은 mock 응답 지연이다.
-function mockDelay() { return new Promise((resolve) => setTimeout(resolve, 120)) }
