@@ -37,7 +37,7 @@
   - 범영 님(DB 담당): 병합 후 공용 DB에 `add_glossary_term.sql` 실행(체크리스트 9). 로컬 DB는 각자 실행
   - 경환 님(더미 DB 생성기): 나중에 생성기·`99_check.sql`에 넣을지는 선택(지금은 별도 파일로 충분)
   - 화면 담당: 툴팁·챗봇에서 `features/ai/api/glossaryApi.js`의 `getGlossary()`를 쓸 수 있다
-  - 범영·우찬 님: API 정의서 HELP-01 상태 🟡 → ✅ 반영
+  - 범영 님: 이 PR은 `api_definition.md`를 고치지 않는다. 병합 후 정의서 HELP-01 상태를 🟡 → ✅로 바꾸는 것은 후속 작업이다(PR 본문으로 요청)
 
 ## 확인
 - 확인함
@@ -52,6 +52,8 @@
 - N-31(AI 요약)·N-32(챗봇)도 `com.baeksuescape.help`에 둔다.
 - 툴팁(N-30-2)은 N-30에 적힌 6개 탭에서만 보인다. 상권 분석·대출 상품·신용 라운지·관리자·마이 페이지에는 두지 않는다.
 - 용어·문구를 바꾸려면 `add_glossary_term.sql`을 고치고 다시 실행하면 된다(같은 용어는 덮어씀).
+- 정렬은 `ORDER BY TERM`(Oracle 기본 바이너리 정렬)이라 영문 용어(DSR, SHAP 영향도)가 한글보다 앞에 온다. 문서·mock 순서도 같다. 다른 순서가 필요하면 화면에서 다시 정렬한다.
+- 🆕 11/20 리뷰 반영: SQL의 `WHENEVER SQLERROR`·`OSERROR`에 `ROLLBACK`을 붙였다(FP-139 e33120d와 같은 형식). MERGE 한 문장이라 동작 차이는 없고 일관성 목적이다. Oracle 실행 확인은 병합 후 DB 담당이 실행하면서 `COUNT = 20`으로 확인한다.
 
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
