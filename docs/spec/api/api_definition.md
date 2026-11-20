@@ -14,6 +14,7 @@
 > 4. 광희 님 요청: SIM-01 주요 표에 `USER_CREDIT_PROFILE`, DIAG-09 409에 "같은 달 겹침"
 > 5. 2-9 **용어 사전 HELP-01 ✅**(FP-180 PR #108)
 > 6. 2-5 **DIAG-01 ✅ 경로 `/api/members/me/peer-benchmark`·원천 회원 표(동주, FP-160 PR #120)**, DIAG-02·05 ⛔(쓰는 화면 없음 / `scenario-base`가 기준금리 제공), 2-10 ADM-01·02 쿼리·담당 FP-184
+> 7. 2-10 **모형 성능 비교 ADM-01·02 ✅(동주, FP-184)** — ACTIVE 모델(지금 0.2)의 평가 표본 기준, 1-2에 409 `MODEL_EVAL_NOT_READY`
 >
 > 이전 변경 (11/19): FP-219 AUTH-13~15·AUTH-06 휴대폰 인증 필수, FP-170 SIM-01·02·DIAG-09 ✅, 1-2 C팀 오류 표 정리
 > 이전 변경 (11/18): 저장소 `docs/spec/api/`로 이관, PR #83(DIAG-07 표준편차·DIAG-08 `months[]`·전망 조건) 반영, 간편결제 × 12 🟡 정정, `isXxx` 필드 규칙
@@ -111,6 +112,7 @@
 | 503 | `MODEL_NOT_READY` | SIM-02·DIAG-09: 실제 모델 파일 없음, 연결 실패, 타임아웃, 그 밖의 5xx. 저장하지 않으므로 `MODEL_ERROR` 기록 없음 |
 
 - 커뮤니티(동주, PR #80) 오류 code: 403 `NOT_OWNER`(남의 글 수정·삭제), 404 `POST_NOT_FOUND`·`TARGET_NOT_FOUND`·`REPORT_NOT_FOUND`, 409 `OWN_CONTENT`(본인 글 신고)·`DUPLICATE_REPORT`·`POST_HIDDEN`·`STATUS_CHANGED`·`ALREADY_HANDLED`, 429 `DAILY_LIMIT_EXCEEDED`(하루 3번 초과).
+- 모형 성능 비교(동주, FP-184) 오류 code: 400 `INVALID_INPUT`(`group`·`label`·`cutoff` 허용값 밖), 409 `MODEL_EVAL_NOT_READY`(ACTIVE 모델이 없거나 그 버전의 평가 표본이 없음) 🆕 11/20
 
 ---
 
@@ -279,8 +281,8 @@
 
 | ID | 메서드 · 경로 | 기능 | 주요 표 | 담당 | 상태 |
 |---|---|---|---|---|---|
-| ADM-01 | `GET /api/admin/model-performance?group=LEGACY\|THINFILE&label=DELINQ\|NONFIN&cutoff=600~800` 🆕 11/20 | N-25-1 비교 조건 선택, N-25-2 성능 지표 재계산·비교 표, N-25-4 직군별 우량 고객 오거절률 | `MODEL_EVAL_SAMPLE`(평가 표본 3,085건, PR #99 🆕 11/20), `MODEL_ARTIFACT`(같은 라벨 AUC `METRICS_JSON.same_label_comparison`, PR #98 🆕 11/20) | 동주 (FP-184) 🆕 11/20 | 🟡 서버 구현 완료, FP-184 PR 병합 대기 🆕 11/20 |
-| ADM-02 | `GET /api/admin/model-performance/roc?group=…&label=…` 🆕 11/20 | N-25-3 ROC 곡선 | 위와 같음 | 동주 (FP-184) 🆕 11/20 | 🟡 서버 구현 완료, FP-184 PR 병합 대기 🆕 11/20 |
+| ADM-01 | `GET /api/admin/model-performance?group=LEGACY\|THINFILE&label=DELINQ\|NONFIN&cutoff=600~800` 🆕 11/20 | N-25-1 비교 조건 선택, N-25-2 성능 지표 재계산·비교 표, N-25-4 직군별 우량 고객 오거절률 | `MODEL_EVAL_SAMPLE`(평가 표본 3,085건, PR #99 🆕 11/20), `MODEL_ARTIFACT`(같은 라벨 AUC `METRICS_JSON.same_label_comparison`, PR #98 🆕 11/20) | 동주 (FP-184) 🆕 11/20 | ✅ ACTIVE 모델(지금 `LGBM-BASE-0.2`) 기준 🆕 11/20 |
+| ADM-02 | `GET /api/admin/model-performance/roc?group=…&label=…` 🆕 11/20 | N-25-3 ROC 곡선 | 위와 같음 | 동주 (FP-184) 🆕 11/20 | ✅ 🆕 11/20 |
 | ADM-03 | `GET /api/admin/stats` | N-26-1 구분·지표 선택, N-26-2 요약 수치, N-26-3 분포 차트, N-26-4 통계 표·직군별 점수 표 | `ASSESSMENT` | 확인 필요 (Q-10) | 🟡 |
 | ADM-04 | `GET /api/stats/compare` | N-26-5 비교 분석 화면 (사용자), N-26-6 직군 × 연령 격자·선택한 집단, N-26-7 직군별·연령별 비교 | `ASSESSMENT` | 광희 (FP-159) | ⛔ (사용자 쪽은 미정) |
 | ADM-05 | `GET /api/admin/users?q&role&status&page&size` | N-27-1 계정 목록 조회·검색 (size 최대 100) | `APP_USER` | 경환·우찬 (FP-80) | ✅ |

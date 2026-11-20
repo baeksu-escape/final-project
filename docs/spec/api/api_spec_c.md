@@ -709,13 +709,13 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 {
   "group": "LEGACY", "label": "DELINQ", "cutoff": 700,
   "sampleBasis": "VALID", "sampleCount": 1800, "badCount": 174, "aucBasis": "SEED_MEAN_5",
-  "legacy": { "modelVersion": "LGBM-BASE-0.1", "auc": 0.6049, "accuracy": 61.5, "misclassCost": 0.4321,
+  "legacy": { "modelVersion": "LGBM-BASE-0.2", "auc": 0.6047, "accuracy": 61.5, "misclassCost": 0.4321,
               "goodRejectRate": 30.25, "badApproveRate": 40.0, "approvalRate": 65.12 },
-  "alternative": { "modelVersion": "LGBM-BASE-0.1", "auc": 0.5991, "...": "같은 필드" },
+  "alternative": { "modelVersion": "LGBM-BASE-0.2", "auc": 0.6078, "...": "같은 필드" },
   "byJob": [ { "jobType": "EMPLOYEE", "sampleCount": 1411, "badCount": 130, "legacyGoodRejectRate": 31.5, "alternativeGoodRejectRate": 29.25 } ]
 }
 ```
-(건수·AUC 말고 지표 숫자는 모양 예시다.)
+(건수·AUC 말고 지표 숫자는 모양 예시다. AUC는 ACTIVE 모델 `LGBM-BASE-0.2`의 연체 라벨 5개 시드 평균 🆕 11/20)
 
 ### GET `/api/admin/model-performance/roc` (ADM-02)
 
@@ -737,9 +737,12 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 | 400 | `INVALID_INPUT` | `group`·`label`이 허용값이 아님, `cutoff`가 600~800 밖. 틀린 칸마다 `fieldErrors[].field` = 쿼리 이름 | "고객 집단 값이 올바르지 않습니다." / "비교 라벨 값이 올바르지 않습니다." / "컷오프는 600~800점 사이로 넣어 주세요." |
 | 400 | `INVALID_INPUT` | `cutoff`가 정수가 아님(공통 처리기) | field `cutoff` "형식이 올바르지 않습니다." |
 | 401 / 403 | `UNAUTHORIZED` / `FORBIDDEN` | 토큰 없음 / 관리자가 아님 | 공통 |
-| 409 | `MODEL_EVAL_NOT_READY` 🆕 | ACTIVE 모델이 없거나, ACTIVE 모델 버전의 평가 표본이 아직 없음(예: 공용 DB가 아직 `DEV-DUMMY`, 적재 SQL 미실행). 409 = 지금 상태로는 처리할 수 없음(B팀 명세서 용어집) | "지금 사용 중인 모델(LGBM-BASE-0.1)의 평가 표본이 아직 준비되지 않았습니다." |
+| 409 | `MODEL_EVAL_NOT_READY` 🆕 | ACTIVE 모델이 없거나, ACTIVE 모델 버전의 평가 표본이 아직 없음(예: 공용 DB가 아직 `DEV-DUMMY`, 적재 SQL 미실행). 409 = 지금 상태로는 처리할 수 없음(B팀 명세서 용어집) | "지금 사용 중인 모델(LGBM-BASE-0.2)의 평가 표본이 아직 준비되지 않았습니다." (괄호 안은 ACTIVE 버전) |
 
-409가 나오면 DB 담당이 `create_model_eval_sample.sql`(표가 없을 때) → `load_model_eval_sample_lgbm_base_0_1.sql`을 실행하고, `MODEL_REGISTRY`에서 그 버전이 ACTIVE인지 본다. 모델을 다시 학습하면 새 `MODEL_VERSION`으로 평가 표본도 다시 적재해야 화면이 나온다.
+409가 나오면 DB 담당이 ACTIVE 모델 버전에 맞는 SQL을 실행하고 `MODEL_REGISTRY`에서 그 버전이 ACTIVE인지 본다. 0.2 기준(🆕 11/20): `create_model_eval_sample.sql`(표가 없을 때) → `load_model_eval_sample_lgbm_base_0_2.sql` → `update_model_metrics_same_label_lgbm_base_0_2.sql`(LEGACY의 5개 시드 평균 AUC, 없으면 `aucBasis`가 `SINGLE_SEED`로 바뀜). 모델을 다시 학습하면 새 `MODEL_VERSION`으로 평가 표본도 다시 적재해야 화면이 나온다.
+
+---
+
 ## N-30-1 금융 용어 사전 (HELP-01, FP-180, 담당 광희) 🆕 11/19
 
 | 메서드 | 경로 | 설명 | 데이터 출처 |
