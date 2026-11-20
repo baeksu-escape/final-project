@@ -356,7 +356,7 @@ function handleMemberScenarioRecalculate({ body, token }) {
     fixedPayment + Math.max(0, variablePayment + interestChange),
   )
   const surplusDiffAmount = changed.monthlySurplusAmount - current.monthlySurplusAmount
-  // 적자일 때만 ⌊총자산 × 25% ÷ 월 부족액⌋. 흑자이거나 총자산 미입력이면 null
+  // 적자일 때만 ⌊총자산 × 15% ÷ 월 부족액⌋. 흑자이거나 총자산 미입력이면 null
   const survivableMonths = changed.monthlySurplusAmount < 0 && b.totalAssetAmount !== null
     ? Math.floor((b.totalAssetAmount * b.survivableAssetRatioPct) / 100 / -changed.monthlySurplusAmount)
     : null

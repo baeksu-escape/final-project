@@ -43,9 +43,9 @@ public class ScenarioService {
 
     /**
      * 적자일 때 부족액에 쓸 수 있다고 보는 총자산 비율(%). 저장된 자산은 총자산 하나뿐이라(전세보증금·자동차 등 포함) 일부만 쓸 수 있다고 본다.
-     * TODO(팀 결정) 명세(N-17-4)에 기준이 없다. 시나리오 화면의 가정(25%)을 임시로 쓴다. 정해지면 이 값만 바꾼다.
+     * D-33 11/20 합의: 총자산의 15%(현금·예금 수준)를 사용한다.
      */
-    static final int SURVIVABLE_ASSET_RATIO_PCT = 25;
+    static final int SURVIVABLE_ASSET_RATIO_PCT = 15;
 
     static final String SHORTFALL = "SHORTFALL";
     static final String IMPROVED = "IMPROVED";
@@ -60,7 +60,7 @@ public class ScenarioService {
     static final List<String> ASSUMPTIONS = List.of(
             "금리 변화는 변동금리 대출에만 반영하고, 고정금리·금리 방식을 모르는 대출의 상환액은 바꾸지 않습니다.",
             "월 이자 변화는 변동금리 대출 잔액 × 금리 변화 ÷ 12로 간단히 어림한 값이며, 대출마다 금리는 0% 아래로 내려가지 않는 것으로 봅니다.",
-            "적자가 나면 총자산의 " + SURVIVABLE_ASSET_RATIO_PCT + "%를 부족액에 쓸 수 있다고 가정해 버틸 수 있는 개월 수를 계산합니다.",
+            "총자산의 " + SURVIVABLE_ASSET_RATIO_PCT + "%(가구 금융자산 중 현금·예금 수준)를 부족액에 쓸 수 있다고 가정합니다.",
             "월 소득은 최근 12개월 평균입니다.");
 
     private final IncomeVolatilityService incomeVolatilityService;
