@@ -454,7 +454,7 @@ class MemberFinanceControllerTest {
     @DisplayName("DIAG-09: 본문 조건이 전달되고 JSON 필드 이름이 고정된다")
     void postExpectedScore() throws Exception {
         when(expectedScoreService.expectedScore(eq(2L), any())).thenReturn(new ExpectedScoreResponse(588, "CAUTION", 571,
-                "CAUTION", -17, "LGBM-BASE-0.1", "DEV-DUMMY", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", false));
+                "CAUTION", -17, "LGBM-BASE-0.1", "DEV-DUMMY", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", true, 1));
 
         mockMvc.perform(loggedIn(post(EXPECTED_SCORE)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -468,7 +468,8 @@ class MemberFinanceControllerTest {
                 .andExpect(jsonPath("$.modelVersion").value("LGBM-BASE-0.1"))
                 .andExpect(jsonPath("$.baseModelVersion").value("DEV-DUMMY"))
                 .andExpect(jsonPath("$.baseRequestId").value("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"))
-                .andExpect(jsonPath("$.paymentStatusApplied").value(false));
+                .andExpect(jsonPath("$.paymentStatusApplied").value(true))
+                .andExpect(jsonPath("$.assumedDelinquencyCount").value(1));
 
         ArgumentCaptor<CashFlowConditionRequest> captor = ArgumentCaptor.forClass(CashFlowConditionRequest.class);
         verify(expectedScoreService).expectedScore(eq(2L), captor.capture());

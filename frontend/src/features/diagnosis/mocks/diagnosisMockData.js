@@ -71,6 +71,8 @@ export const SAMPLE_EXPECTED_SCORE_BASE = Object.freeze({
   gradeCutoffs: Object.freeze({ standard: 665, good: 780 }),
   incomePointPerPercent: 1, // 평균 소득이 1% 늘 때 +1점
   expensePointPerPercent: 0.5, // 월 지출이 1% 늘 때 −0.5점
+  storedDelinquencyCount: 0, // 저장된 최근 1년 30일 이상 연체 건수 예시(밀림이면 +1)
+  delayedPointPenalty: 15, // mock 전용: 밀림이면 −15점(실제 감점은 모델이 정한다)
 })
 
 // FP-239 N-16 DIAG-03-1 자산·부채 저장값 mock. 연소득은 위 현금흐름 예시(시드 회원 2번)의 월 평균 × 12에 가깝게 둔 예시값이고,
