@@ -4,7 +4,6 @@ import { forecastCashFlow, getCashFlowData } from '../api/financeApi.js'
 // 처음 화면에 쓰는 예측 조건(UI 참고자료 기본값: 변동 폭 100%, 제때 납부, 12개월). 월 고정 지출은 저장값으로 채운다.
 const DEFAULT_CONDITIONS = { incomeVariationPct: 100, fixedExpenseAmount: null, paymentStatus: 'ON_TIME', months: 12 }
 const CONDITION_KEYS = Object.keys(DEFAULT_CONDITIONS)
-const AUTO_DELAY_MS = 500
 const sameConditions = (a, b) => CONDITION_KEYS.every((key) => a?.[key] === b?.[key])
 
 const validAmount = (value) => Number.isSafeInteger(value) && value >= 0
@@ -29,21 +28,18 @@ const EMPTY_LOAD = { key: null, loading: true, error: '', baseline: null }
 const IDLE = { applied: null, result: null, status: 'idle', error: '' }
 
 // N-21-2·N-21-4·N-21-5 현금흐름 예측 화면 상태.
-// 처음 들어오면 저장값과 기본 조건으로 한 번 예측하고, 이후에는 조건이 0.5초 동안 바뀌지 않으면 최신 조건으로 한 번만 다시 예측한다.
-// status: idle(완료·대기) · waiting(입력 멈춤 대기) · loading(계산 중) · invalid(요청 안 함) · error(실패)
-// 회원·직군 전환, 다시 불러오기, 새 입력, 화면 이탈이 있으면 예약과 늦은 응답을 모두 버린다.
+// 처음에는 저장값과 기본 조건으로 예측하고 이후에는 버튼으로 다시 예측한다.
+// status: idle(완료·대기) · loading(계산 중) · invalid(요청 안 함) · error(실패)
+// 회원·직군 전환, 다시 불러오기, 새 입력, 화면 이탈 시 늦은 응답을 버린다.
 export function useCashFlowForecast(userId, workerTypeCode) {
   const [revision, setRevision] = useState(0)
   const [load, setLoad] = useState(EMPTY_LOAD)
   const [form, setForm] = useState({ key: null, values: DEFAULT_CONDITIONS, ...IDLE })
   const seq = useRef(0)
-  const timer = useRef(null)
   const key = `${userId}:${workerTypeCode}:${revision}`
 
-  // 예약된 자동 예측과 진행 중 응답을 모두 무효로 만든다.
+  // 진행 중인 예측 응답을 무효로 만든다.
   const cancelPending = () => {
-    clearTimeout(timer.current)
-    timer.current = null
     seq.current += 1
   }
 
@@ -64,7 +60,6 @@ export function useCashFlowForecast(userId, workerTypeCode) {
   // N-21-1 저장값을 불러오고 기본 조건으로 첫 예측을 한 번 요청한다.
   useEffect(() => {
     let active = true
-    clearTimeout(timer.current)
     seq.current += 1
     getCashFlowData(userId, workerTypeCode).then(
       (baseline) => {
@@ -80,9 +75,8 @@ export function useCashFlowForecast(userId, workerTypeCode) {
     return () => { active = false }
   }, [key, userId, workerTypeCode, runForecast])
 
-  // 화면을 떠나면 예약과 진행 중 응답을 버린다.
+  // 화면을 떠나면 진행 중 응답을 버린다.
   useEffect(() => () => {
-    clearTimeout(timer.current)
     seq.current += 1
   }, [])
 
@@ -91,7 +85,7 @@ export function useCashFlowForecast(userId, workerTypeCode) {
   const baseline = ready ? load.baseline : null
   const complete = isBaselineComplete(baseline)
 
-  // N-21-2 조건 하나를 바꾼다. 이전 예약·응답을 취소하고, 유효하면 0.5초 뒤 최신 조건으로 예측을 예약한다.
+  // N-21-2 조건 하나를 바꾸고 이전 응답을 무효화한다.
   const setCondition = (name, value) => {
     cancelPending()
     const values = { ...current.values, [name]: value }
@@ -100,19 +94,15 @@ export function useCashFlowForecast(userId, workerTypeCode) {
       setForm({ ...current, values, status: invalid ? 'invalid' : 'idle', error: invalid })
       return
     }
-    // 마지막으로 적용한 조건과 같으면 다시 요청하지 않는다.
-    if (sameConditions(values, current.applied)) {
-      setForm({ ...current, values, status: 'idle', error: '' })
-      return
-    }
-    setForm({ ...current, values, status: 'waiting', error: '' })
-    const mySeq = seq.current
-    timer.current = setTimeout(() => { timer.current = null; runForecast(baseline, values, key, mySeq) }, AUTO_DELAY_MS)
+    setForm({ ...current, values, status: 'idle', error: '' })
   }
 
-  // 실패 뒤 같은 조건으로 바로 다시 요청한다.
-  const retry = () => {
-    if (!complete || conditionError(current.values)) return
+  const canForecast = complete && current.status !== 'loading' && !conditionError(current.values)
+    && !sameConditions(current.values, current.applied)
+
+  // N-21-8 유효한 변경 조건을 버튼으로 예측한다.
+  const forecast = () => {
+    if (!canForecast) return
     cancelPending()
     runForecast(baseline, { ...current.values }, key, seq.current)
   }
@@ -127,8 +117,10 @@ export function useCashFlowForecast(userId, workerTypeCode) {
     status: current.status,
     error: current.error,
     stale: Boolean(current.result) && !sameConditions(current.values, current.applied),
+    canForecast,
     setCondition,
-    retry,
+    forecast,
+    retry: forecast,
     reload: () => setRevision((value) => value + 1),
   }
 }

@@ -21,8 +21,8 @@ export default function CashFlowPage() {
       </header>
       <IncomeVolatilitySection />
       {cf.loading ? <p role="status">현금흐름 자료를 불러오는 중입니다.</p> : cf.loadError ? <Notice type="warn">{cf.loadError} <Button size="sm" onClick={cf.reload}>다시 시도</Button></Notice> : <div className="cf-layout">
-        <CashFlowConditions values={cf.values} status={cf.status} error={cf.error} stale={cf.stale}
-          canForecast={cf.baselineComplete} onChange={cf.setCondition} onRetry={cf.retry} />
+        <CashFlowConditions values={cf.values} status={cf.status} error={cf.error} stale={cf.stale || (cf.status === 'idle' && cf.canForecast)}
+          baselineComplete={cf.baselineComplete} canForecast={cf.canForecast} onChange={cf.setCondition} onForecast={cf.forecast} onRetry={cf.retry} />
         <Card title="월별 소득과 지출" className="cf-result">
           <p className="cf-legend">
             <span><i className="cf-swatch cf-swatch--act" /> 실제 소득</span>
