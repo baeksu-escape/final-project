@@ -26,7 +26,7 @@ export function adaptAssetDebtData(raw) {
 
 // N-21 현금흐름 월별 기준 자료는 정확히 12개월 연속이어야 하며 NULL 소득은 그대로 둔다.
 export function adaptCashFlowData(raw) {
-  // TODO(광희 요청 11/19): 소득이 12개월보다 적은 회원(자영업자·프리랜서)의 months가 짧을 때 화면이 예측을 어떻게 처리할지 정해 달라고 요청(임의 0 채우기 금지).
+  // 소득은 12개월 입력으로 확정(decisions.md 1-4)이라 정상 경로에서는 12개월이 온다. 그보다 짧으면 안전장치로 예측을 막고 0으로 채우지 않는다.
   if (raw && Array.isArray(raw.months) && raw.months.length < 12) throw new Error('저장된 소득이 12개월보다 적어 현금흐름을 예측할 수 없습니다.')
   if (!raw || !Array.isArray(raw.months) || raw.months.length !== 12
     || !['fixedExpenseAmount','otherExpenseAmount','monthlyPaymentAmount'].every((key) => Object.hasOwn(raw, key))) throw new Error('현금흐름 기준 자료는 12개월이 필요합니다.')
