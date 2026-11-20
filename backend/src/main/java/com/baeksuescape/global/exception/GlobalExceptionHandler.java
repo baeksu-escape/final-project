@@ -1,7 +1,10 @@
 package com.baeksuescape.global.exception;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
@@ -33,14 +37,14 @@ public class GlobalExceptionHandler {
 
     // 업무 오류: 던진 쪽이 정한 상태·코드·문구를 그대로 쓴다.
     // FP-143 서버 로그에 상태·오류 코드·요청 방식·경로만 한 줄 남긴다(409 INPUT_INCOMPLETE처럼 응답만 보고 끝나서 원인을 찾기 어렵던 문제).
-    // 문구·칸 오류·요청 본문은 남기지 않는다. 경로는 /api/members/me/…처럼 회원 번호가 없고, 있어도 평가 requestId(UUID)뿐이다.
+    // 문구·칸 오류·요청 본문은 남기지 않는다. 경로는 실제 주소가 아니라 경로 템플릿(logPath)으로 남긴다.
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> handleApi(ApiException e, HttpServletRequest request) {
         int status = e.getStatus().value();
         if (status >= 500) {
-            log.warn("API 오류 {} {} {} {}", status, e.getCode(), request.getMethod(), request.getRequestURI());
+            log.warn("API 오류 {} {} {} {}", status, e.getCode(), request.getMethod(), logPath(request));
         } else {
-            log.info("API 오류 {} {} {} {}", status, e.getCode(), request.getMethod(), request.getRequestURI());
+            log.info("API 오류 {} {} {} {}", status, e.getCode(), request.getMethod(), logPath(request));
         }
         return ResponseEntity.status(e.getStatus()).body(new ErrorResponse(e.getCode(), e.getMessage(), e.getFieldErrors()));
     }
@@ -101,14 +105,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception e, HttpServletRequest request) {
         log.error("처리하지 못한 오류: {} at {} ({} {})", e.getClass().getName(), firstAppFrame(e),
-                request.getMethod(), request.getRequestURI());
+                request.getMethod(), logPath(request));
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ErrorResponse.of("INTERNAL_ERROR", "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."));
     }
 
+    // FP-143 로그에 남길 경로. 실제 주소(getRequestURI) 대신 컨트롤러의 경로 템플릿을 쓴다
+    // (예: /api/products/{productCode}, /api/admin/users/{userId}/lock, /api/report/{requestId}).
+    // 경로 변수에 들어온 값(사용자가 넣은 임의 문자열, 관리자 경로의 회원 번호, 평가 requestId)은 남기지 않는다(AGENTS.md 5장).
+    // 컨트롤러가 정해지기 전에 난 오류라 템플릿이 없으면 주소 대신 고정 문구를 남긴다.
+    static String logPath(HttpServletRequest request) {
+        Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        return pattern instanceof String template ? template : "(경로 템플릿 없음)";
+    }
+
     // 원인 예외까지 따라가며 com.baeksuescape 코드의 첫 위치를 찾는다. 없으면 맨 위 위치. 메시지는 읽지 않는다.
+
+    // 원인 체인이 A→B→A처럼 돌아도 끝나도록 이미 본 예외는 다시 보지 않는다.
     static String firstAppFrame(Throwable e) {
-        for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Throwable t = e; t != null && seen.add(t); t = t.getCause()) {
             for (StackTraceElement frame : t.getStackTrace()) {
                 if (frame.getClassName().startsWith("com.baeksuescape.")) {
                     String cls = frame.getClassName();

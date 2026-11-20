@@ -1,23 +1,21 @@
 -- ====================================================================
 -- FP-143 평가 조회 쿼리 실행 계획 점검 — 리포트·진단 내역·시뮬레이터가 부르는 쿼리가 인덱스를 쓰는지 본다.
--- 읽기만 한다(EXPLAIN PLAN은 쿼리를 실행하지 않고 계획만 PLAN_TABLE에 적는다). 로컬 DB에서 SQL Developer F5로 실행한다.
+-- 서비스 표(ASSESSMENT·ASSESSMENT_FACTOR)의 데이터와 통계는 바꾸지 않는다. EXPLAIN PLAN은 쿼리를 실행하지 않고 계획만 적는다.
+-- 이 파일이 쓰는 곳은 PLAN_TABLE 하나다: 계획을 PLAN_TABLE(세션별 임시 표)에 적고, 맨 끝에서 이 파일이 적은 행(Q1~Q6)을 지운 뒤 COMMIT한다.
+--   → 이 창에서 커밋하지 않은 다른 작업이 있으면 그 COMMIT에 같이 커밋되므로, 새 창(새 접속)에서 실행한다.
+-- 통계 갱신은 따로 뗐다: 행 수가 많이 바뀐 뒤라면 gather_assessment_stats.sql을 먼저 실행한다(통계를 바꾸는 파일).
+-- ⚠️ 로컬 DB에서만 실행한다(SQL Developer F5). 공용 DB에서는 COMMIT이 다른 작업까지 커밋할 수 있어 돌리지 않는다.
 -- 값은 예시다(USER_ID 1 = demo_employee). 실제 매퍼(AssessmentMapper.xml)와 같은 WHERE·ORDER BY를 썼다.
 --
 -- 보는 법: 각 계획의 Operation 열
 --  - INDEX RANGE SCAN / INDEX UNIQUE SCAN + 표 이름 = 인덱스를 씀 (기대)
 --  - TABLE ACCESS FULL = 표 전체를 읽음. 행이 아주 적은 표(수백 행 이하)는 Oracle이 일부러 이렇게 고르기도 해서 문제는 아니다.
 --    서비스 평가가 수천 행 이상인데 FULL이 나오면 알려 준다.
--- 먼저 통계를 최신으로 맞춘다(행 수가 바뀐 뒤 옛 통계로 계획을 잘못 고르는 것을 막음).
 -- ====================================================================
 SET LINESIZE 200
 SET PAGESIZE 200
 
-BEGIN
-    DBMS_STATS.GATHER_TABLE_STATS(USER, 'ASSESSMENT');
-    DBMS_STATS.GATHER_TABLE_STATS(USER, 'ASSESSMENT_FACTOR');
-END;
-/
-
+-- 지금 통계가 언제 것인지만 본다(LAST_ANALYZED가 오래됐고 행 수가 많이 바뀌었으면 gather_assessment_stats.sql 먼저)
 SELECT TABLE_NAME, NUM_ROWS, LAST_ANALYZED FROM USER_TABLES
  WHERE TABLE_NAME IN ('ASSESSMENT', 'ASSESSMENT_FACTOR', 'MODEL_EVAL_SAMPLE') ORDER BY TABLE_NAME;
 
@@ -60,5 +58,6 @@ EXPLAIN PLAN SET STATEMENT_ID = 'Q6' FOR
 SELECT COUNT(*) FROM ASSESSMENT WHERE USER_ID = 1 AND GRADE_STATUS_CODE = 'SCORED';
 SELECT PLAN_TABLE_OUTPUT FROM TABLE(DBMS_XPLAN.DISPLAY(NULL, 'Q6', 'BASIC +ROWS'));
 
+-- 정리: 이 파일이 PLAN_TABLE에 적은 계획만 지운다(서비스 표는 건드리지 않음)
 DELETE FROM PLAN_TABLE WHERE STATEMENT_ID IN ('Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6');
 COMMIT;

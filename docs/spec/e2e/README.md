@@ -14,6 +14,7 @@ python -I -X utf8 docs/spec/e2e/e2e_check.py --env-file "$env:USERPROFILE\avenue
 python -I -X utf8 docs/spec/e2e/e2e_check.py --login demo_self --env-file "$env:USERPROFILE\avenue-secrets\avenue_dev.env"
 ```
 파이썬 기본 라이브러리만 쓴다(설치할 것 없음). 항목마다 `PASS/FAIL/SKIP`과 근거 한 줄을 출력하고, FAIL이 있으면 종료 코드 1이다.
+E2E-09B는 다른 시연 계정(기본: `--login`이 아닌 첫 계정)으로도 로그인한다. 바꾸려면 `--other-login demo_free`.
 
 | ID | 흐름 | 기대 결과 | API |
 |---|---|---|---|
@@ -22,16 +23,22 @@ python -I -X utf8 docs/spec/e2e/e2e_check.py --login demo_self --env-file "$env:
 | E2E-02 | 토큰 없이 리포트 | 401 | RPT-02 |
 | E2E-03 | 점수 산출(저장) | 200 `SCORED` | RPT-01 → ML-03 → `ASSESSMENT`·`ASSESSMENT_FACTOR` |
 | E2E-04 | 같은 requestId 다시 | 새로 저장하지 않고 같은 결과 | RPT-01 |
-| E2E-05 | 내 리포트 | 방금 평가, `modelVersion` = `LGBM-BASE-0.1` | RPT-02 |
+| E2E-05 | 내 리포트 | 방금 평가, `modelVersion` = 기대 모델 버전(E2E-00 health 또는 `--model-version`) | RPT-02 |
 | E2E-06 | SHAP·피처 칩 | 요인 1개 이상, 피처 칩 기존 18 / 대안 38 | RPT-02 |
 | E2E-07 | 진단 내역 | 맨 위 = 방금 평가 | MEM-06 |
 | E2E-08 | 지난 평가 상세 | 200 | RPT-03 |
-| E2E-09 | 없는·남의 평가 | 404 `ASSESSMENT_NOT_FOUND` | RPT-03 |
+| E2E-09 | 없는 평가(임의 UUID) | 404 `ASSESSMENT_NOT_FOUND` | RPT-03 |
+| E2E-09B | 다른 회원의 실제 평가 | 그 회원은 200으로 열리고, 내 토큰으로는 404 `ASSESSMENT_NOT_FOUND`. 다른 계정에 평가가 없으면 SKIP | MEM-06 → RPT-03 |
 | E2E-10 | 시뮬레이터 현재 값 | 입력 10개 | SIM-01 |
-| E2E-11 | 시뮬레이터 재계산 | 200, 전·후 점수와 감점 요인 | SIM-02 → ML-04 |
+| E2E-11 | 시뮬레이터 재계산 | 200. 화면이 쓰는 값: 전 점수 = 리포트 대안 점수, 전·후 점수 0~1000·등급 코드, `delta.total` = 후 − 전 = 금융 + 대안 영향, 감점 요인마다 순위·피처 이름·감점 | SIM-02 → ML-04 |
 | E2E-12 | 시뮬레이터 범위 밖(통신비 13개월) | 400 `changes.TELECOM_ON_TIME_MONTHS` | SIM-02 |
-| E2E-13 | 예상 점수(소득 −10%) | 200, 실제 모델로 계산 | DIAG-09 → ML-03 |
-| E2E-14 | 시뮬레이터·예상 점수 | 진단 내역 건수가 늘지 않음(저장 안 함) | MEM-06 |
+| E2E-13 | 예상 점수(소득 −10%) | 200. 화면이 쓰는 값: 현재 점수 = 리포트 대안 점수, 출발 평가 = 방금 평가, 예상 점수 0~1000·등급 코드, 차이 = 예상 − 현재, 두 모델 버전 = 실제 모델 | DIAG-09 → ML-03 |
+| E2E-14 | 시뮬레이터·예상 점수 | 진단 내역 건수가 늘지 않고 맨 위 평가도 그대로(저장 안 함) | MEM-06 |
+
+**스크립트와 같이 고쳐야 하는 값**
+- 기대 모델 버전은 코드에 없다. E2E-00에서 FastAPI `/v1/health`의 `modelVersion`을 읽어 쓰고, 직접 정하려면 `--model-version LGBM-BASE-0.2`. 그래서 모델을 바꿔도 스크립트는 그대로다(FP-237).
+- E2E-12의 13개월: 통신비 정시 납부 상한 **12개월이 임시값(SIM-02 TODO)**이라 그 바로 위 값으로 범위 밖을 확인한다. 상한이 바뀌면 이 값도 "새 상한 + 1"로 바꾼다.
+- E2E-06의 피처 칩 18/38: 피처 세트(FS-V1)가 바뀌면 같이 바꾼다.
 
 ## 3. 수동 점검 (자동으로 보기 어려운 것)
 | ID | 할 일 | 기대 결과 |
@@ -43,5 +50,9 @@ python -I -X utf8 docs/spec/e2e/e2e_check.py --login demo_self --env-file "$env:
 | M-05 | 직군별 시연 계정 3개(`demo_employee`·`demo_self`·`demo_free`) | 각자 점수 산출·리포트 정상 (자영업자·프리랜서는 근무기간 입력 필요할 수 있음) |
 | M-06 | 화면에서 리포트 게이지·SHAP 카드·시뮬레이터 슬라이더 | 숫자가 API 응답과 같음 |
 
-## 4. 결과 기록
+## 4. 평가 조회 실행 계획 점검 (SQL)
+- [explain_assessment_queries.sql](explain_assessment_queries.sql): 리포트·진단 내역·시뮬레이터가 부르는 쿼리 6개가 인덱스를 쓰는지 본다. 서비스 표는 바꾸지 않고, 계획을 적은 `PLAN_TABLE`의 자기 행만 끝에 지우고 COMMIT한다(새 창에서 실행).
+- [gather_assessment_stats.sql](gather_assessment_stats.sql): 평가 행 수가 많이 바뀐 뒤에만 먼저 실행한다. **통계를 바꾸는 파일**이라 따로 뗐다(데이터는 그대로). 공용 DB는 DB 담당이 판단한다.
+
+## 5. 결과 기록
 점검할 때마다 날짜·DB(로컬/공용)·계정·PASS/FAIL 수를 작업 로그(`docs/logs/`)에 남긴다.

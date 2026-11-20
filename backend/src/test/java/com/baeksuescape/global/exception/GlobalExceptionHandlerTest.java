@@ -113,6 +113,32 @@ class GlobalExceptionHandlerTest {
                 .doesNotContain("SELECT", "secret@example.com");
     }
 
+    // FP-143 경로 변수에 민감한 문자열(이메일·전화번호 같은 임의 값)이 들어와도 로그에는 경로 템플릿만 남는다(AGENTS.md 5장).
+    @Test
+    void 경로_변수_값은_로그에_남기지_않고_템플릿만_남긴다() throws Exception {
+        String sensitive = "secret@example.com";
+        List<String> logs = captureLogs(() -> {
+            mvc.perform(post("/api/members/me/__test/items/{code}/conflict", sensitive).header(HttpHeaders.AUTHORIZATION, auth))
+                    .andExpect(status().isNotFound());
+            mvc.perform(post("/api/members/me/__test/items/{code}/boom", "010-1234-5678").header(HttpHeaders.AUTHORIZATION, auth))
+                    .andExpect(status().isInternalServerError());
+        });
+        assertThat(logs).hasSize(2);
+        assertThat(logs.get(0)).isEqualTo("API 오류 404 PRODUCT_NOT_FOUND POST /api/members/me/__test/items/{code}/conflict");
+        assertThat(logs.get(1)).endsWith("(POST /api/members/me/__test/items/{code}/boom)");
+        assertThat(String.join("\n", logs)).doesNotContain(sensitive, "secret", "010-1234-5678");
+    }
+
+    // FP-143 원인 체인이 A→B→A로 돌아도 위치 찾기가 끝난다(무한 루프 방지).
+    @Test
+    void 원인_체인이_순환해도_위치_찾기가_끝난다() {
+        RuntimeException a = new RuntimeException("a");
+        RuntimeException b = new RuntimeException("b");
+        a.initCause(b);
+        b.initCause(a);
+        assertThat(GlobalExceptionHandler.firstAppFrame(a)).contains("GlobalExceptionHandlerTest.원인_체인이_순환해도_위치_찾기가_끝난다");
+    }
+
     private interface Request {
         void run() throws Exception;
     }

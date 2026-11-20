@@ -12,6 +12,7 @@
 > 2. 2-7 **대출 상품 LOAN-01~05 ✅(경환, FP-90 PR #101)**, SIM-03은 만들지 않음 → Q-9 해결, 오류 `PRODUCT_NOT_FOUND`
 > 3. 2-10 N-25 모형 성능 비교의 재료를 평가 표본 표 `MODEL_EVAL_SAMPLE`(PR #99, 표 48개)로, 1장 등급 구간 `CUT-0.2`(DRAFT, PR #106)
 > 4. 광희 님 요청: SIM-01 주요 표에 `USER_CREDIT_PROFILE`, DIAG-09 409에 "같은 달 겹침"
+> 5. 2-9 **용어 사전 HELP-01 ✅**(FP-180 PR #108)
 >
 > 이전 변경 (11/19): FP-219 AUTH-13~15·AUTH-06 휴대폰 인증 필수, FP-170 SIM-01·02·DIAG-09 ✅, 1-2 C팀 오류 표 정리
 > 이전 변경 (11/18): 저장소 `docs/spec/api/`로 이관, PR #83(DIAG-07 표준편차·DIAG-08 `months[]`·전망 조건) 반영, 간편결제 × 12 🟡 정정, `isXxx` 필드 규칙
@@ -267,7 +268,7 @@
 
 | ID | 메서드 · 경로 | 기능 | 주요 표 | 인증 | 상태 |
 |---|---|---|---|---|---|
-| HELP-01 | `GET /api/glossary` | N-30-1 용어 사전 데이터, N-30-2 쉬운 말로 바꾸기 | `GLOSSARY_TERM` | USER | 🟡 |
+| HELP-01 | `GET /api/glossary` | N-30-1 용어 사전 데이터, N-30-2 쉬운 말로 바꾸기 | `GLOSSARY_TERM` | USER | ✅ FP-180 PR #108 🆕 11/20 |
 | HELP-02 | `GET /api/chatbot/presets` | N-32-1 질문 버튼 방식 설명 | `CHATBOT_PRESET_QUESTION` | USER | 🟡 |
 | HELP-03 | `POST /api/chatbot/questions` | N-32-2 자유 질문 AI 설명 (하루 10회, 질문 글은 저장 안 함) | `CHATBOT_QUESTION_LOG`, `APP_SETTING` | USER | 🟡 |
 
