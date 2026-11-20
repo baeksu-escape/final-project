@@ -116,7 +116,7 @@ def render_load_sql(rows: pd.DataFrame, model_version: str, csv_sha256: str) -> 
         "-- ====================================================================",
         "-- N-25 모형 성능 비교용 평가 표본 적재 — MODEL_EVAL_SAMPLE(DDL C10)에 고객별 기존·대안 모델 점수와 정답 라벨을 넣는다 (FP-235)",
         f"-- 모델 버전 {model_version}, 행 수: {len(rows)}, 집단/분할별: {count_text}",
-        f"-- 원본: training/export_eval_scores.py가 만든 eval_scores.csv(SHA-256 {csv_sha256}). CSV는 Git에 없고 #파일공유로 전달한다.",
+        f"-- 원본: training/export_eval_scores.py가 만든 eval_scores.csv(SHA-256 {csv_sha256}). CSV는 Git에 없다(받는 쪽은 이 SQL로 만든 표를 읽는다).",
         ("-- 기존 집단은 VALID만, 씬파일은 노출 1인(eval_future_credit_exposure = 1) TRAIN+VALID이며 TEST는 없다(최종 평가 FP-144)."
          if "TRAIN" in set(rows.loc[rows["group"] == "thinfile", "data_split"]) or "thinfile" not in set(rows["group"]) else
          "-- 기존 집단·씬파일 모두 VALID만이다(씬파일 노출 1, 씬파일 TRAIN은 모델 학습에 써서 평가에서 뺐다). TEST는 없다(최종 평가 FP-144)."),
