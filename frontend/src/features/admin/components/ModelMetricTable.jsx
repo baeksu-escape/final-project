@@ -5,13 +5,15 @@ function formatValue(type, value) {
   return type === 'rate' ? formatRate(value) : value.toFixed(3)
 }
 
-// 차이(대안 − 기존) 글자와 나빠졌는지 — 비율은 %p, 나머지는 소수. 지표마다 좋은 방향이 다르다.
+// 차이(대안 − 기존) 글자와 나빠졌는지 — 비율은 %p(값이 이미 %), 나머지는 소수. 지표마다 좋은 방향이 다르다.
+// 표시 자릿수에서 0으로 보이는 차이는 '나빠짐'으로 치지 않는다(비율 0.05%p, 나머지 0.0005 미만).
 function diffOf(metric, legacyValue, altValue) {
   const diff = altValue - legacyValue
-  const text = metric.type === 'rate' ? `${(diff * 100).toFixed(1)}%p` : diff.toFixed(3)
+  const isRate = metric.type === 'rate'
+  const text = isRate ? `${diff.toFixed(1)}%p` : diff.toFixed(3)
   const sign = diff > 0 ? '+' : ''
   const worse = metric.lowerIsBetter ? diff > 0 : diff < 0
-  return { text: `${sign}${text}`, worse: Math.abs(diff) >= 0.0005 && worse }
+  return { text: `${sign}${text}`, worse: Math.abs(diff) >= (isRate ? 0.05 : 0.0005) && worse }
 }
 
 // N-25-2 성능 지표 비교 표 — 지표 6개를 기존·대안·차이로 나란히 보여 준다. 대안이 나쁜 지표도 그대로 '나빠짐'으로 표시한다.

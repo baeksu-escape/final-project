@@ -34,5 +34,5 @@ export const MODEL_METRICS = Object.freeze([
 // 직군 코드 → 이름 (공통 직군 코드를 그대로 쓴다)
 export const jobLabel = (jobType) => JOB_TYPE_LABELS[jobType] ?? jobType
 
-// 0~1 비율을 '12.3%'로
-export const formatRate = (value) => `${(value * 100).toFixed(1)}%`
+// 서버가 % 단위(소수 둘째 자리, API README 3장)로 준 비율을 '12.3%'로
+export const formatRate = (value) => `${value.toFixed(1)}%`

@@ -2,7 +2,8 @@ import { apiGet } from '../../../common/api/client.js'
 // mock 모드에서 쓸 응답을 등록한다(VITE_USE_MOCK=false면 등록돼도 쓰이지 않는다).
 import '../mocks/modelPerformanceMockHandlers.js'
 
-// N-25 모형 성능 비교 API 경로 — B팀 API 정의서 ADM-01·02(🟡 제안, 11/17). 응답 필드는 FP-185에서 정한 제안안.
+// N-25 모형 성능 비교 API 경로 — API 정의서 ADM-01·02, 서버 FP-184(api_spec_c.md N-25). 비율·ROC 좌표는 %, AUC는 0~1.
+// ACTIVE 모델의 평가 표본이 아직 없으면 409 MODEL_EVAL_NOT_READY가 온다(화면은 공통 오류 문구를 보여 준다).
 export const MODEL_PERFORMANCE_API = Object.freeze({
   PERFORMANCE: '/api/admin/model-performance',
   ROC: '/api/admin/model-performance/roc',

@@ -7,9 +7,11 @@ import { requireMockAdmin } from './adminMockShared.js'
 // N-25 모형 성능 비교 mock (ADM-01·02) — 실제 응답과 같은 모양으로 돌려준다.
 // 건수·불량 수·AUC는 B조 평가 표 MODEL_EVAL_SAMPLE(3,085행)과 METRICS_JSON 값과 같다(11/19 FP-235).
 // 컷오프별 지표·ROC 점·직군별 오거절률은 컷오프에 따라 움직이는 **시연용 예시**이며 실제 계산 결과가 아니다(FP-184에서 표로 계산).
+// 단위는 실제 API와 같다: 비율·ROC 좌표는 % 소수 둘째 자리, AUC는 0~1(API README 3장). 아래 계산은 0~1로 하고 내보낼 때 %로 바꾼다.
 
 const MODEL_VERSION = 'LGBM-BASE-0.1'
-const ROC_POINT_COUNT = 20
+// ROC 점 개수 — 실제 API처럼 기준 점수 0, 10, …, 1010마다 한 점(102개). 화면이 컷오프/10번째 점을 컷오프 위치로 쓴다.
+const ROC_POINT_COUNT = 101
 
 // 집단·라벨별 값 — auc: [기존, 대안](LEGACY는 5개 시드 평균, THINFILE은 시드 1개), bad: 불량(라벨 1) 수,
 // improve: 예시 지표에서 대안이 나아지는 정도(연체 라벨은 대안 효과를 넣지 않은 라벨이라 0), penalty: 씬파일의 기존 모형 불리함(예시)
@@ -45,6 +47,8 @@ const JOB_REJECT_BASE = {
 
 const clamp = (value) => Math.min(0.95, Math.max(0.01, value))
 const round4 = (value) => Math.round(value * 10000) / 10000
+// 0~1 비율 → % 소수 둘째 자리
+const toPercent = (value) => Math.round(value * 10000) / 100
 
 const totalOf = (group) => Object.values(SAMPLE_COUNTS[group]).reduce((sum, n) => sum + n, 0)
 
@@ -54,20 +58,20 @@ function metricsOf(auc, goodRejectRate, badApproveRate, defaultRate) {
   return {
     modelVersion: MODEL_VERSION,
     auc,
-    accuracy: round4(1 - (goodRejectRate * good + badApproveRate * defaultRate)),
+    accuracy: toPercent(1 - (goodRejectRate * good + badApproveRate * defaultRate)),
     misclassCost: round4(goodRejectRate * good + badApproveRate * defaultRate * 5),
-    goodRejectRate: round4(goodRejectRate),
-    badApproveRate: round4(badApproveRate),
-    approvalRate: round4((1 - goodRejectRate) * good + badApproveRate * defaultRate),
+    goodRejectRate: toPercent(goodRejectRate),
+    badApproveRate: toPercent(badApproveRate),
+    approvalRate: toPercent((1 - goodRejectRate) * good + badApproveRate * defaultRate),
   }
 }
 
-// AUC가 주어진 값이 되는 예시 곡선 tpr = fpr^k (k = 1/auc - 1)
+// AUC가 주어진 값이 되는 예시 곡선 tpr = fpr^k (k = 1/auc - 1). 기준 점수가 오를수록 fpr이 커지게 순서대로 만든다.
 function rocPoints(auc) {
   const k = 1 / auc - 1
   return Array.from({ length: ROC_POINT_COUNT + 1 }, (_, i) => {
-    const fpr = i / ROC_POINT_COUNT
-    return { fpr: round4(fpr), tpr: round4(fpr ** k) }
+    const fpr = Math.min(1, i / (ROC_POINT_COUNT - 1))
+    return { fpr: toPercent(fpr), tpr: toPercent(fpr ** k) }
   })
 }
 
@@ -112,8 +116,8 @@ registerMockHandlers({
         sampleCount,
         // 직군별 불량 수는 집단 불량 수를 표본 비율로 나눈 예시 값이다
         badCount: Math.round((byLabel.bad * sampleCount) / total),
-        legacyGoodRejectRate: round4(clamp(legacyBase * scale + example.penalty)),
-        alternativeGoodRejectRate: round4(clamp(legacyBase * scale - (legacyBase - altBase) * byLabel.improve + example.penalty / 2)),
+        legacyGoodRejectRate: toPercent(clamp(legacyBase * scale + example.penalty)),
+        alternativeGoodRejectRate: toPercent(clamp(legacyBase * scale - (legacyBase - altBase) * byLabel.improve + example.penalty / 2)),
       }
     })
     return {

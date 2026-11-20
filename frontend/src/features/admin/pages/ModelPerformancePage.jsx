@@ -104,11 +104,18 @@ export default function ModelPerformancePage() {
         <Card title="ROC 곡선">
           {roc.error && <Notice type="warn">{roc.error}</Notice>}
           {roc.data ? (
-            <RocCurveChart legacy={roc.data.legacy} alternative={roc.data.alternative} caption={`${groupInfo.label} ${labelName}`} />
+            <RocCurveChart
+              legacy={roc.data.legacy}
+              alternative={roc.data.alternative}
+              cutoff={cutoff}
+              caption={`${groupInfo.label} ${labelName}`}
+            />
           ) : (
             !roc.error && <p className="hint">곡선을 불러오는 중입니다…</p>
           )}
-          <p className="hint">곡선은 평가 표본 점수로 그립니다. AUC 값은 왼쪽 비교 표를 보세요.</p>
+          <p className="hint">
+            곡선은 평가 표본 점수로 그립니다. 점은 지금 컷오프({cutoff}점)의 위치입니다. AUC 값은 왼쪽 비교 표를 보세요.
+          </p>
         </Card>
       </div>
 

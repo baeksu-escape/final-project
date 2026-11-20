@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- N-25 모형 성능 비교 (FP-184) — MODEL_REGISTRY ACTIVE 모델의 MODEL_EVAL_SAMPLE(DDL C10)과 MODEL_ARTIFACT.METRICS_JSON을 읽는다 -->
+<mapper namespace="com.baeksuescape.admin.mapper.ModelPerformanceMapper">
+
+    <!-- 지금 쓰는 모델 버전 (AssessmentMapper와 같은 조건) -->
+    <select id="selectActiveModelVersion" resultType="string">
+        SELECT MODEL_VERSION
+          FROM MODEL_REGISTRY
+         WHERE STATUS_CODE = 'ACTIVE'
+         ORDER BY ACTIVATED_AT DESC
+         FETCH FIRST 1 ROWS ONLY
+    </select>
+
+    <!-- 평가 표본. TEST는 최종 평가(FP-144)용이라 화면 비교에 섞지 않는다 -->
+    <select id="selectEvalSamples" resultType="com.baeksuescape.admin.dto.ModelPerformanceRows$EvalSampleRow">
+        SELECT S.SPLIT_CODE                AS splitCode,
+               S.WORKER_TYPE_CODE          AS workerTypeCode,
+               S.LABEL_ANY_DELINQUENCY_12M AS labelAnyDelinquency12m,
+               S.LABEL_NONFIN_EFFECT_12M   AS labelNonfinEffect12m,
+               S.SCORE_LEGACY_DELINQ       AS scoreLegacyDelinq,
+               S.SCORE_ALT_DELINQ          AS scoreAltDelinq,
+               S.SCORE_LEGACY_NONFIN       AS scoreLegacyNonfin,
+               S.SCORE_ALT_NONFIN          AS scoreAltNonfin
+          FROM MODEL_EVAL_SAMPLE S
+          JOIN DIM_WORKER_TYPE W ON W.WORKER_TYPE_CODE = S.WORKER_TYPE_CODE
+         WHERE S.MODEL_VERSION = #{modelVersion}
+           AND S.GROUP_CODE = #{groupCode}
+           AND S.SPLIT_CODE IN ('TRAIN', 'VALID')
+         ORDER BY W.DISPLAY_ORDER, S.EVAL_SAMPLE_ID
+    </select>
+
+    <!-- 같은 라벨 비교 AUC(5개 시드 평균). 두 행(trad_legacy·alt_legacy)에 같은 값이 들어 있어 한 행만 읽는다 -->
+    <select id="selectSeedMeanAuc" resultType="com.baeksuescape.admin.dto.ModelPerformanceRows$SeedMeanAucRow">
+        SELECT *
+          FROM (
+                SELECT
+                <choose>
+                    <when test="label == 'NONFIN'">
+                       JSON_VALUE(METRICS_JSON, '$.same_label_comparison.by_label.label_nonfin_effect_12m.legacy.mean' RETURNING NUMBER) AS legacyAuc,
+                       JSON_VALUE(METRICS_JSON, '$.same_label_comparison.by_label.label_nonfin_effect_12m.alternative.mean' RETURNING NUMBER) AS alternativeAuc
+                    </when>
+                    <otherwise>
+                       JSON_VALUE(METRICS_JSON, '$.same_label_comparison.by_label.label_any_delinquency_12m.legacy.mean' RETURNING NUMBER) AS legacyAuc,
+                       JSON_VALUE(METRICS_JSON, '$.same_label_comparison.by_label.label_any_delinquency_12m.alternative.mean' RETURNING NUMBER) AS alternativeAuc
+                    </otherwise>
+                </choose>,
+                       ARTIFACT_NAME
+                  FROM MODEL_ARTIFACT
+                 WHERE MODEL_VERSION = #{modelVersion}
+               )
+         WHERE legacyAuc IS NOT NULL AND alternativeAuc IS NOT NULL
+         ORDER BY ARTIFACT_NAME
+         FETCH FIRST 1 ROWS ONLY
+    </select>
+</mapper>

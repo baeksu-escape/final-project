@@ -6,6 +6,7 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
+> - 🆕 11/20 (동주, FP-184) N-25 모형 성능 비교 ADM-01 `GET /api/admin/model-performance`·ADM-02 `/roc` 구현. ACTIVE 모델의 평가 표본(`MODEL_EVAL_SAMPLE`)으로 계산하고, 표본이 없으면 409 `MODEL_EVAL_NOT_READY`(새 오류 code). 맨 아래 「N-25 모형 성능 비교」 절.
 > - 🆕 11/19 (광희, FP-170 추가 수정) 저장 데이터를 읽는 API 5개를 팀 공통 규칙대로 `/api/members/me/**`로 옮기고 옛 경로를 지웠다(우찬 님 합의): SIM-01 `credit-care-base`, SIM-02 `credit-care-recalculate`, DIAG-07-1 `income-volatility`, DIAG-08-1 `cash-flow-forecast`, DIAG-09 `cash-flow-expected-score`. 로그인 확인은 보안 설정이 한다(토큰 없음 401, 관리자 403). SIM-01에 `topReductionFactors`, DIAG-08-1에 기준값 3개(`baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`)를 추가했다(경환 님 요청).
 > - 🆕 11/18 (광희, FP-170) SIM-01 `credit-care/base`·DIAG-09 `cash-flow/expected-score` 추가, SIM-02 Spring 구현(출발 평가 = 최근 SCORED, 404 `ASSESSMENT_NOT_FOUND`).
 
@@ -521,3 +522,90 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 프론트: `features/simulation/api/simulationApi.js`의 `recalculateCreditCare({ changes })`. mock은 588점 예시에서 간단한 규칙으로 계산한다(진짜 모델 아님).
 
 - Spring 검사(11/18 구현): JSON 정수만 받는다. `12.0`처럼 소수점이 있는 값과 문자열(`"2"`)은 "0 이상의 정수를 입력해 주세요."로 막는다.
+
+---
+
+## N-25 모형 성능 비교 (ADM-01·02, FP-184, 담당 동주) 🆕 11/20
+
+> 관리자 「모형 성능 비교」 화면(FP-185)이 쓴다. **합성 학습 데이터로 낸 평가 결과**라 실제 신용평가·심사 결과가 아니며, 대안 모형이 나쁜 지표도 걸러 내지 않고 그대로 돌려준다.
+> 평가 표본은 서비스 회원이 아니라 합성 학습 고객(`CUSTOMER_REF` SYN…·THF…)이라 회원 신용정보 열람 감사 로그(N-35) 대상이 아니다.
+
+| 메서드 | 경로 | 설명 | 원천 |
+|---|---|---|---|
+| GET | `/api/admin/model-performance?group=&label=&cutoff=` | ADM-01 · N-25-1·2·4 컷오프 기준 지표 6개, 직군별 우량 고객 오거절률 | DB `MODEL_EVAL_SAMPLE`, `MODEL_ARTIFACT.METRICS_JSON` |
+| GET | `/api/admin/model-performance/roc?group=&label=` | ADM-02 · N-25-3 ROC 곡선 점 | DB `MODEL_EVAL_SAMPLE` |
+
+- 권한: `/api/admin/**`라 관리자(`ROLE_ADMIN`)만 부른다. 토큰 없음 401, 일반 회원 403(공통 보안 설정).
+- **비교할 모델 = `MODEL_REGISTRY`의 ACTIVE 모델**(B팀 명세서 ML-03 "DB의 ACTIVE가 스위치"). 그 버전의 `MODEL_EVAL_SAMPLE` 행 중 TRAIN·VALID만 쓴다(TEST는 최종 평가 FP-144용이라 섞지 않는다).
+- 프론트: `features/admin/api/modelPerformanceApi.js`의 `fetchModelPerformance({ group, label, cutoff })`, `fetchModelRoc({ group, label })`. mock은 같은 모양의 시연용 예시다.
+
+### 쿼리 값
+
+| 이름 | 값 | 생략하면 | 설명 |
+|---|---|---|---|
+| `group` | `LEGACY` \| `THINFILE` | `LEGACY` | 고객 집단(`MODEL_EVAL_SAMPLE.GROUP_CODE` 그대로). 두 집단은 정답 라벨 생성 방식이 달라 합치지 않는다('전체' 없음, 11/19 결정) |
+| `label` | `DELINQ` \| `NONFIN` | `DELINQ` | 비교 라벨. 기존·대안 모두 **같은 라벨로 학습한 점수**끼리 비교한다(피처 정의서 C20). DELINQ = `SCORE_LEGACY_DELINQ`·`SCORE_ALT_DELINQ` + `LABEL_ANY_DELINQUENCY_12M`, NONFIN = `SCORE_LEGACY_NONFIN`·`SCORE_ALT_NONFIN` + `LABEL_NONFIN_EFFECT_12M` |
+| `cutoff` | 정수 600~800 | 700 | 승인 기준 점수(ADM-01만). 화면 슬라이더는 10점 간격 |
+
+### GET `/api/admin/model-performance` (ADM-01)
+
+계산 규칙: 점수 ≥ `cutoff`면 승인, 미만이면 거절(부도로 예측). 라벨 1이 불량, 0이 우량이다.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `group`·`label`·`cutoff` | 문자열·문자열·정수 | 요청 값(생략했으면 기본값) |
+| `sampleBasis` | 문자열 | `VALID`(검증 표본만) \| `TRAIN_VALID`(TRAIN이 섞임. 씬파일은 이 모델이 학습하지 않은 집단이라 TRAIN도 평가에 쓴다) |
+| `sampleCount`·`badCount` | 정수 | 표본 인원, 그중 불량 인원 |
+| `aucBasis` | 문자열 | `SEED_MEAN_5`(METRICS_JSON 같은 라벨 비교 5개 시드 평균) \| `SINGLE_SEED`(이 표본으로 계산, 시드 1개). LEGACY는 평균 값이 있으면 `SEED_MEAN_5`, THINFILE은 항상 `SINGLE_SEED` |
+| `legacy`·`alternative` | 객체 | 기존·대안 모형 지표(아래) |
+| `byJob[]` | 배열 | 직군별(`DIM_WORKER_TYPE` 표시 순서) `{ jobType, sampleCount, badCount, legacyGoodRejectRate, alternativeGoodRejectRate }`. 직군별은 불량 수가 적어 값이 흔들리므로 화면에 인원을 함께 보여 준다 |
+
+`legacy`·`alternative` 객체
+
+| 필드 | 단위 | 계산 |
+|---|---|---|
+| `modelVersion` | 문자열 | ACTIVE 모델 버전(두 객체 같음) |
+| `auc` | 0~1, 소수 넷째 자리 | ROC-AUC(확률). 위 `aucBasis` 참고. 직접 계산할 때는 불량·우량 한 명씩 골랐을 때 불량 쪽 점수가 더 낮을 확률(같으면 0.5) |
+| `accuracy` | %, 소수 둘째 자리 | (우량 승인 + 불량 거절) / 전체 |
+| `misclassCost` | 1인당 상대값, 소수 넷째 자리 | (우량 거절 + 불량 승인 × 5) / 전체 (부도 오승인 5배, decisions.md N-25) |
+| `goodRejectRate` | % | 우량 거절 / 우량 |
+| `badApproveRate` | % | 불량 승인 / 불량 |
+| `approvalRate` | % | 승인 / 전체 |
+
+분모가 0이면 0을 준다.
+
+```json
+{
+  "group": "LEGACY", "label": "DELINQ", "cutoff": 700,
+  "sampleBasis": "VALID", "sampleCount": 1800, "badCount": 174, "aucBasis": "SEED_MEAN_5",
+  "legacy": { "modelVersion": "LGBM-BASE-0.1", "auc": 0.6049, "accuracy": 61.5, "misclassCost": 0.4321,
+              "goodRejectRate": 30.25, "badApproveRate": 40.0, "approvalRate": 65.12 },
+  "alternative": { "modelVersion": "LGBM-BASE-0.1", "auc": 0.5991, "...": "같은 필드" },
+  "byJob": [ { "jobType": "EMPLOYEE", "sampleCount": 1411, "badCount": 130, "legacyGoodRejectRate": 31.5, "alternativeGoodRejectRate": 29.25 } ]
+}
+```
+(건수·AUC 말고 지표 숫자는 모양 예시다.)
+
+### GET `/api/admin/model-performance/roc` (ADM-02)
+
+- 컷오프와 무관하고 `group`·`label`만 받는다.
+- 기준 점수 t를 0, 10, …, 1010으로 올리며 "점수 < t면 거절"로 볼 때의 점을 준다(102개, (0,0)에서 (100,100)까지 순서대로).
+  - `fpr` = 우량 거절률(%), `tpr` = 불량 거절률(%), 소수 둘째 자리.
+- 곡선은 이 표본(시드 1개)으로 그린다. AUC 숫자는 주지 않는다. 화면 비교 표의 AUC(5개 시드 평균)와 섞이지 않게 하려는 것이다.
+
+```json
+{ "group": "THINFILE", "label": "NONFIN",
+  "legacy": { "points": [ { "fpr": 0.0, "tpr": 0.0 }, "…", { "fpr": 100.0, "tpr": 100.0 } ] },
+  "alternative": { "points": [ "…" ] } }
+```
+
+### 오류 (두 API 같음)
+
+| 상태 | code | 언제 | 문구 |
+|---|---|---|---|
+| 400 | `INVALID_INPUT` | `group`·`label`이 허용값이 아님, `cutoff`가 600~800 밖. 틀린 칸마다 `fieldErrors[].field` = 쿼리 이름 | "고객 집단 값이 올바르지 않습니다." / "비교 라벨 값이 올바르지 않습니다." / "컷오프는 600~800점 사이로 넣어 주세요." |
+| 400 | `INVALID_INPUT` | `cutoff`가 정수가 아님(공통 처리기) | field `cutoff` "형식이 올바르지 않습니다." |
+| 401 / 403 | `UNAUTHORIZED` / `FORBIDDEN` | 토큰 없음 / 관리자가 아님 | 공통 |
+| 409 | `MODEL_EVAL_NOT_READY` 🆕 | ACTIVE 모델이 없거나, ACTIVE 모델 버전의 평가 표본이 아직 없음(예: 공용 DB가 아직 `DEV-DUMMY`, 적재 SQL 미실행). 409 = 지금 상태로는 처리할 수 없음(B팀 명세서 용어집) | "지금 사용 중인 모델(LGBM-BASE-0.1)의 평가 표본이 아직 준비되지 않았습니다." |
+
+409가 나오면 DB 담당이 `create_model_eval_sample.sql`(표가 없을 때) → `load_model_eval_sample_lgbm_base_0_1.sql`을 실행하고, `MODEL_REGISTRY`에서 그 버전이 ACTIVE인지 본다. 모델을 다시 학습하면 새 `MODEL_VERSION`으로 평가 표본도 다시 적재해야 화면이 나온다.
