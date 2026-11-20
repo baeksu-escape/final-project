@@ -14,7 +14,11 @@
 > 4. 광희 님 요청: SIM-01 주요 표에 `USER_CREDIT_PROFILE`, DIAG-09 409에 "같은 달 겹침"
 > 5. 2-9 **용어 사전 HELP-01 ✅**(FP-180 PR #108)
 > 6. 2-5 **DIAG-01 ✅ 경로 `/api/members/me/peer-benchmark`·원천 회원 표(동주, FP-160 PR #120)**, DIAG-02·05 ⛔(쓰는 화면 없음 / `scenario-base`가 기준금리 제공), 2-10 ADM-01·02 쿼리·담당 FP-184
+<<<<<<< HEAD
 > 7. 2-10 **모형 성능 비교 ADM-01·02 ✅(동주, FP-184)** — ACTIVE 모델(지금 0.2)의 평가 표본 기준
+=======
+> 7. 2-5 **(광희, FP-239)** DIAG-03-1 자산·부채 저장값 `GET /api/members/me/financial-health` ✅, DIAG-04 시나리오 새 경로 2개 ✅(PR #118), DIAG-09 '밀림' 반영(연체 +1, `assumedDelinquencyCount`). 이번부터 API를 만든 사람이 PR에서 정의서를 같이 고친다(범영 11/20)
+>>>>>>> fbf0001ef71a1e8b01de84e475189561fb8c76c4
 >
 > 이전 변경 (11/19): FP-219 AUTH-13~15·AUTH-06 휴대폰 인증 필수, FP-170 SIM-01·02·DIAG-09 ✅, 1-2 C팀 오류 표 정리
 > 이전 변경 (11/18): 저장소 `docs/spec/api/`로 이관, PR #83(DIAG-07 표준편차·DIAG-08 `months[]`·전망 조건) 반영, 간편결제 × 12 🟡 정정, `isXxx` 필드 규칙
@@ -194,20 +198,20 @@
 | DIAG-01 | `GET /api/members/me/peer-benchmark` 🆕 11/20 | N-15-2 동년배 기준값 조회 (같은 직군·같은 연령대 회원 평균, 11/19 팀 결정으로 공공통계 대신 회원 표) | `APP_USER`, `USER_INCOME_MONTH`, `USER_ASSET_SNAPSHOT`, `USER_LOAN` 🆕 11/20 | USER | 동주 (FP-160) | ✅ |
 | DIAG-02 | `GET /api/finance/peer-benchmark/all` | N-15-3 나와 평균 비교 막대 | — | USER | 동주 | ⛔ 만들지 않음 — 화면은 DIAG-01 `sameWorkerType`을 쓴다 🆕 11/20 |
 | DIAG-03 | `POST /api/diagnosis/financial-health/calculate` | N-16-1 건전성 지표 계산, N-16-2 위험 단계 판정, N-16-3 값 바꿔 보기 (요청 본문 `{ totalAsset, annualIncome, totalDebt, annualDebtService }`로 계산, DB 안 읽음) | — | USER | 광희 (FP-166) | ✅ |
-| DIAG-03-1 | `GET /api/diagnosis/health` | N-16-1·2 저장 데이터로 건전성 계산, N-16-4 보유 대출 표 (로그인 회원 본인) | `USER_ASSET_SNAPSHOT`, `USER_LOAN`, `USER_EXPENSE_ITEM`, `USER_INCOME_MONTH` | USER | 광희 (FP-166 후속) | 🟡 |
-| DIAG-04 | `POST /api/diagnosis/scenario/recalculate` | N-17-3 공통 재계산 틀, N-17-4 상환 여력 재계산 | 위 + `FACT_POLICY_RATE` | USER | 광희 (FP-167) | 🟡 (프론트 mock만 있음) |
+| DIAG-03-1 | `GET /api/members/me/financial-health` 🆕 11/20 | N-16-1·2·4 저장값 조회: 총자산·연소득·총부채·연 원리금·보유 대출 목록 (로그인 회원 본인, 미입력은 null). 비율·위험 단계는 이 값으로 DIAG-03을 부른다 | `USER_INCOME_MONTH`, `USER_ASSET_SNAPSHOT`, `USER_LOAN`, `DIM_LOAN_TYPE` | USER | 광희 (FP-239) | ✅ |
+| DIAG-04 | `GET /api/members/me/scenario-base`, `POST /api/members/me/scenario-recalculate` 🆕 11/20 | N-17-1 저장값 조회, N-17-2~5 금리·소득·지출 조건으로 상환 여력 재계산(점수 안 구함, 저장 안 함). 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다 | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM`, `USER_LOAN`, `USER_ASSET_SNAPSHOT`, `FACT_POLICY_RATE` | USER | 광희 (FP-167) | ✅ (PR #118) |
 | DIAG-05 | `GET /api/finance/policy-rates` | N-17-2 시나리오 입력 (기준금리) | `FACT_POLICY_RATE` | USER | 동주 | ⛔ 만들지 않음 — 기준금리는 `GET /api/members/me/scenario-base`의 `policyRate`(광희 FP-167, 원천 `FACT_POLICY_RATE` 동주 FP-153)로 받는다 🆕 11/20 |
 | DIAG-06 | `POST /api/diagnosis/dsr/calculate` | N-20-4 DSR 계산·위험 단계 (요청 본문 `{ annualIncome, annualDebtService }`) | — | USER | 광희 (FP-166) | ✅ |
 | DIAG-07 | `POST /api/diagnosis/income-volatility` | N-22-3 변동성 지표 계산(월 소득 표준편차 `standardDeviation` 포함), N-22-4 성수기·비수기 소득 격차 계산, N-22-5 소득 부족 달 확인 (요청 본문으로 계산, DB 안 읽음) | — | USER | 광희 (FP-203) | ✅ |
 | DIAG-07-1 | `GET /api/members/me/income-volatility` 🆕 11/20 | N-22-1 저장 데이터 조회 + N-22-3·4·5 (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM` | USER | 광희 (FP-203) | ✅ |
 | DIAG-08 | `POST /api/diagnosis/cash-flow/forecast` | N-21-5 현금흐름 전망 계산, N-21-6 최근 12개월 적자 개월 수 계산, N-21-7 성수기·비수기 소득 격차 계산, N-21-9 과거 월 실적 `months[]`(요청의 `past12MonthsHistory`를 같은 모양으로 돌려줌) (요청 본문으로 계산, DB 안 읽음) | — | USER | 광희 (FP-203) | ✅ |
 | DIAG-08-1 | `GET /api/members/me/cash-flow-forecast` 🆕 11/20 | N-21-1 저장 데이터 조회 + N-21-2 전망 조건(쿼리, `incomeVariationPct`·`fixedExpenseAmount`·`paymentStatus` 추가) + N-21-5·6·7 + N-21-9 과거 월 실적 `months[]`(최대 12개) (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM`, `USER_LOAN` | USER | 광희 (FP-203) | ✅ |
-| DIAG-09 | `POST /api/members/me/cash-flow-expected-score` 🆕 11/20 | N-21-8 예상 대안 점수 재계산 (FastAPI ML-03을 ACTIVE 모델로 1번 호출, 저장 안 함 — O-6 확정). 응답 `expectedScore`·`scoreDiff`·`modelVersion`·`baseModelVersion` | 읽기만 (`ASSESSMENT` 최근 SCORED, 입력 표) | USER | 광희 (FP-170) | ✅ (PR #93) |
+| DIAG-09 | `POST /api/members/me/cash-flow-expected-score` 🆕 11/20 | N-21-8 예상 대안 점수 재계산 (FastAPI ML-03을 ACTIVE 모델로 1번 호출, 저장 안 함 — O-6 확정). 응답 `expectedScore`·`scoreDiff`·`modelVersion`·`baseModelVersion`. 🆕 11/20 밀림 반영: `paymentStatus=DELAYED`면 최근 1년 30일 이상 연체(`DQ1200001`)를 +1로 가정, 응답 `assumedDelinquencyCount`(넣은 건수) 추가, `paymentStatusApplied`는 DELAYED일 때 `true` | 읽기만 (`ASSESSMENT` 최근 SCORED, 입력 표) | USER | 광희 (FP-170, 밀림 FP-239) | ✅ (PR #93) |
 | ~~DIAG-10~~ | ~~`GET /api/commercial/dongs/{admDongCode}`~~ | N-24-2 소상공인 상권 분석, N-24-3 상권 분석 차트, N-24-5 행정동 상세 창 | — (상권 표 5개는 DDL에서 제거, 11/14) | USER | C조 | ⛔ **API 만들지 않음** — 화면이 정적 JSON(`frontend/public/data/market/`)을 읽는다(N-24 결정) |
 | ~~DIAG-11~~ | ~~`GET /api/commercial/heatmap`~~ | N-24-4 상권 공간 시각화 (지도 히트맵) | 위와 같음 | USER | C조 | ⛔ 위와 같음 |
 
 - C팀(광희) API의 요청·응답 상세와 오류 문구는 [api_spec_c.md](api_spec_c.md)에 있다.
-- DIAG-08-1 화면 조건이 범위 밖이면 400 `INVALID_INPUT`(`fieldErrors[0].field` = 쿼리 이름). `paymentStatus`는 지금 값만 검사하고 계산에 쓰지 않는다. DIAG-09도 아직 반영하지 않는다(`paymentStatusApplied: false`). '밀림' 반영 방식(제안: 최근 1년 연체 횟수 +1)은 팀 결정 대기.
+- DIAG-08-1 화면 조건이 범위 밖이면 400 `INVALID_INPUT`(`fieldErrors[0].field` = 쿼리 이름). `paymentStatus`는 DIAG-08-1에서는 값만 검사하고 계산에 쓰지 않는다. 🆕 11/20 DIAG-09는 '밀림'(`DELAYED`)이면 최근 1년 30일 이상 연체 +1로 예상 점수를 구한다(경환 제안, 범영 동의, FP-239). 화면 문구는 "최근 1년 30일 이상 연체 1회 추가로 가정".
 - `/api/income`이 프론트 코드에 1번 나온다. 어느 기능의 경로인지 확인이 필요하다.
 - DIAG-07-1·08-1·09와 SIM-01·02는 공통 규칙(1장)대로 `/api/members/me/**`에 있다(광희 PR #103, 우찬 합의). 로그인 확인은 보안 설정이 하며 토큰이 없으면 401, 관리자 계정은 403이다. 옛 경로(`/api/diagnosis/income-volatility` GET 등)는 지웠고, 요청 본문만 쓰는 POST(DIAG-03·06·07·08)는 `/api/diagnosis/**`에 그대로 있다. 🆕 11/20
 - DIAG-07-1·08-1 저장 데이터 규칙: 기준월 = `USER_INCOME_MONTH`의 가장 늦은 `BASE_MONTH`(DDL 11/10 결정). 지출·대출도 같은 달 값을 쓴다(그 달에 행이 없으면 0). 급여소득자는 월급 1행을 12개월로 펼친다.

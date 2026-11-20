@@ -6,7 +6,11 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
+<<<<<<< HEAD
 > - 🆕 11/20 (동주, FP-184) N-25 모형 성능 비교 ADM-01 `GET /api/admin/model-performance`·ADM-02 `/roc` 구현. ACTIVE 모델의 평가 표본(`MODEL_EVAL_SAMPLE`)으로 계산하고, 표본이 없으면 409 `MODEL_EVAL_NOT_READY`(새 오류 code). 맨 아래 「N-25 모형 성능 비교」 절.
+=======
+> - 🆕 11/20 (광희, FP-239) N-16 자산·부채 저장값 `GET /api/members/me/financial-health`(DIAG-03-1) 추가: 총자산·연소득·총부채·연 원리금·보유 대출 목록, 미입력은 null. 정의서의 옛 경로 `GET /api/diagnosis/health`를 대신한다. 비율은 화면이 이 값으로 DIAG-03 POST를 불러 구한다. 같은 PR에서 DIAG-09 '밀림' 반영: `paymentStatus=DELAYED`면 최근 1년 30일 이상 연체 +1로 예상 점수를 구하고 응답에 `assumedDelinquencyCount`를 추가, `paymentStatusApplied`는 밀림일 때 `true`(범영 11/20 동의).
+>>>>>>> fbf0001ef71a1e8b01de84e475189561fb8c76c4
 > - 🆕 11/20 (동주, FP-160) N-15 같은 직군·연령대 회원 평균 `GET /api/members/me/peer-benchmark`(DIAG-01) 추가. 11/19 팀 결정대로 공공통계 대신 회원 표에서 계산한다. 정의서의 옛 경로 `/api/finance/peer-benchmark`·원천(FACT_*)은 범영 님이 정의서에 반영한다. DIAG-02(`/all`)는 쓰는 화면이 없어 만들지 않았다. PR 리뷰 반영: 미입력 자산·대출은 평균에서 빼고(O-15), 금액별 인원 3개를 추가했으며, 소득은 기준월 포함 최근 12개월만 쓴다.
 > - 🆕 11/20 (광희, FP-167) N-17 시나리오 테스트 API 2개 추가: `GET /api/members/me/scenario-base`(기준값)·`POST /api/members/me/scenario-recalculate`(상환 여력 재계산). 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다. 버틸 수 있는 개월 수의 "총자산 25%"는 임시 가정(팀 결정 대기). 금리 변화는 변동금리 대출의 상환액에만 반영하고 대출마다 금리 하한은 0%다(리뷰 반영, 고정 상환액은 줄지 않음).
 > - 🆕 11/19 (광희, FP-180) N-30-1 용어 사전 `GET /api/glossary`(HELP-01) 추가, 기준 데이터 `docs/spec/sql/add_glossary_term.sql`(20개).
@@ -119,7 +123,7 @@
 | `forecastMonths` | 정수 | 아니오 (기본 6) | 예측 기간. **3·6·12만** 받는다(없거나 0이면 6). 그 밖의 값은 `400 INVALID_INPUT`, `fieldErrors[0].field = forecastMonths` |
 | `incomeVariationPct` | 정수 0~200 | 아니오 | 소득 변동 폭(%). 과거 같은 달 패턴을 얼마나 반영할지 (11/17 추가) |
 | `fixedExpenseAmount` | 정수 ≥ 0 | 아니오 (기본 저장값) | 월 고정지출(원). 저장된 고정지출(FIXED) 자리만 이 값으로 바꾼다 (11/17 추가) |
-| `paymentStatus` | `ON_TIME`·`DELAYED` | 아니오 | 납부 상태. 지금은 값만 검사하고 계산에 쓰지 않는다. 예상 점수(DIAG-09, N-21-8)에서 쓸 예정 (11/17 추가) |
+| `paymentStatus` | `ON_TIME`·`DELAYED` | 아니오 | 납부 상태. 현금흐름 전망은 값만 검사하고 계산에 쓰지 않는다(11/17 추가). 🆕 11/20 예상 점수(DIAG-09, N-21-8)는 `DELAYED`면 최근 1년 연체 +1로 계산한다(FP-239) |
 
 계산 규칙:
 
@@ -222,7 +226,7 @@
   - 회원 번호는 넘기지 않는다. 공통 `client.js`가 로그인 토큰을 붙인다.
 - mock 모드(`VITE_USE_MOCK`)에서는 로그인한 mock 회원이 누구든 위 예시와 같은 회원 2번 값을 돌려준다(로그인하지 않았으면 401). 전망 mock은 쿼리 조건을 반영해 계산한다.
 
-### POST `/api/members/me/cash-flow-expected-score` (DIAG-09, N-21-8, FP-170) 🆕 11/18 · 🆕 11/19 경로 이동
+### POST `/api/members/me/cash-flow-expected-score` (DIAG-09, N-21-8, FP-170) 🆕 11/18 · 🆕 11/19 경로 이동 · 🆕 11/20 밀림 반영(FP-239)
 
 전망 조건 중 소득·지출 변화를 저장된 입력에 반영해 예상 대안 점수를 FastAPI ML-03으로 **다시 구한다. 저장하지 않는다**(O-6).
 
@@ -234,11 +238,11 @@
   | `incomeChangePercent` | 소수 | 위 결과 × (1 + %/100). 0원 아래는 0, 원 단위 반올림. 급여소득자(1개월)는 이 값만 적용된다 |
   | `fixedExpenseAmount` | 정수 ≥ 0 | 저장된 FIXED 항목들의 비율을 지킨 채 합계를 이 값으로 맞춘다(반올림 차이는 마지막 항목). FIXED 항목이 없으면 FIXED 1행을 더한다 |
   | `expenseChangePercent` | 소수 | 위 결과의 모든 지출 항목 × (1 + %/100) |
-  | `paymentStatus` | `ON_TIME`·`DELAYED` | **값만 검사하고 점수에는 아직 반영하지 않는다**(반영할 피처는 범영·경환 님과 정한 뒤 추가). `forecastMonths`·`loanPaymentChangePercent`는 보내도 점수에 쓰지 않는다 |
+  | `paymentStatus` | `ON_TIME`·`DELAYED` | 🆕 11/20 `DELAYED`(밀림)면 요청의 최근 1년 30일 이상 연체 건수(`creditProfile.delinqCount12m`, 피처 `DQ1200001`)를 **+1**한다. 저장값이 없으면(신용 이력 없음) 0으로 보고 1이 된다(모델 0.2가 null을 0으로 읽는 것과 같음, D-31). `ON_TIME`·생략이면 바꾸지 않는다(경환 제안, 범영 11/20 동의). `forecastMonths`·`loanPaymentChangePercent`는 보내도 점수에 쓰지 않는다 |
 
 - 처리 순서(범영 11/18):
   1. 현재 점수는 점수가 나온(SCORED) 최근 평가다.
-  2. 요청은 `ScoreInputAssembler.build()`로 만들고 소득·지출만 바꾼다. requestId는 매번 새 UUID, 모델은 ACTIVE 버전이다.
+  2. 요청은 `ScoreInputAssembler.build()`로 만들고 소득·지출과(🆕 11/20) 밀림이면 연체 건수만 바꾼다. requestId는 매번 새 UUID, 모델은 ACTIVE 버전이다.
   3. `PredictionClient.score()`를 한 번만 부른다.
 - 응답 `200`:
 
@@ -250,13 +254,15 @@
   | `modelVersion` | 문자열 | 예상 점수를 계산한 모델(ACTIVE) |
   | `baseModelVersion` | 문자열 | 🆕 11/19 현재 점수를 낸 모델. `modelVersion`과 다르면 화면이 "모델이 바뀌어 점수 차이가 클 수 있습니다"를 안내한다 |
   | `baseRequestId` | 문자열 | 현재 점수를 가져온 평가 |
-  | `paymentStatusApplied` | 불리언 | 납부 상태가 점수에 반영됐는지. 지금은 항상 `false` |
+  | `paymentStatusApplied` | 불리언 | 🆕 11/20 납부 상태가 점수에 반영됐는지. `paymentStatus`가 `DELAYED`면 `true`, `ON_TIME`·생략이면 `false` |
+  | `assumedDelinquencyCount` | 정수 또는 `null` | 🆕 11/20 밀림일 때 점수 계산에 넣은 최근 1년 30일 이상 연체 건수(저장값 + 1). 밀림이 아니면 `null`. 화면 문구: "최근 1년 30일 이상 연체 1회 추가로 가정" |
 
   ```json
-  { "currentScore": 588, "currentGradeBandCode": "CAUTION", "expectedScore": 578, "expectedGradeBandCode": "CAUTION",
-    "scoreDiff": -10, "modelVersion": "DEV-DUMMY", "baseModelVersion": "DEV-DUMMY",
-    "baseRequestId": "00000000-0000-4000-8000-000000000588", "paymentStatusApplied": false }
+  { "currentScore": 588, "currentGradeBandCode": "CAUTION", "expectedScore": 563, "expectedGradeBandCode": "CAUTION",
+    "scoreDiff": -25, "modelVersion": "DEV-DUMMY", "baseModelVersion": "DEV-DUMMY",
+    "baseRequestId": "00000000-0000-4000-8000-000000000588", "paymentStatusApplied": true, "assumedDelinquencyCount": 1 }
   ```
+  (예: 소득 −10%·밀림. 밀림이 아니면 `"paymentStatusApplied": false, "assumedDelinquencyCount": null`)
 - 오류:
 
   | 상태 | code | 언제 |
@@ -267,7 +273,7 @@
   | 404 | `ASSESSMENT_NOT_FOUND` | 점수가 나온 평가가 하나도 없음(리포트와 같은 코드) |
   | 409 | `INPUT_INCOMPLETE` | 저장된 입력 기준월이 없거나 출생연도가 없음(점수 산출과 같은 문구). 🆕 11/19 소득이 직군에 필요한 개월 수(자영업자·프리랜서 12, 급여소득자 1)보다 적거나 같은 달이 겹치면 ML-03을 부르지 않고 "소득을 필요한 개월 수만큼 입력해 주세요."(점수 산출과 같음, 0원으로 채워 계산하지 않음) |
   | 503 | `MODEL_NOT_READY` | ML-03 연결 실패·시간 초과·5xx. 저장하지 않으므로 MODEL_ERROR 기록을 남기지 않는다 |
-- 프론트: `diagnosisApi.js`의 `getExpectedScore({ incomeVariationPct, incomeChangePercent, fixedExpenseAmount, expenseChangePercent, paymentStatus })`. mock은 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"으로만 계산하며, 진짜 모델 점수가 아니다.
+- 프론트: `diagnosisApi.js`의 `getExpectedScore({ incomeVariationPct, incomeChangePercent, fixedExpenseAmount, expenseChangePercent, paymentStatus })`. mock은 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"(🆕 11/20 밀림이면 −15점 더)으로만 계산하며, 진짜 모델 점수가 아니다.
 
 ---
 
@@ -405,8 +411,9 @@
 |---|---|---|---|
 | POST | `/api/diagnosis/dsr/calculate` | N-20-4 DSR·위험 단계 | 요청 본문 |
 | POST | `/api/diagnosis/financial-health/calculate` | N-16-1·2 건전성 지표, N-16-3 값 바꿔 보기 | 요청 본문 |
+| GET | `/api/members/me/financial-health` 🆕 11/20 | N-16-1·2·4 내 저장값(DIAG-03-1, FP-239) | 저장 데이터 (아래 「DIAG-03-1」) |
 
-- 두 API 모두 **DB를 읽지 않고 받은 값으로 계산만** 한다. 저장 데이터 조회 연결(N-16·N-20 "저장 데이터 조회")은 후속 작업이다.
+- 위 두 POST API는 **DB를 읽지 않고 받은 값으로 계산만** 한다. 저장값은 DIAG-03-1이 돌려주고, 화면은 그 값으로 POST를 불러 비율·위험 단계를 구한다.
 - 상환 부담률(N-16-1)과 DSR(N-20-4)은 백엔드 `FinancialHealthCalculator.calculateRepaymentBurdenRatio()` **함수 하나를 함께 쓴다**.
 - 비율은 `금액 ÷ 기준 × 100`이다. BigDecimal로 계산해 소수 둘째 자리에서 반올림(HALF_UP)한다.
 - 오류: 금액이 음수이면 `400 INVALID_INPUT`이고 `fieldErrors[0].field`에 그 필드 이름(예: `totalAsset`)이 담긴다. DSR API는 연소득이 0이어도 `400`이다(`field`: `annualIncome`).
@@ -481,6 +488,31 @@
 ```
 
 프론트: `features/diagnosis/api/diagnosisApi.js`의 `calculateDsr(payload)`, `calculateFinancialHealth(payload)`. mock도 백엔드와 같은 규칙으로 계산한다.
+
+### GET `/api/members/me/financial-health` — DIAG-03-1 자산·부채 저장값 (FP-239) 🆕 11/20
+
+로그인 회원의 **저장된 값**을 돌려준다. 비율·위험 단계는 계산하지 않는다(화면이 이 값으로 위 POST를 부른다). 같은 직군 평균(`peer`)은 넣지 않는다. 화면이 DIAG-01(`/peer-benchmark`)의 `sameWorkerType`을 붙인다(경환 님 11/20).
+
+- 로그인한 일반 회원만(보안 설정: 토큰 없음 401, 관리자 403). 회원은 토큰에서 꺼내고 쿼리·본문은 없다.
+- 기준월 = 그 회원의 가장 늦은 소득월(DIAG-07-1·08-1·N-17과 같음). 미입력은 0원으로 바꾸지 않고 `null`이다(O-15 A안, DIAG-01과 같은 규칙).
+
+  | 필드 | 값 | 미입력이면 |
+  |---|---|---|
+  | `baseMonth` | 기준월 `"YYYY-MM"` | — |
+  | `totalAssetAmount` | 기준월 `USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT` | `null`(자산 행 없음·NULL) |
+  | `annualIncomeAmount` | N-20-3 공유 함수 `calculateAnnualIncome`로 기준월 포함 최근 12개월(달력)의 합. 급여소득자는 월급을 12개월로 펼치므로 월급 × 12 | `null`(자영업자·프리랜서가 12개 달을 다 채우지 않음. 일부 합으로 연소득을 낮게 보이지 않게 한다) |
+  | `totalDebtAmount` | 기준월 대출이 있으면 `BALANCE_AMT` 합, 대출 행이 없고 `NO_LOAN_YN='Y'`(해당 없음)면 0 | `null`(둘 다 아님) |
+  | `annualPaymentAmount` | 같은 규칙으로 `MONTHLY_PAYMENT_AMT` 합 × 12, 해당 없음은 0 | `null` |
+  | `loans[]` | N-16-4 보유 대출(기준월, `LOAN_ID` 순): `loanId`, `loanTypeCode`, `loanTypeName`(`DIM_LOAN_TYPE`), `balanceAmount`, `annualRatePct`(연 %), `rateTypeCode`(`FIXED`·`VARIABLE`·`UNKNOWN`), `remainingMonths`, `monthlyPaymentAmount` | 빈 배열 |
+
+  ```json
+  { "baseMonth": "2026-08", "totalAssetAmount": 30000000, "annualIncomeAmount": 25193976,
+    "totalDebtAmount": 15000000, "annualPaymentAmount": 4200000,
+    "loans": [ { "loanId": 101, "loanTypeCode": "CREDIT", "loanTypeName": "신용대출", "balanceAmount": 12000000,
+                 "annualRatePct": 5.0, "rateTypeCode": "VARIABLE", "remainingMonths": 36, "monthlyPaymentAmount": 200000 } ] }
+  ```
+- 오류: `404 NOT_FOUND` "저장된 소득 데이터가 없습니다."(다른 저장값 API와 같음). 401·403은 위와 같다.
+- 프론트: `diagnosisApi.js`의 `getMemberFinancialHealth()`. mock은 예시값이다(총자산·대출은 N-17 시나리오 기준값 예시와 같다).
 
 ---
 
