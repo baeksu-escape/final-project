@@ -5,7 +5,7 @@ const SAMPLES = {
   FREELANCER: { asset: 3000, incomes: [520, 180, 610, 240, 90, 700, 450, 300, 660, 210, 380, 560], fixed: 140, other: 16, peer: [3600, 4200, 1800], loans: [['신용대출', 1200, 6.9, 'FIXED', 24, 55]] },
 }
 export const MOCK_MONTHLY_DEBT_RATE = 0.048
-export const ASSET_ASSUMPTIONS = ['직군별 공통 시연값이며 회원의 실제 DB 자료가 아닙니다.', '총부채를 바꾸면 저장 연 상환액을 부채 비율로 조정합니다(시연 가정).', '저장 부채가 0원이면 새 부채의 월 4.8%를 상환한다고 가정합니다(실제 금융 계산 아님).']
+export const ASSET_ASSUMPTIONS = ['부채를 바꿨을 때 연 원리금은 시연 추정입니다.', '총부채를 바꾸면 저장 연 상환액을 부채 비율로 조정합니다(시연 가정).', '저장 부채가 0원이면 새 부채의 월 4.8%를 상환한다고 가정합니다(실제 금융 계산 아님).']
 
 // N-16-1·N-21-1 직군별 합성 기준값을 새 객체로 만든다. 실제 개인정보·DB 저장값을 사용하지 않는다.
 export function createFinanceMockData(workerTypeCode) {

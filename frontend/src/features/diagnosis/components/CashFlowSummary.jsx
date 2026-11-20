@@ -1,8 +1,8 @@
-// N-21-9 예측 결과 요약 카드 3개 — 예측 기간 누적 잉여, 가장 빠듯한 달, n개월 뒤 예상 점수.
+// N-21-9 예측 결과 요약 — 누적 잉여, 빠듯한 달, 조건을 반영한 예상 점수를 표시한다.
 const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(Math.round(v)).toLocaleString('ko-KR')}`
 const monthLabel = (baseMonth) => `${Number(String(baseMonth).slice(5, 7))}월`
 
-export default function CashFlowSummary({ result, months }) {
+export default function CashFlowSummary({ result }) {
   const { cumulativeSurplusAmount, tightestMonth, currentScore, endScore } = result
   return (
     <div className="cf-summary">
@@ -15,7 +15,7 @@ export default function CashFlowSummary({ result, months }) {
         <strong className="cf-big">{tightestMonth ? `${monthLabel(tightestMonth.baseMonth)} · ${signed(tightestMonth.netAmount)}원` : '—'}</strong>
       </div>
       <div className="cf-summary__item">
-        <span className="cf-hint">{months}개월 뒤 예상 점수</span>
+        <span className="cf-hint">조건을 반영한 예상 점수</span>
         <strong className="cf-big">
           {Number.isInteger(endScore) ? endScore : '—'}
           {Number.isInteger(endScore) && Number.isInteger(currentScore) && <span className="cf-hint"> ({signed(endScore - currentScore)})</span>}

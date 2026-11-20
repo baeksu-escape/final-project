@@ -50,7 +50,7 @@ function useIncomeVolatility(userId, workerTypeCode, baseline) {
   return { loading: !ready, result: ready ? state.result : null, error: ready ? state.error : '', retry: () => setRevision((value) => value + 1) }
 }
 
-// N-22-3·4·5·6 변동성 요약 — API(지금은 mock 임시 계산) 결과만 받아 최근 12개월 소득 지표와 월 고정지출 기준의 부족 달을 표시한다.
+// N-22-3·4·5·6 변동성 요약 — 서버(DIAG-07-1) 결과만 받아 최근 12개월 소득 지표와 월 고정지출 기준의 부족 달을 표시한다.
 // data는 현금흐름 화면이 이미 받은 기준 자료(getCashFlowData 응답)이며, 이 컴포넌트는 직접 계산하지 않는다.
 export default function IncomeVolatilitySection({ data }) {
   const { user } = useAuth()
@@ -131,7 +131,7 @@ export default function IncomeVolatilitySection({ data }) {
         ) : (
           <>
           {response.nearestDeficit && (
-            <p>가장 가까운 부족 달: {formatMonth(response.nearestDeficit.baseMonth)}({response.nearestDeficit.monthsUntil}개월 뒤) · 미리 모아 둘 금액 {formatWon(response.nearestDeficit.reserveAmount)}</p>
+            <p>가장 가까운 부족 달: {response.nearestDeficit.dueMonth ? `${formatMonth(response.nearestDeficit.dueMonth)}(${response.nearestDeficit.monthsUntil}개월 뒤)` : `${response.nearestDeficit.monthsUntil}개월 뒤`} · 미리 모아 둘 금액 {formatWon(response.nearestDeficit.reserveAmount)}</p>
           )}
           <ul className="iv-deficits__list">
             {deficits.map((item) => (
