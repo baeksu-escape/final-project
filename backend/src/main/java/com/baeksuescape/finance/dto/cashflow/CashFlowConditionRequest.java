@@ -34,6 +34,6 @@ public class CashFlowConditionRequest {
     /** N-21-2 월 고정 지출 (원, 0 이상, 생략 가능). 보내면 저장된 고정지출(FIXED 합계) 대신 이 값을 쓴다. */
     private Long fixedExpenseAmount;
 
-    /** N-21-2 카드값·대출 납부 상태 (ON_TIME 제때·DELAYED 밀림, 생략 가능). 값만 검사하고 예상 점수(DIAG-09)에서 쓴다. */
+    /** N-21-2 카드값·대출 납부 상태 (ON_TIME 제때·DELAYED 밀림, 생략 가능). 전망(DIAG-08-1)은 값만 검사하고, 예상 점수(DIAG-09)는 밀림이면 최근 1년 연체 +1로 계산한다(FP-239). */
     private String paymentStatus;
 }

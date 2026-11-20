@@ -12,6 +12,7 @@ import {
   SAMPLE_INCOME_VOLATILITY,
   SAMPLE_MONTHLY_INCOMES,
   SAMPLE_SCENARIO_BASE,
+  SAMPLE_MEMBER_FINANCIAL_HEALTH,
 } from './diagnosisMockData.js'
 
 // N-20-4 DSR(연소득 대비 연원리금 상환비율) 및 위험 단계 계산
@@ -260,8 +261,11 @@ function handleExpectedScore({ body, token }) {
   const baseExpense = fixedExpenseAmount === null ? monthlyTotalExpense : fixedExpenseAmount + (monthlyTotalExpense - monthlyFixedExpense)
   const expenseRatioPct = ((baseExpense * (1 + expenseChangePercent / 100)) / monthlyTotalExpense - 1) * 100
   const base = SAMPLE_EXPECTED_SCORE_BASE
+  // FP-239 밀림(DELAYED)이면 실제 API처럼 최근 1년 30일 이상 연체를 1회 더한 것으로 보고, mock에서는 정해진 점수만큼 뺀다.
+  const delayed = paymentStatus === 'DELAYED'
   const expectedScore = Math.min(1000, Math.max(0, Math.round(
-    base.score + incomeChangePercent * base.incomePointPerPercent - expenseRatioPct * base.expensePointPerPercent,
+    base.score + incomeChangePercent * base.incomePointPerPercent - expenseRatioPct * base.expensePointPerPercent
+      - (delayed ? base.delayedPointPenalty : 0),
   )))
   const gradeOf = (score) => {
     if (score >= base.gradeCutoffs.good) return 'GOOD'
@@ -276,7 +280,8 @@ function handleExpectedScore({ body, token }) {
     modelVersion: base.modelVersion,
     baseModelVersion: base.modelVersion, // mock은 현재·예상 점수를 같은 모델로 본다(다르면 화면이 모델 변경 안내)
     baseRequestId: base.baseRequestId,
-    paymentStatusApplied: false,
+    paymentStatusApplied: delayed,
+    assumedDelinquencyCount: delayed ? base.storedDelinquencyCount + 1 : null,
   }
 }
 
@@ -290,6 +295,12 @@ function handlePeerBenchmark({ token }) {
     ? { memberCount: counts[user.jobType], ...createFinanceMockData(user.jobType).asset.peer }
     : { ...empty }
   return { workerTypeCode: user.jobType, ageBandCode: null, sameWorkerType, sameAgeBand: { ...empty } }
+}
+
+// FP-239 N-16 DIAG-03-1 자산·부채 저장값 mock — 실제 API처럼 로그인하지 않았으면 401, 응답 모양은 실제와 같다.
+function handleMemberFinancialHealth({ token }) {
+  requireMockUser(token)
+  return structuredClone(SAMPLE_MEMBER_FINANCIAL_HEALTH)
 }
 
 // N-17-1 DIAG-04 시나리오 기준값 mock — 실제 API(GET /api/members/me/scenario-base)와 같은 모양이다.
@@ -388,5 +399,6 @@ registerMockHandlers({
   'POST /api/members/me/cash-flow-expected-score': handleExpectedScore,
   'GET /api/members/me/scenario-base': handleScenarioBase,
   'POST /api/members/me/scenario-recalculate': handleMemberScenarioRecalculate,
+  'GET /api/members/me/financial-health': handleMemberFinancialHealth,
 })
 

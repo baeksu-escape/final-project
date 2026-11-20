@@ -13,6 +13,7 @@ export const DIAGNOSIS_API = Object.freeze({
   EXPECTED_SCORE: '/api/members/me/cash-flow-expected-score',
   SCENARIO_BASE: '/api/members/me/scenario-base',
   MEMBER_SCENARIO_RECALCULATE: '/api/members/me/scenario-recalculate',
+  MEMBER_FINANCIAL_HEALTH: '/api/members/me/financial-health',
 })
 
 // N-22 로그인한 회원의 저장된 최근 12개월 소득으로 변동성 지표·성수기·비수기 격차·소득 부족 달을 조회한다.
@@ -33,8 +34,9 @@ export function getCashFlowForecast(condition = {}) {
 }
 
 // N-21-8 전망 조건(소득 변동 폭·소득 변화율·월 고정 지출·지출 변화율)으로 예상 대안 점수를 다시 구한다(DIAG-09, 저장 안 함).
-// condition은 getCashFlowForecast와 같은 이름의 숫자 값이다. 납부 상태는 아직 점수에 반영되지 않는다(paymentStatusApplied: false).
-// 응답: { currentScore, currentGradeBandCode, expectedScore, expectedGradeBandCode, scoreDiff, modelVersion, baseModelVersion, baseRequestId, paymentStatusApplied }
+// condition은 getCashFlowForecast와 같은 이름의 값이다. FP-239: paymentStatus가 'DELAYED'(밀림)면 최근 1년 30일 이상 연체를 1회 더해 계산하고
+// paymentStatusApplied: true, assumedDelinquencyCount: 넣은 연체 건수(저장값 + 1)다. 제때·생략이면 false와 null. 화면 문구: "최근 1년 30일 이상 연체 1회 추가로 가정".
+// 응답: { currentScore, currentGradeBandCode, expectedScore, expectedGradeBandCode, scoreDiff, modelVersion, baseModelVersion, baseRequestId, paymentStatusApplied, assumedDelinquencyCount }
 // modelVersion(예상 점수 모델)과 baseModelVersion(현재 점수 모델)이 다르면 scoreDiff에 모델 차이도 섞인다.
 export function getExpectedScore(condition = {}) {
   return apiPost(DIAGNOSIS_API.EXPECTED_SCORE, condition)
@@ -55,6 +57,14 @@ export function calculateFinancialHealth(payload) {
 // 옛 mock 전용 함수다(서버에는 이 경로가 없다). 저장 데이터로 계산하는 실제 API는 아래 recalculateMemberScenario를 쓴다.
 export function recalculateScenario(payload) {
   return apiPost(DIAGNOSIS_API.RECALCULATE_SCENARIO, payload)
+}
+
+// FP-239 N-16-1·2·4 DIAG-03-1 로그인 회원의 자산·부채 저장값(기준월 = 가장 늦은 소득월). 비율·위험 단계는 이 값으로 calculateFinancialHealth를 부른다.
+// 응답: { baseMonth, totalAssetAmount, annualIncomeAmount, totalDebtAmount, annualPaymentAmount,
+//         loans: [{ loanId, loanTypeCode, loanTypeName, balanceAmount, annualRatePct, rateTypeCode, remainingMonths, monthlyPaymentAmount }] }
+// 미입력은 0이 아니라 null이다(총자산 미입력, 대출 미입력. 대출 "해당 없음"은 0). 자영업자·프리랜서가 최근 12개월을 다 채우지 않았으면 연소득이 null. 저장된 소득이 없으면 404.
+export function getMemberFinancialHealth() {
+  return apiGet(DIAGNOSIS_API.MEMBER_FINANCIAL_HEALTH)
 }
 
 // N-17-1 DIAG-04 로그인 회원의 시나리오 기준값(월 소득 12개월 평균·지출·상환액, 변동금리 대출 잔액, 총자산, 현재 정책금리, 계산 가정).
