@@ -63,8 +63,32 @@ class ChangeSqlTests(unittest.TestCase):
         for version, sql in CHANGE_SQL.items():
             text = re.sub(r"\s+", " ", sql)
             self.assertIn(f"'{version}' AS CUTOFF_VERSION, 'DRAFT' AS STATUS_CODE", text, version)
-            found = [(code, int(low), int(high)) for code, low, high in re.findall(r"'(CAUTION|STANDARD|GOOD)'(?: AS GRADE_BAND_CODE)?, (\d+)(?: AS MIN_SCORE)?, (\d+)", text)]
-            self.assertEqual(found, DRAFT_VERSIONS[version], version)
+            # 확인 블록(MERGE 앞)과 MERGE 두 곳에 같은 경계가 들어 있어야 한다.
+            check_part, merge_part = text.split("MERGE INTO SCORE_GRADE_BAND")[0], text.split("MERGE INTO SCORE_GRADE_BAND")[1]
+            for part in (check_part, merge_part):
+                found = [(code, int(low), int(high)) for code, low, high in re.findall(r"'(CAUTION|STANDARD|GOOD)'(?: AS GRADE_BAND_CODE)?, (\d+)(?: AS MIN_SCORE)?, (\d+)", part)]
+                self.assertEqual(found, DRAFT_VERSIONS[version], version)
+
+    def test_stops_when_existing_rows_differ_before_changing_anything(self):
+        # 같은 버전·등급 코드가 이미 있으면 MERGE가 건너뛰어 성공하므로, MERGE 앞에서 상태·경계·표시 순서를 비교해 다르면 오류로 멈춘다(검수 반영).
+        for version, sql in CHANGE_SQL.items():
+            text = re.sub(r"\s+", " ", sql)
+            check = text[text.index("DECLARE"):text.index("MERGE INTO SCORE_CUTOFF_VERSION")]
+            self.assertLess(sql.index("DECLARE"), sql.index("MERGE INTO SCORE_CUTOFF_VERSION"), version)
+            self.assertIn(f"WHERE CUTOFF_VERSION = '{version}'", check, version)
+            self.assertIn("IF v_status <> 'DRAFT' THEN RAISE_APPLICATION_ERROR(-20141", check, version)               # 상태
+            self.assertIn("b.MIN_SCORE <> e.MIN_SCORE OR b.MAX_SCORE <> e.MAX_SCORE OR b.DISPLAY_ORDER <> e.DISPLAY_ORDER", check, version)   # 경계·표시 순서
+            self.assertIn("RAISE_APPLICATION_ERROR(-20142", check, version)
+            self.assertIn("GRADE_BAND_CODE NOT IN ('CAUTION', 'STANDARD', 'GOOD')", check, version)                   # 모르는 등급 코드
+            self.assertIn("RAISE_APPLICATION_ERROR(-20143", check, version)
+            self.assertIn("WHEN NO_DATA_FOUND THEN NULL", check, version)                                              # 버전 행이 없는 새 DB는 통과
+
+    def test_check_block_does_not_change_data(self):
+        # 확인 블록은 읽기만 한다. 값을 바꾸는 문장은 MERGE 두 개뿐이어야 한다.
+        for version, sql in CHANGE_SQL.items():
+            block = sql[sql.index("DECLARE"):sql.index("MERGE INTO SCORE_CUTOFF_VERSION")]
+            for word in ("INSERT", "UPDATE", "DELETE", "MERGE", "COMMIT"):
+                self.assertNotIn(word, block.upper(), f"{version} 확인 블록에 {word}가 있다")
 
     def test_rolls_back_both_steps_on_error(self):
         # 두 번째 MERGE가 실패해도 첫 번째(버전 행)만 커밋되지 않도록 오류 종료 때 ROLLBACK한다(SQL*Plus는 종료 시 기본이 COMMIT).
