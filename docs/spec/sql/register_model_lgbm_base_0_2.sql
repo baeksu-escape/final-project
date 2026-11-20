@@ -12,12 +12,13 @@
 --    두 값은 라벨이 다르므로 나란히 비교하지 않는다(같은 라벨 비교는 재욱 님 후속 SQL이 METRICS_JSON에 더한다).
 --  - AUC_TEST: 비워 둔다(FP-144).
 --
--- 실행 순서: (0.1 등록이 끝난 DB) 이 파일 → 서버 PC 파일을 0.2 묶음으로 교체·/v1/health 확인 → activate_model_lgbm_base_0_2.sql
+-- 실행 순서: (0.1 등록이 끝난 DB) 이 파일(미리 해 둬도 됨) → 서버 PC 파일을 0.2 묶음으로 교체·/v1/health 확인 → 바로 activate_model_lgbm_base_0_2.sql
+--   (파일 교체와 전환 SQL 사이에는 점수 요청이 409라, 공용 DB는 두 단계를 연달아 사용자가 없는 시간에 한다)
 -- 다시 실행해도 된다: 이미 있는 행은 건너뛴다. 공용 DB 실행은 DB 담당이 한다.
 -- SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다.
 -- ====================================================================
-WHENEVER SQLERROR EXIT SQL.SQLCODE
-WHENEVER OSERROR EXIT FAILURE
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
+WHENEVER OSERROR EXIT FAILURE ROLLBACK
 SET SERVEROUTPUT ON
 
 DECLARE
