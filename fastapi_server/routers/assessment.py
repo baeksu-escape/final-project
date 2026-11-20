@@ -1,5 +1,6 @@
 # FP-140·FP-141 Spring → FastAPI 내부 API ML-01~04 (B팀 API 명세서 4장). FastAPI는 DB를 읽거나 쓰지 않는다. 저장은 Spring이 한다.
-# 모델 버전이 계산기를 고른다: DB ACTIVE가 DEV-DUMMY면 Mock, LGBM-BASE-0.1이면 실제 모델(FP-141). 그래서 DB 전환이 곧 스위치다.
+# 모델 버전이 계산기를 고른다: DB ACTIVE가 DEV-DUMMY면 Mock, 불러온 모델 묶음의 버전(LGBM-BASE-0.1·0.2 등, meta.json)과 같으면 실제 모델
+# (FP-141, FP-237). 그래서 DB 전환이 곧 스위치이고, 모델 교체는 묶음 파일을 바꾸고 DB ACTIVE를 같은 버전으로 바꾸면 된다.
 import logging
 import re
 import time
@@ -10,7 +11,7 @@ from pipeline import mock_scorer, model_scorer
 from pipeline.feature_builder import build_features
 from pipeline.feature_catalog import (
     CUTOFF_VERSION, FEATURE_SET_VERSION, FEATURES, GRADE_BANDS, MODEL_VERSION,
-    REAL_FEATURE_SET_VERSION, REAL_MODEL_VERSION,
+    REAL_FEATURE_SET_VERSION, is_real_model_version,
 )
 from pipeline.simulation import simulate, validate_changes
 from schemas.assessment import ScoreRequest, SimulateRequest
@@ -77,38 +78,43 @@ def _check_bill_data(req: ScoreRequest):
                         for n in empty], req.requestId)
 
 
-SUPPORTED_MODEL_VERSIONS = (MODEL_VERSION, REAL_MODEL_VERSION)
+def supported_model_versions() -> list[str]:
+    """이 서버가 지금 계산할 수 있는 버전: Mock(DEV-DUMMY)은 항상, 실제 모델은 불러온 묶음의 버전(FP-237)."""
+    scorer = model_scorer.get_scorer()
+    return [MODEL_VERSION] + ([scorer.version] if scorer.ready else [])
 
 
 def _pick_scorer(version: str | None, field: str, request_id: str):
     """N-12-2 요청한 모델 버전으로 계산기를 고른다 → (score_features 함수, 모델 버전, 피처 세트).
-    DEV-DUMMY(또는 버전 없음)는 Mock, LGBM-BASE-0.1은 실제 모델. 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503."""
+    DEV-DUMMY(또는 버전 없음)는 Mock. 실제 모델은 불러온 묶음의 버전(meta.json, 예: LGBM-BASE-0.1·0.2)과 같을 때만 쓴다(FP-237).
+    실제 모델 버전을 요청했는데 묶음을 못 불러왔으면 Mock으로 바꾸지 않고 503, 불러온 묶음과 버전이 다르면 409."""
     if version is None or version == MODEL_VERSION:
         return mock_scorer.score_features, MODEL_VERSION, FEATURE_SET_VERSION
-    if version == REAL_MODEL_VERSION:
-        scorer = model_scorer.get_scorer()
-        if not scorer.ready:
-            raise ApiError(503, "MODEL_NOT_READY", "모델을 아직 불러오지 못했습니다.", request_id=request_id)
-        return scorer.score_features, REAL_MODEL_VERSION, REAL_FEATURE_SET_VERSION
+    scorer = model_scorer.get_scorer()
+    if scorer.ready and version == scorer.version:
+        return scorer.score_features, scorer.version, REAL_FEATURE_SET_VERSION
+    if not scorer.ready and is_real_model_version(version):
+        raise ApiError(503, "MODEL_NOT_READY", "모델을 아직 불러오지 못했습니다.", request_id=request_id)
     raise ApiError(409, "VERSION_MISMATCH", "요청한 모델 버전을 이 서버가 계산할 수 없습니다.",
-                   [{"field": field, "message": f"받는 모델 버전: {', '.join(SUPPORTED_MODEL_VERSIONS)}"}], request_id)
+                   [{"field": field, "message": f"받는 모델 버전: {', '.join(supported_model_versions())}"}], request_id)
 
 
-# ML-01 서버 상태 확인 — modelLoaded는 실제 모델(LGBM-BASE-0.1) 파일을 불러왔는지다. Mock은 항상 쓸 수 있다.
+# ML-01 서버 상태 확인 — modelLoaded는 실제 모델 파일을 불러왔는지, modelVersion은 불러온 묶음의 버전이다. Mock은 항상 쓸 수 있다.
 @router.get("/health")
 def health():
-    loaded = model_scorer.get_scorer().ready
-    return {"status": "UP", "modelLoaded": loaded, "modelVersion": REAL_MODEL_VERSION if loaded else MODEL_VERSION,
-            "supportedModelVersions": list(SUPPORTED_MODEL_VERSIONS)}
+    scorer = model_scorer.get_scorer()
+    return {"status": "UP", "modelLoaded": scorer.ready, "modelVersion": scorer.version if scorer.ready else MODEL_VERSION,
+            "supportedModelVersions": supported_model_versions()}
 
 
 # ML-02 모델·피처셋·등급 구간 버전과 피처 목록. 실제 모델을 불러왔으면 그 정보(피처 38개), 아니면 Mock 정보(39개).
 @router.get("/model-info")
 def model_info():
-    if model_scorer.get_scorer().ready:
+    scorer = model_scorer.get_scorer()
+    if scorer.ready:
         from training.config import MODELS   # 실제 모델 피처 순서의 기준
         codes = set(MODELS["alternative"]["features"])
-        model_version, feature_set, features = REAL_MODEL_VERSION, REAL_FEATURE_SET_VERSION, [f for f in FEATURES if f.code in codes]
+        model_version, feature_set, features = scorer.version, REAL_FEATURE_SET_VERSION, [f for f in FEATURES if f.code in codes]
     else:
         model_version, feature_set, features = MODEL_VERSION, FEATURE_SET_VERSION, FEATURES
     return {
@@ -116,7 +122,7 @@ def model_info():
         "featureSetVersion": feature_set,
         "cutoffVersion": CUTOFF_VERSION,
         "gradeBands": GRADE_BANDS,
-        "supportedModelVersions": list(SUPPORTED_MODEL_VERSIONS),
+        "supportedModelVersions": supported_model_versions(),
         "features": [
             {"featureCode": f.code, "alternativeYn": f.alternative_yn, "simulatableYn": f.simulatable_yn}
             for f in features
