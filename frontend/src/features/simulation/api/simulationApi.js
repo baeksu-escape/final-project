@@ -6,6 +6,11 @@ import { INPUT_KEYS, describeSimulationError, fromCreditCareBase, toSimulationCh
 
 const beforeOfferCache = new Map()
 
+// N-18-7 다시 불러올 때 현재 점수의 참고 정보 캐시를 비운다.
+export function clearScoreBandOfferCache() {
+  beforeOfferCache.clear()
+}
+
 // N-18-7 현재 점수의 조회 성공 결과를 재사용한다.
 async function getCachedBeforeOffer(score) {
   if (beforeOfferCache.has(score)) return beforeOfferCache.get(score)

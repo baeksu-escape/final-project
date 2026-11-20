@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { Button, Card, MoneyInput, Notice, NumberInput, Slider, Toast } from '../../../common/components/index.js'
@@ -18,6 +18,9 @@ export default function SimulationPage() {
   const products = useLoanProducts()
   const [focusKeys, setFocusKeys] = useState([])
   const [toast, setToast] = useState('')
+  const focusTimer = useRef(null)
+
+  useEffect(() => () => clearTimeout(focusTimer.current), [])
 
   if (sim.loading) return <p role="status">시뮬레이터 값을 불러오는 중입니다.</p>
   if (sim.error) return <Notice type="warn">{sim.error} <Button onClick={sim.reload}>다시 시도</Button></Notice>
@@ -44,7 +47,8 @@ export default function SimulationPage() {
     setToast(sameInputs({ ...values, ...example }, sim.applied ?? sim.baseline)
       ? '이미 계산한 조건입니다. 결과를 확인해 보세요.'
       : '예시 값을 넣었습니다. [예상 점수 계산하기]를 눌러 확인해 보세요.')
-    setTimeout(() => {
+    clearTimeout(focusTimer.current)
+    focusTimer.current = setTimeout(() => {
       const input = document.querySelector(`#sim-field-${keys[0]} input`)
       input?.scrollIntoView({ block: 'center', behavior: 'smooth' })
       input?.focus({ preventScroll: true })
