@@ -14,7 +14,7 @@
 .sc-group__title { font-size: 12.5px; font-weight: 600; }
 .sc-preset { min-height: 36px; padding: 4px 12px; border-radius: 10px; border: 1px solid var(--line2); background: var(--inp); color: var(--fg2); text-align: left; cursor: pointer; font-size: 13px; }
 .sc-preset:hover { border-color: var(--vio); }
-.sc-preset[aria-pressed="true"] { background: var(--pri); border-color: var(--pri); color: var(--pri-fg, #fff); font-weight: 600; }
+.sc-preset[aria-pressed="true"] { background: var(--pri); border-color: var(--pri); color: var(--pri-fg); font-weight: 600; }
 .sc-field { display: grid; gap: 4px; padding-top: 6px; }
 /* 입력 안내 줄 — 높이를 고정해 문구가 바뀌어도 오른쪽 결과가 움직이지 않게 한다. 넘치면 스크롤로 읽는다. */
 .sc-status { block-size: 3.2em; overflow: auto; margin: 0; font-size: 13px; line-height: 1.5; color: var(--mut); }

@@ -388,7 +388,7 @@
   ```json
   { "current": { "monthlyIncomeAmount": 2099498, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 350000, "monthlySurplusAmount": 433984, "dsrPct": 16.67 },
     "changed": { "monthlyIncomeAmount": 1259699, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 370000, "monthlySurplusAmount": -425815, "dsrPct": 29.37 },
-    "monthlyInterestChangeAmount": 20000, "surplusDiffAmount": -859799, "survivableMonths": 17, "verdict": "SHORTFALL",
+    "monthlyInterestChangeAmount": 20000, "surplusDiffAmount": -859799, "survivableMonths": 10, "verdict": "SHORTFALL",
     "assumptions": ["금리 변화는 변동금리 대출 잔액에만 반영하고, …"] }
   ```
   (예: 변동금리 대출 1,200만 원·연 5%·월 원리금 20만 원(전체 상환액 35만 원 중), 총자산 3,000만 원, `{ "ratePctPoint": 2, "incomePct": -40 }`. 같은 기준값에 `-5`%p면 금리가 0%까지만 내려가 월 이자 −50,000원, 상환액은 고정 15만 원이 남아 30만 원)
