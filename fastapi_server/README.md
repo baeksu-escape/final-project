@@ -113,7 +113,9 @@ python -m unittest discover tests -v
 - 시뮬레이션 결과는 저장하지 않는다(O-9). 회복 점수는 그 항목을 시뮬레이터 범위 안 가장 좋은 값으로 바꿨을 때의 점수 차이다(O-14).
 - 현금흐름 화면의 예상 대안 점수(N-21-8, DIAG-09)는 Spring이 바꾼 입력으로 ML-03을 부르고 저장하지 않는다(O-6). FastAPI 쪽 추가 작업은 없다.
 - Mock 가중치는 화면 시험용 임의 값이다. 학습 결과가 아니고 점수 의미도 없다.
-- **모델을 바꿀 때(예: 0.1 → 0.2):** ① 서버 PC `artifacts/`의 5개 파일을 새 묶음으로 바꾸고 FastAPI를 다시 켠다 → `/v1/health`의 `modelVersion`이 새 버전인지 확인 ② DB에 등록 SQL(`register_model_lgbm_base_0_2.sql`) ③ 전환 SQL(`activate_model_lgbm_base_0_2.sql`). 되돌리기는 파일을 이전 묶음으로 바꾸고 `rollback_model_lgbm_base_0_2_to_0_1.sql`. 그 DB를 쓰는 모든 PC가 같은 묶음이어야 한다(다르면 409). 코드는 바꾸지 않는다.
+- **모델을 바꿀 때(예: 0.1 → 0.2):** ① DB에 등록 SQL(`register_model_lgbm_base_0_2.sql`) — CANDIDATE로만 넣으므로 서비스는 그대로다. 미리 해 둬도 된다 ② 서버 PC `artifacts/`의 5개 파일을 새 묶음으로 바꾸고 FastAPI를 다시 켠다 → `/v1/health`의 `modelVersion`이 새 버전인지 확인 ③ **②가 끝나면 바로** 전환 SQL(`activate_model_lgbm_base_0_2.sql`). 되돌리기는 파일을 이전 묶음으로 바꾸고 바로 `rollback_model_lgbm_base_0_2_to_0_1.sql`. 그 DB를 쓰는 모든 PC가 같은 묶음이어야 한다(다르면 409). 코드는 바꾸지 않는다.
+  - ⚠️ **②와 ③ 사이에는 점수 요청이 모두 409 `VERSION_MISMATCH`다.** 서버는 새 버전만 계산하는데 DB ACTIVE는 아직 옛 버전이기 때문이다. 이때 점수 산출은 `NOT_SCORABLE`(`MODEL_ERROR`) 평가로 저장되어 쓸모없는 행이 남는다(시뮬레이터·예상 점수는 저장하지 않고 오류만 난다). 공용 DB에서는 ②·③을 연달아 하고, 사용자가 없는 시간(시연·통합 테스트 중이 아닐 때)에 한다. 반대 순서(파일은 그대로 두고 SQL만 실행)도 같은 409가 난다.
+  - Spring은 ML-01·02를 부르지 않아서(시작할 때도) 버전이 어긋나도 미리 경고하지 않는다. 바꾼 뒤 `docs/spec/e2e/e2e_check.py`(FP-143)로 확인하면 E2E-03·05에서 바로 드러난다.
 - 피처 사전: Mock은 `FS-DRAFT` 39개, 실제 모델은 `FS-V1` 38개(`LRZ021201` 제외, O-17). `FS-V1`·`LGBM-BASE-0.1`(CANDIDATE) 기준 데이터는 PR #72로 들어왔다. 이미 만든 DB에는 `docs/spec/sql/add_fs_v1_feature_set.sql` → `seed/avenue_seed_dim_feature_fs_v1.sql` 순서로 한 번 실행한다. 버전 이름은 `training/config.py` 한 곳에서 가져온다.
 - 실제 모델 호출 때 SHAP 라이브러리가 "LightGBM 이진 분류 출력 모양이 바뀌었다"는 경고를 한 줄 낸다. `training/explain.py`가 두 모양을 모두 처리하므로 결과에는 영향이 없다.
 - 이상치 상한 3개는 `pipeline/feature_builder.py` 맨 위 상수다. 학습 전처리도 같은 값을 써야 하며, Spring 업무상 상한이 정해지면 바꾼다(`TODO(C8)`).

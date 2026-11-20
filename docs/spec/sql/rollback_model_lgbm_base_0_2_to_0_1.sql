@@ -6,8 +6,8 @@
 -- 이미 저장된 0.2 평가는 지우지 않는다(평가마다 자기 모델 버전이 남는다). Mock(DEV-DUMMY)으로 되돌리려면 rollback_model_to_dev_dummy.sql.
 -- SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다.
 -- ====================================================================
-WHENEVER SQLERROR EXIT SQL.SQLCODE
-WHENEVER OSERROR EXIT FAILURE
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
+WHENEVER OSERROR EXIT FAILURE ROLLBACK
 SET SERVEROUTPUT ON
 
 DECLARE

@@ -6,6 +6,8 @@
 --  1. 서버 PC의 fastapi_server/artifacts/를 0.2 묶음(avenue_model_files_20261120_v02.zip, 5개 파일)으로 바꾸고 FastAPI를 다시 켠다.
 --     /v1/health가 "modelVersion": "LGBM-BASE-0.2", "modelLoaded": true 인지 본다.
 --     파일을 바꾸지 않고 이 SQL만 실행하면 모든 점수 요청이 409(VERSION_MISMATCH) → MODEL_ERROR로 저장된다.
+--     반대로 파일만 바꾸고 이 SQL을 늦게 실행해도, 그 사이 점수 요청이 모두 같은 409다. 1을 마치면 바로 이 SQL을 실행하고,
+--     공용 DB는 사용자가 없는 시간(시연·통합 테스트 중이 아닐 때)에 한다.
 --  2. register_model_lgbm_base_0_2.sql로 0.2 모델 행이 이미 있어야 한다. 없으면 아래 사전 확인에서 멈추고 아무것도 바꾸지 않는다.
 --  3. 공용 DB는 팀이 전환 시점을 정하고 DB 담당이 팀에 알린 뒤 실행한다(그 DB를 쓰는 모든 PC가 0.2 묶음으로 바꿔야 함).
 --     되돌리기는 rollback_model_lgbm_base_0_2_to_0_1.sql(파일도 0.1 묶음으로 되돌린다).
@@ -15,8 +17,8 @@
 -- 전환 뒤 0.1로 낸 평가에서 시뮬레이터(SIM-02)를 쓰면 409 "점수를 다시 산출" 안내가 나온다(정상, 다시 산출하면 0.2 평가가 생김).
 -- SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다.
 -- ====================================================================
-WHENEVER SQLERROR EXIT SQL.SQLCODE
-WHENEVER OSERROR EXIT FAILURE
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
+WHENEVER OSERROR EXIT FAILURE ROLLBACK
 SET SERVEROUTPUT ON
 
 DECLARE
