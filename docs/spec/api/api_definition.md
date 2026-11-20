@@ -14,7 +14,7 @@
 > 4. 광희 님 요청: SIM-01 주요 표에 `USER_CREDIT_PROFILE`, DIAG-09 409에 "같은 달 겹침"
 > 5. 2-9 **용어 사전 HELP-01 ✅**(FP-180 PR #108)
 > 6. 2-5 **DIAG-01 ✅ 경로 `/api/members/me/peer-benchmark`·원천 회원 표(동주, FP-160 PR #120)**, DIAG-02·05 ⛔(쓰는 화면 없음 / `scenario-base`가 기준금리 제공), 2-10 ADM-01·02 쿼리·담당 FP-184
-> 7. 2-10 **모형 성능 비교 ADM-01·02 ✅(동주, FP-184)** — ACTIVE 모델(지금 0.2)의 평가 표본 기준, 1-2에 409 `MODEL_EVAL_NOT_READY`
+> 7. 2-10 **모형 성능 비교 ADM-01·02 ✅(동주, FP-184)** — ACTIVE 모델(지금 0.2)의 평가 표본 기준
 >
 > 이전 변경 (11/19): FP-219 AUTH-13~15·AUTH-06 휴대폰 인증 필수, FP-170 SIM-01·02·DIAG-09 ✅, 1-2 C팀 오류 표 정리
 > 이전 변경 (11/18): 저장소 `docs/spec/api/`로 이관, PR #83(DIAG-07 표준편차·DIAG-08 `months[]`·전망 조건) 반영, 간편결제 × 12 🟡 정정, `isXxx` 필드 규칙
@@ -112,8 +112,6 @@
 | 503 | `MODEL_NOT_READY` | SIM-02·DIAG-09: 실제 모델 파일 없음, 연결 실패, 타임아웃, 그 밖의 5xx. 저장하지 않으므로 `MODEL_ERROR` 기록 없음 |
 
 - 커뮤니티(동주, PR #80) 오류 code: 403 `NOT_OWNER`(남의 글 수정·삭제), 404 `POST_NOT_FOUND`·`TARGET_NOT_FOUND`·`REPORT_NOT_FOUND`, 409 `OWN_CONTENT`(본인 글 신고)·`DUPLICATE_REPORT`·`POST_HIDDEN`·`STATUS_CHANGED`·`ALREADY_HANDLED`, 429 `DAILY_LIMIT_EXCEEDED`(하루 3번 초과).
-- 모형 성능 비교(동주, FP-184) 오류 code: 400 `INVALID_INPUT`(`group`·`label`·`cutoff` 허용값 밖), 409 `MODEL_EVAL_NOT_READY`(ACTIVE 모델이 없거나 그 버전의 평가 표본이 없음) 🆕 11/20
-
 ---
 
 ## 2. API 목록
