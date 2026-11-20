@@ -257,7 +257,8 @@ Spring이 시작할 때 한 번 부른다. 세 버전이 DB에 있는지 확인�
 }
 ```
 - `gradeBands`와 `features`가 DB(`SCORE_GRADE_BAND`, `DIM_FEATURE`)와 다르면 Spring이 경고 로그를 남긴다.
-- 실제 모델을 불러왔으면 `LGBM-BASE-0.1` / `FS-V1` / 피처 38개, 아니면 Mock `DEV-DUMMY` / `FS-DRAFT` / 39개를 돌려준다. `supportedModelVersions`는 이 서버가 계산할 수 있는 버전 목록이다.
+- 실제 모델을 불러왔으면 그 묶음의 버전(예: `LGBM-BASE-0.1`) / `FS-V1` / 피처 38개, 아니면 Mock `DEV-DUMMY` / `FS-DRAFT` / 39개를 돌려준다. `supportedModelVersions`는 이 서버가 지금 계산할 수 있는 버전 목록이다: `DEV-DUMMY` + 불러온 묶음의 버전(못 불러왔으면 `DEV-DUMMY`만). 🆕 11/20
+- 🆕 11/20 실제 모델 버전은 코드 상수가 아니라 불러온 묶음의 `meta.json`(`model_version`)에서 정한다(FP-237). 모델을 바꿀 때 코드는 그대로 두고 파일 교체 + DB 등록·전환 SQL만 한다.
 
 ### 4-3. ML-03 `POST /v1/assessments/score` — N-12-2 점수 계산
 
