@@ -131,7 +131,7 @@ def render_load_sql(rows: pd.DataFrame, model_version: str, csv_sha256: str) -> 
         "BEGIN",
         f"    SELECT COUNT(*) INTO v_cnt FROM MODEL_REGISTRY WHERE MODEL_VERSION = '{model_version}';",
         "    IF v_cnt <> 1 THEN",
-        f"        RAISE_APPLICATION_ERROR(-20114, 'MODEL_REGISTRY에 {model_version} 행이 없습니다. add_fs_v1_feature_set.sql을 먼저 실행하세요');",
+        f"        RAISE_APPLICATION_ERROR(-20114, 'MODEL_REGISTRY에 {model_version} 행이 없습니다. 모델 등록 SQL을 먼저 실행하세요');",
         "    END IF;",
         f"    SELECT COUNT(*) INTO v_cnt FROM MODEL_EVAL_SAMPLE WHERE MODEL_VERSION = '{model_version}';",
         "    IF v_cnt > 0 THEN",

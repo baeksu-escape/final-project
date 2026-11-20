@@ -66,7 +66,7 @@ def main() -> None:
     parser.add_argument("--data-dir", type=Path, default=config.DEFAULT_DATA_DIR, help="학습 데이터 폴더(1_model/ 이 들어 있는 폴더)")
     parser.add_argument("--out-dir", type=Path, default=config.DEFAULT_OUT_DIR, help="모델·설명 파일을 저장할 폴더")
     parser.add_argument("--with-thinfile", action="store_true", help="씬파일(노출 1) TRAIN 행을 학습에 더한다(결측을 학습시키는 c안). 씬파일 TRAIN은 평가에 쓰지 않는다")
-    parser.add_argument("--monotone", action="store_true", help="config.MONOTONE_CONSTRAINTS의 피처에 단조 제약을 건다(후보 A)")
+    parser.add_argument("--monotone", action="store_true", help="config.MONOTONE_CONSTRAINTS의 피처에 단조 제약을 건다(후보 B, 8개 피처)")
     parser.add_argument("--model-version", default=config.MODEL_VERSION, help="설명 파일에 적을 모델 버전(기본은 config 값, 0.2를 만들 때만 바꾼다)")
     args = parser.parse_args()
     monotone = config.MONOTONE_CONSTRAINTS if args.monotone else None
