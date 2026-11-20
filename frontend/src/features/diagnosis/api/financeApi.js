@@ -1,14 +1,23 @@
 import { USE_MOCK } from '../../../common/config/env.js'
+import { apiGet } from '../../../common/api/client.js'
 import { adaptAssetDebtData, adaptCashFlowData, adaptCashFlowForecast, adaptExpectedScore, describeExpectedScoreError, validateForecastConditions } from '../adapters/financeAdapter.js'
 import { calculateFinancialHealth, getCashFlowForecast, getExpectedScore } from './diagnosisApi.js'
 import { createFinanceMockData } from '../mocks/financeMockData.js'
 import { previewAssetDebtMock } from '../mocks/financeMockCalculations.js'
 
+const PEER_BENCHMARK_PATH = '/api/members/me/peer-benchmark'
+
+// N-15-3 로그인 회원의 같은 직군·연령대 회원 평균을 조회한다.
+export function getPeerBenchmark() {
+  return apiGet(PEER_BENCHMARK_PATH)
+}
+
 // N-16-1 회원별 화면 호출 범위를 확인하고 시연 기준값을 반환한다. 실제 API 경로는 정하지 않는다.
 // TODO(광희 요청: DIAG-03-1): 저장된 총자산·연소득·총부채·대출 목록·직군 평균 조회 API가 🟡 미정이라 브라우저 mock 기준값을 유지한다.
 export async function getAssetDebtData(userId, workerTypeCode) {
   requireMock(userId)
-  const data = adaptAssetDebtData(createFinanceMockData(workerTypeCode).asset)
+  const benchmark = await getPeerBenchmark()
+  const data = adaptAssetDebtData({ ...createFinanceMockData(workerTypeCode).asset, peer: benchmark?.sameWorkerType })
   await mockDelay()
   return data
 }

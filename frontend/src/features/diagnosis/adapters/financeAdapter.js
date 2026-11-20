@@ -87,8 +87,8 @@ export function validateForecastConditions(conditions) {
 
 function adaptPeer(peer) {
   if (peer === null) return null
-  if (!peer || typeof peer !== 'object' || !['annualIncomeAmount','totalAssetAmount','totalDebtAmount'].every((key) => Object.hasOwn(peer, key))) throw new Error('직군 평균 응답이 올바르지 않습니다.')
-  return { annualIncomeAmount: amountOrNull(peer.annualIncomeAmount), totalAssetAmount: amountOrNull(peer.totalAssetAmount), totalDebtAmount: amountOrNull(peer.totalDebtAmount) }
+  if (!peer || typeof peer !== 'object' || !['memberCount','annualIncomeAmount','totalAssetAmount','totalDebtAmount'].every((key) => Object.hasOwn(peer, key))) throw new Error('직군 평균 응답이 올바르지 않습니다.')
+  return { memberCount: amountOrNull(peer.memberCount), annualIncomeAmount: amountOrNull(peer.annualIncomeAmount), totalAssetAmount: amountOrNull(peer.totalAssetAmount), totalDebtAmount: amountOrNull(peer.totalDebtAmount) }
 }
 function amountOrNull(value) { if (!validAmount(value)) throw new Error('원 단위 금액 응답이 올바르지 않습니다.'); return value ?? null }
 function finiteOrNull(value) { if (value == null) return null; if (!Number.isFinite(value) || value < 0) throw new Error('금리 응답이 올바르지 않습니다.'); return value }

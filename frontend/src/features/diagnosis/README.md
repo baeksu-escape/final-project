@@ -14,6 +14,7 @@ UI 원본은 `5unyCwrGcxS3WrWFUk9qid`의 `1794641606-4f83` 버전으로 앞선 F
 ## 공통 계약
 
 - `getAssetDebtData(userId, workerTypeCode)`: `totalAssetAmount`, `annualIncomeAmount`, `totalDebtAmount`, `annualPaymentAmount`, `loans`, `peer`, `assumptions`.
+- 직군 평균은 DIAG-01 회원 평균 API의 `sameWorkerType`과 회원 수를 사용한다. PR #116 병합 전에는 mock에서 기존 직군별 시연 평균을 반환하며, DIAG-03-1 자산·부채 기준값은 기존 mock을 유지한다.
 - 대출 행은 `loanId`, `loanTypeName`, `balanceAmount`, `annualRatePct`, `rateTypeCode`, `remainingMonths`, `monthlyPaymentAmount`. 표는 원본 UI 열(종류·잔액·금리·방식·월 상환)만 사용한다.
 - `getCashFlowData(userId)`: DIAG-08-1 응답에서 정확히 12개 연속 월의 `months[{baseMonth,incomeAmount}]`와 기준값 `baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`를 읽어 화면 이름 `fixedExpenseAmount`·`otherExpenseAmount`·`monthlyPaymentAmount`로 옮긴다(서버 값이며 mock 아님). 저장값이 없으면 null을 유지하고 예측은 불가로 표시한다. `currentScore`는 이 응답에 없다.
 - `forecastCashFlow({userId,baseline,conditions})`: 조건은 `incomeVariationPct`, `fixedExpenseAmount`, `paymentStatus`, `months`. 결과는 `forecastMonths`, `monthlyExpenseAmount`, `cumulativeSurplusAmount`, `tightestMonth`, `scorePath`, `currentScore`, `endScore`, `source`.
