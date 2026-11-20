@@ -6,6 +6,7 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
+> - 🆕 11/20 (동주, FP-160) N-15 같은 직군·연령대 회원 평균 `GET /api/members/me/peer-benchmark`(DIAG-01) 추가. 11/19 팀 결정대로 공공통계 대신 회원 표에서 계산한다. 정의서의 옛 경로 `/api/finance/peer-benchmark`·원천(FACT_*)은 범영 님이 정의서에 반영한다. DIAG-02(`/all`)는 쓰는 화면이 없어 만들지 않았다. PR 리뷰 반영: 미입력 자산·대출은 평균에서 빼고(O-15), 금액별 인원 3개를 추가했으며, 소득은 기준월 포함 최근 12개월만 쓴다.
 > - 🆕 11/20 (광희, FP-167) N-17 시나리오 테스트 API 2개 추가: `GET /api/members/me/scenario-base`(기준값)·`POST /api/members/me/scenario-recalculate`(상환 여력 재계산). 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다. 버틸 수 있는 개월 수의 "총자산 25%"는 임시 가정(팀 결정 대기). 금리 변화는 변동금리 대출의 상환액에만 반영하고 대출마다 금리 하한은 0%다(리뷰 반영, 고정 상환액은 줄지 않음).
 > - 🆕 11/19 (광희, FP-180) N-30-1 용어 사전 `GET /api/glossary`(HELP-01) 추가, 기준 데이터 `docs/spec/sql/add_glossary_term.sql`(20개).
 > - 🆕 11/19 (광희, FP-170 추가 수정) 저장 데이터를 읽는 API 5개를 팀 공통 규칙대로 `/api/members/me/**`로 옮기고 옛 경로를 지웠다(우찬 님 합의): SIM-01 `credit-care-base`, SIM-02 `credit-care-recalculate`, DIAG-07-1 `income-volatility`, DIAG-08-1 `cash-flow-forecast`, DIAG-09 `cash-flow-expected-score`. 로그인 확인은 보안 설정이 한다(토큰 없음 401, 관리자 403). SIM-01에 `topReductionFactors`, DIAG-08-1에 기준값 3개(`baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`)를 추가했다(경환 님 요청).
@@ -269,6 +270,53 @@
 
 ---
 
+## N-15 동년배·같은 직군 비교 (DIAG-01, FP-160, 담당 동주) 🆕 11/20
+
+자산·부채 건전성 화면의 "같은 직군 평균과 비교" 카드(N-15-3)에 쓰는 회원 평균이다. 11/19 팀 결정으로 공공통계(`FACT_HFS_*`) 대신 **서비스 회원 표**에서 요청 때마다 계산한다(적재 없음). 공공통계에는 프리랜서 구분이 없기 때문이다.
+
+### GET `/api/members/me/peer-benchmark` (DIAG-01)
+
+- 로그인한 일반 회원만(보안 설정: 토큰 없음 401, 관리자 403). 회원은 토큰에서 꺼내고 쿼리·본문은 없다.
+- 응답 200 — 금액은 원, 평균은 반올림한 정수. 필드 이름은 건전성 화면 `peer`와 같다.
+
+```json
+{
+  "workerTypeCode": "EMPLOYEE",
+  "ageBandCode": "30S",
+  "sameWorkerType": { "memberCount": 132, "annualIncomeAmount": 42000000, "totalAssetAmount": 85000000, "totalDebtAmount": 31000000,
+                      "incomeMemberCount": 130, "assetMemberCount": 128, "debtMemberCount": 125 },
+  "sameAgeBand":    { "memberCount": 3,   "annualIncomeAmount": null,     "totalAssetAmount": null,     "totalDebtAmount": null,
+                      "incomeMemberCount": 3, "assetMemberCount": 3, "debtMemberCount": 2 }
+}
+```
+
+| 필드 | 뜻 |
+|---|---|
+| `workerTypeCode` | 내 직군 (`EMPLOYEE`·`SELF_EMPLOYED`·`FREELANCER`) |
+| `ageBandCode` | 내 연령대 (`20S`·`30S`·`40S`·`50_PLUS`) — 연 나이(올해 − 출생연도), 평가 저장과 같은 구간 |
+| `sameWorkerType` | 같은 직군 회원 평균 (본인 포함) |
+| `sameAgeBand` | 같은 연령대 회원 평균 (직군과 상관없이, 본인 포함) |
+| `*.memberCount` | 그룹 회원 수 |
+| `*.annualIncomeAmount`·`totalAssetAmount`·`totalDebtAmount` | 평균 연소득·총자산·총부채. 그 금액을 입력한 회원만 평균에 넣고, **그 인원이 5명 미만이면 그 금액만 null**(몇 명뿐인 평균은 그 사람들의 값이 드러난다) — 화면은 "비교할 회원이 부족합니다"로 처리 |
+| `*.incomeMemberCount`·`assetMemberCount`·`debtMemberCount` 🆕 11/20 | 각 금액 평균에 들어간 회원 수 (PR 리뷰 반영) |
+
+- 평균에 넣는 회원: 일반 회원, 탈퇴 아님, 직군·출생연도 있음, 소득 행이 1개 이상(더미 회원 포함).
+- 회원 값(기준월 = 그 회원의 가장 늦은 소득월, DIAG-07-1과 같은 규칙). 미입력은 0원으로 넣지 않고 **그 금액 평균에서만 뺀다**(O-15 A안).
+
+  | 금액 | 평균에 넣는 경우 | 빼는 경우 |
+  |---|---|---|
+  | 연소득 | 기준월 포함 **최근 12개월(달력)** 안에 직군별 필요 개월 수(`DIM_WORKER_TYPE`: 급여소득자 1, 자영업자·프리랜서 12)만큼 소득이 있음 → N-20-3 공유 함수 `FinancialHealthCalculator.calculateAnnualIncome`(급여소득자 = 기준월 월급 × 12, 자영업자·프리랜서 = 12개월 합). 1년 넘은 소득은 섞지 않는다 | 빠진 달이 있어 개월 수가 모자람 |
+  | 총자산 | 기준월 `USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT`가 있음 | NULL(미입력)·자산 행 없음 |
+  | 총부채 | 기준월 대출 행이 있으면 `BALANCE_AMT` 합, 행이 없고 `NO_LOAN_YN='Y'`(해당 없음)면 0 | 둘 다 아님(미입력) |
+- 오류
+
+  | 상태 | code | 언제 |
+  |---|---|---|
+  | 401 | `UNAUTHORIZED` | 토큰 없음·만료, 탈퇴·없는 계정 |
+  | 403 | `FORBIDDEN` | 관리자 계정 |
+  | 409 | `JOB_TYPE_REQUIRED` | 직군을 고르지 않음 |
+
+- 참고: 지금 더미 회원은 20대가 60%이고 30대 이상의 부채가 거의 0이라 평균이 어색하게 보일 수 있다.
 ## N-17 시나리오 테스트 (FP-167, 담당 광희) 🆕 11/20
 
 로그인 회원의 저장 데이터에 금리·소득·지출 변화를 넣어 **상환 여력**(월 잉여, 상환 부담률, 월 이자 변화, 버틸 수 있는 개월 수)을 다시 계산한다. **점수는 구하지 않고**(점수 예측은 N-21 DIAG-09) **저장하지 않는다**.

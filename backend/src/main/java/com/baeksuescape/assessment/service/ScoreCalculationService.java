@@ -203,7 +203,7 @@ public class ScoreCalculationService {
     }
 
     // 평가 시점 연령대 (DDL CK_ASM_AGE_BAND). 가입이 20세 이상이라 20 미만은 없다.
-    static String ageBandCode(int age) {
+    public static String ageBandCode(int age) {
         if (age < 30) {
             return "20S";
         }
