@@ -739,7 +739,7 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 | 401 / 403 | `UNAUTHORIZED` / `FORBIDDEN` | 토큰 없음 / 관리자가 아님 | 공통 |
 | 409 | `MODEL_EVAL_NOT_READY` 🆕 | ACTIVE 모델이 없거나, ACTIVE 모델 버전의 평가 표본이 아직 없음(예: 공용 DB가 아직 `DEV-DUMMY`, 적재 SQL 미실행). 409 = 지금 상태로는 처리할 수 없음(B팀 명세서 용어집) | "지금 사용 중인 모델(LGBM-BASE-0.2)의 평가 표본이 아직 준비되지 않았습니다." (괄호 안은 ACTIVE 버전) |
 
-409가 나오면 DB 담당이 ACTIVE 모델 버전에 맞는 SQL을 실행하고 `MODEL_REGISTRY`에서 그 버전이 ACTIVE인지 본다. 0.2 기준(🆕 11/20): `create_model_eval_sample.sql`(표가 없을 때) → `load_model_eval_sample_lgbm_base_0_2.sql` → `update_model_metrics_same_label_lgbm_base_0_2.sql`(LEGACY의 5개 시드 평균 AUC, 없으면 `aucBasis`가 `SINGLE_SEED`로 바뀜). 모델을 다시 학습하면 새 `MODEL_VERSION`으로 평가 표본도 다시 적재해야 화면이 나온다.
+409가 나오면 ACTIVE 모델 버전에 맞는 평가 표본 SQL이 실행됐는지, `MODEL_REGISTRY`에서 그 버전이 ACTIVE인지 본다. 공용 DB는 그 SQL이 든 PR의 작성자가 병합 후 실행한다(sql README 「공용 DB 적용 규칙」, PR #124). 0.2 기준(🆕 11/20): `create_model_eval_sample.sql`(표가 없을 때) → `load_model_eval_sample_lgbm_base_0_2.sql` → `update_model_metrics_same_label_lgbm_base_0_2.sql`(LEGACY의 5개 시드 평균 AUC, 없으면 `aucBasis`가 `SINGLE_SEED`로 바뀜). 모델을 다시 학습하면 새 `MODEL_VERSION`으로 평가 표본도 다시 적재해야 화면이 나온다.
 
 ---
 
