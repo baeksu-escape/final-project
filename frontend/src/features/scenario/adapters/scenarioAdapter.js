@@ -8,13 +8,15 @@ export function adaptBaseline(data) {
   return Object.fromEntries([...fields.map((key) => [key, data[key]]), ['policyRate', data.policyRate ?? null], ['assumptions', [...data.assumptions]]])
 }
 
-// N-17-2 직접 입력 범위와 숫자 유효성을 계산 입구에서 확인한다.
-export function adaptConditions(value) {
-  const ranges = { ratePctPoint: [-5, 10], incomePct: [-100, 100], expensePct: [-50, 100] }
-  if (!value || typeof value !== 'object' || Object.keys(value).length !== 3) throw new Error('시나리오 조건을 확인해 주세요.')
-  for (const [key, [min, max]] of Object.entries(ranges)) if (!Number.isFinite(value[key]) || value[key] < min || value[key] > max) throw new Error('시나리오 입력 범위를 확인해 주세요.')
-  return { ...value }
+// N-17-5 서버 계산 결과의 필수 필드를 확인하고 화면에 전달한다.
+export function adaptResponse(result) {
+  const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+  if (!isObject(result) || !isObject(result.current) || !isObject(result.changed)
+    || typeof result.verdict !== 'string' || !Number.isFinite(result.surplusDiffAmount)
+    || !Number.isFinite(result.monthlyInterestChangeAmount)
+    || !(result.survivableMonths === null || Number.isSafeInteger(result.survivableMonths))
+    || (result.assumptions != null && (!Array.isArray(result.assumptions) || result.assumptions.some((item) => typeof item !== 'string')))) {
+    throw new Error('시나리오 결과 응답이 올바르지 않습니다.')
+  }
+  return result
 }
-
-// N-17-5 계산 결과를 화면 계약으로 전달한다.
-export function adaptResponse(result) { return result }

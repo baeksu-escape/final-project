@@ -15,14 +15,14 @@ const ROWS = [
 ]
 
 // N-17-5 현재와 시나리오 결과 및 서버 계산 가정을 함께 보여 준다.
-export default function ScenarioResult({ result, assumptions, stale }) {
+export default function ScenarioResult({ result, assumptions, stale, calcError }) {
   const { current, changed } = result
   const max = Math.max(1, ...ROWS.flatMap((row) => [current[row.key], changed[row.key]]).filter(Number.isFinite).map(Math.abs))
   const width = (value) => `${Number.isFinite(value) ? Math.min(100, (Math.abs(value) / max) * 100) : 0}%`
   return (
     <Card title="결과" className="sc-result">
       {/* 안내가 나타나도 화면이 밀리지 않게 자리를 둔다. */}
-      <p className="sc-warn" aria-live="polite">{stale ? '위 결과는 이전 조건 기준입니다. 계산이 끝나면 바뀝니다.' : '\u00a0'}</p>
+      <p className="sc-warn" aria-live="polite">{calcError ? '계산하지 못해 이전 조건 결과를 보여 주고 있습니다.' : stale ? '위 결과는 이전 조건 기준입니다. 계산이 끝나면 바뀝니다.' : '\u00a0'}</p>
       <div className="sc-kpis">
         <div className="sc-kpi">
           <span className="sc-hint">이 상황의 월 잉여</span>
