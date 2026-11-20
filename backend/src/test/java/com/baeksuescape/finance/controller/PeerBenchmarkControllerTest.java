@@ -61,11 +61,11 @@ class PeerBenchmarkControllerTest {
     }
 
     @Test
-    @DisplayName("토큰의 회원 번호로 서비스를 부르고, 문서와 같은 필드 이름으로 돌려준다(5명 미만 그룹의 금액은 null로 내려감)")
+    @DisplayName("토큰의 회원 번호로 서비스를 부르고, 문서와 같은 필드 이름으로 돌려준다(금액별 인원 포함, 5명 미만 금액은 null로 내려감)")
     void peerBenchmark_ok_fieldNames() throws Exception {
         given(peerBenchmarkService.benchmark(7L)).willReturn(new PeerBenchmarkResponse("EMPLOYEE", "30S",
-                new GroupAverage(132, 42_000_000L, 85_000_000L, 31_000_000L),
-                new GroupAverage(3, null, null, null)));
+                new GroupAverage(132, 42_000_000L, 85_000_000L, 31_000_000L, 130, 128, 125),
+                new GroupAverage(3, null, null, null, 3, 3, 2)));
 
         mockMvc.perform(get(PEER_BENCHMARK).header(HttpHeaders.AUTHORIZATION, bearer(7L, "ROLE_USER")))
                 .andExpect(status().isOk())
@@ -75,10 +75,14 @@ class PeerBenchmarkControllerTest {
                 .andExpect(jsonPath("$.sameWorkerType.annualIncomeAmount").value(42_000_000))
                 .andExpect(jsonPath("$.sameWorkerType.totalAssetAmount").value(85_000_000))
                 .andExpect(jsonPath("$.sameWorkerType.totalDebtAmount").value(31_000_000))
+                .andExpect(jsonPath("$.sameWorkerType.incomeMemberCount").value(130))
+                .andExpect(jsonPath("$.sameWorkerType.assetMemberCount").value(128))
+                .andExpect(jsonPath("$.sameWorkerType.debtMemberCount").value(125))
                 .andExpect(jsonPath("$.sameAgeBand.memberCount").value(3))
                 .andExpect(jsonPath("$.sameAgeBand.annualIncomeAmount").value(nullValue()))
                 .andExpect(jsonPath("$.sameAgeBand.totalAssetAmount").value(nullValue()))
-                .andExpect(jsonPath("$.sameAgeBand.totalDebtAmount").value(nullValue()));
+                .andExpect(jsonPath("$.sameAgeBand.totalDebtAmount").value(nullValue()))
+                .andExpect(jsonPath("$.sameAgeBand.debtMemberCount").value(2));
         verify(peerBenchmarkService).benchmark(7L);
     }
 

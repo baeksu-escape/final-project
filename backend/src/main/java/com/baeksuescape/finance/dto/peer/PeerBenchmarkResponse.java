@@ -11,12 +11,16 @@ public record PeerBenchmarkResponse(
         GroupAverage sameAgeBand) {
 
     /**
-     * 그룹 하나의 평균. 회원이 기준(5명)보다 적으면 금액 3개는 null이고 memberCount만 채운다.
+     * 그룹 하나의 평균. memberCount는 그룹 회원 수, *MemberCount는 그 금액을 입력해 평균에 들어간 회원 수다.
+     * 금액마다 대상 회원이 기준(5명)보다 적으면 그 금액만 null이다.
      */
     public record GroupAverage(
             int memberCount,
             Long annualIncomeAmount,
             Long totalAssetAmount,
-            Long totalDebtAmount) {
+            Long totalDebtAmount,
+            int incomeMemberCount,
+            int assetMemberCount,
+            int debtMemberCount) {
     }
 }

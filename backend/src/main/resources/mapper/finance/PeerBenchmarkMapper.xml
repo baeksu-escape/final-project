@@ -8,6 +8,8 @@
         <result property="userId" column="USER_ID"/>
         <result property="workerTypeCode" column="WORKER_TYPE_CODE"/>
         <result property="birthYear" column="BIRTH_YEAR"/>
+        <result property="baseMonth" column="BASE_MONTH"/>
+        <result property="requiredIncomeMonths" column="REQUIRED_INCOME_MONTHS"/>
         <result property="totalAssetAmount" column="TOTAL_ASSET_AMT"/>
         <result property="totalDebtAmount" column="TOTAL_DEBT_AMT"/>
     </resultMap>
@@ -18,7 +20,7 @@
         <result property="incomeAmount" column="INCOME_AMT"/>
     </resultMap>
 
-    <!-- 평균 대상 회원 조건: 일반 회원, 탈퇴 아님, 직군·출생연도 있음, 소득 행 1개 이상(아래 M과 JOIN) -->
+    <!-- 평균 대상 회원 조건: 일반 회원, 탈퇴 아님, 직군·출생연도 있음, 소득 행 1개 이상(기준월 M과 JOIN) -->
     <sql id="peerMemberWhere">
         WHERE U.ROLE_CODE = 'ROLE_USER'
           AND U.ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
@@ -26,32 +28,42 @@
           AND U.BIRTH_YEAR IS NOT NULL
     </sql>
 
-    <!-- 회원 한 명당 1행: 기준월의 총자산(없으면 0)과 대출 잔액 합(없으면 0) -->
+    <!-- 회원별 기준월 = 가장 늦은 소득월 -->
+    <sql id="latestIncomeMonth">
+        (SELECT USER_ID, MAX(BASE_MONTH) AS BASE_MONTH
+           FROM USER_INCOME_MONTH
+          GROUP BY USER_ID) M
+    </sql>
+
+    <!-- 회원 한 명당 1행: 기준월·직군별 필요 소득 개월 수, 기준월 총자산과 총부채.
+         O-15 A안: 총자산 NULL은 미입력이라 NULL 그대로 둔다(0원과 다르다).
+         총부채는 대출 행이 있으면 잔액 합, 행이 없고 NO_LOAN_YN='Y'(해당 없음)면 0, 둘 다 아니면 미입력(NULL). -->
     <select id="selectPeerMembers" resultMap="peerMemberRowMap">
-        SELECT U.USER_ID, U.WORKER_TYPE_CODE, U.BIRTH_YEAR,
-               NVL(A.TOTAL_ASSET_AMT, 0) AS TOTAL_ASSET_AMT,
-               (SELECT NVL(SUM(L.BALANCE_AMT), 0)
-                  FROM USER_LOAN L
-                 WHERE L.USER_ID = U.USER_ID
-                   AND L.BASE_MONTH = M.BASE_MONTH) AS TOTAL_DEBT_AMT
+        SELECT U.USER_ID, U.WORKER_TYPE_CODE, U.BIRTH_YEAR, M.BASE_MONTH, D.REQUIRED_INCOME_MONTHS,
+               A.TOTAL_ASSET_AMT,
+               CASE WHEN L.BALANCE_SUM IS NOT NULL THEN L.BALANCE_SUM
+                    WHEN A.NO_LOAN_YN = 'Y' THEN 0
+               END AS TOTAL_DEBT_AMT
           FROM APP_USER U
-          JOIN (SELECT USER_ID, MAX(BASE_MONTH) AS BASE_MONTH
-                  FROM USER_INCOME_MONTH
-                 GROUP BY USER_ID) M ON M.USER_ID = U.USER_ID
+          JOIN <include refid="latestIncomeMonth"/> ON M.USER_ID = U.USER_ID
+          JOIN DIM_WORKER_TYPE D ON D.WORKER_TYPE_CODE = U.WORKER_TYPE_CODE
           LEFT JOIN USER_ASSET_SNAPSHOT A ON A.USER_ID = U.USER_ID AND A.BASE_MONTH = M.BASE_MONTH
+          LEFT JOIN (SELECT USER_ID, BASE_MONTH, SUM(BALANCE_AMT) AS BALANCE_SUM
+                       FROM USER_LOAN
+                      GROUP BY USER_ID, BASE_MONTH) L ON L.USER_ID = U.USER_ID AND L.BASE_MONTH = M.BASE_MONTH
         <include refid="peerMemberWhere"/>
          ORDER BY U.USER_ID
     </select>
 
-    <!-- 평균 대상 회원의 최근 12개월 소득: 회원마다 최신 12행을 고른 뒤 기준월 오름차순 -->
+    <!-- 평균 대상 회원의 소득 중 기준월 포함 최근 12개월(달력 기준) 안의 행만, 회원 번호·기준월 오름차순.
+         1년 넘은 소득은 빠진 달이 있어도 섞이지 않는다. 개월 수가 모자라는지는 서비스가 직군별 필요 개월 수로 본다. -->
     <select id="selectRecentIncomes" resultMap="peerIncomeRowMap">
-        SELECT USER_ID, BASE_MONTH, INCOME_AMT
-          FROM (SELECT I.USER_ID, I.BASE_MONTH, I.INCOME_AMT,
-                       ROW_NUMBER() OVER (PARTITION BY I.USER_ID ORDER BY I.BASE_MONTH DESC) AS RN
-                  FROM USER_INCOME_MONTH I
-                  JOIN APP_USER U ON U.USER_ID = I.USER_ID
-                <include refid="peerMemberWhere"/>)
-         WHERE RN &lt;= 12
-         ORDER BY USER_ID, BASE_MONTH
+        SELECT I.USER_ID, I.BASE_MONTH, I.INCOME_AMT
+          FROM USER_INCOME_MONTH I
+          JOIN APP_USER U ON U.USER_ID = I.USER_ID
+          JOIN <include refid="latestIncomeMonth"/> ON M.USER_ID = I.USER_ID
+        <include refid="peerMemberWhere"/>
+           AND I.BASE_MONTH &gt;= TO_CHAR(ADD_MONTHS(TO_DATE(M.BASE_MONTH, 'YYYY-MM'), -11), 'YYYY-MM')
+         ORDER BY I.USER_ID, I.BASE_MONTH
     </select>
 </mapper>

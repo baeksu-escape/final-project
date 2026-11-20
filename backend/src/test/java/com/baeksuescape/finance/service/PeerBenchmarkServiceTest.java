@@ -57,12 +57,15 @@ class PeerBenchmarkServiceTest {
         when(users.requireUserWithJob(1L)).thenReturn(account);
     }
 
-    // 평균 대상 회원 한 명과 그 회원의 월 소득들
-    private void member(long userId, String workerType, int birthYear, long asset, long debt, long... monthlyIncomes) {
+    // 평균 대상 회원 한 명과 그 회원의 월 소득들(매퍼가 이미 최근 12개월 창으로 거른 값). 필요 개월 수는 DIM_WORKER_TYPE과 같게 넣는다.
+    // 금액을 미입력(null)으로 바꿔 보려고 만든 행을 돌려준다.
+    private PeerMemberRow member(long userId, String workerType, int birthYear, long asset, long debt, long... monthlyIncomes) {
         PeerMemberRow row = new PeerMemberRow();
         row.setUserId(userId);
         row.setWorkerTypeCode(workerType);
         row.setBirthYear(birthYear);
+        row.setBaseMonth("2026-12");
+        row.setRequiredIncomeMonths("EMPLOYEE".equals(workerType) ? 1 : 12);
         row.setTotalAssetAmount(asset);
         row.setTotalDebtAmount(debt);
         members.add(row);
@@ -73,6 +76,14 @@ class PeerBenchmarkServiceTest {
             income.setIncomeAmount(monthlyIncomes[i]);
             incomes.add(income);
         }
+        return row;
+    }
+
+    // 자영업자·프리랜서용 12개월 소득 (모두 같은 금액)
+    private static long[] twelveMonths(long monthly) {
+        long[] months = new long[12];
+        java.util.Arrays.fill(months, monthly);
+        return months;
     }
 
     @Test
@@ -101,37 +112,87 @@ class PeerBenchmarkServiceTest {
     void selfEmployed_annualIncome_isSumOfMonths() {
         me("SELF_EMPLOYED", 1990);
         for (long id = 1; id <= 5; id++) {
-            member(id, "SELF_EMPLOYED", 1990, 0, 0, 1_000_000, 2_000_000, 3_000_000);
+            member(id, "SELF_EMPLOYED", 1990, 0, 0, twelveMonths(500_000));
         }
 
         GroupAverage group = service.benchmark(1L).sameWorkerType();
 
         assertEquals(6_000_000L, group.annualIncomeAmount());
+        assertEquals(5, group.incomeMemberCount());
     }
 
     @Test
-    @DisplayName("소득 행이 없는 회원의 연소득은 0으로 평균에 들어간다")
-    void memberWithoutIncome_countsAsZero() {
+    @DisplayName("자영업자·프리랜서가 최근 12개월 중 빠진 달이 있으면 소득 평균에서만 빼고, 자산·부채 평균에는 넣는다")
+    void missingIncomeMonths_excludedFromIncomeOnly() {
         me("FREELANCER", 1990);
-        for (long id = 1; id <= 4; id++) {
-            member(id, "FREELANCER", 1990, 0, 0, 5_000_000);
+        for (long id = 1; id <= 5; id++) {
+            member(id, "FREELANCER", 1990, 10_000_000, 1_000_000, twelveMonths(400_000));
         }
-        member(5, "FREELANCER", 1990, 0, 0);
+        member(6, "FREELANCER", 1990, 40_000_000, 7_000_000, 9_000_000, 9_000_000); // 2개월뿐
 
-        assertEquals(4_000_000L, service.benchmark(1L).sameWorkerType().annualIncomeAmount());
+        GroupAverage group = service.benchmark(1L).sameWorkerType();
+
+        assertEquals(6, group.memberCount());
+        assertEquals(5, group.incomeMemberCount());
+        assertEquals(4_800_000L, group.annualIncomeAmount());   // 6번 제외
+        assertEquals(6, group.assetMemberCount());
+        assertEquals(15_000_000L, group.totalAssetAmount());    // (10,000,000×5 + 40,000,000) / 6
+        assertEquals(2_000_000L, group.totalDebtAmount());      // (1,000,000×5 + 7,000,000) / 6
     }
 
     @Test
-    @DisplayName("같은 그룹이 5명보다 적으면 인원만 주고 금액 3개는 null이다")
+    @DisplayName("O-15: 총자산 NULL(미입력)·대출 미입력(NULL)은 0원으로 넣지 않고 그 금액 평균에서만 뺀다, 대출 없음(0)은 넣는다")
+    void unenteredAssetAndDebt_excludedPerAmount() {
+        me("EMPLOYEE", 1990);
+        for (long id = 1; id <= 5; id++) {
+            member(id, "EMPLOYEE", 1990, 30_000_000, 0, 3_000_000); // 대출 없음(NO_LOAN_YN='Y') → 0
+        }
+        member(6, "EMPLOYEE", 1990, 0, 0, 3_000_000).setTotalAssetAmount(null);
+        member(7, "EMPLOYEE", 1990, 30_000_000, 0, 3_000_000).setTotalDebtAmount(null);
+
+        GroupAverage group = service.benchmark(1L).sameWorkerType();
+
+        assertEquals(7, group.memberCount());
+        assertEquals(7, group.incomeMemberCount());
+        assertEquals(6, group.assetMemberCount());
+        assertEquals(30_000_000L, group.totalAssetAmount()); // 6번(NULL)을 0원으로 넣었다면 25,714,286
+        assertEquals(6, group.debtMemberCount());
+        assertEquals(0L, group.totalDebtAmount());
+    }
+
+    @Test
+    @DisplayName("금액마다 입력한 회원이 5명보다 적으면 그 금액만 null이고 인원은 그대로 준다")
+    void smallGroup_amountsAreNullPerAmount() {
+        me("FREELANCER", 1990);
+        for (long id = 1; id <= 5; id++) {
+            member(id, "FREELANCER", 1990, 10_000_000, 0, twelveMonths(100_000));
+        }
+        // 5명 중 2명만 자산 입력 → 자산 평균만 null
+        for (PeerMemberRow row : members.subList(0, 3)) {
+            row.setTotalAssetAmount(null);
+        }
+
+        GroupAverage group = service.benchmark(1L).sameWorkerType();
+
+        assertEquals(5, group.memberCount());
+        assertEquals(1_200_000L, group.annualIncomeAmount());
+        assertEquals(2, group.assetMemberCount());
+        assertNull(group.totalAssetAmount());
+        assertEquals(0L, group.totalDebtAmount());
+    }
+
+    @Test
+    @DisplayName("같은 그룹이 5명보다 적으면 금액 3개 모두 null이다")
     void smallGroup_amountsAreNull() {
         me("FREELANCER", 1990);
         for (long id = 1; id <= 4; id++) {
-            member(id, "FREELANCER", 1990, 10_000_000, 0, 1_000_000);
+            member(id, "FREELANCER", 1990, 10_000_000, 0, twelveMonths(100_000));
         }
 
         GroupAverage group = service.benchmark(1L).sameWorkerType();
 
         assertEquals(4, group.memberCount());
+        assertEquals(4, group.incomeMemberCount());
         assertNull(group.annualIncomeAmount());
         assertNull(group.totalAssetAmount());
         assertNull(group.totalDebtAmount());

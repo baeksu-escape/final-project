@@ -8,6 +8,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.YearMonth;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,24 +30,31 @@ class PeerBenchmarkMapperIT {
     private PeerBenchmarkMapper mapper;
 
     @Test
-    @DisplayName("평균 대상 회원을 읽고, 직군·출생연도가 있으며 금액이 음수가 아니다")
+    @DisplayName("평균 대상 회원을 읽고, 직군·출생연도·기준월·필요 개월 수가 있으며 입력된 금액은 음수가 아니다(NULL = 미입력)")
     void selectPeerMembers() {
         List<PeerMemberRow> rows = mapper.selectPeerMembers();
-        System.out.println("[FP-160] 평균 대상 회원 수 = " + rows.size());
+        long assetNull = rows.stream().filter(row -> row.getTotalAssetAmount() == null).count();
+        long debtNull = rows.stream().filter(row -> row.getTotalDebtAmount() == null).count();
+        System.out.println("[FP-160] 평균 대상 회원 수 = " + rows.size() + ", 자산 미입력 = " + assetNull + ", 대출 미입력 = " + debtNull);
 
         assertFalse(rows.isEmpty(), "더미 시드(run_seed_only.sql)가 적재되어 있어야 한다");
         for (PeerMemberRow row : rows) {
             assertNotNull(row.getWorkerTypeCode());
             assertNotNull(row.getBirthYear());
-            assertTrue(row.getTotalAssetAmount() >= 0);
-            assertTrue(row.getTotalDebtAmount() >= 0);
+            assertNotNull(row.getBaseMonth());
+            assertTrue(row.getRequiredIncomeMonths() == 1 || row.getRequiredIncomeMonths() == 12);
+            assertTrue(row.getTotalAssetAmount() == null || row.getTotalAssetAmount() >= 0);
+            assertTrue(row.getTotalDebtAmount() == null || row.getTotalDebtAmount() >= 0);
         }
     }
 
     @Test
-    @DisplayName("회원마다 소득은 12행 이하이고 기준월 오름차순이며, 평균 대상 회원만 나온다")
+    @DisplayName("소득은 회원 기준월 포함 최근 12개월(달력) 안의 행만, 기준월 오름차순으로 나오고 평균 대상 회원만 나온다")
     void selectRecentIncomes() {
-        List<PeerMemberRow> members = mapper.selectPeerMembers();
+        Map<Long, String> baseMonthByUser = new HashMap<>();
+        for (PeerMemberRow member : mapper.selectPeerMembers()) {
+            baseMonthByUser.put(member.getUserId(), member.getBaseMonth());
+        }
         List<PeerIncomeRow> incomes = mapper.selectRecentIncomes();
 
         Map<Long, Integer> countByUser = new HashMap<>();
@@ -55,8 +63,11 @@ class PeerBenchmarkMapperIT {
             countByUser.merge(row.getUserId(), 1, Integer::sum);
             String last = lastMonthByUser.put(row.getUserId(), row.getBaseMonth());
             assertTrue(last == null || last.compareTo(row.getBaseMonth()) < 0, "기준월 오름차순: 회원 " + row.getUserId());
+            YearMonth base = YearMonth.parse(baseMonthByUser.get(row.getUserId()));
+            YearMonth month = YearMonth.parse(row.getBaseMonth());
+            assertFalse(month.isBefore(base.minusMonths(11)) || month.isAfter(base), "12개월 창 밖: 회원 " + row.getUserId() + " " + month);
         }
-        assertEquals(members.size(), countByUser.size(), "소득이 있는 회원 수 = 평균 대상 회원 수");
+        assertEquals(baseMonthByUser.size(), countByUser.size(), "소득이 있는 회원 수 = 평균 대상 회원 수");
         countByUser.values().forEach(count -> assertTrue(count <= 12));
     }
 }
