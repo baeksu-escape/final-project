@@ -4,6 +4,7 @@ import com.baeksuescape.finance.dto.cashflow.CashFlowConditionRequest;
 import com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse;
 import com.baeksuescape.finance.dto.cashflow.ExpectedScoreResponse;
 import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityResponse;
+import com.baeksuescape.finance.dto.health.FinancialHealthBaseResponse;
 import com.baeksuescape.finance.dto.scenario.ScenarioBaseResponse;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateRequest;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateResponse;
@@ -13,6 +14,7 @@ import com.baeksuescape.finance.dto.simulation.CreditCareSimulationResponse;
 import com.baeksuescape.finance.service.CreditCareSimulationService;
 import com.baeksuescape.finance.service.ExpectedScoreService;
 import com.baeksuescape.finance.service.IncomeVolatilityService;
+import com.baeksuescape.finance.service.MemberFinancialHealthService;
 import com.baeksuescape.finance.service.ScenarioService;
 import com.baeksuescape.global.security.AuthUser;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +40,13 @@ public class MemberFinanceController {
     private final IncomeVolatilityService incomeVolatilityService;
     private final ExpectedScoreService expectedScoreService;
     private final ScenarioService scenarioService;
+    private final MemberFinancialHealthService memberFinancialHealthService;
+
+    /** FP-239 N-16-1·2·4 DIAG-03-1 자산·부채 저장값: 총자산·연소득·총부채·연 원리금·보유 대출(미입력은 null). 소득이 없으면 404. */
+    @GetMapping("/financial-health")
+    public ResponseEntity<FinancialHealthBaseResponse> getFinancialHealth(@AuthenticationPrincipal AuthUser user) {
+        return ResponseEntity.ok(memberFinancialHealthService.load(user.userId()));
+    }
 
     /** N-18-1·N-18-8·N-18-10 SIM-01 입력 10개의 내 실제 값과 출발 평가의 감점 요인 상위 3개. 평가가 없으면 404 ASSESSMENT_NOT_FOUND. */
     @GetMapping("/credit-care-base")
