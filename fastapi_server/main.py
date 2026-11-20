@@ -1,4 +1,4 @@
-# FP-140·FP-141 예측 서버(FastAPI) 시작점 — ML-01~04. 요청의 모델 버전이 DEV-DUMMY면 Mock, LGBM-BASE-0.1이면 실제 모델로 계산한다.
+# FP-140·FP-141 예측 서버(FastAPI) 시작점 — ML-01~04. 요청의 모델 버전이 DEV-DUMMY면 Mock, 불러온 모델 묶음의 버전(LGBM-BASE-0.1·0.2 등)이면 실제 모델로 계산한다.
 # 실행: fastapi_server 폴더에서 `uvicorn main:app --port 8000` → 브라우저에서 http://localhost:8000/docs
 import logging
 from contextlib import asynccontextmanager
@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Avenue 예측 서버", version="LGBM-BASE-0.1 / DEV-DUMMY", lifespan=lifespan)
+app = FastAPI(title="Avenue 예측 서버", version="실제 모델(묶음 meta.json 버전) / DEV-DUMMY", lifespan=lifespan)
 app.include_router(router)
 
 
