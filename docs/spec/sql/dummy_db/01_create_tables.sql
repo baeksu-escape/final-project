@@ -81,7 +81,7 @@
 --     컷오프별 지표·ROC를 API(FP-184)가 행 단위로 계산하기 위한 표이며, 기본 시드에는 넣지 않고 load_model_eval_sample_*.sql로 적재한다. 기존 DB는 create_model_eval_sample.sql.
 --  C11 [2026-11-19 · B팀 재욱] 등급 구간 버전 CUT-0.2(DRAFT)를 기준 데이터에 추가 (FP-139, 구조 변경 없음). 점수 분포 25/50/25 임시 결정(D-01)의 경계:
 --     CAUTION 0~659, STANDARD 660~730, GOOD 731~1000. DRAFT라 서비스는 계속 CUT-0.1(ACTIVE)을 쓰고, ACTIVE 전환 시점은 팀이 정한다. 기존 DB는 add_cutoff_cut_0_2.sql.
---  C12 [2026-11-19 · A팀 우찬] USER_ASSET_SNAPSHOT에 자산 4종 열 추가(N-05-4, 조장 결정). 총자산은 4종 합계로 계속 저장. 기존 DB는 alter_user_asset_snapshot_breakdown.sql.
+--  Z1 [2026-11-19 · A팀 우찬] (임시 번호 — PR 직전 develop 병합 때 마지막 번호로 바꿈) USER_ASSET_SNAPSHOT에 자산 4종 열 추가(N-05-4, 조장 결정). 총자산은 4종 합계로 계속 저장. 기존 DB는 alter_user_asset_snapshot_breakdown.sql.
 --     DEPOSIT_AMT·INVESTMENT_AMT·REAL_ESTATE_AMT·OTHER_ASSET_AMT (NULL 허용, CHECK >= 0). 표 수(48)는 그대로다.
 -- ====================================================================
 
@@ -375,11 +375,11 @@ CREATE TABLE USER_ASSET_SNAPSHOT (
     CONSTRAINT CK_UAS_NO_LOAN CHECK (NO_LOAN_YN IN ('Y', 'N'))
 );
 COMMENT ON TABLE  USER_ASSET_SNAPSHOT IS '총자산 (N-05-4, N-16 건전성). 월 고정지출은 USER_EXPENSE_ITEM에 둔다';
-COMMENT ON COLUMN USER_ASSET_SNAPSHOT.DEPOSIT_AMT IS 'v0.3.2 (C12) 예금·적금 (N-05-4). NULL은 미입력, 0은 없음. 합계는 TOTAL_ASSET_AMT';
-COMMENT ON COLUMN USER_ASSET_SNAPSHOT.INVESTMENT_AMT IS 'v0.3.2 (C12) 투자(주식·펀드 등) (N-05-4). NULL은 미입력, 0은 없음. 합계는 TOTAL_ASSET_AMT';
-COMMENT ON COLUMN USER_ASSET_SNAPSHOT.REAL_ESTATE_AMT IS 'v0.3.2 (C12) 부동산·보증금 (N-05-4). NULL은 미입력, 0은 없음. 합계는 TOTAL_ASSET_AMT';
-COMMENT ON COLUMN USER_ASSET_SNAPSHOT.OTHER_ASSET_AMT IS 'v0.3.2 (C12) 기타 자산 (N-05-4). NULL은 미입력, 0은 없음. 합계는 TOTAL_ASSET_AMT';
-COMMENT ON COLUMN USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT IS '총자산 (N-05-4·N-05-8). NULL은 미입력, 0은 자산 없음. v0.3.2 (C12) 4종 합계(C12부터). C12 전에 저장한 행은 합계만 있다';
+COMMENT ON COLUMN USER_ASSET_SNAPSHOT.DEPOSIT_AMT IS 'v0.3.2 (Z1) 예금·적금 (N-05-4). NULL은 미입력, 0은 없음. 합계는 TOTAL_ASSET_AMT';
+COMMENT ON COLUMN USER_ASSET_SNAPSHOT.INVESTMENT_AMT IS 'v0.3.2 (Z1) 투자(주식·펀드 등) (N-05-4). NULL은 미입력, 0은 없음. 합계는 TOTAL_ASSET_AMT';
+COMMENT ON COLUMN USER_ASSET_SNAPSHOT.REAL_ESTATE_AMT IS 'v0.3.2 (Z1) 부동산·보증금 (N-05-4). NULL은 미입력, 0은 없음. 합계는 TOTAL_ASSET_AMT';
+COMMENT ON COLUMN USER_ASSET_SNAPSHOT.OTHER_ASSET_AMT IS 'v0.3.2 (Z1) 기타 자산 (N-05-4). NULL은 미입력, 0은 없음. 합계는 TOTAL_ASSET_AMT';
+COMMENT ON COLUMN USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT IS '총자산 (N-05-4·N-05-8). NULL은 미입력, 0은 자산 없음. v0.3.2 (Z1) 4종 합계(Z1부터). Z1 전에 저장한 행은 합계만 있다';
 COMMENT ON COLUMN USER_ASSET_SNAPSHOT.NO_LOAN_YN IS '대출 입력 확인 상태 (N-05-3·N-05-8). NULL은 미입력/미확인, Y는 대출 없음 선택, N은 대출 있음';
 
 -- N-05-5 지출 + N-21-3 기타 지출.

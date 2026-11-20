@@ -143,7 +143,7 @@ public class FinancialInputService {
     }
 
     // N-05-4·O-15 자산·대출 없음 — 저장할 때마다 기준월 행을 만든다(저장한 기준월 기록 겸). 자산 칸이 모두 비면 TOTAL_ASSET_AMT NULL(0원과 구분).
-    // DDL C12(FP-227) 자산 4종을 화면이 보낸 그대로 각각 저장한다(빈 칸 NULL, 0은 0). 총자산은 그 합계다(totalAsset).
+    // DDL Z1(FP-227) 자산 4종을 화면이 보낸 그대로 각각 저장한다(빈 칸 NULL, 0은 0). 총자산은 그 합계다(totalAsset).
     // noLoanYn: 대출 줄이 있으면 N, 줄 없이 "대출 없음"이면 Y, 둘 다 아니면 NULL(미확인).
     private void saveAsset(long userId, String baseMonth, DataInputDtos.Assets assets, String noLoanYn, LocalDateTime now) {
         AssetRow row = new AssetRow();
@@ -287,7 +287,7 @@ public class FinancialInputService {
         return new DataInputDtos.InputStatus(sections, altData.completion(user.getUserId()));
     }
 
-    // 저장 값을 화면 요청 본문 모양으로 되돌린다(toValues가 읽는 모양). 자산은 DDL C12부터 4종을 그대로, 그 전에 저장한 행은 '기타 자산'에 합계를 넣는다.
+    // 저장 값을 화면 요청 본문 모양으로 되돌린다(toValues가 읽는 모양). 자산은 DDL Z1부터 4종을 그대로, 그 전에 저장한 행은 '기타 자산'에 합계를 넣는다.
     private Map<String, Object> toInput(UserAccount user, Saved saved) {
         String baseMonth = saved.baseMonth();
         Map<String, Object> input = new LinkedHashMap<>();
@@ -317,8 +317,8 @@ public class FinancialInputService {
 
         input.put("creditProfile", creditSection(baseMonth, saved.credit()));
 
-        // DDL C12(FP-227) 4종 중 하나라도 값이 있으면 저장된 4종을 그대로 돌려준다.
-        // 4종이 모두 NULL인 행(C12 전에 저장해 합계만 있음)은 예전처럼 '기타 자산'에 총자산을 넣는다.
+        // DDL Z1(FP-227) 4종 중 하나라도 값이 있으면 저장된 4종을 그대로 돌려준다.
+        // 4종이 모두 NULL인 행(Z1 전에 저장해 합계만 있음)은 예전처럼 '기타 자산'에 총자산을 넣는다.
         Map<String, Object> assets = section(baseMonth);
         boolean hasBreakdown = Stream.of(asset.getDepositAmt(), asset.getInvestmentAmt(), asset.getRealEstateAmt(), asset.getOtherAssetAmt())
                 .anyMatch(Objects::nonNull);

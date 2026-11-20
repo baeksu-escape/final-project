@@ -30,7 +30,7 @@
 | 새 개발 스키마에 서비스 테이블과 더미 회원 데이터를 처음 준비 | `avenue_ddl.sql` → `dummy_db/run_seed_only.sql` | 같은 스키마에서 실행한다. DDL 내장 기준 데이터는 유지하고 시드 대상 테이블은 비어 있어야 한다 |
 | 테이블은 이미 최신 DDL로 만들어졌고 시드 대상 테이블이 비어 있음 | `dummy_db/run_seed_only.sql` | 원본 DDL을 다시 실행하지 않는다. 대상 테이블이 없거나 한 곳이라도 데이터가 있으면 시드 실행 전에 중단한다 |
 | 데이터가 있는 기존 DB에 이번 자산·대출 상태 변경만 적용 | [alter_user_asset_snapshot_no_loan.sql](alter_user_asset_snapshot_no_loan.sql) | 테이블·데이터를 유지한다. 기존 행의 새 `NO_LOAN_YN`은 NULL이며 Y/N 보정은 하지 않는다 |
-| 데이터가 있는 기존 DB에 자산 4종 열(`USER_ASSET_SNAPSHOT` 예금·적금·투자·부동산·보증금·기타 자산, DDL C12)만 추가 | [alter_user_asset_snapshot_breakdown.sql](alter_user_asset_snapshot_breakdown.sql) | 스키마 소유자로 한 번 실행한다(공용 DB는 DB 담당). 기존 행의 새 4개 열은 NULL로 남고 총자산은 그대로다. 이미 열이 있으면 오류로 멈춘다. 새로 DDL을 실행하는 DB에는 필요 없다 |
+| 데이터가 있는 기존 DB에 자산 4종 열(`USER_ASSET_SNAPSHOT` 예금·적금·투자·부동산·보증금·기타 자산, DDL Z1)만 추가 | [alter_user_asset_snapshot_breakdown.sql](alter_user_asset_snapshot_breakdown.sql) | 스키마 소유자로 한 번 실행한다(공용 DB는 DB 담당). 기존 행의 새 4개 열은 NULL로 남고 총자산은 그대로다. 이미 열이 있으면 오류로 멈춘다. 새로 DDL을 실행하는 DB에는 필요 없다 |
 | 데이터가 있는 기존 DB에 대출 상품 문구 보강만 적용 | [update_loan_product_copy.sql](update_loan_product_copy.sql) | LP001~LP017의 ID·코드 대응을 확인한 뒤 지정 문구와 상품 특징만 갱신한다. 자동 실행 묶음에는 연결하지 않는다 |
 | 데이터가 있는 기존 DB에 산출 불가 사유 `ALT_DATA_EMPTY` 1행만 추가 | [add_not_scorable_reason_alt_data_empty.sql](add_not_scorable_reason_alt_data_empty.sql) | 이미 있으면 넣지 않으므로 다시 실행해도 된다. 새로 DDL을 실행하는 DB에는 필요 없다 |
 | 금융 용어 사전(쉬운 금융사전 N-30, FP-180) 넣기 | [add_glossary_term.sql](add_glossary_term.sql) | 새 DB·기존 DB 모두 이 파일로 넣는다(DDL·시드에는 용어가 없다). DDL → `run_seed_only.sql` 다음에 실행한다. `GLOSSARY_TERM` 20행(합성 교육용 문구)이며 같은 용어는 문구를 덮어써 다시 실행해도 같은 결과다. 적용 후 `99_check.sql`의 `GLOSSARY_TERM` 기대값 0과 다르게 나오는 것은 정상 |

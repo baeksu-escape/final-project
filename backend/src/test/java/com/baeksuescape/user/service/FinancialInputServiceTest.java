@@ -139,7 +139,7 @@ class FinancialInputServiceTest {
         assertThat(FinancialInputService.totalAsset(new DataInputDtos.Assets(n("0"), null, null, null))).isZero();
     }
 
-    // FP-227 DDL C12 — 저장한 자산 행을 기준월 2026-10의 저장본으로 두고 조회한다.
+    // FP-227 DDL Z1 — 저장한 자산 행을 기준월 2026-10의 저장본으로 두고 조회한다.
     private DataInputDtos.FinancialInputResponse loadWithAsset(AssetRow asset) {
         asset.setBaseMonth("2026-10");
         asset.setCreatedAt(DataInputFixtures.NOW);
@@ -184,7 +184,7 @@ class FinancialInputServiceTest {
 
     @Test
     void oldRowWithOnlyTotalPutsTotalIntoOtherAmount() {
-        // (3) C12 전에 저장한 행(4종 NULL, 총자산만)은 기타 자산 칸에 총자산을 넣는다.
+        // (3) Z1 전에 저장한 행(4종 NULL, 총자산만)은 기타 자산 칸에 총자산을 넣는다.
         AssetRow old = new AssetRow();
         old.setTotalAssetAmt(30000000L);
         Map<String, Object> assets = assetsOf(loadWithAsset(old));
@@ -427,7 +427,7 @@ class FinancialInputServiceTest {
         Map<String, Object> input = response.input();
         assertThat(input).containsEntry("baseMonth", "2026-10").containsEntry("jobType", "EMPLOYEE");
         assertThat((Map<String, Object>) input.get("income")).containsEntry("monthlySalary", 3000000L);
-        // FP-227 (3) DDL C12 전에 저장해 4종이 모두 NULL이고 합계만 있는 행은 '기타 자산'에 합계를 넣어 돌려준다.
+        // FP-227 (3) DDL Z1 전에 저장해 4종이 모두 NULL이고 합계만 있는 행은 '기타 자산'에 합계를 넣어 돌려준다.
         assertThat((Map<String, Object>) input.get("assets")).containsEntry("otherAmount", 3000000L).containsEntry("depositAmount", null);
         // 불러온 대출은 화면 목록에 넣지 않는다(다시 저장해도 IMPORTED 행은 그대로).
         assertThat((Map<String, Object>) input.get("loans")).containsEntry("items", List.of()).containsEntry("noItems", true);

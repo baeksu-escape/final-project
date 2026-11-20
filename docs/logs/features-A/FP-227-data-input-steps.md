@@ -123,8 +123,8 @@
 - 대출은 "보유한 대출이 없습니다."를 체크하지 않았으면 줄이 늘 1개 이상 보인다(`minRows`, `withMinimumRows`).
 - "없음"·"신용 이력이 없어요"를 체크하면 칸을 숨기지 않고 잠근다(값은 보관하고, `해당 없음` 표시). 요청 본문 모양은 같다.
 
-## 11/19 v1.4 — 자산 4종 저장(DDL C12), 버튼 배치, 카드·신용 빈 칸 통과 오류
-- **DB(DDL v0.3.2 C12, 조장 결정 11/19):** `USER_ASSET_SNAPSHOT`의 `TOTAL_ASSET_AMT` 앞에 열 4개를 추가했다.
+## 11/19 v1.4 — 자산 4종 저장(DDL Z1), 버튼 배치, 카드·신용 빈 칸 통과 오류
+- **DB(DDL v0.3.2 Z1, 조장 결정 11/19):** `USER_ASSET_SNAPSHOT`의 `TOTAL_ASSET_AMT` 앞에 열 4개를 추가했다.
   - 열: `DEPOSIT_AMT`·`INVESTMENT_AMT`·`REAL_ESTATE_AMT`·`OTHER_ASSET_AMT` (NUMBER(15), NULL 허용).
   - 제약: CHECK `CK_UAS_DEPOSIT_AMT`·`CK_UAS_INVESTMENT_AMT`·`CK_UAS_REAL_ESTATE_AMT`·`CK_UAS_OTHER_ASSET_AMT` (>= 0).
   - 총자산 열은 그대로 두고 4종 합계를 계속 저장한다. 재무 건전성 진단(C팀)과 입력 완료 판단이 이 열을 쓴다.
@@ -152,6 +152,7 @@
   - 공용 DB·로컬 DB에는 아무것도 실행하지 않았다.
 - **공용 DB 적용:** 병합한 뒤 DB 담당(범영)이 `alter_user_asset_snapshot_breakdown.sql`을 한 번 실행한다. 로컬 DB는 각자 실행한다.
 - 11/19 develop 병합 때 B팀 FP-139가 C11을 먼저 써서 자산 4종 변경을 C12로 바꿈.
+- 11/20 develop #115(재욱 CUT-0.3)가 C12를 써서 다시 겹침. PR 준비가 끝날 때까지 임시 번호 Z1로 두고, PR 직전 develop 병합 때 마지막 번호로 바꾼다.
 
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
