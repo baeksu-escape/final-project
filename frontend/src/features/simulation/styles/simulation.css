@@ -16,9 +16,8 @@
 .sim-result { position: sticky; top: 12px; }
 .sim-slider-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; }
 .sim-money-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 12px; margin-top: 12px; }
-.sim-field { display: grid; gap: 4px; border-radius: 8px; }
 /* 입력 오류(.field-error)가 생겨도 칸이 밀리지 않도록 오류 한 줄(12.5px) 자리를 항상 비워 두고 그 자리에 겹쳐 그린다. */
-.sim-field { position: relative; padding-bottom: 20px; }
+.sim-field { display: grid; gap: 4px; border-radius: 8px; position: relative; padding-bottom: 20px; }
 .sim-field .field-error { position: absolute; bottom: 0; left: 0; }
 /* 조건에 따라 생기는 한 줄 문구 자리를 미리 확보한다. 상태 줄은 두 줄 높이를 항상 차지하고, 이전 조건 안내는 숨겨도 자리를 둔다. */
 .sim-status { display: block; min-height: 2lh; }

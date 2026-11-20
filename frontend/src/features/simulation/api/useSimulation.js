@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { adaptSimulationInputs, adaptSimulationResult, addDeductionExamples, sameInputs, validateInputs } from '../adapters/simulationAdapter.js'
-import { getSimulationInputs, recalculateSimulation } from './simulationApi.js'
+import { clearScoreBandOfferCache, getSimulationInputs, recalculateSimulation } from './simulationApi.js'
 
 const EMPTY = { userId: null, revision: -1, loading: true, error: '', currentScore: null, baseline: null, deductions: [] }
 
@@ -91,7 +91,10 @@ export function useSimulation(userId) {
     setForm({ key: formKey, values: base.baseline, ...IDLE_FORM })
   }
 
-  const reload = useCallback(() => setRevision((value) => value + 1), [])
+  const reload = useCallback(() => {
+    clearScoreBandOfferCache()
+    setRevision((value) => value + 1)
+  }, [])
 
   return {
     loading: !ready || base.loading,
