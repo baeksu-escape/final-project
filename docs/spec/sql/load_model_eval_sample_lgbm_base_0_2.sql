@@ -5,7 +5,7 @@
 -- 기존 집단은 VALID만, 씬파일은 노출 1인(eval_future_credit_exposure = 1) TRAIN+VALID이며 TEST는 없다(최종 평가 FP-144).
 -- 점수 4개: 연체 라벨로 학습·평가한 기존·대안, 비금융 효과 라벨로 학습·평가한 기존·대안(0~1000). 서버 모델은 SCORE_LEGACY_DELINQ와 SCORE_ALT_NONFIN뿐이다.
 -- 한 번만 실행한다: 이 모델 버전의 행이 이미 있으면 오류로 멈춘다(다시 넣으려면 먼저 해당 행을 지운다). 표가 없으면 create_model_eval_sample.sql을 먼저 실행한다.
--- SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다. 공용 DB는 DB 담당이 실행한다.
+-- SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다. 공용 DB는 PR 작성자가 병합 후 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」).
 -- ====================================================================
 SET DEFINE OFF
 WHENEVER SQLERROR EXIT FAILURE ROLLBACK

@@ -3,7 +3,7 @@
 > A팀(우찬·경환) API의 요청·응답 상세다. 관리: A팀. 작성 규칙은 [README](README.md) 3장, 전체 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > - **원본:** 우찬 님 「A팀 API 명세 — 반영 요청(11/16)」. develop `bfe6b94`(PR #50·#52·#53 병합 후)의 실제 Spring Controller·DTO에서 뽑은 내용이다. 🆕 11/18 이 파일로 옮겼다(그 전에는 정의서에 요약만 있었다). 그 뒤 코드가 바뀌면 A팀이 이 파일을 고친다.
-> - 🆕 최근 변경 (11/19, FP-227): 자산 4종 저장(DDL Z1). INP-02 요청 본문 모양은 바뀌지 않고, INP-01이 저장된 4종을 그대로 돌려준다
+> - 🆕 최근 변경 (11/19, FP-227): 자산 4종 저장(DDL C13). INP-02 요청 본문 모양은 바뀌지 않고, INP-01이 저장된 4종을 그대로 돌려준다
 > - 최근 변경 (11/19, FP-227): MEM-05 저장 전 직군 변경 허용(`JOB_TYPE_LOCKED` 추가)
 > - 🆕 최근 변경 (11/19, FP-90): 7장 대출 상품 LOAN-01~05 추가(경환), 5장 오류 code에 `PRODUCT_NOT_FOUND`
 > - 이전 변경 (11/18, FP-219): AUTH-06 가입 요청에 휴대폰 인증 토큰 추가·이름·닉네임 규칙, 닉네임 중복 확인·휴대폰 인증번호 발송·확인 API(AUTH-13~15) 추가
@@ -99,8 +99,8 @@
   - `annualRatePercent` 0~20, `remainingMonths` 필수(0 허용)
   - `noItems: true` → `USER_ASSET_SNAPSHOT.NO_LOAN_YN = 'Y'`
 - `creditProfile` 🟡 = `{ cardLimitAmount, cardMonthlySpendAmount, delinquencyCount12m, cashAdvanceMonths, newLoanCount3m, privateLenderLoanBalanceAmount, noCreditHistory }` → `USER_CREDIT_PROFILE`(`MANUAL`)
-- `assets` = `{ depositAmount, investmentAmount, realEstateAmount, otherAmount }` 🆕 11/19 FP-227(DDL Z1) → 4종을 `DEPOSIT_AMT`·`INVESTMENT_AMT`·`REAL_ESTATE_AMT`·`OTHER_ASSET_AMT`에 각각 그대로 저장(빈 칸 NULL, 0은 0)하고, 합계를 `TOTAL_ASSET_AMT`에 계속 저장(모두 비면 NULL). 요청 본문 모양은 그대로다
-  - INP-01 응답의 `input.assets`: 저장된 4종을 그대로 돌려준다. Z1 전에 저장한 행(4종이 모두 NULL)은 `otherAmount`에 총자산. `totalAmount`는 총자산
+- `assets` = `{ depositAmount, investmentAmount, realEstateAmount, otherAmount }` 🆕 11/19 FP-227(DDL C13) → 4종을 `DEPOSIT_AMT`·`INVESTMENT_AMT`·`REAL_ESTATE_AMT`·`OTHER_ASSET_AMT`에 각각 그대로 저장(빈 칸 NULL, 0은 0)하고, 합계를 `TOTAL_ASSET_AMT`에 계속 저장(모두 비면 NULL). 요청 본문 모양은 그대로다
+  - INP-01 응답의 `input.assets`: 저장된 4종을 그대로 돌려준다. C13 전에 저장한 행(4종이 모두 NULL)은 `otherAmount`에 총자산. `totalAmount`는 총자산
 - `fixedExpense` = `{ monthlyAmount }`, `otherExpenses` = `{ items: [{ category, memo, monthlyAmount }] }` (`category`에 `INSTALLMENT`(할부) 추가)
 
 **INP-03 세부**
@@ -177,7 +177,7 @@
 ## 6. 2차로 넘긴 것
 
 - 관리자 2단계 인증의 이메일 외 수단(TOTP 등), 1회용 토큰 저장소(DB·Redis), `VERIFICATION_CODE.PURPOSE_CODE`에 `ADMIN_STEP_UP` 추가(DDL 제안)
-- 금융(대출) 불러오기, 간편 로그인 재인증 화면 (자산 4칸 개별 저장은 11/19 FP-227 DDL Z1로 반영)
+- 금융(대출) 불러오기, 간편 로그인 재인증 화면 (자산 4칸 개별 저장은 11/19 FP-227 DDL C13로 반영)
 - N-19 지난달 대비 알림(D-25로 1차 제외), N-01-5 시연 계정 [채우기](UI 초안용이라 제외)
 
 ## 7. 대출 상품 (LOAN) — N-37 🆕 11/19

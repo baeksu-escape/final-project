@@ -4,12 +4,18 @@ import com.baeksuescape.finance.dto.cashflow.CashFlowConditionRequest;
 import com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse;
 import com.baeksuescape.finance.dto.cashflow.ExpectedScoreResponse;
 import com.baeksuescape.finance.dto.cashflow.IncomeVolatilityResponse;
+import com.baeksuescape.finance.dto.scenario.ScenarioBaseResponse;
+import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateRequest;
+import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateResponse;
 import com.baeksuescape.finance.dto.simulation.CreditCareBaseResponse;
 import com.baeksuescape.finance.dto.simulation.CreditCareSimulationRequest;
 import com.baeksuescape.finance.dto.simulation.CreditCareSimulationResponse;
 import com.baeksuescape.finance.service.CreditCareSimulationService;
 import com.baeksuescape.finance.service.ExpectedScoreService;
 import com.baeksuescape.finance.service.IncomeVolatilityService;
+import com.baeksuescape.finance.service.MemberFinancialHealthService;
+import com.baeksuescape.finance.service.ScenarioService;
+import com.baeksuescape.finance.dto.health.FinancialHealthBaseResponse;
 import org.springframework.http.MediaType;
 import com.baeksuescape.global.security.JwtTokenProvider;
 import com.baeksuescape.user.mapper.UserAccountMapper;
@@ -29,6 +35,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +73,9 @@ class MemberFinanceControllerTest {
     private static final String INCOME_VOLATILITY = "/api/members/me/income-volatility";
     private static final String CASH_FLOW_FORECAST = "/api/members/me/cash-flow-forecast";
     private static final String EXPECTED_SCORE = "/api/members/me/cash-flow-expected-score";
+    private static final String SCENARIO_BASE = "/api/members/me/scenario-base";
+    private static final String SCENARIO_RECALCULATE = "/api/members/me/scenario-recalculate";
+    private static final String FINANCIAL_HEALTH = "/api/members/me/financial-health";
 
     @Autowired
     private MockMvc mockMvc;
@@ -77,6 +88,12 @@ class MemberFinanceControllerTest {
 
     @MockBean
     private CreditCareSimulationService creditCareSimulationService;
+
+    @MockBean
+    private ScenarioService scenarioService;
+
+    @MockBean
+    private MemberFinancialHealthService memberFinancialHealthService;
 
     @Autowired
     private JwtTokenProvider tokenProvider;
@@ -100,36 +117,127 @@ class MemberFinanceControllerTest {
         return builder.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.issue(1L, "ROLE_ADMIN"));
     }
 
-    // 5개 API 요청 (POST는 빈 JSON 본문)
+    // 8개 API 요청 (POST는 빈 JSON 본문). FP-167에서 시나리오 2개, FP-239에서 자산·부채 저장값 1개를 더했다.
     private List<MockHttpServletRequestBuilder> allApis() {
         return List.of(
+                get(FINANCIAL_HEALTH),
                 get(CREDIT_CARE_BASE),
                 post(CREDIT_CARE_RECALCULATE).contentType(MediaType.APPLICATION_JSON).content("{\"changes\":{}}"),
                 get(INCOME_VOLATILITY),
                 get(CASH_FLOW_FORECAST),
-                post(EXPECTED_SCORE).contentType(MediaType.APPLICATION_JSON).content("{}"));
+                post(EXPECTED_SCORE).contentType(MediaType.APPLICATION_JSON).content("{}"),
+                get(SCENARIO_BASE),
+                post(SCENARIO_RECALCULATE).contentType(MediaType.APPLICATION_JSON).content("{}"));
     }
 
     @Test
-    @DisplayName("5개 API 모두 토큰이 없으면 보안 설정이 401 UNAUTHORIZED를 내고 서비스를 부르지 않는다")
+    @DisplayName("8개 API 모두 토큰이 없으면 보안 설정이 401 UNAUTHORIZED를 내고 서비스를 부르지 않는다")
     void allApis_withoutToken_unauthorized() throws Exception {
         for (MockHttpServletRequestBuilder request : allApis()) {
             mockMvc.perform(request)
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
         }
-        verifyNoInteractions(incomeVolatilityService, expectedScoreService, creditCareSimulationService);
+        verifyNoInteractions(incomeVolatilityService, expectedScoreService, creditCareSimulationService, scenarioService,
+                memberFinancialHealthService);
     }
 
     @Test
-    @DisplayName("5개 API 모두 관리자 토큰이면 403 FORBIDDEN이고 서비스를 부르지 않는다 (/api/members/me/**는 ROLE_USER 전용)")
+    @DisplayName("8개 API 모두 관리자 토큰이면 403 FORBIDDEN이고 서비스를 부르지 않는다 (/api/members/me/**는 ROLE_USER 전용)")
     void allApis_admin_forbidden() throws Exception {
         for (MockHttpServletRequestBuilder request : allApis()) {
             mockMvc.perform(asAdmin(request))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         }
-        verifyNoInteractions(incomeVolatilityService, expectedScoreService, creditCareSimulationService);
+        verifyNoInteractions(incomeVolatilityService, expectedScoreService, creditCareSimulationService, scenarioService,
+                memberFinancialHealthService);
+    }
+
+    @Test
+    @DisplayName("FP-239 DIAG-03-1 자산·부채 저장값: 화면 adapter와 같은 필드 이름, 총자산 미입력은 null, 대출 목록 필드")
+    void getFinancialHealth() throws Exception {
+        when(memberFinancialHealthService.load(2L)).thenReturn(new FinancialHealthBaseResponse("2026-08", null,
+                30_000_000L, 15_000_000L, 5_520_000L,
+                List.of(new FinancialHealthBaseResponse.LoanItem(11L, "CREDIT", "신용대출", 15_000_000L,
+                        new BigDecimal("5.400"), "VARIABLE", 36, 460_000L))));
+
+        mockMvc.perform(loggedIn(get(FINANCIAL_HEALTH), 2L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.baseMonth").value("2026-08"))
+                .andExpect(jsonPath("$.totalAssetAmount").value(nullValue()))
+                .andExpect(jsonPath("$.annualIncomeAmount").value(30000000))
+                .andExpect(jsonPath("$.totalDebtAmount").value(15000000))
+                .andExpect(jsonPath("$.annualPaymentAmount").value(5520000))
+                .andExpect(jsonPath("$.loans[0].loanId").value(11))
+                .andExpect(jsonPath("$.loans[0].loanTypeCode").value("CREDIT"))
+                .andExpect(jsonPath("$.loans[0].loanTypeName").value("신용대출"))
+                .andExpect(jsonPath("$.loans[0].balanceAmount").value(15000000))
+                .andExpect(jsonPath("$.loans[0].annualRatePct").value(5.4))
+                .andExpect(jsonPath("$.loans[0].rateTypeCode").value("VARIABLE"))
+                .andExpect(jsonPath("$.loans[0].remainingMonths").value(36))
+                .andExpect(jsonPath("$.loans[0].monthlyPaymentAmount").value(460000));
+    }
+
+    @Test
+    @DisplayName("N-17-1 시나리오 기준값: 화면 adapter와 같은 필드 이름, 총자산 미입력은 null, 정책금리 기준일·금리")
+    void getScenarioBase() throws Exception {
+        when(scenarioService.base(2L)).thenReturn(new ScenarioBaseResponse(3_000_000L, 1_800_000L, 500_000L,
+                30_000_000L, null, new ScenarioBaseResponse.PolicyRate(LocalDate.of(2026, 10, 31), new BigDecimal("3.000")),
+                List.of("가정 1")));
+
+        mockMvc.perform(loggedIn(get(SCENARIO_BASE), 2L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.monthlyIncomeAmount").value(3000000))
+                .andExpect(jsonPath("$.monthlyExpenseAmount").value(1800000))
+                .andExpect(jsonPath("$.monthlyPaymentAmount").value(500000))
+                .andExpect(jsonPath("$.variableLoanBalanceAmount").value(30000000))
+                .andExpect(jsonPath("$.totalAssetAmount").value(nullValue()))
+                .andExpect(jsonPath("$.policyRate.baseDate").value("2026-10-31"))
+                .andExpect(jsonPath("$.policyRate.ratePct").value(3.0))
+                .andExpect(jsonPath("$.assumptions[0]").value("가정 1"));
+    }
+
+    @Test
+    @DisplayName("N-17-2~4 시나리오 재계산: 조건이 서비스로 전달되고 current·changed와 결과 필드 이름이 화면과 같다")
+    void recalculateScenario() throws Exception {
+        ScenarioRecalculateResponse.Side now = new ScenarioRecalculateResponse.Side(3_000_000L, 1_800_000L, 500_000L, 700_000L, new BigDecimal("16.67"));
+        ScenarioRecalculateResponse.Side after = new ScenarioRecalculateResponse.Side(2_400_000L, 1_980_000L, 525_000L, -105_000L, new BigDecimal("21.88"));
+        when(scenarioService.recalculate(eq(2L), any())).thenReturn(new ScenarioRecalculateResponse(now, after,
+                25_000L, -805_000L, 95L, "SHORTFALL", List.of("가정 1")));
+
+        mockMvc.perform(loggedIn(post(SCENARIO_RECALCULATE).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ratePctPoint\":1,\"incomePct\":-20,\"expensePct\":10}"), 2L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.current.monthlySurplusAmount").value(700000))
+                .andExpect(jsonPath("$.current.dsrPct").value(16.67))
+                .andExpect(jsonPath("$.changed.monthlyIncomeAmount").value(2400000))
+                .andExpect(jsonPath("$.changed.monthlyPaymentAmount").value(525000))
+                .andExpect(jsonPath("$.monthlyInterestChangeAmount").value(25000))
+                .andExpect(jsonPath("$.surplusDiffAmount").value(-805000))
+                .andExpect(jsonPath("$.survivableMonths").value(95))
+                .andExpect(jsonPath("$.verdict").value("SHORTFALL"))
+                .andExpect(jsonPath("$.assumptions[0]").value("가정 1"));
+
+        ArgumentCaptor<ScenarioRecalculateRequest> captor = ArgumentCaptor.forClass(ScenarioRecalculateRequest.class);
+        verify(scenarioService).recalculate(eq(2L), captor.capture());
+        assertEquals(1.0, captor.getValue().getRatePctPoint());
+        assertEquals(-20.0, captor.getValue().getIncomePct());
+        assertEquals(10.0, captor.getValue().getExpensePct());
+    }
+
+    @Test
+    @DisplayName("시나리오 조건이 범위 밖이면 서비스의 400이 공통 오류 형식(fieldErrors)으로 나간다")
+    void recalculateScenarioOutOfRange() throws Exception {
+        when(scenarioService.recalculate(eq(2L), any())).thenThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT",
+                "금리 변화는 -5~+10%p 사이로 입력해 주세요.",
+                List.of(new ErrorResponse.FieldErrorItem("ratePctPoint", "금리 변화는 -5~+10%p 사이로 입력해 주세요."))));
+
+        mockMvc.perform(loggedIn(post(SCENARIO_RECALCULATE).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ratePctPoint\":11}"), 2L))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("ratePctPoint"));
     }
 
     @Test
@@ -346,7 +454,7 @@ class MemberFinanceControllerTest {
     @DisplayName("DIAG-09: 본문 조건이 전달되고 JSON 필드 이름이 고정된다")
     void postExpectedScore() throws Exception {
         when(expectedScoreService.expectedScore(eq(2L), any())).thenReturn(new ExpectedScoreResponse(588, "CAUTION", 571,
-                "CAUTION", -17, "LGBM-BASE-0.1", "DEV-DUMMY", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", false));
+                "CAUTION", -17, "LGBM-BASE-0.1", "DEV-DUMMY", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", true, 1));
 
         mockMvc.perform(loggedIn(post(EXPECTED_SCORE)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -360,7 +468,8 @@ class MemberFinanceControllerTest {
                 .andExpect(jsonPath("$.modelVersion").value("LGBM-BASE-0.1"))
                 .andExpect(jsonPath("$.baseModelVersion").value("DEV-DUMMY"))
                 .andExpect(jsonPath("$.baseRequestId").value("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"))
-                .andExpect(jsonPath("$.paymentStatusApplied").value(false));
+                .andExpect(jsonPath("$.paymentStatusApplied").value(true))
+                .andExpect(jsonPath("$.assumedDelinquencyCount").value(1));
 
         ArgumentCaptor<CashFlowConditionRequest> captor = ArgumentCaptor.forClass(CashFlowConditionRequest.class);
         verify(expectedScoreService).expectedScore(eq(2L), captor.capture());

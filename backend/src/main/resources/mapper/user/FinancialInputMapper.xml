@@ -22,7 +22,7 @@
     </select>
 
     <!-- N-05-4·O-15 기준월 자산 행을 만들거나 고친다. TOTAL_ASSET_AMT NULL = 미입력, NO_LOAN_YN NULL = 대출 미확인.
-         DDL Z1(FP-227) 자산 4종을 각각 저장한다(빈 칸 NULL). TOTAL_ASSET_AMT는 4종 합계로 계속 저장한다(재무 건전성·입력 완료 판단이 쓴다). -->
+         DDL C13(FP-227) 자산 4종을 각각 저장한다(빈 칸 NULL). TOTAL_ASSET_AMT는 4종 합계로 계속 저장한다(재무 건전성·입력 완료 판단이 쓴다). -->
     <update id="mergeAsset">
         MERGE INTO USER_ASSET_SNAPSHOT t
         USING (SELECT #{userId} AS USER_ID, #{baseMonth} AS BASE_MONTH FROM DUAL) s
