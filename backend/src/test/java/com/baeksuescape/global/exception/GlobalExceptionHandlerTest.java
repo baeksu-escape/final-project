@@ -1,5 +1,6 @@
 package com.baeksuescape.global.exception;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -10,8 +11,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,6 +25,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.baeksuescape.global.security.JwtTokenProvider;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 
@@ -84,6 +91,43 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.fieldErrors").isEmpty())
                 .andExpect(content().string(not(containsString("SELECT"))))
                 .andExpect(content().string(not(containsString("secret@example.com"))));
+    }
+
+    // FP-143 업무 오류는 상태·코드·방식·경로만 서버 로그에 한 줄 남기고, 응답 문구·칸 오류는 남기지 않는다.
+    @Test
+    void 업무_오류는_상태_코드_경로만_로그에_남긴다() throws Exception {
+        List<String> logs = captureLogs(() -> mvc.perform(post("/api/members/me/__test/conflict").header(HttpHeaders.AUTHORIZATION, auth))
+                .andExpect(status().isConflict()));
+        assertThat(logs).containsExactly("API 오류 409 DUPLICATE_NICKNAME POST /api/members/me/__test/conflict");
+    }
+
+    // FP-143 500은 예외 종류와 우리 코드 위치를 남기고, 예외 메시지(SQL·이메일)는 남기지 않는다.
+    @Test
+    void 예상_못_한_오류는_위치를_남기고_메시지는_남기지_않는다() throws Exception {
+        List<String> logs = captureLogs(() -> mvc.perform(post("/api/members/me/__test/boom").header(HttpHeaders.AUTHORIZATION, auth))
+                .andExpect(status().isInternalServerError()));
+        assertThat(logs).hasSize(1);
+        assertThat(logs.get(0))
+                .startsWith("처리하지 못한 오류: java.lang.IllegalStateException at SecurityTestController.boom:")
+                .endsWith("(POST /api/members/me/__test/boom)")
+                .doesNotContain("SELECT", "secret@example.com");
+    }
+
+    private interface Request {
+        void run() throws Exception;
+    }
+
+    private static List<String> captureLogs(Request request) throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            request.run();
+        } finally {
+            logger.detachAppender(appender);
+        }
+        return appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
     }
 
     @Test
