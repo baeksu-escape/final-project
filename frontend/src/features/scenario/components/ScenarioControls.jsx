@@ -1,10 +1,10 @@
-import { Card, NumberInput, Slider } from '../../../common/components/index.js'
+import { Button, Card, NumberInput, Slider } from '../../../common/components/index.js'
 import { BASE_PRESET, BETTER_PRESETS, SCENARIO_FIELDS, WORSE_PRESETS } from './scenarioConfig.js'
 
 const signed = (value, unit, digits = 0) => `${value > 0 ? '+' : value < 0 ? '−' : '±'}${Math.abs(value).toFixed(digits)}${unit}`
 
 // N-17-2 상황 버튼 9개와 금리·소득·지출 슬라이더+직접 입력. 슬라이더를 움직이면 상황 선택이 풀린다.
-export default function ScenarioControls({ values, presetId, inputError, variableLoanBalanceAmount, onChange, onSelect }) {
+export default function ScenarioControls({ values, presetId, inputError, calcError, variableLoanBalanceAmount, onChange, onSelect, onRetry }) {
   const presetButton = (preset) => (
     <button key={preset.id} type="button" className="sc-preset" aria-pressed={presetId === preset.id} onClick={() => onSelect(preset)}>
       {preset.label}
@@ -42,6 +42,7 @@ export default function ScenarioControls({ values, presetId, inputError, variabl
         {inputError || (Number.isSafeInteger(variableLoanBalanceAmount)
           ? `변동금리 대출 ${variableLoanBalanceAmount.toLocaleString('ko-KR')}원에 금리 변화를 적용합니다.`
           : '변동금리 대출 잔액 정보가 없어 변경 후 월 원리금과 월 잉여는 계산하지 않습니다.')}
+        {calcError && <> <Button size="sm" onClick={onRetry}>다시 시도</Button></>}
       </p>
     </Card>
   )
