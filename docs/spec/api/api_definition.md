@@ -15,7 +15,11 @@
 > 5. 2-9 **용어 사전 HELP-01 ✅**(FP-180 PR #108)
 > 6. 2-5 **DIAG-01 ✅ 경로 `/api/members/me/peer-benchmark`·원천 회원 표(동주, FP-160 PR #120)**, DIAG-02·05 ⛔(쓰는 화면 없음 / `scenario-base`가 기준금리 제공), 2-10 ADM-01·02 쿼리·담당 FP-184
 > 7. 2-5 **(광희, FP-239)** DIAG-03-1 자산·부채 저장값 `GET /api/members/me/financial-health` ✅, DIAG-04 시나리오 새 경로 2개 ✅(PR #118), DIAG-09 '밀림' 반영(연체 +1, `assumedDelinquencyCount`). 이번부터 API를 만든 사람이 PR에서 정의서를 같이 고친다(범영 11/20)
+<<<<<<< HEAD
 > 8. 2-10 **모형 성능 비교 ADM-01·02 ✅(동주, FP-184)** — ACTIVE 모델(지금 0.2)의 평가 표본 기준
+=======
+> 8. 2-2·2-3 **(우찬, FP-227)** MEM-05 입력 저장 전 직군 다시 고르기·409 `JOB_TYPE_LOCKED`, INP-02 자산 4종 각각 저장(DDL C13)
+>>>>>>> 104031b7f4bea18adc3e64b6ebc0145408c7ace7
 >
 > 이전 변경 (11/19): FP-219 AUTH-13~15·AUTH-06 휴대폰 인증 필수, FP-170 SIM-01·02·DIAG-09 ✅, 1-2 C팀 오류 표 정리
 > 이전 변경 (11/18): 저장소 `docs/spec/api/`로 이관, PR #83(DIAG-07 표준편차·DIAG-08 `months[]`·전망 조건) 반영, 간편결제 × 12 🟡 정정, `isXxx` 필드 규칙
@@ -148,7 +152,7 @@
 | MEM-02 | `POST /api/members/me/profile/unmask` | N-04-2 마스킹 해제 | `APP_USER` | USER | ✅ |
 | MEM-03 | `PUT /api/members/me/email` | N-04-3 계정 관리 (이메일 변경, N-02-3 재인증) | `APP_USER`, `VERIFICATION_CODE` | USER | ✅ |
 | MEM-04 | `PUT /api/members/me/password` | N-04-3 계정 관리 (비밀번호 변경) | `APP_USER` | USER 전용 | ✅ |
-| MEM-05 | `PATCH /api/members/me/job-type` | N-05-1 직군 선택 (처음 한 번만, 이미 있으면 409 `JOB_TYPE_ALREADY_SELECTED`) | `APP_USER` | USER | ✅ |
+| MEM-05 | `PATCH /api/members/me/job-type` | N-05-1 직군 선택 (입력 저장 전에는 다시 고를 수 있음. 같은 직군이면 200, 저장한 입력이나 평가가 있으면 409 `JOB_TYPE_LOCKED`, 그사이 다른 요청이 먼저 바꿨으면 409 `JOB_TYPE_ALREADY_SELECTED`) 🆕 11/20 | `APP_USER`, `USER_ASSET_SNAPSHOT`·`ASSESSMENT`(잠금 판단에 읽기만) | USER | ✅ |
 | MEM-06 | `GET /api/members/me/diagnoses` | N-04-6 진단 내역 조회 | `ASSESSMENT` | USER | ✅ **구현됨 (FP-142, 실제 연결 확인 11/16)** (응답 상세: B팀 명세서 3-4) |
 | MEM-07 | `DELETE /api/members/me` | N-04-7 회원 탈퇴 `{ password }` — 상태 `WITHDRAWN`·개인정보 덮어쓰기, 소셜 연결·인증 기록·동의로 불러온 데이터 삭제, 직접 입력·평가는 보관. 간편 로그인 전용 계정은 토큰 발급 10분 이내로 확인(넘으면 403 `RECENT_LOGIN_REQUIRED`) | `APP_USER`, `USER_*`, `SYSTEM_LOG` | USER | ✅ |
 
@@ -167,7 +171,7 @@
   - `income` = `{ incomeType, monthlySalary, items: [{ month, amount }] }` (급여소득자 1달, 그 외 12달)
   - `loans` = `{ items: [{ loanTypeCode, balanceAmount, annualRatePercent, rateType, monthlyPaymentAmount, remainingMonths }], noItems }` — **필드 변경 `sectorCode` → `loanTypeCode`**(`DIM_LOAN_TYPE` 6개), 금리 0~20, `remainingMonths` 필수(0 허용), `noItems: true` → `NO_LOAN_YN = 'Y'`
   - `creditProfile` = `{ cardLimitAmount, cardMonthlySpendAmount, delinquencyCount12m, cashAdvanceMonths, newLoanCount3m, privateLenderLoanBalanceAmount, noCreditHistory }` → `USER_CREDIT_PROFILE`(MANUAL)
-  - `assets` 4칸 → 합계만 `TOTAL_ASSET_AMT`에 저장(모두 비면 NULL, 다시 열면 합계가 `otherAmount`로 돌아옴)
+  - `assets` 4칸 → 자산 4종을 각각 저장하고 합계도 `TOTAL_ASSET_AMT`에 저장(DDL C13, 모두 비면 NULL). 다시 열면 4종이 그대로 돌아오고, C13 전에 저장한 행만 `otherAmount`에 총자산이 들어감 🆕 11/20
   - `otherExpenses` category에 `INSTALLMENT`(할부) 추가
 - INP-03 세부(A팀 명세 3장)
   - `source`: `easypay`, `telecom`, `national-pension`, `health-insurance`, `utility`

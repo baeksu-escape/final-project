@@ -78,7 +78,7 @@ public class MyPageController {
         return Map.of();
     }
 
-    // MEM-05 N-05-1 직군 선택(첫 선택만, N-04-8 변경은 미정)
+    // MEM-05 N-05-1 직군 선택 — 입력을 저장하기 전에는 다시 고를 수 있다(FP-227, 저장 후 변경 N-04-8은 미정)
     @PatchMapping("/job-type")
     public AuthResponses.Me selectJobType(@AuthenticationPrincipal AuthUser user, @RequestBody MyPageDtos.JobType request) {
         return myPageService.selectJobType(user.userId(), request);
