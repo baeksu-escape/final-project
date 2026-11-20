@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- FP-161 N-26 관리자 직군·연령별 통계(ADM-03). 서비스 회원 평가(DATASET_CODE='SERVICE')만 쓰고 탈퇴 회원은 뺀다(D-26·D-28 담당자 결정 11/20).
+     합성 고객은 ASSESSMENT에 적재되지 않았고 평가 표본(MODEL_EVAL_SAMPLE)은 연령대가 없어 쓰지 않는다. -->
+<mapper namespace="com.baeksuescape.admin.mapper.AdminStatsMapper">
+
+    <!-- 회원마다 가장 최근 SCORED 평가 1건(selectLatestScored와 같은 정렬). 직군·연령대는 평가 시점 값. 잠긴 회원(LOCKED)은 넣는다 -->
+    <select id="selectLatestScoredMembers" resultType="com.baeksuescape.admin.dto.AdminStatsRows$MemberScore">
+        SELECT USER_ID AS userId, WORKER_TYPE_CODE AS workerTypeCode, AGE_BAND_CODE AS ageBandCode,
+               TRAD_SCORE AS tradScore, ALT_SCORE AS altScore, ALT_GRADE_BAND_CODE AS altGradeBandCode
+          FROM (SELECT A.USER_ID, A.WORKER_TYPE_CODE, A.AGE_BAND_CODE, A.TRAD_SCORE, A.ALT_SCORE, A.ALT_GRADE_BAND_CODE,
+                       ROW_NUMBER() OVER (PARTITION BY A.USER_ID ORDER BY A.ASSESSED_AT DESC, A.ASSESSMENT_ID DESC) AS RN
+                  FROM ASSESSMENT A
+                  JOIN APP_USER U ON U.USER_ID = A.USER_ID
+                 WHERE A.DATASET_CODE = 'SERVICE'
+                   AND A.GRADE_STATUS_CODE = 'SCORED'
+                   AND U.ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN')
+         WHERE RN = 1
+         ORDER BY USER_ID
+    </select>
+
+    <!-- 가입 회원 수: 일반 회원 중 탈퇴 제외(관리자 계정은 세지 않는다) -->
+    <select id="selectRegisteredMemberCount" resultType="long">
+        SELECT COUNT(*)
+          FROM APP_USER
+         WHERE ROLE_CODE = 'ROLE_USER'
+           AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
+    </select>
+
+    <!-- 오늘 산출: from 이후 저장된 서비스 SCORED 평가 수(탈퇴 회원 제외) -->
+    <select id="selectScoredCountSince" resultType="long">
+        SELECT COUNT(*)
+          FROM ASSESSMENT A
+          JOIN APP_USER U ON U.USER_ID = A.USER_ID
+         WHERE A.DATASET_CODE = 'SERVICE'
+           AND A.GRADE_STATUS_CODE = 'SCORED'
+           AND U.ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
+           AND A.ASSESSED_AT &gt;= #{from}
+    </select>
+</mapper>

@@ -1,0 +1,138 @@
+package com.baeksuescape.admin.service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+import com.baeksuescape.admin.dto.AdminStatsDtos.GradeCount;
+import com.baeksuescape.admin.dto.AdminStatsDtos.GroupStats;
+import com.baeksuescape.admin.dto.AdminStatsDtos.StatsResponse;
+import com.baeksuescape.admin.dto.AdminStatsDtos.Summary;
+import com.baeksuescape.admin.dto.AdminStatsRows.MemberScore;
+import com.baeksuescape.admin.mapper.AdminStatsMapper;
+import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
+
+/**
+ * FP-161 N-26-1~4 관리자 직군·연령별 통계(ADM-03).
+ * D-26 담당자 결정(11/20, 광희): 11/06 확정 UI대로 요약(평가 고객 수·평균 점수 기존→대안·Standard 이상 비율·가입 회원 수·오늘 산출),
+ * 대안 등급 분포, 직군별·연령대별 통계 표를 만든다(v3의 상자 그림·히트맵·통신비 연체 경험은 UI에 없어 만들지 않는다).
+ * 데이터는 서비스 회원의 최근 SCORED 평가 1건이고, D-28 결정대로 탈퇴 회원은 뺀다(매퍼).
+ */
+@Service
+public class AdminStatsService {
+
+    static final String WORKER_TYPE = "WORKER_TYPE";
+    static final String AGE_BAND = "AGE_BAND";
+    /** 그룹 회원이 이보다 적으면 평균·비율·등급 분포를 내지 않는다(동주 님 DIAG-01과 같은 기준) */
+    static final int MIN_GROUP_SIZE = 5;
+
+    /** 그룹 코드 고정 순서 (DIM_WORKER_TYPE 3분류 D-03, ASSESSMENT 연령대 4구간) */
+    static final Map<String, List<String>> GROUP_CODES = Map.of(
+            WORKER_TYPE, List.of("EMPLOYEE", "SELF_EMPLOYED", "FREELANCER"),
+            AGE_BAND, List.of("20S", "30S", "40S", "50_PLUS"));
+    static final List<String> GRADE_CODES = List.of("CAUTION", "STANDARD", "GOOD");
+    private static final List<String> STANDARD_OR_ABOVE = List.of("STANDARD", "GOOD");
+    private static final BigDecimal HUNDRED = new BigDecimal("100");
+
+    private final AdminStatsMapper mapper;
+    private final Clock clock;
+
+    public AdminStatsService(AdminStatsMapper mapper, Clock clock) {
+        this.mapper = mapper;
+        this.clock = clock;
+    }
+
+    /** ADM-03. groupBy를 생략하면 직군별, WORKER_TYPE·AGE_BAND 외의 값이면 400 INVALID_INPUT(field groupBy). */
+    public StatsResponse stats(String groupBy) {
+        String by = groupBy == null || groupBy.isBlank() ? WORKER_TYPE : groupBy;
+        if (!GROUP_CODES.containsKey(by)) {
+            String message = "구분은 WORKER_TYPE(직군별) 또는 AGE_BAND(연령대별)여야 합니다.";
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", message, List.of(new FieldErrorItem("groupBy", message)));
+        }
+        List<MemberScore> members = mapper.selectLatestScoredMembers();
+        long registered = mapper.selectRegisteredMemberCount();
+        long today = mapper.selectScoredCountSince(LocalDate.now(clock).atStartOfDay());
+        return build(by, members, registered, today);
+    }
+
+    /** 계산 본체(DB 없이 테스트). */
+    static StatsResponse build(String groupBy, List<MemberScore> members, long registeredMemberCount, long todayScoredCount) {
+        Function<MemberScore, String> key = WORKER_TYPE.equals(groupBy) ? MemberScore::getWorkerTypeCode : MemberScore::getAgeBandCode;
+        boolean enough = members.size() >= MIN_GROUP_SIZE;
+        Summary summary = new Summary(members.size(),
+                enough ? avgTrad(members) : null,
+                enough ? avgAlt(members) : null,
+                enough ? avgUplift(members) : null,
+                enough ? standardOrAboveRate(members) : null,
+                registeredMemberCount, todayScoredCount);
+
+        List<GroupStats> groups = new ArrayList<>();
+        for (String code : GROUP_CODES.get(groupBy)) {
+            List<MemberScore> group = members.stream().filter(m -> code.equals(key.apply(m))).toList();
+            boolean groupEnough = group.size() >= MIN_GROUP_SIZE;
+            groups.add(new GroupStats(code, group.size(),
+                    groupEnough ? avgTrad(group) : null,
+                    groupEnough ? avgAlt(group) : null,
+                    groupEnough ? avgUplift(group) : null,
+                    groupEnough ? standardOrAboveRate(group) : null,
+                    groupEnough ? gradeDistribution(group) : null));
+        }
+        return new StatsResponse(groupBy, MIN_GROUP_SIZE, summary, enough ? gradeDistribution(members) : null, groups);
+    }
+
+    /** 기존 점수 평균: 기존 모델로 산출된 회원만 */
+    static BigDecimal avgTrad(List<MemberScore> members) {
+        return average(members.stream().map(MemberScore::getTradScore).filter(v -> v != null).toList());
+    }
+
+    static BigDecimal avgAlt(List<MemberScore> members) {
+        return average(members.stream().map(MemberScore::getAltScore).filter(v -> v != null).toList());
+    }
+
+    /** 상승폭: 두 점수가 다 있는 회원의 (대안 − 기존) 평균 */
+    static BigDecimal avgUplift(List<MemberScore> members) {
+        return average(members.stream()
+                .filter(m -> m.getTradScore() != null && m.getAltScore() != null)
+                .map(m -> m.getAltScore() - m.getTradScore()).toList());
+    }
+
+    /** Standard 이상 비율(%): 대안 등급이 STANDARD·GOOD인 회원 ÷ 대상 회원 */
+    static BigDecimal standardOrAboveRate(List<MemberScore> members) {
+        long count = members.stream().filter(m -> STANDARD_OR_ABOVE.contains(m.getAltGradeBandCode())).count();
+        return rate(count, members.size());
+    }
+
+    /** 대안 등급 분포(CAUTION·STANDARD·GOOD 순서, 0명인 등급도 행이 있다) */
+    static List<GradeCount> gradeDistribution(List<MemberScore> members) {
+        List<GradeCount> out = new ArrayList<>();
+        for (String grade : GRADE_CODES) {
+            int count = (int) members.stream().filter(m -> grade.equals(m.getAltGradeBandCode())).count();
+            out.add(new GradeCount(grade, count, rate(count, members.size())));
+        }
+        return out;
+    }
+
+    private static BigDecimal average(List<Integer> values) {
+        if (values.isEmpty()) {
+            return null;
+        }
+        long sum = values.stream().mapToLong(Integer::longValue).sum();
+        return BigDecimal.valueOf(sum).divide(BigDecimal.valueOf(values.size()), 1, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal rate(long count, int total) {
+        if (total == 0) {
+            return null;
+        }
+        return BigDecimal.valueOf(count).multiply(HUNDRED).divide(BigDecimal.valueOf(total), 1, RoundingMode.HALF_UP);
+    }
+}

@@ -6,6 +6,7 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
+> - 🆕 11/20 (광희, FP-161) N-26-1~4 관리자 직군·연령별 통계 `GET /api/admin/stats`(ADM-03) 추가. D-26(11/06 UI대로)·D-28(탈퇴 회원 제외) 담당자 결정, 데이터는 서비스 회원별 최근 SCORED 평가, 5명 미만 그룹은 평균 숨김.
 > - 🆕 11/20 (광희, FP-239) N-16 자산·부채 저장값 `GET /api/members/me/financial-health`(DIAG-03-1) 추가: 총자산·연소득·총부채·연 원리금·보유 대출 목록, 미입력은 null. 정의서의 옛 경로 `GET /api/diagnosis/health`를 대신한다. 비율은 화면이 이 값으로 DIAG-03 POST를 불러 구한다. 같은 PR에서 DIAG-09 '밀림' 반영: `paymentStatus=DELAYED`면 최근 1년 30일 이상 연체 +1로 예상 점수를 구하고 응답에 `assumedDelinquencyCount`를 추가, `paymentStatusApplied`는 밀림일 때 `true`(범영 11/20 동의).
 > - 🆕 11/20 (동주, FP-160) N-15 같은 직군·연령대 회원 평균 `GET /api/members/me/peer-benchmark`(DIAG-01) 추가. 11/19 팀 결정대로 공공통계 대신 회원 표에서 계산한다. 정의서의 옛 경로 `/api/finance/peer-benchmark`·원천(FACT_*)은 범영 님이 정의서에 반영한다. DIAG-02(`/all`)는 쓰는 화면이 없어 만들지 않았다. PR 리뷰 반영: 미입력 자산·대출은 평균에서 빼고(O-15), 금액별 인원 3개를 추가했으며, 소득은 기준월 포함 최근 12개월만 쓴다.
 > - 🆕 11/20 (광희, FP-167) N-17 시나리오 테스트 API 2개 추가: `GET /api/members/me/scenario-base`(기준값)·`POST /api/members/me/scenario-recalculate`(상환 여력 재계산). 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다. 버틸 수 있는 개월 수의 "총자산 25%"는 임시 가정(팀 결정 대기). 금리 변화는 변동금리 대출의 상환액에만 반영하고 대출마다 금리 하한은 0%다(리뷰 반영, 고정 상환액은 줄지 않음).
@@ -681,6 +682,48 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 프론트: `features/simulation/api/simulationApi.js`의 `recalculateCreditCare({ changes })`. mock은 588점 예시에서 간단한 규칙으로 계산한다(진짜 모델 아님).
 
 - Spring 검사(11/18 구현): JSON 정수만 받는다. `12.0`처럼 소수점이 있는 값과 문자열(`"2"`)은 "0 이상의 정수를 입력해 주세요."로 막는다.
+
+## N-26-1~4 관리자 직군·연령별 통계 (ADM-03, FP-161, 담당 광희) 🆕 11/20
+
+관리자 "직군·연령별 통계" 화면(FP-162)에 쓴다. **D-26·D-28 담당자 결정(11/20, 광희)**:
+- 항목은 11/06 확정 UI대로 만든다: 요약, 대안 등급 분포, 직군별·연령대별 통계 표. 기능 명세 v3의 상자 그림·직군×연령 히트맵·통신비 연체 경험은 UI에 없어 만들지 않는다.
+- 데이터는 **서비스 회원의 최근 SCORED 평가 1건**이다(`ASSESSMENT`, `DATASET_CODE='SERVICE'`). 명세의 합성 고객 12,000명은 `ASSESSMENT`에 적재되지 않았고, 평가 표본(`MODEL_EVAL_SAMPLE`)에는 연령대가 없어 쓰지 않는다.
+- **탈퇴 회원(`WITHDRAWN`)의 평가는 뺀다.** 잠긴 회원(`LOCKED`)은 넣는다. DIAG-01 회원 평균·관리자 계정 목록과 같은 기준이다.
+
+### GET `/api/admin/stats?groupBy=WORKER_TYPE|AGE_BAND`
+
+- 관리자만(보안 설정: `/api/admin/**` = `ROLE_ADMIN`). 일반 회원 `403 FORBIDDEN`, 토큰 없음 `401`, 비밀번호 변경이 필요한 관리자 `403 PASSWORD_CHANGE_REQUIRED`.
+- `groupBy`: `WORKER_TYPE`(직군별, 생략하면 이것)·`AGE_BAND`(연령대별). 그 밖의 값은 `400 INVALID_INPUT`(`fieldErrors[0].field` = `groupBy`).
+- 대상 = 회원마다 가장 최근 SCORED 서비스 평가 1건(`ASSESSED_AT`이 같으면 `ASSESSMENT_ID`가 큰 것). 직군·연령대는 **평가 시점 값**이다.
+- 점수 평균·비율은 소수 첫째 자리(HALF_UP). **대상이 5명(`minGroupSize`)보다 적은 그룹(또는 전체)은 평균·비율·등급 분포가 `null`**이다(몇 명뿐이면 개인 점수가 드러난다, DIAG-01과 같은 기준). 인원 수는 보인다.
+- 응답 `200`:
+
+  | 필드 | 형식 | 설명 |
+  |---|---|---|
+  | `groupBy`, `minGroupSize` | 문자열, 정수 | 요청한 구분, 숨김 기준(5) |
+  | `summary.assessedMemberCount` | 정수 | 평가 고객 수(최근 SCORED 평가가 있는 회원, 탈퇴 제외) |
+  | `summary.avgTradScore`·`avgAltScore` | 소수 또는 `null` | 평균 기존·대안 점수. 기존은 기존 모델로 산출된 회원만 |
+  | `summary.avgScoreUplift` | 소수 또는 `null` | 상승폭 = 두 점수가 다 있는 회원의 (대안 − 기존) 평균 |
+  | `summary.standardOrAboveRatePct` | 소수 또는 `null` | Standard 이상 비율(%) = 대안 등급 STANDARD·GOOD ÷ 대상 |
+  | `summary.registeredMemberCount` | 정수 | 가입 회원 수(일반 회원, 탈퇴 제외, 관리자 계정은 세지 않음) |
+  | `summary.todayScoredCount` | 정수 | 오늘 산출: 오늘 0시(서버 시간 Asia/Seoul) 이후 저장된 서비스 SCORED 평가 수(탈퇴 제외). 관리자 전용 수치 |
+  | `gradeDistribution` | 배열 또는 `null` | 전체 대안 등급 분포 `[{ gradeBandCode, count, ratePct }]`, CAUTION·STANDARD·GOOD 순서(0명도 있음) |
+  | `groups[]` | 배열 | 직군 3개(`EMPLOYEE`·`SELF_EMPLOYED`·`FREELANCER`) 또는 연령대 4개(`20S`·`30S`·`40S`·`50_PLUS`)를 고정 순서로(0명도 있음). 각각 `groupCode`, `memberCount`, `avgTradScore`, `avgAltScore`, `avgScoreUplift`, `standardOrAboveRatePct`, `gradeDistribution` |
+
+  ```json
+  { "groupBy": "WORKER_TYPE", "minGroupSize": 5,
+    "summary": { "assessedMemberCount": 14, "avgTradScore": 636.9, "avgAltScore": 705.4, "avgScoreUplift": 68.8,
+                 "standardOrAboveRatePct": 71.4, "registeredMemberCount": 40, "todayScoredCount": 3 },
+    "gradeDistribution": [ { "gradeBandCode": "CAUTION", "count": 4, "ratePct": 28.6 }, { "gradeBandCode": "STANDARD", "count": 8, "ratePct": 57.1 },
+                           { "gradeBandCode": "GOOD", "count": 2, "ratePct": 14.3 } ],
+    "groups": [ { "groupCode": "EMPLOYEE", "memberCount": 6, "avgTradScore": 663.3, "avgAltScore": 720.0, "avgScoreUplift": 56.7,
+                  "standardOrAboveRatePct": 83.3, "gradeDistribution": [ … ] },
+                { "groupCode": "FREELANCER", "memberCount": 3, "avgTradScore": null, "avgAltScore": null, "avgScoreUplift": null,
+                  "standardOrAboveRatePct": null, "gradeDistribution": null } ] }
+  ```
+  (mock 예시값. `SELF_EMPLOYED` 행은 줄였다)
+- 알려진 한계: 평가마다 모델(0.1·0.2)과 등급 구간 버전이 다를 수 있다. 등급은 평가 때 저장된 값을 그대로 쓴다. 시연 DB에서 점수를 낸 회원이 적으면 대부분의 그룹이 5명 미만으로 비어 보인다.
+- 프론트: `features/admin/api/adminStatsApi.js`의 `getAdminStats({ groupBy })`. mock은 예시 회원 14명으로 같은 규칙대로 계산한다.
 
 ## N-30-1 금융 용어 사전 (HELP-01, FP-180, 담당 광희) 🆕 11/19
 
