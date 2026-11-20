@@ -7,7 +7,7 @@
 --     모델 파일 없이 바꾸면 모든 점수 요청이 503(MODEL_NOT_READY) → MODEL_ERROR로 저장된다.
 --  2. 이 DB에 FS-V1 기준 데이터가 있어야 한다(add_fs_v1_feature_set.sql + seed/avenue_seed_dim_feature_fs_v1.sql).
 --     아래 사전 확인이 없으면 멈추고 아무것도 바꾸지 않는다.
---  3. 공용 DB는 DB 담당이 팀에 알린 뒤 실행한다. 되돌리기는 rollback_model_to_dev_dummy.sql.
+--  3. 공용 DB는 전환 PR 작성자가 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」). 되돌리기는 rollback_model_to_dev_dummy.sql.
 --
 -- 순서가 중요하다: ACTIVE는 한 행만 허용(UX_MRG_ACTIVE)이라 DEV-DUMMY를 먼저 RETIRED로 바꾼 뒤 LGBM-BASE-0.1을 ACTIVE로 바꾼다.
 -- 이미 LGBM-BASE-0.1이 ACTIVE면 아무것도 바꾸지 않으므로 다시 실행해도 된다. 저장된 평가 행은 건드리지 않는다.
