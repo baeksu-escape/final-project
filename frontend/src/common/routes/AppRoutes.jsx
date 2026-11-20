@@ -28,6 +28,7 @@ import JobSelectPage from '../../features/dataInput/pages/JobSelectPage.jsx'
 import CreditReportPage from '../../features/credit/pages/CreditReportPage.jsx'
 import SimulationPage from '../../features/simulation/pages/SimulationPage.jsx'
 import MarketPage from '../../features/market/pages/MarketPage.jsx'
+import ScenarioPage from '../../features/scenario/pages/ScenarioPage.jsx'
 import AdminReportsPage from '../../features/admin/pages/AdminReportsPage.jsx'
 import LoungePage from '../../features/community/pages/LoungePage.jsx'
 import LoanProductsPage from '../../features/loans/pages/LoanProductsPage.jsx'
@@ -66,7 +67,7 @@ export default function AppRoutes() {
             <Route element={<RouteGuard requireScore />}>
               <Route path={PATHS.REPORT} element={<CreditReportPage />} />
               <Route path={PATHS.ASSET_DEBT} element={<PlaceholderPage title="자산·부채 건전성" nId="N-16" />} />
-              <Route path={PATHS.SCENARIO} element={<PlaceholderPage title="시나리오 테스트" nId="N-17" />} />
+              <Route path={PATHS.SCENARIO} element={<ScenarioPage />} />
               <Route path={PATHS.CASH_FLOW} element={<PlaceholderPage title="현금흐름·소득 변동성" nId="N-21·N-22" />} />
               <Route path={PATHS.MARKET} element={<MarketPage />} />
               <Route path={PATHS.SIMULATOR} element={<SimulationPage />} />
