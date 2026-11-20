@@ -14,6 +14,18 @@ CUTOFF_VERSION = "CUT-0.1"
 from training.config import FEATURE_SET_VERSION as REAL_FEATURE_SET_VERSION  # noqa: E402  "FS-V1"
 from training.config import MODEL_VERSION as REAL_MODEL_VERSION  # noqa: E402  "LGBM-BASE-0.1"
 
+# FP-237 실제 모델 버전은 서버가 불러온 모델 묶음의 meta.json(model_version)에서 정한다(11/20 범영 결정).
+# 그래서 0.1 묶음을 넣으면 0.1, 0.2 묶음을 넣으면 0.2로 동작하고, 코드를 먼저 병합해도 이미 0.1을 쓰는 서버가 깨지지 않는다.
+# REAL_MODEL_VERSION은 meta.json에 버전이 적혀 있지 않은 옛 묶음을 위한 기본값이다. 버전 이름은 아래 모양만 받는다.
+import re  # noqa: E402
+
+REAL_MODEL_VERSION_PATTERN = re.compile(r"LGBM-BASE-\d+\.\d+")
+
+
+def is_real_model_version(version: str | None) -> bool:
+    """실제 모델 버전 이름 모양(LGBM-BASE-숫자.숫자)인지. Mock(DEV-DUMMY)·알 수 없는 이름과 구분할 때 쓴다."""
+    return version is not None and REAL_MODEL_VERSION_PATTERN.fullmatch(version) is not None
+
 # 등급 구간 CUT-0.1 (decisions.md D-01 임시값: 0~664 / 665~779 / 780~1000).
 GRADE_BANDS = [
     {"gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 664},
