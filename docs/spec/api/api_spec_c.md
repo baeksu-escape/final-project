@@ -6,7 +6,11 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
+<<<<<<< HEAD
 > - 🆕 11/20 (동주, FP-184) N-25 모형 성능 비교 ADM-01 `GET /api/admin/model-performance`·ADM-02 `/roc` 구현. ACTIVE 모델의 평가 표본(`MODEL_EVAL_SAMPLE`)으로 계산하고, 표본이 없으면 409 `MODEL_EVAL_NOT_READY`(새 오류 code). 맨 아래 「N-25 모형 성능 비교」 절.
+=======
+> - 🆕 11/19 (광희, FP-180) N-30-1 용어 사전 `GET /api/glossary`(HELP-01) 추가, 기준 데이터 `docs/spec/sql/add_glossary_term.sql`(20개).
+>>>>>>> origin/develop
 > - 🆕 11/19 (광희, FP-170 추가 수정) 저장 데이터를 읽는 API 5개를 팀 공통 규칙대로 `/api/members/me/**`로 옮기고 옛 경로를 지웠다(우찬 님 합의): SIM-01 `credit-care-base`, SIM-02 `credit-care-recalculate`, DIAG-07-1 `income-volatility`, DIAG-08-1 `cash-flow-forecast`, DIAG-09 `cash-flow-expected-score`. 로그인 확인은 보안 설정이 한다(토큰 없음 401, 관리자 403). SIM-01에 `topReductionFactors`, DIAG-08-1에 기준값 3개(`baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`)를 추가했다(경환 님 요청).
 > - 🆕 11/18 (광희, FP-170) SIM-01 `credit-care/base`·DIAG-09 `cash-flow/expected-score` 추가, SIM-02 Spring 구현(출발 평가 = 최근 SCORED, 404 `ASSESSMENT_NOT_FOUND`).
 
@@ -523,6 +527,7 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 
 - Spring 검사(11/18 구현): JSON 정수만 받는다. `12.0`처럼 소수점이 있는 값과 문자열(`"2"`)은 "0 이상의 정수를 입력해 주세요."로 막는다.
 
+<<<<<<< HEAD
 ---
 
 ## N-25 모형 성능 비교 (ADM-01·02, FP-184, 담당 동주) 🆕 11/20
@@ -609,3 +614,37 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 | 409 | `MODEL_EVAL_NOT_READY` 🆕 | ACTIVE 모델이 없거나, ACTIVE 모델 버전의 평가 표본이 아직 없음(예: 공용 DB가 아직 `DEV-DUMMY`, 적재 SQL 미실행). 409 = 지금 상태로는 처리할 수 없음(B팀 명세서 용어집) | "지금 사용 중인 모델(LGBM-BASE-0.1)의 평가 표본이 아직 준비되지 않았습니다." |
 
 409가 나오면 DB 담당이 `create_model_eval_sample.sql`(표가 없을 때) → `load_model_eval_sample_lgbm_base_0_1.sql`을 실행하고, `MODEL_REGISTRY`에서 그 버전이 ACTIVE인지 본다. 모델을 다시 학습하면 새 `MODEL_VERSION`으로 평가 표본도 다시 적재해야 화면이 나온다.
+=======
+## N-30-1 금융 용어 사전 (HELP-01, FP-180, 담당 광희) 🆕 11/19
+
+| 메서드 | 경로 | 설명 | 데이터 출처 |
+|---|---|---|---|
+| GET | `/api/glossary` | 용어 사전 전체(용어·쉬운 말·뜻 풀이). 툴팁(N-30-2, FP-157)과 챗봇(N-32)이 쓴다 | DB `GLOSSARY_TERM` |
+
+- 인증: 로그인 필요(보안 설정 "그 밖의 `/api/**`"). 토큰이 없으면 `401 UNAUTHORIZED`다. 회원 데이터를 읽지 않으므로 관리자 계정도 부를 수 있다.
+- 요청 값은 없다. 사전 전체를 **용어 이름 순서**(`ORDER BY TERM`)로 한 번에 돌려준다(수십 행).
+- 사전이 비어 있어도 오류가 아니라 `{ "terms": [] }`다. 화면은 사전에 없는 말을 원래 말 그대로 보여 준다.
+- 기준 데이터: [`docs/spec/sql/add_glossary_term.sql`](../sql/add_glossary_term.sql)(합성 교육용 문구 20개, 다시 실행해도 됨). dummy_db 생성기에는 들어 있지 않아 DDL·시드 다음에 따로 실행한다. 공용 DB 실행은 병합 후 DB 담당(범영)이 한다.
+
+응답 `200`:
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `terms[]` | 배열 | 용어 목록 |
+| `terms[].term` | 문자열 | 화면에 나오는 금융 용어(최대 50자) |
+| `terms[].easyText` | 문자열 | 바꿔 보여 줄 쉬운 말(최대 200자) |
+| `terms[].explanation` | 문자열 또는 `null` | 툴팁에 보일 뜻 풀이(최대 1000자) |
+
+```json
+{
+  "terms": [
+    { "term": "DSR", "easyText": "1년 소득 중 빚 갚는 데 쓰는 돈의 비율", "explanation": "총부채원리금상환비율의 줄임말입니다. …" },
+    { "term": "원리금", "easyText": "갚아야 하는 원금과 이자를 합친 돈", "explanation": "빌린 돈(원금)과 그 돈을 빌린 대가(이자)를 합친 금액입니다. …" }
+  ]
+}
+```
+
+- `GLOSSARY_TERM.TERM_ID`는 화면이 쓰지 않아 보내지 않는다.
+- SHAP 용어 풀이는 "점수에 어떻게 반영됐는지"만 설명하고 원인처럼 쓰지 않는다(AGENTS.md 5장).
+- 프론트: `features/ai/api/glossaryApi.js`의 `getGlossary()`. mock은 시드 문구 5개를 같은 모양으로 돌려준다(로그인하지 않았으면 401).
+>>>>>>> origin/develop
