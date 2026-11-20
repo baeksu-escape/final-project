@@ -232,7 +232,7 @@
 - SIM-02 범위: 10개 키 모두 0 이상 정수, `TELECOM_ON_TIME_MONTHS`·`UTILITY_LATE_MONTHS`는 0~12. 나머지 상한은 화면 슬라이더 범위가 정해지면 추가한다. `EASYPAY_MONTHLY_COUNT`는 **월 횟수 그대로** 보낸다. 🟡 FastAPI ML-04가 지금은 × 12로 12개월 값을 만들지만, 변환 방식은 피처 정의서 9장에서 아직 정하지 않았다(코드 TODO). `null`은 키를 뺀 것과 같다.
 - SIM-02 응답 = ML-04 응답에서 `requestId`·`shap`을 빼고 감점 요인에 `featureName`을 더한다(그 평가의 `FEATURE_SET_VERSION`으로 `DIM_FEATURE` 조회. Mock `FS-DRAFT` 39개 / 실제 `FS-V1` 38개).
 - SIM-02 오류 전달: ML-04 422 → 400 `INVALID_INPUT`, 503 `MODEL_NOT_READY` → 503, 409 `VERSION_MISMATCH` → 409(점수를 다시 산출하라는 안내), 연결 실패·타임아웃·그 밖의 5xx → 503 `MODEL_NOT_READY`. 시뮬레이터는 저장하지 않으므로 NOT_SCORABLE로 저장하지 않는다.
-- SIM-04는 금리·한도·등급만 돌려주는 실제 API다. SIM-03(상품 3개 포함)을 만들 때는 SIM-04의 서비스(`ScoreBandOfferService.findOffer`)를 재사용한다.
+- SIM-04는 금리·한도·등급만 돌려주는 실제 API다. SIM-03은 만들지 않고, 시뮬레이터의 상품 추천은 화면이 SIM-04와 LOAN-01(대출 상품 목록, 경환 FP-90)을 합쳐 보여 준다. 🆕 11/20
 
 ### 2-7. 대출 상품 — 담당 경환 (FP-90, PR #101) 🆕 11/20
 
