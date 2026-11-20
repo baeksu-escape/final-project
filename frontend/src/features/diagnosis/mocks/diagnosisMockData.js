@@ -73,6 +73,20 @@ export const SAMPLE_EXPECTED_SCORE_BASE = Object.freeze({
   expensePointPerPercent: 0.5, // 월 지출이 1% 늘 때 −0.5점
 })
 
+// FP-239 N-16 DIAG-03-1 자산·부채 저장값 mock. 연소득은 위 현금흐름 예시(시드 회원 2번)의 월 평균 × 12에 가깝게 둔 예시값이고,
+// 총자산·대출은 아래 시나리오 기준값 예시와 같다(변동금리 1,200만 원 월 20만 원 + 고정금리 월 15만 원 = 월 35만 원). 실제 저장 데이터 아님.
+export const SAMPLE_MEMBER_FINANCIAL_HEALTH = Object.freeze({
+  baseMonth: '2026-08',
+  totalAssetAmount: 30000000,
+  annualIncomeAmount: 25193976,
+  totalDebtAmount: 15000000,
+  annualPaymentAmount: 4200000,
+  loans: Object.freeze([
+    Object.freeze({ loanId: 101, loanTypeCode: 'CREDIT', loanTypeName: '신용대출', balanceAmount: 12000000, annualRatePct: 5, rateTypeCode: 'VARIABLE', remainingMonths: 36, monthlyPaymentAmount: 200000 }),
+    Object.freeze({ loanId: 102, loanTypeCode: 'CARD_LOAN', loanTypeName: '카드론', balanceAmount: 3000000, annualRatePct: 7.2, rateTypeCode: 'FIXED', remainingMonths: 24, monthlyPaymentAmount: 150000 }),
+  ]),
+})
+
 // N-17-1 DIAG-04 시나리오 기준값 mock. 소득·지출은 위 현금흐름 예시(시드 회원 2번)와 같고,
 // 상환액·변동금리 대출·총자산은 금리 변화를 화면에서 볼 수 있게 넣은 예시값이다(실제 저장 데이터 아님).
 // 정책금리는 develop의 한국은행 기준금리 적재 SQL의 가장 최근 값이다. 버틸 개월 수는 서버와 같은 총자산 25% 가정(TODO 팀 결정).

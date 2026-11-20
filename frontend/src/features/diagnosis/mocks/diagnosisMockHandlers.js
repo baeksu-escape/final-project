@@ -10,6 +10,7 @@ import {
   SAMPLE_INCOME_VOLATILITY,
   SAMPLE_MONTHLY_INCOMES,
   SAMPLE_SCENARIO_BASE,
+  SAMPLE_MEMBER_FINANCIAL_HEALTH,
 } from './diagnosisMockData.js'
 
 // N-20-4 DSR(연소득 대비 연원리금 상환비율) 및 위험 단계 계산
@@ -279,6 +280,12 @@ function handleExpectedScore({ body, token }) {
 }
 
 // N-17-1 DIAG-04 시나리오 기준값 mock — 실제 API(GET /api/members/me/scenario-base)와 같은 모양이다.
+// FP-239 N-16 DIAG-03-1 자산·부채 저장값 mock — 실제 API처럼 로그인하지 않았으면 401, 응답 모양은 실제와 같다.
+function handleMemberFinancialHealth({ token }) {
+  requireMockUser(token)
+  return structuredClone(SAMPLE_MEMBER_FINANCIAL_HEALTH)
+}
+
 function handleScenarioBase({ token }) {
   requireMockUser(token) // 실제 API처럼 로그인하지 않았으면 401
   const b = SAMPLE_SCENARIO_BASE
@@ -373,5 +380,6 @@ registerMockHandlers({
   'POST /api/members/me/cash-flow-expected-score': handleExpectedScore,
   'GET /api/members/me/scenario-base': handleScenarioBase,
   'POST /api/members/me/scenario-recalculate': handleMemberScenarioRecalculate,
+  'GET /api/members/me/financial-health': handleMemberFinancialHealth,
 })
 

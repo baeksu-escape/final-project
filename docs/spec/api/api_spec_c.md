@@ -6,6 +6,7 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
+> - 🆕 11/20 (광희, FP-239) N-16 자산·부채 저장값 `GET /api/members/me/financial-health`(DIAG-03-1) 추가: 총자산·연소득·총부채·연 원리금·보유 대출 목록, 미입력은 null. 정의서의 옛 경로 `GET /api/diagnosis/health`를 대신한다. 비율은 화면이 이 값으로 DIAG-03 POST를 불러 구한다.
 > - 🆕 11/20 (동주, FP-160) N-15 같은 직군·연령대 회원 평균 `GET /api/members/me/peer-benchmark`(DIAG-01) 추가. 11/19 팀 결정대로 공공통계 대신 회원 표에서 계산한다. 정의서의 옛 경로 `/api/finance/peer-benchmark`·원천(FACT_*)은 범영 님이 정의서에 반영한다. DIAG-02(`/all`)는 쓰는 화면이 없어 만들지 않았다. PR 리뷰 반영: 미입력 자산·대출은 평균에서 빼고(O-15), 금액별 인원 3개를 추가했으며, 소득은 기준월 포함 최근 12개월만 쓴다.
 > - 🆕 11/20 (광희, FP-167) N-17 시나리오 테스트 API 2개 추가: `GET /api/members/me/scenario-base`(기준값)·`POST /api/members/me/scenario-recalculate`(상환 여력 재계산). 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다. 버틸 수 있는 개월 수의 "총자산 25%"는 임시 가정(팀 결정 대기). 금리 변화는 변동금리 대출의 상환액에만 반영하고 대출마다 금리 하한은 0%다(리뷰 반영, 고정 상환액은 줄지 않음).
 > - 🆕 11/19 (광희, FP-180) N-30-1 용어 사전 `GET /api/glossary`(HELP-01) 추가, 기준 데이터 `docs/spec/sql/add_glossary_term.sql`(20개).
@@ -400,8 +401,9 @@
 |---|---|---|---|
 | POST | `/api/diagnosis/dsr/calculate` | N-20-4 DSR·위험 단계 | 요청 본문 |
 | POST | `/api/diagnosis/financial-health/calculate` | N-16-1·2 건전성 지표, N-16-3 값 바꿔 보기 | 요청 본문 |
+| GET | `/api/members/me/financial-health` 🆕 11/20 | N-16-1·2·4 내 저장값(DIAG-03-1, FP-239) | 저장 데이터 (아래 「DIAG-03-1」) |
 
-- 두 API 모두 **DB를 읽지 않고 받은 값으로 계산만** 한다. 저장 데이터 조회 연결(N-16·N-20 "저장 데이터 조회")은 후속 작업이다.
+- 위 두 POST API는 **DB를 읽지 않고 받은 값으로 계산만** 한다. 저장값은 DIAG-03-1이 돌려주고, 화면은 그 값으로 POST를 불러 비율·위험 단계를 구한다.
 - 상환 부담률(N-16-1)과 DSR(N-20-4)은 백엔드 `FinancialHealthCalculator.calculateRepaymentBurdenRatio()` **함수 하나를 함께 쓴다**.
 - 비율은 `금액 ÷ 기준 × 100`이다. BigDecimal로 계산해 소수 둘째 자리에서 반올림(HALF_UP)한다.
 - 오류: 금액이 음수이면 `400 INVALID_INPUT`이고 `fieldErrors[0].field`에 그 필드 이름(예: `totalAsset`)이 담긴다. DSR API는 연소득이 0이어도 `400`이다(`field`: `annualIncome`).
@@ -476,6 +478,31 @@
 ```
 
 프론트: `features/diagnosis/api/diagnosisApi.js`의 `calculateDsr(payload)`, `calculateFinancialHealth(payload)`. mock도 백엔드와 같은 규칙으로 계산한다.
+
+### GET `/api/members/me/financial-health` — DIAG-03-1 자산·부채 저장값 (FP-239) 🆕 11/20
+
+로그인 회원의 **저장된 값**을 돌려준다. 비율·위험 단계는 계산하지 않는다(화면이 이 값으로 위 POST를 부른다). 같은 직군 평균(`peer`)은 넣지 않는다. 화면이 DIAG-01(`/peer-benchmark`)의 `sameWorkerType`을 붙인다(경환 님 11/20).
+
+- 로그인한 일반 회원만(보안 설정: 토큰 없음 401, 관리자 403). 회원은 토큰에서 꺼내고 쿼리·본문은 없다.
+- 기준월 = 그 회원의 가장 늦은 소득월(DIAG-07-1·08-1·N-17과 같음). 미입력은 0원으로 바꾸지 않고 `null`이다(O-15 A안, DIAG-01과 같은 규칙).
+
+  | 필드 | 값 | 미입력이면 |
+  |---|---|---|
+  | `baseMonth` | 기준월 `"YYYY-MM"` | — |
+  | `totalAssetAmount` | 기준월 `USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT` | `null`(자산 행 없음·NULL) |
+  | `annualIncomeAmount` | N-20-3 공유 함수 `calculateAnnualIncome`로 기준월 포함 최근 12개월(달력)의 합. 급여소득자는 월급을 12개월로 펼치므로 월급 × 12 | `null`(자영업자·프리랜서가 12개 달을 다 채우지 않음. 일부 합으로 연소득을 낮게 보이지 않게 한다) |
+  | `totalDebtAmount` | 기준월 대출이 있으면 `BALANCE_AMT` 합, 대출 행이 없고 `NO_LOAN_YN='Y'`(해당 없음)면 0 | `null`(둘 다 아님) |
+  | `annualPaymentAmount` | 같은 규칙으로 `MONTHLY_PAYMENT_AMT` 합 × 12, 해당 없음은 0 | `null` |
+  | `loans[]` | N-16-4 보유 대출(기준월, `LOAN_ID` 순): `loanId`, `loanTypeCode`, `loanTypeName`(`DIM_LOAN_TYPE`), `balanceAmount`, `annualRatePct`(연 %), `rateTypeCode`(`FIXED`·`VARIABLE`·`UNKNOWN`), `remainingMonths`, `monthlyPaymentAmount` | 빈 배열 |
+
+  ```json
+  { "baseMonth": "2026-08", "totalAssetAmount": 30000000, "annualIncomeAmount": 25193976,
+    "totalDebtAmount": 15000000, "annualPaymentAmount": 4200000,
+    "loans": [ { "loanId": 101, "loanTypeCode": "CREDIT", "loanTypeName": "신용대출", "balanceAmount": 12000000,
+                 "annualRatePct": 5.0, "rateTypeCode": "VARIABLE", "remainingMonths": 36, "monthlyPaymentAmount": 200000 } ] }
+  ```
+- 오류: `404 NOT_FOUND` "저장된 소득 데이터가 없습니다."(다른 저장값 API와 같음). 401·403은 위와 같다.
+- 프론트: `diagnosisApi.js`의 `getMemberFinancialHealth()`. mock은 예시값이다(총자산·대출은 N-17 시나리오 기준값 예시와 같다).
 
 ---
 

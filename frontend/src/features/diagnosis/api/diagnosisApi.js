@@ -13,6 +13,7 @@ export const DIAGNOSIS_API = Object.freeze({
   EXPECTED_SCORE: '/api/members/me/cash-flow-expected-score',
   SCENARIO_BASE: '/api/members/me/scenario-base',
   MEMBER_SCENARIO_RECALCULATE: '/api/members/me/scenario-recalculate',
+  MEMBER_FINANCIAL_HEALTH: '/api/members/me/financial-health',
 })
 
 // N-22 로그인한 회원의 저장된 최근 12개월 소득으로 변동성 지표·성수기·비수기 격차·소득 부족 달을 조회한다.
@@ -55,6 +56,14 @@ export function calculateFinancialHealth(payload) {
 // 옛 mock 전용 함수다(서버에는 이 경로가 없다). 저장 데이터로 계산하는 실제 API는 아래 recalculateMemberScenario를 쓴다.
 export function recalculateScenario(payload) {
   return apiPost(DIAGNOSIS_API.RECALCULATE_SCENARIO, payload)
+}
+
+// FP-239 N-16-1·2·4 DIAG-03-1 로그인 회원의 자산·부채 저장값(기준월 = 가장 늦은 소득월). 비율·위험 단계는 이 값으로 calculateFinancialHealth를 부른다.
+// 응답: { baseMonth, totalAssetAmount, annualIncomeAmount, totalDebtAmount, annualPaymentAmount,
+//         loans: [{ loanId, loanTypeCode, loanTypeName, balanceAmount, annualRatePct, rateTypeCode, remainingMonths, monthlyPaymentAmount }] }
+// 미입력은 0이 아니라 null이다(총자산 미입력, 대출 미입력. 대출 "해당 없음"은 0). 자영업자·프리랜서가 최근 12개월을 다 채우지 않았으면 연소득이 null. 저장된 소득이 없으면 404.
+export function getMemberFinancialHealth() {
+  return apiGet(DIAGNOSIS_API.MEMBER_FINANCIAL_HEALTH)
 }
 
 // N-17-1 DIAG-04 로그인 회원의 시나리오 기준값(월 소득 12개월 평균·지출·상환액, 변동금리 대출 잔액, 총자산, 현재 정책금리, 계산 가정).
