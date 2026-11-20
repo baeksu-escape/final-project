@@ -14,13 +14,15 @@ const ROWS = [
   { key: 'monthlySurplusAmount', label: '월 잉여', surplus: true },
 ]
 
-// N-17-5 현재와 시나리오 결과를 나란히 보여 준다(월 잉여·상환 부담률·월 이자 변화·비교 막대·판정). 값은 계산 함수 결과 그대로다.
-export default function ScenarioResult({ result }) {
+// N-17-5 현재와 시나리오 결과 및 서버 계산 가정을 함께 보여 준다.
+export default function ScenarioResult({ result, assumptions, stale }) {
   const { current, changed } = result
   const max = Math.max(1, ...ROWS.flatMap((row) => [current[row.key], changed[row.key]]).filter(Number.isFinite).map(Math.abs))
   const width = (value) => `${Number.isFinite(value) ? Math.min(100, (Math.abs(value) / max) * 100) : 0}%`
   return (
     <Card title="결과" className="sc-result">
+      {/* 안내가 나타나도 화면이 밀리지 않게 자리를 둔다. */}
+      <p className="sc-warn" aria-live="polite">{stale ? '위 결과는 이전 조건 기준입니다. 계산이 끝나면 바뀝니다.' : '\u00a0'}</p>
       <div className="sc-kpis">
         <div className="sc-kpi">
           <span className="sc-hint">이 상황의 월 잉여</span>
@@ -52,6 +54,7 @@ export default function ScenarioResult({ result }) {
       </div>
       <Verdict result={result} />
       <p className="sc-hint">단위 원 · 원리금은 입력한 대출 기준, 월 고정 지출에는 할부·정기결제를 포함합니다. 시연용 계산이며 실제 심사 결과가 아닙니다.</p>
+      {assumptions.length > 0 && <ul className="sc-hint">{assumptions.map((item, index) => <li key={index}>{item}</li>)}</ul>}
     </Card>
   )
 }
@@ -64,7 +67,7 @@ function Verdict({ result }) {
       <p className="sc-box sc-box--warn">
         이 상황이면 매달 <strong>{won(-changed.monthlySurplusAmount)}</strong>이 모자랍니다.{' '}
         {Number.isInteger(result.survivableMonths)
-          ? <>바로 쓸 수 있는 돈을 자산의 25%로 보면 약 <strong>{result.survivableMonths}개월</strong> 버틸 수 있습니다.</>
+          ? <>약 <strong>{result.survivableMonths}개월</strong> 버틸 수 있습니다.</>
           : '총자산 정보가 없어 버틸 수 있는 기간은 계산하지 않습니다.'}
       </p>
     )
