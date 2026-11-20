@@ -1,6 +1,8 @@
 // N-20 DSR 계산 및 N-17 시나리오 상환 여력 재계산 mock 핸들러
 import { registerMockHandlers, requireMockUser } from '../../../common/mocks/mockHandlers.js'
 import { ApiError } from '../../../common/api/ApiError.js'
+import { ROLES } from '../../../common/config/roles.js'
+import { createFinanceMockData } from './financeMockData.js'
 import {
   evaluateDsrRisk,
   evaluateHealthLevel,
@@ -283,6 +285,18 @@ function handleExpectedScore({ body, token }) {
   }
 }
 
+// N-15-3 로그인 회원의 직군별 시연 평균을 회원 평균 API 형태로 제공한다.
+function handlePeerBenchmark({ token }) {
+  const user = requireMockUser(token)
+  if (user.role === ROLES.ADMIN) throw new ApiError(403, '일반 회원만 이용할 수 있습니다.')
+  const empty = { memberCount: null, annualIncomeAmount: null, totalAssetAmount: null, totalDebtAmount: null }
+  const counts = { EMPLOYEE: 120, SELF_EMPLOYED: 80, FREELANCER: 60 }
+  const sameWorkerType = counts[user.jobType]
+    ? { memberCount: counts[user.jobType], ...createFinanceMockData(user.jobType).asset.peer }
+    : { ...empty }
+  return { workerTypeCode: user.jobType, ageBandCode: null, sameWorkerType, sameAgeBand: { ...empty } }
+}
+
 // FP-239 N-16 DIAG-03-1 자산·부채 저장값 mock — 실제 API처럼 로그인하지 않았으면 401, 응답 모양은 실제와 같다.
 function handleMemberFinancialHealth({ token }) {
   requireMockUser(token)
@@ -376,6 +390,7 @@ function handleMemberScenarioRecalculate({ body, token }) {
 
 // mock 핸들러 등록
 registerMockHandlers({
+  'GET /api/members/me/peer-benchmark': handlePeerBenchmark,
   'POST /api/diagnosis/dsr/calculate': handleDsrCalculate,
   'POST /api/diagnosis/scenario/recalculate': handleScenarioRecalculate,
   'POST /api/diagnosis/financial-health/calculate': handleFinancialHealth,
