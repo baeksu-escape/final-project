@@ -5,7 +5,7 @@ const FIELDS = [{ key: 'annualIncomeAmount', label: '연소득' }, { key: 'total
 // N-15-3 같은 직군 회원 평균을 비교한다. 공통 막대에는 유효한 값만 전달한다.
 export default function AssetDebtPeerComparison({ values, peer }) {
   return <Card title="같은 직군 평균과 비교" className="ad-peer">
-    <p className="ad-hint">{peer?.memberCount ? `같은 직군 회원 ${peer.memberCount.toLocaleString('ko-KR')}명의 평균입니다.` : '같은 직군 평균을 계산할 회원이 부족합니다.'} 단위: 원</p>
+    <p className="ad-hint">{peer?.memberCount ? '같은 직군 회원 중 입력한 회원의 평균입니다.' : '같은 직군 평균을 계산할 회원이 부족합니다.'} 단위: 원</p>
     <div className="ad-peer__items">{FIELDS.map(({ key, label }) => {
       const myValue = values?.[key]
       const avgValue = peer?.[key]
