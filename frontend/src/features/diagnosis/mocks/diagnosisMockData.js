@@ -73,6 +73,25 @@ export const SAMPLE_EXPECTED_SCORE_BASE = Object.freeze({
   expensePointPerPercent: 0.5, // 월 지출이 1% 늘 때 −0.5점
 })
 
+// N-17-1 DIAG-04 시나리오 기준값 mock. 소득·지출은 위 현금흐름 예시(시드 회원 2번)와 같고,
+// 상환액·변동금리 대출·총자산은 금리 변화를 화면에서 볼 수 있게 넣은 예시값이다(실제 저장 데이터 아님).
+// 정책금리는 develop의 한국은행 기준금리 적재 SQL의 가장 최근 값이다. 버틸 개월 수는 서버와 같은 총자산 25% 가정(TODO 팀 결정).
+export const SAMPLE_SCENARIO_BASE = Object.freeze({
+  monthlyIncomeAmount: 2099498,
+  monthlyExpenseAmount: 1315514,
+  monthlyPaymentAmount: 350000,
+  variableLoanBalanceAmount: 12000000,
+  totalAssetAmount: 30000000,
+  policyRate: Object.freeze({ baseDate: '2026-10-31', ratePct: 3 }),
+  survivableAssetRatioPct: 25,
+  assumptions: Object.freeze([
+    '금리 변화는 변동금리 대출 잔액에만 반영하고, 고정금리·금리 방식을 모르는 대출은 반영하지 않습니다.',
+    '월 이자 변화는 변동금리 대출 잔액 × 금리 변화 ÷ 12로 간단히 어림한 값입니다.',
+    '적자가 나면 총자산의 25%를 부족액에 쓸 수 있다고 가정해 버틸 수 있는 개월 수를 계산합니다.',
+    '월 소득은 최근 12개월 평균입니다.',
+  ]),
+})
+
 // N-22 GET /api/members/me/income-volatility 응답 예시. 불리언은 실제 응답처럼 is 없이 highVolatility로 쓴다.
 export const SAMPLE_INCOME_VOLATILITY = Object.freeze({
   meanIncome: 2099498,

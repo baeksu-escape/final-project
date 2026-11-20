@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- N-17-1·N-17-2 시나리오 테스트용 저장 데이터 조회 (FP-167). 기준월은 소득 기준월(USER_INCOME_MONTH의 가장 늦은 달)로 현금흐름 전망과 같다 -->
+<mapper namespace="com.baeksuescape.finance.mapper.ScenarioMapper">
+
+    <!-- 금리 변화를 반영할 변동금리 대출 잔액 합계. 고정(FIXED)·금리 방식 모름(UNKNOWN)은 빼고, 대출이 없으면 0 -->
+    <select id="selectLatestVariableLoanBalance" resultType="long">
+        SELECT NVL(SUM(BALANCE_AMT), 0)
+          FROM USER_LOAN
+         WHERE USER_ID = #{userId}
+           AND RATE_TYPE_CODE = 'VARIABLE'
+           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
+    </select>
+
+    <!-- 버틸 수 있는 개월 수 계산용 총자산. 행이 없거나 미입력(NULL)이면 NULL을 그대로 돌려준다(0으로 바꾸지 않음) -->
+    <select id="selectLatestTotalAsset" resultType="java.lang.Long">
+        SELECT MAX(TOTAL_ASSET_AMT)
+          FROM USER_ASSET_SNAPSHOT
+         WHERE USER_ID = #{userId}
+           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
+    </select>
+
+    <!-- 시나리오 출발 금리: 한국은행 기준금리 중 기준일이 가장 늦은 1행 (DDL 주석 FACT_POLICY_RATE.BASE_DATE) -->
+    <select id="selectLatestPolicyRate" resultType="com.baeksuescape.finance.dto.scenario.PolicyRateRow">
+        SELECT BASE_DATE AS baseDate, RATE_PCT AS ratePct
+          FROM FACT_POLICY_RATE
+         WHERE RATE_NAME = '한국은행 기준금리'
+         ORDER BY BASE_DATE DESC
+         FETCH FIRST 1 ROWS ONLY
+    </select>
+</mapper>
