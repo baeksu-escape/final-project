@@ -11,6 +11,8 @@ export const DIAGNOSIS_API = Object.freeze({
   INCOME_VOLATILITY: '/api/members/me/income-volatility',
   CASH_FLOW_FORECAST: '/api/members/me/cash-flow-forecast',
   EXPECTED_SCORE: '/api/members/me/cash-flow-expected-score',
+  SCENARIO_BASE: '/api/members/me/scenario-base',
+  MEMBER_SCENARIO_RECALCULATE: '/api/members/me/scenario-recalculate',
 })
 
 // N-22 로그인한 회원의 저장된 최근 12개월 소득으로 변동성 지표·성수기·비수기 격차·소득 부족 달을 조회한다.
@@ -50,7 +52,22 @@ export function calculateFinancialHealth(payload) {
 }
 
 // N-17-4 금리·소득·지출 변화에 따른 월 잉여금 및 상환 여력 재계산 (N-17-3, N-21-4 공통)
+// 옛 mock 전용 함수다(서버에는 이 경로가 없다). 저장 데이터로 계산하는 실제 API는 아래 recalculateMemberScenario를 쓴다.
 export function recalculateScenario(payload) {
   return apiPost(DIAGNOSIS_API.RECALCULATE_SCENARIO, payload)
+}
+
+// N-17-1 DIAG-04 로그인 회원의 시나리오 기준값(월 소득 12개월 평균·지출·상환액, 변동금리 대출 잔액, 총자산, 현재 정책금리, 계산 가정).
+// 응답: { monthlyIncomeAmount, monthlyExpenseAmount, monthlyPaymentAmount, variableLoanBalanceAmount, totalAssetAmount, policyRate: { baseDate, ratePct }, assumptions }
+// 총자산 미입력이면 totalAssetAmount, 정책금리 데이터가 없으면 policyRate가 null이다. 저장된 소득이 없으면 404.
+export function getScenarioBase() {
+  return apiGet(DIAGNOSIS_API.SCENARIO_BASE)
+}
+
+// N-17-2~5 DIAG-04 금리·소득·지출 변화를 반영한 상환 여력(지금·조건 반영 후 나란히). 점수는 구하지 않고 저장하지 않는다.
+// condition: { ratePctPoint(-5~10 %p), incomePct(-100~100 %), expensePct(-50~100 %) } — 생략하면 0(변화 없음).
+// 응답: { current, changed, monthlyInterestChangeAmount, surplusDiffAmount, survivableMonths, verdict, assumptions }
+export function recalculateMemberScenario(condition = {}) {
+  return apiPost(DIAGNOSIS_API.MEMBER_SCENARIO_RECALCULATE, condition)
 }
 
