@@ -14,7 +14,7 @@ export default function SimulationResult({ currentScore, result, stale }) {
     return (
       <Card title="예상 대안 점수" className="sim-result">
         <p className="sim-big">{currentScore ?? '—'}</p>
-        <p className="sim-hint">지금 대안 점수입니다. 조건을 바꾸면 입력이 멈춘 뒤 자동으로 결과가 나옵니다.</p>
+        <p className="sim-hint">지금 대안 점수입니다. 조건을 바꾸고 계산하기를 누르면 결과가 나옵니다.</p>
       </Card>
     )
   }
