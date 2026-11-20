@@ -15,11 +15,8 @@
 > 5. 2-9 **용어 사전 HELP-01 ✅**(FP-180 PR #108)
 > 6. 2-5 **DIAG-01 ✅ 경로 `/api/members/me/peer-benchmark`·원천 회원 표(동주, FP-160 PR #120)**, DIAG-02·05 ⛔(쓰는 화면 없음 / `scenario-base`가 기준금리 제공), 2-10 ADM-01·02 쿼리·담당 FP-184
 > 7. 2-5 **(광희, FP-239)** DIAG-03-1 자산·부채 저장값 `GET /api/members/me/financial-health` ✅, DIAG-04 시나리오 새 경로 2개 ✅(PR #118), DIAG-09 '밀림' 반영(연체 +1, `assumedDelinquencyCount`). 이번부터 API를 만든 사람이 PR에서 정의서를 같이 고친다(범영 11/20)
-<<<<<<< HEAD
-> 8. 2-10 **모형 성능 비교 ADM-01·02 ✅(동주, FP-184)** — ACTIVE 모델(지금 0.2)의 평가 표본 기준
-=======
 > 8. 2-2·2-3 **(우찬, FP-227)** MEM-05 입력 저장 전 직군 다시 고르기·409 `JOB_TYPE_LOCKED`, INP-02 자산 4종 각각 저장(DDL C13)
->>>>>>> 104031b7f4bea18adc3e64b6ebc0145408c7ace7
+> 9. 2-10 **모형 성능 비교 ADM-01·02 ✅(동주, FP-184)** — ACTIVE 모델(지금 0.2)의 평가 표본 기준
 >
 > 이전 변경 (11/19): FP-219 AUTH-13~15·AUTH-06 휴대폰 인증 필수, FP-170 SIM-01·02·DIAG-09 ✅, 1-2 C팀 오류 표 정리
 > 이전 변경 (11/18): 저장소 `docs/spec/api/`로 이관, PR #83(DIAG-07 표준편차·DIAG-08 `months[]`·전망 조건) 반영, 간편결제 × 12 🟡 정정, `isXxx` 필드 규칙
