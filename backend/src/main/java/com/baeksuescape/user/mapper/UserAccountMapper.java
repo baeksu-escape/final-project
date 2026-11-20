@@ -57,6 +57,13 @@ public interface UserAccountMapper {
     // N-05-1 직군 첫 선택 — 직군이 비어 있을 때만 저장한다. 바뀐 행 수(0이면 이미 선택됨).
     int updateWorkerTypeIfEmpty(@Param("userId") long userId, @Param("workerTypeCode") String workerTypeCode, @Param("now") LocalDateTime now);
 
+    // FP-227 N-05-1 저장 전 직군 변경 — 지금 직군이 fromCode일 때만 toCode로 바꾼다. 바뀐 행 수(0이면 그사이 다른 요청이 바꿈).
+    int updateWorkerTypeFrom(@Param("userId") long userId, @Param("fromCode") String fromCode, @Param("toCode") String toCode,
+            @Param("now") LocalDateTime now);
+
+    // FP-227 직군 변경 잠금 판단 — 점수 산출 결과와 관계없이 이 회원의 평가(ASSESSMENT) 행 수.
+    int countAssessments(@Param("userId") long userId);
+
     // 같은 회원의 쓰기 요청을 한 줄로 세운다 — 트랜잭션 맨 앞에서 회원 행을 잠그고(FOR UPDATE), 커밋·롤백 때 풀린다.
     // 동시에 들어온 동의·불러오기·입력 저장·탈퇴가 서로 끼어들어 행이 중복되는 것을 막는다(PR #52 리뷰 4·5, DB 제약 대신). 회원이 없으면 null.
     Long lockUser(@Param("userId") long userId);

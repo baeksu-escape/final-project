@@ -38,6 +38,15 @@ const REQUEST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 // 'NETWORK_ERROR_ONCE' 시나리오에서 연결 실패를 이미 한 번 냈는지.
 let networkErrorShown = false
 
+// FP-227 MEM-05 입력을 저장한 뒤(또는 평가가 있을 때) 다른 직군으로 바꾸려 할 때의 오류 코드.
+const JOB_TYPE_LOCKED_CODE = 'JOB_TYPE_LOCKED'
+
+// FP-227 이 회원의 평가가 있는지 — 점수 산출 결과가 하나라도 있거나, 처음부터 점수가 있는 데모 계정이면 있다고 본다.
+function hasMockAssessment(user) {
+  if (user.hasScore === true) return true
+  return [...scoreResults.values()].some((result) => result.userId === user.userId)
+}
+
 // 문자열로 정해지는 min~max 정수 — 같은 요청이면 같은 mock 점수가 나온다. 실제 점수 계산이 아니다.
 function mockScore(seedText, min, max) {
   let hash = 0
@@ -147,12 +156,16 @@ function registerConsentDeleteHandler(consentId) {
 }
 
 registerMockHandlers({
-  // N-05-1 직군 저장 — 직군이 없는 일반 사용자만 저장할 수 있다. 직군 변경은 팀 결정 전이라 막는다.
+  // N-05-1 직군 저장(MEM-05, FP-227 서버 규칙과 같음) — 비어 있으면 저장, 같은 직군이면 그대로, 다른 직군이면 저장한 입력도 평가도 없을 때만 바꾼다.
+  // mock에서 '평가 있음'은 이 회원의 점수 산출 결과가 있거나 처음부터 점수가 있는 데모 계정(hasScore)일 때다.
   'PATCH /api/members/me/job-type': ({ body, token }) => {
     const user = patchMockAccountUser(token)
     if (user.role !== ROLES.USER) throw new ApiError(403, '일반 사용자만 직군을 선택할 수 있습니다.')
     if (!Object.values(JOB_TYPES).includes(body?.jobType)) throw new ApiError(400, '직군을 선택해 주세요.')
-    if (user.jobType) throw new ApiError(409, '이미 직군이 선택되어 있습니다.')
+    if (user.jobType === body.jobType) return { user }
+    if (user.jobType && (savedInputs.has(user.userId) || hasMockAssessment(user))) {
+      throw new ApiError(409, '입력을 저장한 뒤에는 직군을 바꿀 수 없습니다.', { code: JOB_TYPE_LOCKED_CODE })
+    }
     return { user: patchMockAccountUser(token, { jobType: body.jobType }) }
   },
 

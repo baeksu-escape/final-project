@@ -79,6 +79,23 @@ export function createEmptyValues(sections, baseMonth = defaultBaseMonth(section
   return values
 }
 
+// FP-227 화면에 보일 최소 줄 맞추기 — 설정에 minRows가 있는 줄 섹션(대출)은 "없음" 체크가 풀려 있고 줄이 모자라면 빈 줄을 채운다.
+// 처음 값·서버 저장본·임시저장본·[삭제]·체크 해제가 모두 이 함수를 지나므로 같은 규칙이 된다(DataInputPage가 화면 값을 바꿀 때마다 부른다).
+// 채운 줄은 id와 함께 값에 들어가 다음 그리기에서도 같은 줄이다. 바꿀 것이 없으면 받은 값을 그대로 돌려준다.
+// 요청 본문(buildPayload)·mock 서버 검사(toValues)에는 쓰지 않으므로 본문 모양은 바뀌지 않는다.
+export function withMinimumRows(values, sections) {
+  let next = values
+  for (const section of sections) {
+    if (section.kind !== 'list' || !section.minRows) continue
+    if (section.noItemsLabel && values.noItems?.[section.key]) continue
+    const rows = values[section.key] ?? []
+    if (rows.length >= section.minRows) continue
+    const added = withItemIds(Array.from({ length: section.minRows - rows.length }, () => createEmptyRow(section)))
+    next = { ...next, [section.key]: [...rows, ...added] }
+  }
+  return next
+}
+
 // 서버에 저장된 요청 본문을 화면 입력값으로 되돌린다(불러온 줄에는 id를 붙인다).
 export function toValues(input, sections) {
   const values = createEmptyValues(sections, input?.baseMonth ?? defaultBaseMonth(sections))
@@ -111,8 +128,10 @@ export function buildPayload(values, sections, jobType) {
     const value = values[section.key]
     const body = { baseMonth: values.baseMonth, ...section.payloadExtra }
     if (section.kind === 'list') {
-      body.items = value.map(withoutId)
-      if (section.noItemsLabel) body.noItems = values.noItems[section.key]
+      // FP-227 "없음" 체크면 잠가 둔 줄은 보내지 않는다(체크하면 줄을 지우던 때와 같은 본문: items: [], noItems: true).
+      const noItems = section.noItemsLabel ? values.noItems[section.key] : false
+      body.items = noItems ? [] : value.map(withoutId)
+      if (section.noItemsLabel) body.noItems = noItems
     } else {
       // FP-86 체크 칸은 true/false로, 비활성 칸(disabledWhen)은 null로 보낸다.
       for (const field of section.fields) {

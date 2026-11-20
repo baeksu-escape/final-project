@@ -14,6 +14,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +35,7 @@ import com.baeksuescape.user.dto.AuthRequests;
 import com.baeksuescape.user.dto.AuthResponses;
 import com.baeksuescape.user.dto.MyPageDtos;
 import com.baeksuescape.user.dto.UserAccount;
+import com.baeksuescape.user.mapper.FinancialInputMapper;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 import com.baeksuescape.user.mapper.UserConsentMapper;
 import com.baeksuescape.user.mapper.UserSocialAccountMapper;
@@ -52,6 +55,8 @@ class SocialAndMyPageServiceTest {
     private UserSocialAccountMapper socialMapper;
     @Mock
     private EmailVerificationService emailVerification;
+    @Mock
+    private FinancialInputMapper financialInputMapper;
 
     private final AvenueProperties properties = TestKeys.properties();
     private final JwtTokenProvider tokenProvider = new JwtTokenProvider(properties);
@@ -67,7 +72,7 @@ class SocialAndMyPageServiceTest {
                 ENCODER, CRYPTO, HMAC, CLOCK, null,
                 new SystemLogService(mock(SystemLogMapper.class), TransactionOperations.withoutTransaction(), CLOCK));
         social = new SocialLoginService(properties, store, socialMapper, userMapper, auth);
-        myPage = new MyPageService(userMapper, emailVerification, views, ENCODER, CRYPTO, HMAC, CLOCK);
+        myPage = new MyPageService(userMapper, financialInputMapper, emailVerification, views, ENCODER, CRYPTO, HMAC, CLOCK);
     }
 
     private static String codeOf(Runnable action) {
@@ -183,17 +188,68 @@ class SocialAndMyPageServiceTest {
         verify(userMapper).updatePassword(eq(7L), anyString(), any());
     }
 
-    @Test
-    void 직군은_비어_있을_때만_저장하고_이미_있으면_409() {
+    // FP-227 MEM-05 — 직군을 selectById가 돌려줄 계정에 넣어 둔다(null이면 아직 고르지 않음).
+    private UserAccount givenJobType(String jobType) {
         UserAccount account = UserFixtures.user(7L, "newbie");
-        account.setWorkerTypeCode("FREELANCER");
+        account.setWorkerTypeCode(jobType);
         given(userMapper.selectById(7L)).willReturn(account);
+        return account;
+    }
+
+    @Test
+    void 직군이_비어_있으면_저장한다() {
+        UserAccount account = givenJobType(null);
         assertThat(codeOf(() -> myPage.selectJobType(7L, new MyPageDtos.JobType("STUDENT")))).isEqualTo("400 INVALID_INPUT");
 
-        given(userMapper.updateWorkerTypeIfEmpty(eq(7L), eq("FREELANCER"), any())).willReturn(1);
+        given(userMapper.updateWorkerTypeIfEmpty(eq(7L), eq("FREELANCER"), any())).willAnswer(invocation -> {
+            account.setWorkerTypeCode("FREELANCER");
+            return 1;
+        });
         assertThat(myPage.selectJobType(7L, new MyPageDtos.JobType("FREELANCER")).user().jobType()).isEqualTo("FREELANCER");
+        verify(userMapper).lockUser(7L);
+        verify(userMapper, never()).updateWorkerTypeFrom(any(Long.class), anyString(), anyString(), any());
+    }
 
-        given(userMapper.updateWorkerTypeIfEmpty(eq(7L), eq("EMPLOYEE"), any())).willReturn(0);
-        assertThat(codeOf(() -> myPage.selectJobType(7L, new MyPageDtos.JobType("EMPLOYEE")))).isEqualTo("409 JOB_TYPE_ALREADY_SELECTED");
+    @Test
+    void 같은_직군을_다시_고르면_바꾸지_않고_200() {
+        givenJobType("EMPLOYEE");
+        given(financialInputMapper.selectSavedBaseMonths(7L)).willReturn(List.of("2026-10"));
+
+        assertThat(myPage.selectJobType(7L, new MyPageDtos.JobType("EMPLOYEE")).user().jobType()).isEqualTo("EMPLOYEE");
+        verify(userMapper, never()).updateWorkerTypeIfEmpty(any(Long.class), anyString(), any());
+        verify(userMapper, never()).updateWorkerTypeFrom(any(Long.class), anyString(), anyString(), any());
+    }
+
+    @Test
+    void 저장한_입력도_평가도_없으면_다른_직군으로_바꾼다() {
+        UserAccount account = givenJobType("EMPLOYEE");
+        given(financialInputMapper.selectSavedBaseMonths(7L)).willReturn(List.of());
+        given(userMapper.countAssessments(7L)).willReturn(0);
+        given(userMapper.updateWorkerTypeFrom(eq(7L), eq("EMPLOYEE"), eq("FREELANCER"), any())).willAnswer(invocation -> {
+            account.setWorkerTypeCode("FREELANCER");
+            return 1;
+        });
+
+        assertThat(myPage.selectJobType(7L, new MyPageDtos.JobType("FREELANCER")).user().jobType()).isEqualTo("FREELANCER");
+        verify(userMapper).updateWorkerTypeFrom(eq(7L), eq("EMPLOYEE"), eq("FREELANCER"), any());
+
+        // 그사이 다른 요청이 먼저 바꿔 조건부 변경이 0행이면 409로 알린다.
+        account.setWorkerTypeCode("EMPLOYEE");
+        given(userMapper.updateWorkerTypeFrom(eq(7L), eq("EMPLOYEE"), eq("SELF_EMPLOYED"), any())).willReturn(0);
+        assertThat(codeOf(() -> myPage.selectJobType(7L, new MyPageDtos.JobType("SELF_EMPLOYED")))).isEqualTo("409 JOB_TYPE_ALREADY_SELECTED");
+    }
+
+    @Test
+    void 저장한_입력이나_평가가_있으면_다른_직군으로_못_바꾸고_409_JOB_TYPE_LOCKED() {
+        givenJobType("EMPLOYEE");
+        given(financialInputMapper.selectSavedBaseMonths(7L)).willReturn(List.of("2026-10"));
+        given(userMapper.countAssessments(7L)).willReturn(0);
+        assertThat(codeOf(() -> myPage.selectJobType(7L, new MyPageDtos.JobType("FREELANCER")))).isEqualTo("409 JOB_TYPE_LOCKED");
+
+        given(financialInputMapper.selectSavedBaseMonths(7L)).willReturn(List.of());
+        given(userMapper.countAssessments(7L)).willReturn(1);
+        assertThat(codeOf(() -> myPage.selectJobType(7L, new MyPageDtos.JobType("FREELANCER")))).isEqualTo("409 JOB_TYPE_LOCKED");
+
+        verify(userMapper, never()).updateWorkerTypeFrom(any(Long.class), anyString(), anyString(), any());
     }
 }
