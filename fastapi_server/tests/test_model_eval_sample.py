@@ -1,5 +1,6 @@
 # N-25 평가 표본 표(MODEL_EVAL_SAMPLE) 일치 검사 — DDL, 기존 DB용 생성 SQL, 적재 SQL, 내보내기 스크립트, 점검 SQL이 같은 구조·값을 쓰는지 본다(DB 접속 불필요).
 # 실행: fastapi_server 폴더에서 `python -m unittest discover tests -v`
+import json
 import re
 import unittest
 from pathlib import Path
@@ -13,7 +14,8 @@ SQL_DIR = Path(__file__).resolve().parents[2] / "docs/spec/sql"
 DB_DIR = SQL_DIR / "dummy_db"
 DDL = (SQL_DIR / "avenue_ddl.sql").read_text(encoding="utf-8").replace("\r\n", "\n")
 CREATE_SQL = (SQL_DIR / "create_model_eval_sample.sql").read_text(encoding="utf-8").replace("\r\n", "\n")
-LOAD_SQL = (SQL_DIR / "load_model_eval_sample_lgbm_base_0_1.sql").read_text(encoding="utf-8").replace("\r\n", "\n")
+LOAD_SQL_FILES = {"LGBM-BASE-0.1": "load_model_eval_sample_lgbm_base_0_1.sql", "LGBM-BASE-0.2": "load_model_eval_sample_lgbm_base_0_2.sql"}
+UPDATE_SQL_0_2 = (SQL_DIR / "update_model_metrics_same_label_lgbm_base_0_2.sql").read_text(encoding="utf-8").replace("\r\n", "\n")
 INSERT = re.compile(r"^INSERT INTO MODEL_EVAL_SAMPLE \(([^)]*)\) VALUES \((.*)\);$", re.MULTILINE)
 
 
@@ -67,15 +69,19 @@ class SqlFilesTests(unittest.TestCase):
             self.assertNotIn("eval_sample", (DB_DIR / runner).read_text(encoding="utf-8").lower(), runner)
 
 
-class LoadSqlTests(unittest.TestCase):
+class LoadSqlChecks:
+    """모델 버전마다 만든 적재 SQL(0.1, 0.2)이 같은 규칙을 지키는지 본다. 서브클래스가 model_version을 정한다."""
+    model_version = ""
+
     def setUp(self):
+        self.load_sql = (SQL_DIR / LOAD_SQL_FILES[self.model_version]).read_text(encoding="utf-8").replace("\r\n", "\n")
         self.rows = []
-        for columns, values in INSERT.findall(LOAD_SQL):
+        for columns, values in INSERT.findall(self.load_sql):
             self.assertEqual([c.strip() for c in columns.split(",")], LOAD_COLUMNS)
             self.rows.append([v.strip().strip("'") for v in values.split(",")])
 
     def test_row_count_matches_header(self):
-        header = re.search(r"행 수: (\d+), 집단/분할별: ([^\n]+)", LOAD_SQL)
+        header = re.search(r"행 수: (\d+), 집단/분할별: ([^\n]+)", self.load_sql)
         self.assertEqual(len(self.rows), int(header.group(1)))
         by_group = {tuple(key.split("/")): int(count) for key, count in re.findall(r"(\w+/\w+) (\d+)", header.group(2))}
         actual = {}
@@ -86,7 +92,7 @@ class LoadSqlTests(unittest.TestCase):
 
     def test_codes_and_ranges(self):
         for model, split, group, ref, worker, delinq, nonfin, *scores in self.rows:
-            self.assertEqual(model, config.MODEL_VERSION)
+            self.assertEqual(model, self.model_version)
             self.assertIn(split, {"TRAIN", "VALID"})                  # TEST는 최종 평가(FP-144) 전에는 넣지 않는다
             self.assertIn(group, {"LEGACY", "THINFILE"})
             self.assertIn(worker, set(SEGMENT_TO_WORKER_TYPE.values()))
@@ -102,6 +108,65 @@ class LoadSqlTests(unittest.TestCase):
     def test_keys_are_unique(self):
         keys = [(row[0], row[1], row[2], row[3]) for row in self.rows]
         self.assertEqual(len(keys), len(set(keys)))                  # UK_MES_SAMPLE
+
+    def test_header_names_the_model_version_and_checks_it_before_inserting(self):
+        self.assertIn(f"모델 버전 {self.model_version},", self.load_sql)
+        self.assertIn(f"WHERE MODEL_VERSION = '{self.model_version}'", self.load_sql)
+        self.assertLess(self.load_sql.index("RAISE_APPLICATION_ERROR(-20115"), self.load_sql.index("INSERT INTO MODEL_EVAL_SAMPLE"))
+
+
+class LoadSql01Tests(LoadSqlChecks, unittest.TestCase):
+    model_version = "LGBM-BASE-0.1"
+
+
+class LoadSql02Tests(LoadSqlChecks, unittest.TestCase):
+    model_version = "LGBM-BASE-0.2"
+
+    def test_has_the_same_composition_as_version_0_1(self):
+        # 0.2도 씬파일을 학습하지 않아서 0.1과 같은 구성(기존 VALID 1,800, 씬파일 TRAIN 1,057 + VALID 228)이다.
+        header = re.search(r"행 수: (\d+), 집단/분할별: ([^\n]+)", self.load_sql)
+        self.assertEqual(int(header.group(1)), 3085)
+        counts = dict(re.findall(r"(\w+/\w+) (\d+)", header.group(2)))
+        self.assertEqual(counts, {"legacy/VALID": "1800", "thinfile/VALID": "228", "thinfile/TRAIN": "1057"})
+
+
+class UpdateSql02Tests(unittest.TestCase):
+    """모델 0.2의 같은 라벨 AUC 갱신 SQL — JSON_MERGEPATCH로 same_label_comparison만 더하고, AUC 열과 기존 JSON 항목은 건드리지 않는다."""
+
+    def patches(self):
+        return [json.loads(text) for text in re.findall(r"q'\[(.*?)\]'", UPDATE_SQL_0_2, flags=re.DOTALL)]
+
+    def test_two_rows_get_the_same_valid_json(self):
+        patches = self.patches()
+        self.assertEqual(len(patches), 2)
+        self.assertEqual(patches[0], patches[1])
+        self.assertIn("add_comparison('trad_legacy'", UPDATE_SQL_0_2)
+        self.assertIn("add_comparison('alt_legacy'", UPDATE_SQL_0_2)
+        self.assertEqual(list(patches[0]), ["same_label_comparison"])                 # 이 키만 더한다
+
+    def test_values_are_consistent(self):
+        comparison = self.patches()[0]["same_label_comparison"]
+        self.assertEqual(comparison["seeds"], config.SEEDS)
+        self.assertEqual(comparison["model_options"], {"monotone": True, "with_thinfile": False})
+        for label in ("label_any_delinquency_12m", "label_nonfin_effect_12m"):
+            entry = comparison["by_label"][label]
+            for model in ("legacy", "alternative"):
+                self.assertEqual(len(entry[model]["by_seed"]), len(config.SEEDS))
+                self.assertAlmostEqual(entry[model]["mean"], sum(entry[model]["by_seed"]) / len(config.SEEDS), places=3)
+            self.assertAlmostEqual(entry["diff_alt_minus_legacy_mean"], entry["alternative"]["mean"] - entry["legacy"]["mean"], places=4)
+
+    def test_merges_instead_of_replacing_and_keeps_auc_columns(self):
+        self.assertIn("JSON_MERGEPATCH(NVL(METRICS_JSON, '{}'), p_patch RETURNING CLOB)", UPDATE_SQL_0_2)
+        self.assertIn("MODEL_VERSION = 'LGBM-BASE-0.2'", UPDATE_SQL_0_2)
+        self.assertNotIn("SET AUC", UPDATE_SQL_0_2)                                    # AUC_VALID·AUC_TEST는 바꾸지 않는다
+        self.assertIn("RAISE_APPLICATION_ERROR(-20112", UPDATE_SQL_0_2)                # 등록 행이 없으면 멈춘다
+
+    def test_rolls_back_everything_on_error(self):
+        self.assertIn("WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK\n", UPDATE_SQL_0_2)
+        self.assertIn("WHENEVER OSERROR EXIT FAILURE ROLLBACK\n", UPDATE_SQL_0_2)
+
+    def test_longest_line_fits_sqlplus_limit(self):
+        self.assertLess(max(len(line) for line in UPDATE_SQL_0_2.splitlines()), 2499)
 
 
 class RenderTests(unittest.TestCase):
