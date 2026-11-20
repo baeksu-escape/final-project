@@ -22,14 +22,14 @@ export default function SimulationResult({ currentScore, result, stale }) {
   return (
     <Card title="예상 대안 점수" className="sim-result">
       <div className="sim-row sim-row--baseline"><span className="sim-big">{changed.score ?? '—'}</span><span className={result.delta < 0 ? 'sim-mid sim-neg' : 'sim-mid sim-pos'}>{result.delta === null ? '' : formatSigned(result.delta)}</span></div>
-      <p className="sim-hint">지금 {current.score ?? '—'}점 → 바꾸면 {changed.score ?? '—'}점</p>
+      <p className="sim-hint">실제 값 {current.score ?? '—'}점 → 바뀔 값 {changed.score ?? '—'}점</p>
       <div><Chip accent>{current.gradeCode === changed.gradeCode ? `${gradeText(changed.gradeCode)} 등급 유지` : `${gradeText(current.gradeCode)} → ${gradeText(changed.gradeCode)}`}</Chip></div>
       <div className="sim-impacts">
         <div><span className="sim-hint">금융 이력 영향</span><strong>{result.financialImpact === null ? '—' : formatSigned(result.financialImpact)}</strong></div>
         <div><span className="sim-hint">대안 데이터 영향</span><strong>{result.alternativeImpact === null ? '—' : formatSigned(result.alternativeImpact)}</strong></div>
       </div>
       <table className="sim-table">
-        <thead><tr><th scope="col"></th><th scope="col">지금</th><th scope="col">바꾸면</th></tr></thead>
+        <thead><tr><th scope="col"></th><th scope="col">실제 값</th><th scope="col">바뀔 값</th></tr></thead>
         <tbody>
           <tr><th scope="row">예상 금리</th><td>{rateText(current.interestRatePct)}</td><td>{rateText(changed.interestRatePct)}</td></tr>
           <tr><th scope="row">예상 한도</th><td>{moneyText(current.limitAmount)}</td><td>{moneyText(changed.limitAmount)}</td></tr>
@@ -38,7 +38,6 @@ export default function SimulationResult({ currentScore, result, stale }) {
       </table>
       {/* 안내 줄 자리는 항상 차지하고, 이전 조건 기준일 때만 보이게 한다(결과 카드가 흔들리지 않게). */}
       <p className={stale ? 'sim-warn' : 'sim-warn sim-reserve'}>위 결과는 이전 조건 기준입니다. 지금 입력으로 다시 계산되면 바뀝니다.</p>
-      <p className="sim-hint">금리·한도·부도 확률은 같은 점수대의 참고 정보이며 시연용 계산식으로 구한 값입니다(N-18). 실제 점수와 평가에는 반영되지 않습니다.</p>
     </Card>
   )
 }

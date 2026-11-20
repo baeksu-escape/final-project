@@ -55,7 +55,7 @@ export default function SimulationPage() {
     <div className="sim-page">
       <header className="sim-heading">
         <h1>신용케어 시뮬레이터</h1>
-        <p>조건을 바꾸면 입력이 멈춘 뒤 자동으로 점수와 알아볼 수 있는 대출이 어떻게 바뀌는지 보여 줍니다. 실제 점수에는 반영되지 않습니다.</p>
+        <p>조건을 바꾸면 입력이 멈춘 뒤 자동으로 점수와 알아볼 수 있는 대출이 어떻게 바뀌는지 보여 줍니다.<br />금리·한도는 더미 데이터입니다. 여기서 계산한 점수는 저장되지 않으며 내 실제 점수에는 영향을 주지 않습니다.</p>
       </header>
       {sim.currentScore === null && <Notice type="warn">저장된 대안 점수가 없어 예상 점수를 계산할 수 없습니다.</Notice>}
 
@@ -75,7 +75,7 @@ export default function SimulationPage() {
                   formatValue={() => sliderText(values[field.key], field, sim.baseline?.[field.key] == null)} />
                 <NumberInput label={`${field.label} 직접 입력`} min={field.min} max={field.max} step={1} unit={field.unit}
                   value={values[field.key] ?? null} onChange={(v) => sim.setValue(field.key, v)} disabled={sim.baseline?.[field.key] == null} error={inputErrors[field.key]} />
-                <span className="sim-hint">{field.min}{field.unit} ~ {field.max}{field.unit} · 지금 {sim.baseline?.[field.key] ?? '값 없음'}{sim.baseline?.[field.key] == null ? '' : field.unit}{sim.baseline?.[field.key] > field.max ? ` (슬라이더 범위 밖 · 실제 값 ${sim.baseline[field.key]}${field.unit})` : ''}</span>
+                <span className="sim-hint">{field.min}{field.unit} ~ {field.max}{field.unit} · 내 실제 값 {sim.baseline?.[field.key] ?? '없음'}{sim.baseline?.[field.key] == null ? '' : field.unit}{sim.baseline?.[field.key] > field.max ? ` (슬라이더 범위 밖 · 실제 값 ${sim.baseline[field.key]}${field.unit})` : ''}</span>
               </div>
             ))}
           </div>
