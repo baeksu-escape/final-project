@@ -1,13 +1,13 @@
-# 데이터 입력 4단계 이어받기 — 임시저장 회원별 분리·단계 표시·다시 들어온 회원은 ④부터·동의 전 버튼 막기
+# 데이터 입력 7단계·입력 완료 현황 단계 리모컨·자산 4종 저장 — 임시저장 회원별 분리·저장 전 직군 다시 고르기·동의 전 버튼 막기
 
 - **날짜:** 2026-11-18
 - **작성자:** JWC1226 / Claude Code
 - **브랜치:** `feature-A/FP-227-data-input-steps`
-- **관련 N-ID:** N-05, N-05-8, N-05-9
+- **관련 N-ID:** N-05, N-05-1(직군 다시 고르기), N-05-4(자산 4종), N-05-8, N-05-9
 - **관련 결정:** 사람 결정 B(다시 들어온 회원의 시작 단계, 11/18)
 
 ## 무엇을, 왜 바꿨나
-- `feature/data-input-steps`의 커밋 `b407365`(작성자 altrongg-code, 11/18 20:08)을 그대로 cherry-pick했다(`4eaf3ae`). 내용은 4단계 나누기, 단계별 검사, sessionStorage 임시저장, 기준월을 소득 카드 안으로, 카드·신용 이용 카드 형식 통일이다.
+- `feature/data-input-steps`의 커밋 `b407365`(작성자 altrongg-code, 11/18 20:08)을 그대로 cherry-pick했다(11/19 커밋 정리 뒤 이 브랜치의 커밋은 `bc399bf`). 내용은 4단계 나누기, 단계별 검사, sessionStorage 임시저장, 기준월을 소득 카드 안으로, 카드·신용 이용 카드 형식 통일이다.
 - 이어서 더한 것
   - 임시저장 키를 회원별로 나눴다. 시연 PC처럼 여러 사람이 같은 탭을 쓰면 앞사람 입력이 보이던 문제 때문이다. (키 이름과 지우는 시점은 아래 「11/18 보완」에서 바뀌었다.)
   - 임시저장할 때 서버 저장 시각(`savedAt`)을 함께 넣는다. 다시 들어왔을 때 서버 값과 다르면(다른 탭에서 저장 등) 오래된 임시저장본으로 보고 버린다.
@@ -28,8 +28,8 @@
 | `frontend/src/features/dataInput/dataInput.css` | `data-input-steps`, `__list`, `__item`, `__button` 추가 |
 
 ## DB·API 변경
-- DB: 없음
-- API: 없음
+- DB: 11/18 첫 작업 기준으로는 없음. 지금은 DDL C13으로 `USER_ASSET_SNAPSHOT`에 자산 4종 열 4개를 추가했다(아래 v1.4 절).
+- API: 11/18 첫 작업 기준으로는 없음. 지금은 MEM-05(입력 저장 전 직군 다시 고르기·409 `JOB_TYPE_LOCKED`, v1.1)와 INP-02(자산 4종 각각 저장, v1.4)가 바뀌었다.
 - 영향을 받는 기능·팀원
   - 직접 로그아웃·탈퇴할 때 sessionStorage의 `avenue:draft:`로 시작하는 키만 지운다. 다른 화면도 로그아웃 때 지울 임시저장이 필요하면 이 접두어를 쓰면 된다.
 
@@ -117,7 +117,7 @@
 - **API 변경:** MEM-05 규칙과 오류 코드 `JOB_TYPE_LOCKED`. 경로·요청·응답 모양은 같다. 팀 공지가 필요하다.
 - **DB:** 없음(DDL 그대로, 쿼리 2개 추가).
 - **확인:** `npm run lint` 오류 0, `npm run build` 성공, `mvnw test` 374건 통과. 화면은 사람이 mock 모드로 확인한다(이 작업에서는 브라우저를 조작하지 않았다).
-- **문서 반영 필요(문서 담당):** 기능 정의서 N-05(7단계, 입력 완료 현황 = 단계 리모컨), N-04-8·N-05-1(저장 전 직군 변경 허용). API 정의서 `api_definition.md` 84·144행의 MEM-05 설명도 바꿔야 한다(이 작업에서는 고치지 않음).
+- **문서 반영 필요(문서 담당):** 기능 정의서 N-05(7단계, 입력 완료 현황 = 단계 리모컨), N-04-8·N-05-1(저장 전 직군 변경 허용). API 정의서 `api_definition.md`는 11/20 이 PR에서 2장 MEM-05·INP-02 줄과 머리말 최근 변경 줄을 고쳤다. 1장 오류 표의 `JOB_TYPE_LOCKED`는 범영 님께 추가를 요청한다(1장은 범영 님 관리).
 
 ## 11/19 v1.2·v1.3 (화면만)
 - 대출은 "보유한 대출이 없습니다."를 체크하지 않았으면 줄이 늘 1개 이상 보인다(`minRows`, `withMinimumRows`).
@@ -132,7 +132,7 @@
   - 기존 DB는 새 파일 `docs/spec/sql/alter_user_asset_snapshot_breakdown.sql`을 한 번 실행한다. 기존 행의 4종은 NULL로 남는다.
 - **DDL 짝꿍 파일:**
   - `dummy_db/01_create_tables.sql`을 원본과 바이트까지 같게 맞췄다(`cmp` 출력 없음).
-  - `seed_report.json`의 `ddl_sha256`을 `ff1f759b…0dac`로 바꿨다.
+  - `seed_report.json`의 `ddl_sha256`을 `ff1f759b…0dac`로 바꿨다(그때 값). 지금 값은 `d815c9424b737499d3d80a6e2faff49e429ca26eaf1441fef44722d6c2358529`(11/20 C13 병합 뒤)다.
   - `docs/spec/sql/README.md` 상황별 표에 한 행을 추가했다.
   - 기준 데이터 INSERT·시드 행 수는 바뀌지 않았다.
 - **서버(`FinancialInputService`·`FinancialInputMapper.xml`·`DataInputRows.AssetRow`):**
@@ -147,13 +147,36 @@
   - 카드·신용 6칸은 체크하지 않으면 필수다(설명 끝에 "해당 없는 항목은 0을 입력해 주세요."). 서버 검사는 그대로 두었다.
 - **확인:**
   - `npm run lint` 오류 0, `npm run build` 성공.
-  - `mvnw test` 397건 통과.
+  - `mvnw test` 397건 통과(그때). 11/20 병합 뒤에는 442건 통과(이 PC는 메모리가 모자라 `-Xmx512m` 등 메모리 옵션을 붙여 실행).
   - DB 도구 시험 52건: `bcrypt` 없음 1건만 실패했다(PC 환경 문제, README 안내대로).
   - 공용 DB·로컬 DB에는 아무것도 실행하지 않았다.
-- **공용 DB 적용:** 병합한 뒤 DB 담당(범영)이 `alter_user_asset_snapshot_breakdown.sql`을 한 번 실행한다. 로컬 DB는 각자 실행한다.
+- **공용 DB 적용:** 병합한 뒤 DB 담당(범영)이 `alter_user_asset_snapshot_breakdown.sql`을 한 번 실행한다. 로컬 DB는 각자 실행한다. (11/20 범영 님 안내. FP-238 기본 규칙은 작성자 실행·DB 담당 검수지만, 이번 변경은 DB 담당이 적용하고 DB 변경 채널 공지도 한다.)
 - 11/19 develop 병합 때 B팀 FP-139가 C11을 먼저 써서 자산 4종 변경을 C12로 바꿈.
 - 11/20 develop #115(재욱 CUT-0.3)가 C12를 써서 다시 겹침. PR 준비가 끝날 때까지 임시 번호 Z1로 두고, PR 직전 develop 병합 때 마지막 번호로 바꾼다.
 - 11/20 develop 병합(#115~#126) 때 자산 4종 변경 번호를 C13으로 확정(재욱 님 안내). Z1 표기를 모두 C13으로 바꾸고, 변경 이력에는 C12(재욱 CUT-0.3)와 C13을 둘 다 남김.
+
+바뀐 파일(v1.4, 커밋 `551ecec`. 뒤의 번호 정리 커밋 `e04fd46`·`317d6bf`·`48a710f`는 이 가운데 문서·주석의 변경 번호 글자만 바꿨다)
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `docs/spec/sql/avenue_ddl.sql` | `USER_ASSET_SNAPSHOT` 열 4개·CHECK 4개·COMMENT, 머리말 변경 이력(지금 C13) |
+| `docs/spec/sql/dummy_db/01_create_tables.sql` | DDL 사본(바이트까지 같게) |
+| `docs/spec/sql/dummy_db/seed_report.json` | `ddl_sha256` |
+| `docs/spec/sql/alter_user_asset_snapshot_breakdown.sql` | (새 파일) 기존 DB에 열 4개·CHECK 4개 추가 |
+| `docs/spec/sql/README.md` | 상황별 실행 표에 위 SQL 한 행 |
+| `backend/.../user/dto/DataInputRows.java` | `AssetRow`에 4종 필드 |
+| `backend/.../resources/mapper/user/FinancialInputMapper.xml` | `selectAsset`·`mergeAsset`이 4종 열을 읽고 씀 |
+| `backend/.../user/service/FinancialInputService.java` | `saveAsset` 4종 저장, `toInput` 4종 돌려주기(옛 행은 `otherAmount`에 총자산) |
+| `backend/src/test/.../user/service/FinancialInputServiceTest.java` | 자산 시험 4개 추가 |
+| `docs/spec/api/api_spec_a.md` | INP-02 `assets`·INP-01 응답 설명, 머리말 최근 변경, 6장 |
+| `frontend/src/features/dataInput/config/inputSections.js` | 카드·신용 6칸 `required`, 설명 끝 문구 |
+| `frontend/src/features/dataInput/pages/DataInputPage.jsx` | 단계 아래 버튼 줄을 `data-input-form__actions`(왼쪽·오른쪽 묶음)로 |
+| `frontend/src/features/dataInput/dataInput.css` | `data-input-form__actions`·`__actions-start`·`__actions-end` 추가 |
+| `docs/logs/features-A/FP-227-data-input-steps.md` | 이 절 |
+
+- **디자인 확인 필요(동주 님):** v1.4에서 더한 버튼 배치 CSS 3개(`data-input-form__actions`, `data-input-form__actions-start`, `data-input-form__actions-end`)는 디자인 변경이다. 「다음 사람이 알아야 할 것」의 「새 CSS 클래스 4개」는 11/18에 만들고 v1.1에서 지운 `data-input-steps*` 클래스라 이것과 다르다.
+- **문서 반영 필요(이 PR에서는 고치지 않음):** 기능 정의서(`features.md`) N-05-4 자산 4종 각각 저장, 카드·신용 6칸 필수("신용 이력이 없어요"를 체크하지 않았을 때). FP-218 문서 PR에서 한 번에 반영한다.
+- **팀 결정 필요:** 카드·신용 6칸 필수 검사를 서버에서도 할지. 지금은 화면에서만 검사한다.
+- **공용 DB:** DDL C13, `alter_user_asset_snapshot_breakdown.sql`을 한 번 실행한다. 병합 뒤 범영 님이 적용하고 DB 변경 채널에 공지한다.
 
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
