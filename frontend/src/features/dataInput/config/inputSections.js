@@ -36,6 +36,8 @@ const balanceAmountRule = amountRule(VALIDATION_LIMITS.BALANCE_AMOUNT_MAX)
 //   N-05-2 list 전용 — fixedMonths: 기준월로 끝나는 이 개월 수만큼 줄을 미리 채운다(줄 추가·삭제 없음). readOnly 칸은 입력 칸을 그리지 않는다.
 //   isComplete(saved): 입력 완료 현황에서 이 섹션의 완료 조건이 따로 있을 때 쓴다.
 //   N-05-8 list 전용 — noItemsLabel: 줄이 없어도 완료로 볼 수 있게 하는 체크 문구(대출이 없는 사용자용)
+//     체크하면 줄은 지우지 않고 잠근다(FP-227). 잠긴 줄은 검사하지 않고, 요청 본문에는 줄 없이(items: []) noItems: true로 보낸다.
+//   FP-227 list 전용 — minRows: "없음" 체크가 풀려 있으면 늘 보일 최소 줄 수. 줄이 모자라면 빈 줄을 채운다(inputValues.js withMinimumRows).
 
 // 이 화면의 모든 입력에 함께 보내는 기준월(YYYY-MM).
 export const BASE_MONTH_FIELD = Object.freeze({
@@ -125,19 +127,20 @@ function sumAssets(value) {
   )
 }
 
-// "신용 이력이 없어요"를 체크했는지 — 체크하면 대부업 잔액 외 칸을 비활성화하고 null로 보낸다.
+// "신용 이력이 없어요"를 체크했는지 — 체크하면 대부업 잔액을 포함한 모든 입력 칸을 비활성화하고 null로 보낸다.
 const hasNoCreditHistory = (value) => value?.noCreditHistory === true
 
 // D-29 카드·신용 이용(11/06 확정 UI 순서) — 신용평가사 API 대신 회원이 직접 입력해 USER_CREDIT_PROFILE(SOURCE_CODE='MANUAL')에 저장한다.
 // 입력 완료 현황(completionItems.js 6항목)에는 넣지 않는다. 최근 3개월 최장 연체일수 칸은 두지 않는다(O-16).
+// FP-227 "신용 이력이 없어요"를 체크하지 않았으면 6칸 모두 필수다(해당 없으면 0). 체크하면 잠겨 검사하지 않는다. 서버 검사는 바꾸지 않았다(화면에서만 막는다).
 const CREDIT_PROFILE_SECTION = {
   key: 'creditProfile',
   title: '카드·신용 이용',
-  description: '신용카드와 대출 이용 기록을 입력해 주세요. 신용카드·대출을 써 본 적이 없으면 아래 항목을 체크해 주세요.',
+  description: '신용카드와 대출 이용 기록을 입력해 주세요. 신용카드·대출을 써 본 적이 없으면 아래 항목을 체크해 주세요. 해당 없는 항목은 0을 입력해 주세요.',
   kind: 'fields',
   fields: [
-    { key: 'cardLimitAmount', label: '카드 한도', input: 'money', validate: balanceAmountRule, disabledWhen: hasNoCreditHistory },
-    { key: 'cardMonthlySpendAmount', label: '월 카드 사용액', input: 'money', validate: cardSpendRule, disabledWhen: hasNoCreditHistory },
+    { key: 'cardLimitAmount', label: '카드 한도(모든 카드 합계)', input: 'money', validate: balanceAmountRule, required: true, disabledWhen: hasNoCreditHistory },
+    { key: 'cardMonthlySpendAmount', label: '월 카드 사용액(모든 카드 합계)', input: 'money', validate: cardSpendRule, required: true, disabledWhen: hasNoCreditHistory },
     {
       key: 'delinquencyCount12m',
       label: '최근 1년 연체(30일 이상)',
@@ -147,6 +150,7 @@ const CREDIT_PROFILE_SECTION = {
       max: VALIDATION_LIMITS.CREDIT_COUNT_MAX,
       step: 1,
       validate: numberRule({ max: VALIDATION_LIMITS.CREDIT_COUNT_MAX, integer: true, unit: '회' }),
+      required: true,
       disabledWhen: hasNoCreditHistory,
     },
     {
@@ -158,6 +162,7 @@ const CREDIT_PROFILE_SECTION = {
       max: VALIDATION_LIMITS.CASH_ADVANCE_MONTHS_MAX,
       step: 1,
       validate: numberRule({ max: VALIDATION_LIMITS.CASH_ADVANCE_MONTHS_MAX, integer: true, unit: '개월' }),
+      required: true,
       disabledWhen: hasNoCreditHistory,
     },
     {
@@ -169,9 +174,10 @@ const CREDIT_PROFILE_SECTION = {
       max: VALIDATION_LIMITS.CREDIT_COUNT_MAX,
       step: 1,
       validate: numberRule({ max: VALIDATION_LIMITS.CREDIT_COUNT_MAX, integer: true, unit: '건' }),
+      required: true,
       disabledWhen: hasNoCreditHistory,
     },
-    { key: 'privateLenderLoanBalanceAmount', label: '대부업 대출 잔액', input: 'money', validate: balanceAmountRule },
+    { key: 'privateLenderLoanBalanceAmount', label: '대부업 대출 잔액', input: 'money', validate: balanceAmountRule, required: true, disabledWhen: hasNoCreditHistory },
     { key: 'noCreditHistory', label: '신용 이력이 없어요', input: 'checkbox' },
   ],
 }
@@ -184,6 +190,8 @@ export const COMMON_SECTIONS = Object.freeze([
     description: '보유한 대출을 한 건에 한 줄씩 추가해 주세요. 대출이 없으면 아래 항목을 체크해 주세요.',
     kind: 'list',
     noItemsLabel: '보유한 대출이 없습니다.',
+    // FP-227 "보유한 대출이 없습니다."를 체크하지 않았으면 대출 줄이 늘 1개 이상 보인다(마지막 줄을 지우면 빈 줄이 다시 생긴다).
+    minRows: 1,
     addLabel: '대출 추가',
     emptyMessage: '추가한 대출이 없습니다.',
     itemFields: [

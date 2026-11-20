@@ -12,22 +12,30 @@
     </select>
 
     <select id="selectAsset" resultType="com.baeksuescape.user.dto.DataInputRows$AssetRow">
-        SELECT USER_ID AS userId, BASE_MONTH AS baseMonth, TOTAL_ASSET_AMT AS totalAssetAmt, NO_LOAN_YN AS noLoanYn,
+        SELECT USER_ID AS userId, BASE_MONTH AS baseMonth,
+               DEPOSIT_AMT AS depositAmt, INVESTMENT_AMT AS investmentAmt, REAL_ESTATE_AMT AS realEstateAmt, OTHER_ASSET_AMT AS otherAssetAmt,
+               TOTAL_ASSET_AMT AS totalAssetAmt, NO_LOAN_YN AS noLoanYn,
                CREATED_AT AS createdAt, UPDATED_AT AS updatedAt
           FROM USER_ASSET_SNAPSHOT
          WHERE USER_ID = #{userId}
            AND BASE_MONTH = #{baseMonth}
     </select>
 
-    <!-- N-05-4·O-15 기준월 자산 행을 만들거나 고친다. TOTAL_ASSET_AMT NULL = 미입력, NO_LOAN_YN NULL = 대출 미확인. -->
+    <!-- N-05-4·O-15 기준월 자산 행을 만들거나 고친다. TOTAL_ASSET_AMT NULL = 미입력, NO_LOAN_YN NULL = 대출 미확인.
+         DDL C13(FP-227) 자산 4종을 각각 저장한다(빈 칸 NULL). TOTAL_ASSET_AMT는 4종 합계로 계속 저장한다(재무 건전성·입력 완료 판단이 쓴다). -->
     <update id="mergeAsset">
         MERGE INTO USER_ASSET_SNAPSHOT t
         USING (SELECT #{userId} AS USER_ID, #{baseMonth} AS BASE_MONTH FROM DUAL) s
            ON (t.USER_ID = s.USER_ID AND t.BASE_MONTH = s.BASE_MONTH)
          WHEN MATCHED THEN UPDATE
-              SET t.TOTAL_ASSET_AMT = #{totalAssetAmt,jdbcType=NUMERIC}, t.NO_LOAN_YN = #{noLoanYn,jdbcType=CHAR}, t.UPDATED_AT = #{now}
-         WHEN NOT MATCHED THEN INSERT (USER_ID, BASE_MONTH, TOTAL_ASSET_AMT, NO_LOAN_YN, CREATED_AT)
-              VALUES (s.USER_ID, s.BASE_MONTH, #{totalAssetAmt,jdbcType=NUMERIC}, #{noLoanYn,jdbcType=CHAR}, #{now})
+              SET t.DEPOSIT_AMT = #{depositAmt,jdbcType=NUMERIC}, t.INVESTMENT_AMT = #{investmentAmt,jdbcType=NUMERIC},
+                  t.REAL_ESTATE_AMT = #{realEstateAmt,jdbcType=NUMERIC}, t.OTHER_ASSET_AMT = #{otherAssetAmt,jdbcType=NUMERIC},
+                  t.TOTAL_ASSET_AMT = #{totalAssetAmt,jdbcType=NUMERIC}, t.NO_LOAN_YN = #{noLoanYn,jdbcType=CHAR}, t.UPDATED_AT = #{now}
+         WHEN NOT MATCHED THEN INSERT (USER_ID, BASE_MONTH, DEPOSIT_AMT, INVESTMENT_AMT, REAL_ESTATE_AMT, OTHER_ASSET_AMT,
+                                       TOTAL_ASSET_AMT, NO_LOAN_YN, CREATED_AT)
+              VALUES (s.USER_ID, s.BASE_MONTH, #{depositAmt,jdbcType=NUMERIC}, #{investmentAmt,jdbcType=NUMERIC},
+                      #{realEstateAmt,jdbcType=NUMERIC}, #{otherAssetAmt,jdbcType=NUMERIC},
+                      #{totalAssetAmt,jdbcType=NUMERIC}, #{noLoanYn,jdbcType=CHAR}, #{now})
     </update>
 
     <select id="selectIncomes" resultType="com.baeksuescape.user.dto.DataInputRows$IncomeRow">
