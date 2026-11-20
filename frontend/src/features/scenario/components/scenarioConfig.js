@@ -24,7 +24,7 @@ export const SCENARIO_FIELDS = [
 
 const KEYS = SCENARIO_FIELDS.map((field) => field.key)
 
-// N-17-2 화면에서 막는 입력 검사(최종 검사는 공용 계산 함수가 한다). 문제가 없으면 빈 문자열.
+// N-17-2 화면에서 막는 입력 검사(최종 검사는 서버가 한다). 문제가 없으면 빈 문자열.
 export function scenarioInputError(scenario) {
   for (const field of SCENARIO_FIELDS) {
     const value = scenario[field.key]

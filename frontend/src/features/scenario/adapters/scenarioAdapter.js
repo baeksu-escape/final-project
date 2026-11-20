@@ -5,7 +5,7 @@ export function adaptBaseline(data) {
   if (!data || typeof data !== 'object') throw new Error('기준 데이터를 확인해 주세요.')
   for (const key of fields) if (data[key] !== null && (!Number.isSafeInteger(data[key]) || data[key] < 0)) throw new Error(`기준 금액을 확인해 주세요: ${key}`)
   if (!Array.isArray(data.assumptions) || data.assumptions.some((item) => typeof item !== 'string')) throw new Error('시연 가정을 확인해 주세요.')
-  return Object.fromEntries([...fields.map((key) => [key, data[key]]), ['assumptions', [...data.assumptions]]])
+  return Object.fromEntries([...fields.map((key) => [key, data[key]]), ['policyRate', data.policyRate ?? null], ['assumptions', [...data.assumptions]]])
 }
 
 // N-17-2 직접 입력 범위와 숫자 유효성을 계산 입구에서 확인한다.
