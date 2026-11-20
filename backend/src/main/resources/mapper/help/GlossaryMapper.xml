@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- N-30-1 금융 용어 사전(GLOSSARY_TERM) 조회 (FP-180) -->
+<mapper namespace="com.baeksuescape.help.mapper.GlossaryMapper">
+
+    <!-- 용어 사전 전체를 용어 이름 순서로 읽는다. 수십 행이라 한 번에 돌려준다 -->
+    <select id="selectAllTerms" resultType="com.baeksuescape.help.dto.GlossaryTermRow">
+        SELECT TERM_ID AS termId, TERM AS term, EASY_TEXT AS easyText, EXPLANATION AS explanation
+          FROM GLOSSARY_TERM
+         ORDER BY TERM
+    </select>
+</mapper>
