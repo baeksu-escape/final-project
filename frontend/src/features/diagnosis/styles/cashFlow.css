@@ -7,7 +7,7 @@
 .cf-neg { color: var(--bad); }
 .cf-pos { color: var(--mint); }
 .cf-row { display: flex; justify-content: space-between; margin: -4px 0 0; }
-/* 자동 예측 상태 줄 — 높이를 고정해 문구·버튼이 바뀌어도 아래·옆 화면이 움직이지 않게 한다. 넘치는 문구는 숨기지 않고 줄 안에서 스크롤로 읽는다. */
+/* 예측 상태 줄 — 높이를 고정해 문구·버튼이 바뀌어도 아래·옆 화면이 움직이지 않게 한다. 넘치는 문구는 숨기지 않고 줄 안에서 스크롤로 읽는다. */
 .cf-status { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; block-size: 5em; font-size: 13px; line-height: 1.5; color: var(--mut); }
 .cf-status__text { block-size: 100%; overflow: auto; }
 .cf-status--warn { color: var(--warn); }

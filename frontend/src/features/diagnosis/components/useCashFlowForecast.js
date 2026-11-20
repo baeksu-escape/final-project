@@ -100,6 +100,13 @@ export function useCashFlowForecast(userId, workerTypeCode) {
   const canForecast = complete && current.status !== 'loading' && !conditionError(current.values)
     && !sameConditions(current.values, current.applied)
 
+  // N-21-8 예상 점수만 실패했을 때, 마지막으로 예측한 같은 조건으로 바로 다시 요청한다(전망 결과는 새 응답이 올 때까지 그대로 둔다).
+  const retryScore = () => {
+    if (!complete || current.status === 'loading' || !current.applied) return
+    cancelPending()
+    runForecast(baseline, { ...current.applied }, key, seq.current)
+  }
+
   // N-21-8 유효한 변경 조건을 버튼으로 예측한다.
   const forecast = () => {
     if (!canForecast) return
@@ -121,6 +128,7 @@ export function useCashFlowForecast(userId, workerTypeCode) {
     setCondition,
     forecast,
     retry: forecast,
+    retryScore,
     reload: () => setRevision((value) => value + 1),
   }
 }

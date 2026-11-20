@@ -36,7 +36,7 @@ UI 원본은 `5unyCwrGcxS3WrWFUk9qid`의 `1794641606-4f83` 버전으로 앞선 F
 - 첫 로드에 UI 기본 조건(변동 폭 100%, 제때 납부, 12개월, 저장 고정 지출)으로 한 번 예측한다. 이후 조건을 바꾸고 [예측 다시 하기]를 누르면 예측하며 마지막 적용 조건과 같으면 요청하지 않는다.
 - 조건과 적용값을 분리하고 회원·직군·재조회·조건 변경·새 예측·화면 이탈 시 늦은 응답을 무효화한다. 빈 고정 지출·음수·소수·미완성 12개월 소득과 미입력/잘못된 기타 지출·월 상환액은 화면에서 요청하지 않는다. 실패 때만 다시 시도 버튼을 표시한다.
 - 상태 안내는 조건 카드의 고정 5em 공간 한 곳에서 바뀌고 긴 문구는 스크롤로 읽는다. 다시 시도 버튼은 오른쪽 열에 유지한다. 다시 계산할 때도 이전 차트·요약을 유지하며 이전 조건 차트는 흐리게 표시한다. 처음 결과 로딩만 최소 높이 자리표시를 사용한다. 브라우저·반응형 시각 확인은 미실시다.
-- 12개월 실적 다음에 3·6·12개월 전망을 잇고 월 지출선·예상 점수선과 요약 3개를 표시한다. 소득 변동성 KPI는 이번 범위 밖이다.
+- 12개월 실적 다음에 3·6·12개월 전망과 월 지출선을 표시한다. 예상 점수는 시점을 정하지 않은 조건부 값으로 요약하며 소득 변동성 KPI도 함께 표시한다.
 - 납부 밀림을 점수 계산에 반영한 경우 최근 1년 30일 이상 연체 1회 추가 가정을 안내한다. 제때 납부에는 해당 안내를 표시하지 않는다.
 - 소득·지출·상환 기준값이 미입력이면 예측을 거부하며 0으로 채우지 않는다. 현재점수 NULL이면 점수 경로·결과만 미산출로 유지한다.
 
@@ -46,12 +46,8 @@ UI 원본은 `5unyCwrGcxS3WrWFUk9qid`의 `1794641606-4f83` 버전으로 앞선 F
 
 브라우저 동작·반응형·실제 서버 연결과 사용자 최종검수는 미실시다. 화면 동작은 `npm.cmd run dev`로 직접 확인해야 한다. 프론트 테스트 파일은 추가하지 않았다.
 
-## N-22 소득 변동성 (FP-96 후속: mock 임시 계산 분리)
+## N-22 소득 변동성
 
-- 정식 재무 계산은 광희 FP-203 백엔드 API 담당이다. 프론트는 계산하지 않고 API 함수 결과만 표시한다. FP-203 연동은 대기 중이며 경로·응답 계약은 미정이다.
-- `api/incomeVolatilityApi.js` `getIncomeVolatility({ userId, baseline })`: baseline은 현금흐름 화면이 이미 받은 `getCashFlowData` 응답을 그대로 넘긴다(중복 조회 없음). `VITE_USE_MOCK=false`면 미연결 오류이며 mock 자동 대체는 없다.
-- 임시 응답 모양(FP-203 확정 시 adapter에서 맞춤): `{ stats|null, deficits|null, fixedExpenseAmount, lowestMonthVsFixedExpenseAmount, unavailableReason: 'INCOME_MISSING'|'INCOME_INVALID'|null, source }`. `stats`는 평균·중앙값·표준편차·변동계수(%)·0원 달 수·가장 적은 달·최근 3개월 평균과 차이·소득 격차, `deficits`는 부족 달·부족액·다음 도래월·남은 개월이다. 응답은 `adapters/incomeVolatilityAdapter.js`가 검사한다.
-- 계산식은 `mocks/incomeVolatilityMock.js` 한 벌에만 있다. `utils/incomeStats.js`는 기존 이름(`calculateIncomeGap`·`calculateIncomeStats`·`calculateIncomeDeficitMonths`) 호환을 위한 전달만 하며 정식 프론트 계산이 아니다.
-- `IncomeVolatilitySection`은 기존 `data` prop(현금흐름 기준 자료)을 받고, 회원·직군·기준 자료 변경과 화면 이탈 시 늦은 응답을 버린다. 로딩·오류(다시 시도)를 표시하고 NULL 소득은 0으로 바꾸지 않는다. 변동계수 12% 초과 강조는 화면 표시 기준이다.
-- FP-202 페이지 연결은 이번에도 하지 않았다(섹션은 아직 어느 화면에도 붙어 있지 않다).
-
+- DIAG-07-1 `GET /api/members/me/income-volatility`에 연결했다(`api/incomeVolatilityApi.js`가 응답을 화면 모양으로 옮긴다). 프론트는 계산하지 않고 서버 값을 표시한다. mock 모드에서는 `diagnosisMockHandlers.js`가 같은 모양으로 응답한다.
+- `IncomeVolatilitySection`은 현금흐름 화면(`CashFlowPage`)에 표시한다. 회원·직군 변경과 화면 이탈 시 늦은 응답을 버리고, 로딩·오류(다시 시도)를 표시하며 NULL 소득은 0으로 바꾸지 않는다. 변동계수 12% 초과 강조는 화면 표시 기준이다.
+- 가장 가까운 부족 달: 서버의 `nearestDeficitMonth`는 지난 12개월 중 부족했던 달(과거)이므로, 마지막 입력월 + `monthsUntilNearest`로 앞으로 올 연·월을 계산해 보여 준다. 마지막 입력월(`baseline.months`)을 받지 못하면 "N개월 뒤"만 표시한다.
