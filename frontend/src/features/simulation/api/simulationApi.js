@@ -1,4 +1,18 @@
+import { apiGet, apiPost } from '../../../common/api/client.js'
+// mock 모드에서 쓸 응답을 자동 등록한다 (VITE_USE_MOCK=false면 등록돼도 무시됨)
+import '../mocks/simulationMockHandlers.js'
+
 import { INPUT_KEYS, describeSimulationError, fromCreditCareBase, toSimulationChanges, validateInputs } from '../adapters/simulationAdapter.js'
+
+const beforeOfferCache = new Map()
+
+// N-18-7 현재 점수의 조회 성공 결과를 재사용한다.
+async function getCachedBeforeOffer(score) {
+  if (beforeOfferCache.has(score)) return beforeOfferCache.get(score)
+  const offer = await getScoreBandOfferInfo(score)
+  beforeOfferCache.set(score, offer)
+  return offer
+}
 
 // N-18-1 SIM-01로 회원의 시뮬레이터 입력 10개 현재값과 현재 대안 점수를 불러온다. 실패는 안내 문구가 담긴 오류로 바꿔 던진다.
 export async function getSimulationInputs(userId) {
@@ -24,7 +38,7 @@ export async function recalculateSimulation({ userId, currentScore, baseline, va
   try {
     response = await recalculateCreditCare({ changes: toSimulationChanges(values, baseline) })
     ;[beforeOffer, afterOffer] = await Promise.all([
-      getScoreBandOfferInfo(response.before.score),
+      getCachedBeforeOffer(response.before.score),
       getScoreBandOfferInfo(response.after.score),
     ])
   } catch (error) {
@@ -53,10 +67,6 @@ function hasExactInputKeys(input) {
   const keys = Object.keys(input)
   return keys.length === INPUT_KEYS.length && INPUT_KEYS.every((key) => Object.hasOwn(input, key))
 }
-
-import { apiGet, apiPost } from '../../../common/api/client.js'
-// mock 모드에서 쓸 응답을 자동 등록한다 (VITE_USE_MOCK=false면 등록돼도 무시됨)
-import '../mocks/simulationMockHandlers.js'
 
 // N-18 신용케어 시뮬레이터 API 경로 정의
 export const SIMULATION_API = Object.freeze({

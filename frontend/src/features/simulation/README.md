@@ -12,7 +12,7 @@
 - SIM-01 `GET /api/members/me/credit-care-base`: 현재 점수·입력 기준값. 감점 요인은 서버가 준다(PR #103). 응답에 `topReductionFactors`가 있으면 첫 화면 감점 카드에 쓴다(없으면 재계산 전까지 안내 문구).
 - SIM-02 `POST /api/members/me/credit-care-recalculate`: 변경한 입력으로 재계산한다. 응답의 `topReductionFactors`로 감점 카드를 갱신한다.
 - SIM-04 점수대별 금리·한도: 재계산 점수에 대한 예상 금리·한도를 가져온다.
-- 실패는 `describeSimulationError`로 안내 문구를 만들어 보여 준다. 실패 후 mock으로 바꾸지 않는다. mock 모드(`VITE_USE_MOCK`)에서는 `mocks/`가 같은 모양으로 응답한다.
+- 실패는 `describeSimulationError`로 안내 문구를 만들어 보여 준다. 실패 후 mock으로 바꾸지 않는다. mock 모드(`VITE_USE_MOCK`)에서는 `simulationMockHandlers.js`가 응답한다.
 - SIM-03은 만들지 않았다. 추천은 아래처럼 LOAN-01과 화면 선택으로 한다.
 
 ## 입력과 계산
@@ -31,4 +31,4 @@
 
 ## 확인
 
-11/19 경환이 `npm run dev`로 mock을 끈 DB 연동 환경에서 첫 화면 감점 요인, 재계산, 추천 상품을 확인했다. 이후 추가한 감점 예시 버튼의 DB 연동 화면은 별도 확인이 필요하다.
+11/19 경환이 `npm run dev`로 mock을 끈 DB 연동 환경에서 첫 화면 감점 요인, 재계산, 추천 상품을 확인했다. 11/20 경환이 실제 서버 모드에서 [예시 값 넣어 보기]를 눌러 해당 칸 강조와 예시 값 자동 입력을 확인했다.
