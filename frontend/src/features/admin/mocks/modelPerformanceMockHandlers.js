@@ -6,10 +6,12 @@ import { requireMockAdmin } from './adminMockShared.js'
 
 // N-25 모형 성능 비교 mock (ADM-01·02) — 실제 응답과 같은 모양으로 돌려준다.
 // 건수·불량 수·AUC는 B조 평가 표 MODEL_EVAL_SAMPLE(3,085행)과 METRICS_JSON 값과 같다(11/19 FP-235).
+// 11/20 ACTIVE 모델 0.2 기준으로 맞춤: LEGACY AUC는 0.2 same_label_comparison(5개 시드 평균),
+// THINFILE AUC는 load_model_eval_sample_lgbm_base_0_2.sql 점수로 계산한 시드 1개 값. 불량 수는 라벨이 모델과 무관해 0.1과 같다.
 // 컷오프별 지표·ROC 점·직군별 오거절률은 컷오프에 따라 움직이는 **시연용 예시**이며 실제 계산 결과가 아니다(FP-184에서 표로 계산).
 // 단위는 실제 API와 같다: 비율·ROC 좌표는 % 소수 둘째 자리, AUC는 0~1(API README 3장). 아래 계산은 0~1로 하고 내보낼 때 %로 바꾼다.
 
-const MODEL_VERSION = 'LGBM-BASE-0.1'
+const MODEL_VERSION = 'LGBM-BASE-0.2'
 // ROC 점 개수 — 실제 API처럼 기준 점수 0, 10, …, 1010마다 한 점(102개). 화면이 컷오프/10번째 점을 컷오프 위치로 쓴다.
 const ROC_POINT_COUNT = 101
 
@@ -20,15 +22,15 @@ const GROUP_EXAMPLES = {
     sampleBasis: 'VALID',
     aucBasis: 'SEED_MEAN_5',
     penalty: 0,
-    DELINQ: { auc: [0.6049, 0.5991], bad: 174, improve: 0 },
-    NONFIN: { auc: [0.6102, 0.6533], bad: 175, improve: 0.8 },
+    DELINQ: { auc: [0.6047, 0.6078], bad: 174, improve: 0 },
+    NONFIN: { auc: [0.608, 0.6591], bad: 175, improve: 0.8 },
   },
   THINFILE: {
     sampleBasis: 'TRAIN_VALID',
     aucBasis: 'SINGLE_SEED',
     penalty: 0.06,
-    DELINQ: { auc: [0.5712, 0.5654], bad: 122, improve: 0 },
-    NONFIN: { auc: [0.5598, 0.6148], bad: 117, improve: 1.2 },
+    DELINQ: { auc: [0.5798, 0.5867], bad: 122, improve: 0 },
+    NONFIN: { auc: [0.5605, 0.6263], bad: 117, improve: 1.2 },
   },
 }
 
