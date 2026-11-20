@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- N-15-2 같은 직군·연령대 회원 평균(DIAG-01, FP-160)용 회원 표 조회. 기준월은 회원마다 가장 늦은 소득월(DDL 11/10 결정, IncomeVolatilityMapper와 같은 규칙) -->
+<mapper namespace="com.baeksuescape.finance.mapper.PeerBenchmarkMapper">
+
+    <resultMap id="peerMemberRowMap" type="com.baeksuescape.finance.dto.peer.PeerMemberRow">
+        <result property="userId" column="USER_ID"/>
+        <result property="workerTypeCode" column="WORKER_TYPE_CODE"/>
+        <result property="birthYear" column="BIRTH_YEAR"/>
+        <result property="totalAssetAmount" column="TOTAL_ASSET_AMT"/>
+        <result property="totalDebtAmount" column="TOTAL_DEBT_AMT"/>
+    </resultMap>
+
+    <resultMap id="peerIncomeRowMap" type="com.baeksuescape.finance.dto.peer.PeerIncomeRow">
+        <result property="userId" column="USER_ID"/>
+        <result property="baseMonth" column="BASE_MONTH"/>
+        <result property="incomeAmount" column="INCOME_AMT"/>
+    </resultMap>
+
+    <!-- 평균 대상 회원 조건: 일반 회원, 탈퇴 아님, 직군·출생연도 있음, 소득 행 1개 이상(아래 M과 JOIN) -->
+    <sql id="peerMemberWhere">
+        WHERE U.ROLE_CODE = 'ROLE_USER'
+          AND U.ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
+          AND U.WORKER_TYPE_CODE IS NOT NULL
+          AND U.BIRTH_YEAR IS NOT NULL
+    </sql>
+
+    <!-- 회원 한 명당 1행: 기준월의 총자산(없으면 0)과 대출 잔액 합(없으면 0) -->
+    <select id="selectPeerMembers" resultMap="peerMemberRowMap">
+        SELECT U.USER_ID, U.WORKER_TYPE_CODE, U.BIRTH_YEAR,
+               NVL(A.TOTAL_ASSET_AMT, 0) AS TOTAL_ASSET_AMT,
+               (SELECT NVL(SUM(L.BALANCE_AMT), 0)
+                  FROM USER_LOAN L
+                 WHERE L.USER_ID = U.USER_ID
+                   AND L.BASE_MONTH = M.BASE_MONTH) AS TOTAL_DEBT_AMT
+          FROM APP_USER U
+          JOIN (SELECT USER_ID, MAX(BASE_MONTH) AS BASE_MONTH
+                  FROM USER_INCOME_MONTH
+                 GROUP BY USER_ID) M ON M.USER_ID = U.USER_ID
+          LEFT JOIN USER_ASSET_SNAPSHOT A ON A.USER_ID = U.USER_ID AND A.BASE_MONTH = M.BASE_MONTH
+        <include refid="peerMemberWhere"/>
+         ORDER BY U.USER_ID
+    </select>
+
+    <!-- 평균 대상 회원의 최근 12개월 소득: 회원마다 최신 12행을 고른 뒤 기준월 오름차순 -->
+    <select id="selectRecentIncomes" resultMap="peerIncomeRowMap">
+        SELECT USER_ID, BASE_MONTH, INCOME_AMT
+          FROM (SELECT I.USER_ID, I.BASE_MONTH, I.INCOME_AMT,
+                       ROW_NUMBER() OVER (PARTITION BY I.USER_ID ORDER BY I.BASE_MONTH DESC) AS RN
+                  FROM USER_INCOME_MONTH I
+                  JOIN APP_USER U ON U.USER_ID = I.USER_ID
+                <include refid="peerMemberWhere"/>)
+         WHERE RN &lt;= 12
+         ORDER BY USER_ID, BASE_MONTH
+    </select>
+</mapper>
