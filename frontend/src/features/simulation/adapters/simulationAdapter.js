@@ -1,3 +1,5 @@
+import { GRADE_LABELS } from '../../../common/config/grades.js'
+
 // N-18 서버(또는 mock) 응답을 화면 모델로 바꾸고, 입력을 검증한다. 화면 상태와 API 호출은 여기서 다루지 않는다.
 
 // N-18-2·N-18-3 입력 10개와 화면 범위. 슬라이더 범위는 UI 참고자료 기준이며 금액은 원 단위 0 이상이다.
@@ -29,8 +31,6 @@ const API_CHANGE_KEYS = {
   loanBalance: 'LOAN_BALANCE_AMT',
   privateLenderBalance: 'PRIVATE_LENDER_LOAN_BALANCE_AMT',
 }
-
-export const GRADE_LABELS = { GOOD: 'Good', STANDARD: 'Standard', CAUTION: 'Caution' }
 
 // 부호를 붙여 보여 준다(0은 ±0).
 export function formatSigned(value) {

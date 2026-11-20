@@ -1,5 +1,6 @@
 import { Card, Chip } from '../../../common/components/index.js'
-import { formatSigned, GRADE_LABELS } from '../adapters/simulationAdapter.js'
+import { formatSigned } from '../adapters/simulationAdapter.js'
+import { GRADE_LABELS } from '../../../common/config/grades.js'
 
 const gradeText = (code) => GRADE_LABELS[code] ?? '—'
 const rateText = (value) => (value === null ? '—' : `연 ${value.toFixed(1)}%`)
