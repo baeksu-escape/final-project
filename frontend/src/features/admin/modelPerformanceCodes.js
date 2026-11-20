@@ -10,8 +10,6 @@ export const MODEL_GROUPS = Object.freeze([
 ])
 export const DEFAULT_GROUP = 'LEGACY'
 
-<<<<<<< HEAD
-=======
 // ADM-01 응답 aucBasis → AUC 출처 이름. 서버는 LEGACY라도 5개 시드 평균 값이 DB에 없으면 SINGLE_SEED를 주므로
 // 화면은 집단이 아니라 응답 값으로 출처를 표시한다(위 MODEL_GROUPS.aucBasis는 응답이 없을 때만 쓰는 기본값).
 export const AUC_BASIS_LABELS = Object.freeze({
@@ -19,7 +17,6 @@ export const AUC_BASIS_LABELS = Object.freeze({
   SINGLE_SEED: '시드 1개 값',
 })
 
->>>>>>> 5a3ee5e0b4a8374d3eb68ddcb44c18ce29f0cb32
 // N-25-1 비교 라벨 — 두 모형을 같은 정답으로 맞춰 비교한다(피처 정의서 C20). 표의 점수 열도 라벨마다 따로 있다.
 export const MODEL_LABELS = Object.freeze([
   { value: 'DELINQ', label: '연체 라벨' },

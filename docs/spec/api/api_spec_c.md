@@ -6,11 +6,8 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
-<<<<<<< HEAD
 > - 🆕 11/20 (동주, FP-184) N-25 모형 성능 비교 ADM-01 `GET /api/admin/model-performance`·ADM-02 `/roc` 구현. ACTIVE 모델의 평가 표본(`MODEL_EVAL_SAMPLE`)으로 계산하고, 표본이 없으면 409 `MODEL_EVAL_NOT_READY`(새 오류 code). 맨 아래 「N-25 모형 성능 비교」 절.
-=======
 > - 🆕 11/20 (광희, FP-239) N-16 자산·부채 저장값 `GET /api/members/me/financial-health`(DIAG-03-1) 추가: 총자산·연소득·총부채·연 원리금·보유 대출 목록, 미입력은 null. 정의서의 옛 경로 `GET /api/diagnosis/health`를 대신한다. 비율은 화면이 이 값으로 DIAG-03 POST를 불러 구한다. 같은 PR에서 DIAG-09 '밀림' 반영: `paymentStatus=DELAYED`면 최근 1년 30일 이상 연체 +1로 예상 점수를 구하고 응답에 `assumedDelinquencyCount`를 추가, `paymentStatusApplied`는 밀림일 때 `true`(범영 11/20 동의).
->>>>>>> fbf0001ef71a1e8b01de84e475189561fb8c76c4
 > - 🆕 11/20 (동주, FP-160) N-15 같은 직군·연령대 회원 평균 `GET /api/members/me/peer-benchmark`(DIAG-01) 추가. 11/19 팀 결정대로 공공통계 대신 회원 표에서 계산한다. 정의서의 옛 경로 `/api/finance/peer-benchmark`·원천(FACT_*)은 범영 님이 정의서에 반영한다. DIAG-02(`/all`)는 쓰는 화면이 없어 만들지 않았다. PR 리뷰 반영: 미입력 자산·대출은 평균에서 빼고(O-15), 금액별 인원 3개를 추가했으며, 소득은 기준월 포함 최근 12개월만 쓴다.
 > - 🆕 11/20 (광희, FP-167) N-17 시나리오 테스트 API 2개 추가: `GET /api/members/me/scenario-base`(기준값)·`POST /api/members/me/scenario-recalculate`(상환 여력 재계산). 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다. 버틸 수 있는 개월 수의 "총자산 25%"는 임시 가정(팀 결정 대기). 금리 변화는 변동금리 대출의 상환액에만 반영하고 대출마다 금리 하한은 0%다(리뷰 반영, 고정 상환액은 줄지 않음).
 > - 🆕 11/19 (광희, FP-180) N-30-1 용어 사전 `GET /api/glossary`(HELP-01) 추가, 기준 데이터 `docs/spec/sql/add_glossary_term.sql`(20개).
