@@ -51,10 +51,10 @@ export default function RocCurveChart({ legacy, alternative, cutoff, caption }) 
       <text x={14} y={toY(0.5)} fontSize="11" fill="var(--mut2)" textAnchor="middle" transform={`rotate(-90 14 ${toY(0.5)})`}>
         참 양성률
       </text>
-      <text x={toX(1) - 4} y={toY(0.07)} fontSize="11" fill="var(--mut)" textAnchor="end">
+      <text x={toX(1) - 4} y={toY(0.07)} fontSize="11" fill="var(--mut2)" textAnchor="end">
         기존 모형
       </text>
-      <text x={toX(1) - 4} y={toY(0.13)} fontSize="11" fill="var(--mint)" textAnchor="end">
+      <text x={toX(1) - 4} y={toY(0.13)} fontSize="11" fill="var(--vio2)" textAnchor="end">
         대안 모형
       </text>
     </svg>
