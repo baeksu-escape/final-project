@@ -1,6 +1,6 @@
 -- N-25 기존 DB에 모형 성능 비교용 평가 표본 표 MODEL_EVAL_SAMPLE만 추가한다 (DDL v0.3.2 C10, FP-235). 빈 표만 만들고 데이터는 넣지 않는다.
 -- MODEL_REGISTRY와 DIM_WORKER_TYPE이 있는 스키마에서 한 번 실행한다. Oracle DDL은 자동 COMMIT된다. 같은 이름의 표가 이미 있으면 오류로 중단한다.
--- 표를 만든 뒤 load_model_eval_sample_lgbm_base_0_1.sql로 평가 표본을 적재한다. 공용 DB는 DB 담당이 실행한다.
+-- 표를 만든 뒤 load_model_eval_sample_lgbm_base_0_1.sql로 평가 표본을 적재한다. 공용 DB는 PR 작성자가 병합 후 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」).
 -- 새로 DDL을 실행하는 DB(avenue_ddl.sql)에는 이미 들어 있으므로 실행하지 않는다.
 SET DEFINE OFF
 WHENEVER SQLERROR EXIT FAILURE ROLLBACK

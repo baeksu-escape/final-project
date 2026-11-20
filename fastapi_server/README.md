@@ -39,7 +39,7 @@ uvicorn main:app --port 8000
 3. `SHA256SUMS.txt`가 있으면 서버가 켜질 때 **joblib을 열기 전에 해시를 자동으로 대조**한다. 하나라도 다르면 모델을 열지 않고 "준비 안 됨"(로그에 `model hash mismatch`)이다. joblib은 불러올 때 파일 안의 코드가 실행될 수 있으므로 이 묶음 외의 `.joblib`은 넣지 않는다.
 4. 서버를 다시 켜고 http://localhost:8000/v1/health 에서 `"modelLoaded": true`인지 본다.
 
-**공용 DB를 실제 모델로 전환하는 절차 (DB 담당)**
+**공용 DB를 실제 모델로 전환하는 절차 (모델 전환 PR 작성자, 11/20 규칙)**
 1. 시연·공유에 쓰는 서버 PC의 `artifacts/`에 위 5개 파일을 넣고 FastAPI를 켠다 → `/v1/health`가 **`"modelLoaded": true`**인지 확인한다. false면 여기서 멈춘다(그대로 바꾸면 모든 점수 요청이 503 → `MODEL_ERROR` 저장).
 2. 공용 DB에 FS-V1 기준 데이터가 있는지 본다: `SELECT COUNT(*) FROM DIM_FEATURE WHERE FEATURE_SET_VERSION = 'FS-V1'` → 38(없으면 `docs/spec/sql/add_fs_v1_feature_set.sql` → `seed/avenue_seed_dim_feature_fs_v1.sql`).
 3. 팀에 "지금 실제 모델로 바꾼다"고 알린 뒤, SQL Developer **공용 DB 접속**에서 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`을 F5로 실행한다 → `LGBM-BASE-0.1` ACTIVE, `DEV-DUMMY` RETIRED.

@@ -14,9 +14,9 @@
 --    비금융 효과 라벨의 차이(+0.0511)는 합성 데이터에 설계해 넣은 효과가 반영된 값이다.
 --  - 최종 발표 값은 FP-144(TEST)로 확정한다.
 --
--- 이 SQL은 JSON_MERGEPATCH로 same_label_comparison 키만 더한다. 그래서 DB 담당이 0.2 등록 SQL로 넣은 METRICS_JSON의 기존 항목(label, valid_auc_* 등)은 그대로 남는다.
+-- 이 SQL은 JSON_MERGEPATCH로 same_label_comparison 키만 더한다. 그래서 0.2 등록 SQL이 넣은 METRICS_JSON의 기존 항목(label, valid_auc_* 등)은 그대로 남는다.
 -- 먼저 0.2 등록 SQL을 실행해 두 행이 있어야 한다(없으면 멈춘다). 다시 실행해도 같은 키를 같은 값으로 덮어써서 결과가 같다.
--- 오류가 나면 두 행이 함께 취소된다. 공용 DB 실행은 DB 담당이 한다. SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다.
+-- 오류가 나면 두 행이 함께 취소된다. 공용 DB는 PR 작성자가 병합 후 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」). SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다.
 -- ====================================================================
 WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
 WHENEVER OSERROR EXIT FAILURE ROLLBACK

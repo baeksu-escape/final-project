@@ -3,7 +3,7 @@
 -- docs/spec/sql/seed/avenue_seed_dim_feature_fs_v1.sql을 한 번 실행해서 넣는다(FS-V1 행이 먼저 있어야 한다).
 -- 새로 DDL을 실행하는 DB는 avenue_ddl.sql 기준 데이터에 이미 들어 있으므로 이 파일이 필요 없다.
 -- 이미 같은 버전이 있으면 넣지 않으므로 다시 실행해도 된다. 서비스는 바뀌지 않는다: MODEL_REGISTRY의 ACTIVE는 그대로이며,
--- ACTIVE 전환(DEV-DUMMY를 RETIRED로, LGBM-BASE-0.1을 ACTIVE로)은 이 파일에 없고 DB 담당이 따로 한다.
+-- ACTIVE 전환(DEV-DUMMY를 RETIRED로, LGBM-BASE-0.1을 ACTIVE로)은 이 파일에 없고 activate_model_lgbm_base_0_1.sql이 따로 한다.
 -- SQL*Plus/SQLcl/SQL Developer에서 대상 스키마 소유자로 실행한다.
 WHENEVER SQLERROR EXIT SQL.SQLCODE
 WHENEVER OSERROR EXIT FAILURE

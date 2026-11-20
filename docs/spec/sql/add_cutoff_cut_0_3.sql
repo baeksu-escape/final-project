@@ -5,7 +5,7 @@
 -- DRAFT라서 서비스는 바뀌지 않는다: ACTIVE는 계속 CUT-0.1(665·780)이고, CUT-0.3을 ACTIVE로 옮기는 일은 이 파일에 없다
 -- (팀이 전환 시점을 정한 뒤 FastAPI 상수와 함께 따로 한다. ACTIVE는 동시에 1개만 허용된다).
 -- 이미 같은 버전·구간이 있고 값이 같으면 넣지 않으므로 다시 실행해도 된다. 상태가 DRAFT가 아니거나 경계·표시 순서가 다르면 아무것도 바꾸지 않고 오류(-20141~-20143)로 멈춘다. 일부 구간만 있으면 있는 구간이 같은 값일 때만 빠진 구간을 채운다. CUT-0.1·CUT-0.2는 건드리지 않는다. 오류가 나면 두 단계가 함께 취소된다.
--- SQL*Plus/SQLcl/SQL Developer에서 대상 스키마 소유자로 실행한다. 공용 DB 실행은 DB 담당이 한다.
+-- SQL*Plus/SQLcl/SQL Developer에서 대상 스키마 소유자로 실행한다. 공용 DB는 PR 작성자가 병합 후 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」).
 WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
 WHENEVER OSERROR EXIT FAILURE ROLLBACK
 
@@ -18,7 +18,7 @@ BEGIN
   BEGIN
     SELECT STATUS_CODE INTO v_status FROM SCORE_CUTOFF_VERSION WHERE CUTOFF_VERSION = 'CUT-0.3';
     IF v_status <> 'DRAFT' THEN
-      RAISE_APPLICATION_ERROR(-20141, 'CUT-0.3의 상태가 DRAFT가 아닙니다(' || v_status || '). 값을 확인한 뒤 DB 담당과 정하세요.');
+      RAISE_APPLICATION_ERROR(-20141, 'CUT-0.3의 상태가 DRAFT가 아닙니다(' || v_status || '). 값을 확인한 뒤 팀과 정하세요.');
     END IF;
   EXCEPTION
     WHEN NO_DATA_FOUND THEN NULL;
