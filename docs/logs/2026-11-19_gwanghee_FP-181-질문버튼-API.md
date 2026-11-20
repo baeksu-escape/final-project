@@ -37,19 +37,21 @@
   - 범영 님(DB 담당): 병합 후 공용 DB에 `add_chatbot_preset_question.sql` 실행(체크리스트 9). 로컬 DB는 각자 실행
   - 경환 님(더미 DB 생성기): 나중에 생성기·`99_check.sql`에 넣을지는 선택(지금은 별도 파일로 충분)
   - 용어 도우미 화면(FP-207): `getChatbotPresets()`를 쓸 수 있다
-  - 범영·우찬 님: API 정의서 HELP-02 상태 🟡 → ✅ 반영
+  - 범영 님: 이 PR은 `api_definition.md`를 고치지 않는다. 병합 후 정의서 HELP-02 상태를 🟡 → ✅로 바꾸는 것은 후속 작업이다(PR 본문으로 요청)
 
 ## 확인
 - 확인함
   - `./mvnw clean test`: 394개 통과(실패 0). `ChatbotServiceTest` 2개, `ChatbotControllerTest` 2개 포함.
   - `npm run lint` 오류 0, `npm run build` 성공
   - 시드 SQL: 4행, 길이가 DDL 제한 안(질문 최대 35자/200, 답 최대 267자/2000)임을 스크립트로 확인
+  - 🆕 11/20 최신 develop(FP-180 #108 병합 포함) 반영 후 다시 확인: `./mvnw clean test` 398개 통과, `npm run lint` 오류 0, DB 통합 테스트(`-Ddb.it=true`, 로컬 DB, 키는 일회용 값으로 덮어씀) `ChatbotMapperIT`·`GlossaryMapperIT` 포함 6종 통과
 - 확인 못 함
-  - `ChatbotMapperIT`(`-Ddb.it=true`): 실제 설정 환경변수(`AVENUE_JWT_SECRET` 등)가 이 터미널에 없어 실행하지 못했다. 광희 님 환경에서 실행이 필요하다.
-  - 시드 SQL을 실제 Oracle에 실행해 보지 않았다.
+  - 시드 SQL의 Oracle 실행 확인은 병합 후 DB 담당이 실행하면서 `COUNT = 4`로 확인한다.
 
 ## 다음 사람이 알아야 할 것
 - FP-180(용어 사전, `feature-C/FP-180-glossary`)과 같은 `help` 패키지에 다른 파일을 추가했다. 코드 충돌은 없지만 `api_spec_c.md`의 「최근 변경」 줄과 문서 끝 절이 같은 자리라, 나중에 병합하는 쪽에서 두 쪽 내용을 모두 남긴다.
+  - 🆕 11/20 FP-180(#108)이 먼저 병합되어 이 브랜치에서 develop을 반영하며 정리했다. 「최근 변경」 두 줄을 모두 두고, 문서 끝은 N-30-1 절(FP-180) 다음에 N-32-1 절(FP-181)을 두었다. 어느 쪽 내용도 지우지 않았다.
+- 🆕 11/20 FP-180 리뷰와 같은 형식으로 SQL의 `WHENEVER SQLERROR`·`OSERROR`에 `ROLLBACK`을 붙였다(FP-139 e33120d와 같음).
 - HELP-03(자유 질문)은 `ChatbotMapper`·`ChatbotService`·`ChatbotController`에 이어서 추가한다. 하루 횟수는 `APP_SETTING.CHATBOT_DAILY_LIMIT`(10)을 쓰고, `CHATBOT_QUESTION_LOG`에는 질문 글을 저장하지 않으며 `SUCCESS_YN = 'Y'`만 센다.
 
 ## 검수

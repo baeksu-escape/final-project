@@ -15,8 +15,8 @@
 -- 적용한 DB에서는 dummy_db/99_check.sql의 CHATBOT_PRESET_QUESTION 기대값(0)과 실제(4)가 다르게 나오는 것이 정상이다.
 -- SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다.
 -- ====================================================================
-WHENEVER SQLERROR EXIT SQL.SQLCODE
-WHENEVER OSERROR EXIT FAILURE
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
+WHENEVER OSERROR EXIT FAILURE ROLLBACK
 
 MERGE INTO CHATBOT_PRESET_QUESTION t
 USING (
