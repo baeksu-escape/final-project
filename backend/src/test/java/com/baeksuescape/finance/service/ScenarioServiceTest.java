@@ -126,7 +126,7 @@ class ScenarioServiceTest {
     }
 
     @Test
-    @DisplayName("소득 -20%·지출 +10%는 공통 재계산 틀로 반영되고, 적자면 ⌊총자산 × 25% ÷ 월 부족액⌋개월을 버틴다")
+    @DisplayName("소득 -20%·지출 +10%는 공통 재계산 틀로 반영되고, 적자면 ⌊총자산 × 15% ÷ 월 부족액⌋개월을 버틴다")
     void shortfall() {
         givenStored(40_000_000L);
 
@@ -135,8 +135,8 @@ class ScenarioServiceTest {
         assertEquals(2_400_000L, r.changed().monthlyIncomeAmount());
         assertEquals(1_980_000L, r.changed().monthlyExpenseAmount());
         assertEquals(-80_000L, r.changed().monthlySurplusAmount());
-        // 4,000만 × 25% = 1,000만 ÷ 8만 = 125개월
-        assertEquals(125L, r.survivableMonths());
+        // 4,000만 × 15% = 600만 ÷ 8만 = 75개월
+        assertEquals(75L, r.survivableMonths());
         assertEquals(ScenarioService.SHORTFALL, r.verdict());
         assertEquals(0L, r.monthlyInterestChangeAmount());
     }
