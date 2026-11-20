@@ -52,7 +52,7 @@ E2E-09B는 다른 시연 계정(기본: `--login`이 아닌 첫 계정)으로도
 
 ## 4. 평가 조회 실행 계획 점검 (SQL)
 - [explain_assessment_queries.sql](explain_assessment_queries.sql): 리포트·진단 내역·시뮬레이터가 부르는 쿼리 6개가 인덱스를 쓰는지 본다. 서비스 표는 바꾸지 않고, 계획을 적은 `PLAN_TABLE`의 자기 행만 끝에 지우고 COMMIT한다(새 창에서 실행).
-- [gather_assessment_stats.sql](gather_assessment_stats.sql): 평가 행 수가 많이 바뀐 뒤에만 먼저 실행한다. **통계를 바꾸는 파일**이라 따로 뗐다(데이터는 그대로). 공용 DB는 DB 담당이 판단한다.
+- [gather_assessment_stats.sql](gather_assessment_stats.sql): 평가 행 수가 많이 바뀐 뒤에만 먼저 실행한다. **통계를 바꾸는 파일**이라 따로 뗐다(데이터는 그대로). 공용 DB에서는 실행하지 않는다한다.
 
 ## 5. 결과 기록
 점검할 때마다 날짜·DB(로컬/공용)·계정·PASS/FAIL 수를 작업 로그(`docs/logs/`)에 남긴다.
