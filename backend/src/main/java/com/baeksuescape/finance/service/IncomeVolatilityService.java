@@ -161,8 +161,9 @@ public class IncomeVolatilityService {
     /**
      * 저장된 소득을 계산 입력(MonthlyIncomeItem)으로 바꾼다. 급여소득자는 월급 1행을 마지막 기준월까지 12개월로 펼친다(연소득 = 월급 × 12).
      * 각 달의 지출에는 같은 월 지출 금액을 넣는다(지출은 월별이 아니라 평소 월 금액 하나만 저장된다).
+     * 시나리오 테스트(ScenarioService, N-17-1)도 같은 기준 소득을 쓰므로 같은 패키지에서 함께 쓴다.
      */
-    private List<MonthlyIncomeItem> loadIncomeHistory(long userId, long monthlyExpense) {
+    List<MonthlyIncomeItem> loadIncomeHistory(long userId, long monthlyExpense) {
         List<IncomeMonthRow> rows = incomeVolatilityMapper.selectRecentIncomeMonths(userId);
         if (rows == null || rows.isEmpty()) {
             throw new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "저장된 소득 데이터가 없습니다.");

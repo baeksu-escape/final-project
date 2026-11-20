@@ -6,6 +6,7 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
+> - 🆕 11/20 (광희, FP-167) N-17 시나리오 테스트 API 2개 추가: `GET /api/members/me/scenario-base`(기준값)·`POST /api/members/me/scenario-recalculate`(상환 여력 재계산). 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다. 버틸 수 있는 개월 수의 "총자산 25%"는 임시 가정(팀 결정 대기). 금리 변화는 변동금리 대출의 상환액에만 반영하고 대출마다 금리 하한은 0%다(리뷰 반영, 고정 상환액은 줄지 않음).
 > - 🆕 11/19 (광희, FP-180) N-30-1 용어 사전 `GET /api/glossary`(HELP-01) 추가, 기준 데이터 `docs/spec/sql/add_glossary_term.sql`(20개).
 > - 🆕 11/19 (광희, FP-170 추가 수정) 저장 데이터를 읽는 API 5개를 팀 공통 규칙대로 `/api/members/me/**`로 옮기고 옛 경로를 지웠다(우찬 님 합의): SIM-01 `credit-care-base`, SIM-02 `credit-care-recalculate`, DIAG-07-1 `income-volatility`, DIAG-08-1 `cash-flow-forecast`, DIAG-09 `cash-flow-expected-score`. 로그인 확인은 보안 설정이 한다(토큰 없음 401, 관리자 403). SIM-01에 `topReductionFactors`, DIAG-08-1에 기준값 3개(`baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`)를 추가했다(경환 님 요청).
 > - 🆕 11/18 (광희, FP-170) SIM-01 `credit-care/base`·DIAG-09 `cash-flow/expected-score` 추가, SIM-02 Spring 구현(출발 평가 = 최근 SCORED, 404 `ASSESSMENT_NOT_FOUND`).
@@ -265,6 +266,83 @@
   | 409 | `INPUT_INCOMPLETE` | 저장된 입력 기준월이 없거나 출생연도가 없음(점수 산출과 같은 문구). 🆕 11/19 소득이 직군에 필요한 개월 수(자영업자·프리랜서 12, 급여소득자 1)보다 적거나 같은 달이 겹치면 ML-03을 부르지 않고 "소득을 필요한 개월 수만큼 입력해 주세요."(점수 산출과 같음, 0원으로 채워 계산하지 않음) |
   | 503 | `MODEL_NOT_READY` | ML-03 연결 실패·시간 초과·5xx. 저장하지 않으므로 MODEL_ERROR 기록을 남기지 않는다 |
 - 프론트: `diagnosisApi.js`의 `getExpectedScore({ incomeVariationPct, incomeChangePercent, fixedExpenseAmount, expenseChangePercent, paymentStatus })`. mock은 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"으로만 계산하며, 진짜 모델 점수가 아니다.
+
+---
+
+## N-17 시나리오 테스트 (FP-167, 담당 광희) 🆕 11/20
+
+로그인 회원의 저장 데이터에 금리·소득·지출 변화를 넣어 **상환 여력**(월 잉여, 상환 부담률, 월 이자 변화, 버틸 수 있는 개월 수)을 다시 계산한다. **점수는 구하지 않고**(점수 예측은 N-21 DIAG-09) **저장하지 않는다**.
+
+- 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(DIAG-04, 프론트 mock만 있음)를 아래 두 경로로 대신한다. 기준값을 서버가 저장 데이터에서 읽으므로 요청에 기준값을 보내지 않는다.
+- 로그인 확인은 보안 설정이 한다: 토큰 없음 `401 UNAUTHORIZED`, 관리자 계정 `403 FORBIDDEN`(`/api/members/me/**`는 `ROLE_USER` 전용).
+
+### 계산에 쓰는 저장 데이터 (기준월 = 소득 기준월, 현금흐름 전망과 같음)
+
+| 값 | 출처 | 없을 때 |
+|---|---|---|
+| 월 소득 | `USER_INCOME_MONTH` 최근 12개월 평균(급여소득자는 월급 그대로). DIAG-08-1과 같은 함수 | 소득이 하나도 없으면 404 |
+| 월 지출 | `USER_EXPENSE_ITEM` 기준월 합계 | 0 |
+| 월 상환액 | `USER_LOAN` 기준월 월 원리금 합계 | 0 |
+| 변동금리 대출 | `USER_LOAN` 기준월 `RATE_TYPE_CODE = 'VARIABLE'` 행의 잔액·연 금리·월 원리금(고정·`UNKNOWN` 제외). 기준값 응답에는 잔액 합계만 준다 | 잔액 0(행 없음) |
+| 총자산 | `USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT` 기준월 | `null`(미입력, 0으로 바꾸지 않음) |
+| 현재 정책금리 | `FACT_POLICY_RATE`의 '한국은행 기준금리' 중 기준일이 가장 늦은 행(FP-153 적재 SQL) | `null` |
+
+### GET `/api/members/me/scenario-base` (N-17-1)
+
+- 응답 `200`:
+
+  | 필드 | 형식 | 설명 |
+  |---|---|---|
+  | `monthlyIncomeAmount`, `monthlyExpenseAmount`, `monthlyPaymentAmount` | 정수(원) | 월 소득(12개월 평균)·지출·상환액 |
+  | `variableLoanBalanceAmount` | 정수(원) | 금리 변화를 반영할 변동금리 대출 잔액 |
+  | `totalAssetAmount` | 정수(원) 또는 `null` | 총자산. 미입력이면 `null`(버틸 개월 수를 구하지 않음) |
+  | `policyRate` | 객체 또는 `null` | `{ baseDate: "2026-10-31", ratePct: 3.000 }` 출발 금리(연 %) |
+  | `assumptions` | 문자열 배열 | 화면에 그대로 보여 줄 계산 가정 4개 |
+
+- 오류: `404 NOT_FOUND` "저장된 소득 데이터가 없습니다."(현금흐름 전망과 같음)
+
+### POST `/api/members/me/scenario-recalculate` (N-17-2~5)
+
+- 요청 본문(JSON). 모두 생략할 수 있고, 생략하면 0(변화 없음)이다. 본문이 없어도 된다.
+
+  | 필드 | 형식 | 범위 | 뜻 |
+  |---|---|---|---|
+  | `ratePctPoint` | 소수 | −5 ~ +10 (%p) | 금리 변화. **변동금리 대출 잔액에만** 반영한다 |
+  | `incomePct` | 소수 | −100 ~ +100 (%) | 월 소득 변화 |
+  | `expensePct` | 소수 | −50 ~ +100 (%) | 월 지출 변화 |
+
+- 계산(N-17-3 공통 재계산 틀, 원 단위 반올림):
+  - 바뀐 소득·지출 = 기준값 × (1 + % ÷ 100)
+  - 월 이자 변화 = Σ 변동금리 잔액 × (max(금리 + 변화, 0) − 금리) ÷ 100 ÷ 12. **대출마다 금리는 0% 아래로 내려가지 않는다.** 합계를 낸 뒤 한 번만 반올림한다(HALF_UP, −0.5원 → −1원. 프론트 mock도 같음)
+  - 바뀐 상환액 = 고정 상환액 + max(0, 변동 상환액 + 월 이자 변화). 변동 상환액은 변동금리 대출 월 원리금 합계, 고정 상환액은 전체 월 상환액에서 그것을 뺀 값(고정·`UNKNOWN`)이다. **금리가 내려가도 고정 상환액은 줄지 않는다**
+  - 월 잉여 = 소득 − 지출 − 상환액. 상환 부담률 = 연 원리금 ÷ 연소득 × 100(소수 둘째 자리, N-16-1·N-20-4와 같은 함수). 소득이 0 이하면 `null`
+  - 버틸 수 있는 개월 수 = ⌊총자산 × **25%** ÷ 월 부족액⌋. 조건 반영 후 **적자일 때만** 값이 있고, 흑자이거나 총자산 미입력이면 `null`
+    - ⚠️ 25%는 명세에 기준이 없어 시나리오 화면(경환 FP-210)의 가정을 임시로 쓴다(`ScenarioService.SURVIVABLE_ASSET_RATIO_PCT`, TODO 팀 결정). 바뀌면 기존 필드는 두고 필드를 추가하는 방식으로 고친다.
+- 응답 `200`:
+
+  | 필드 | 형식 | 설명 |
+  |---|---|---|
+  | `current`, `changed` | 객체 | 지금·조건 반영 후. 각각 `monthlyIncomeAmount`, `monthlyExpenseAmount`, `monthlyPaymentAmount`, `monthlySurplusAmount`(원), `dsrPct`(%, 또는 `null`) |
+  | `monthlyInterestChangeAmount` | 정수(원) | 월 이자 변화(±, 대출마다 금리 하한 0% 적용) |
+  | `surplusDiffAmount` | 정수(원) | 조건 반영 후 월 잉여 − 지금 월 잉여 |
+  | `survivableMonths` | 정수 또는 `null` | 버틸 수 있는 개월 수(위 규칙) |
+  | `verdict` | 문자열 | `SHORTFALL`(조건 반영 후 적자), `IMPROVED`(지금보다 잉여 증가), `STILL_POSITIVE`(그 밖, 흑자 유지) |
+  | `assumptions` | 문자열 배열 | 기준값 응답과 같은 계산 가정 |
+
+  ```json
+  { "current": { "monthlyIncomeAmount": 2099498, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 350000, "monthlySurplusAmount": 433984, "dsrPct": 16.67 },
+    "changed": { "monthlyIncomeAmount": 1259699, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 370000, "monthlySurplusAmount": -425815, "dsrPct": 29.37 },
+    "monthlyInterestChangeAmount": 20000, "surplusDiffAmount": -859799, "survivableMonths": 17, "verdict": "SHORTFALL",
+    "assumptions": ["금리 변화는 변동금리 대출 잔액에만 반영하고, …"] }
+  ```
+  (예: 변동금리 대출 1,200만 원·연 5%·월 원리금 20만 원(전체 상환액 35만 원 중), 총자산 3,000만 원, `{ "ratePctPoint": 2, "incomePct": -40 }`. 같은 기준값에 `-5`%p면 금리가 0%까지만 내려가 월 이자 −50,000원, 상환액은 고정 15만 원이 남아 30만 원)
+- 오류:
+
+  | 상태 | code | 언제 |
+  |---|---|---|
+  | 400 | `INVALID_INPUT` | 범위 밖(필드 = 이름). 문구 예: "금리 변화는 -5~+10%p 사이로 입력해 주세요." 조건은 DB를 읽기 전에 검사한다. 숫자로 읽을 수 없는 값(예: `"abc"`)은 공통 처리로 "요청 형식이 올바르지 않습니다."(`fieldErrors` 없음) |
+  | 404 | `NOT_FOUND` | 저장된 소득 데이터가 없음 |
+- 프론트: `diagnosisApi.js`의 `getScenarioBase()`, `recalculateMemberScenario({ ratePctPoint, incomePct, expensePct })`. mock은 위 계산 규칙과 같고, 기준값은 예시값(소득·지출은 시드 회원 2번, 대출·자산은 예시)이다. 옛 `recalculateScenario`(옛 경로 mock)는 지우지 않고 두었다.
 
 ---
 
