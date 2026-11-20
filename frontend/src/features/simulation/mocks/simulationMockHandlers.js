@@ -2,8 +2,6 @@
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { ApiError } from '../../../common/api/ApiError.js'
 import {
-  DUMMY_LOAN_PRODUCTS,
-  getScoreBandOffer,
   SCORE_BAND_OFFER_BASE_DATE,
   SCORE_BAND_OFFER_ROWS,
   SIMULATION_BASE_ASSESSMENT,
@@ -12,42 +10,6 @@ import {
   SIMULATION_FEATURES,
   SIMULATION_MAX_VALUES,
 } from './simulationMockData.js'
-
-// N-18-7 같은 점수대 금리·한도·추천 대출 상품 조회 (3종 추천) — GET은 쿼리스트링, POST는 본문에서 값을 읽는다.
-// query는 공용 mock이 넘기는 URLSearchParams라 get()으로 읽는다(값이 없으면 null).
-function handleLoanRecommend({ body, query }) {
-  const score = Number(query?.get('score') ?? body?.score ?? 680)
-  const jobType = query?.get('jobType') ?? body?.jobType ?? 'FREELANCER'
-  const band = getScoreBandOffer(score)
-
-  // 해당 직군과 점수대에 맞는 상품을 우선 선별하고 3종을 맞춘다.
-  const matched = DUMMY_LOAN_PRODUCTS.filter((prod) =>
-    prod.targetJobTypes.includes(jobType)
-  )
-  const pool = matched.length >= 3 ? matched : DUMMY_LOAN_PRODUCTS
-  const recommended = pool.slice(0, 3).map((prod) => ({
-    productId: prod.productId,
-    productName: prod.productName,
-    institutionName: prod.institutionName,
-    minRate: prod.minRate,
-    maxRate: prod.maxRate,
-    maxLimitAmount: prod.maxLimitAmount,
-    jobType,
-    description: prod.description,
-    isAvailable: score >= prod.minScore,
-    isFavorite: false,
-  }))
-
-  return {
-    score,
-    gradeBand: band.gradeBand,
-    expectedMinRate: band.expectedMinRate,
-    expectedMaxRate: band.expectedMaxRate,
-    expectedLimitAmount: band.expectedLimitAmount,
-    isDummyNotice: true,
-    recommendedProducts: recommended,
-  }
-}
 
 // N-18-5·8 ML-04 changes에 쓰는 키 10개. 이 밖의 키는 오타일 수 있어 오류로 알려 준다(ML-04와 같은 규칙).
 const SIMULATION_CHANGE_KEYS = new Set([
@@ -256,8 +218,6 @@ function handleScoreBandOffer({ query }) {
 // mock 핸들러 등록
 registerMockHandlers({
   'GET /api/simulation/score-band-offer': handleScoreBandOffer,
-  'GET /api/simulation/loans/recommend': handleLoanRecommend,
-  'POST /api/simulation/loans/recommend': handleLoanRecommend,
   'GET /api/members/me/credit-care-base': handleCreditCareBase,
   'POST /api/members/me/credit-care-recalculate': handleCreditCareRecalculate,
 })
