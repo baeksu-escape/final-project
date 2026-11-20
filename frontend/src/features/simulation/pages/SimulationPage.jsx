@@ -11,7 +11,7 @@ import DeductionList from '../components/DeductionList.jsx'
 import SimulationResult from '../components/SimulationResult.jsx'
 import '../styles/simulation.css'
 
-// N-18 신용케어 시뮬레이터 — 조건 10개를 바꾸면 입력이 멈춘 뒤 자동으로 예상 점수와 같은 점수대 참고 상품을 보여 준다.
+// N-18 신용케어 시뮬레이터 — 바꾼 조건을 버튼으로 계산해 예상 점수와 참고 상품을 보여 준다.
 export default function SimulationPage() {
   const { user } = useAuth()
   const sim = useSimulation(user?.userId)
@@ -36,12 +36,12 @@ export default function SimulationPage() {
   const usageRatio = Number.isInteger(values.cardLimitAmount) && values.cardLimitAmount > 0 && Number.isInteger(values.cardMonthlyUsage)
     ? `${Math.round(values.cardMonthlyUsage / values.cardLimitAmount * 100)}%` : '—'
 
-  // N-18-9 예시 값을 칸에 넣고 첫 칸으로 이동한다. 계산은 일반 입력과 같이 0.5초 뒤 자동으로 한다.
+  // N-18-9 예시 값을 칸에 넣고 첫 칸으로 이동한다. 계산은 버튼을 눌러 요청한다.
   const handleFill = (example) => {
     sim.fillValues(example)
     const keys = Object.keys(example)
     setFocusKeys(keys)
-    setToast('예시 값을 넣었습니다. 잠시 뒤 자동으로 예상 점수를 다시 계산합니다.')
+    setToast('예시 값을 넣었습니다. [예상 점수 계산하기]를 눌러 확인해 보세요.')
     setTimeout(() => {
       const input = document.querySelector(`#sim-field-${keys[0]} input`)
       input?.scrollIntoView({ block: 'center', behavior: 'smooth' })
@@ -55,7 +55,7 @@ export default function SimulationPage() {
     <div className="sim-page">
       <header className="sim-heading">
         <h1>신용케어 시뮬레이터</h1>
-        <p>조건을 바꾸면 입력이 멈춘 뒤 자동으로 점수와 알아볼 수 있는 대출이 어떻게 바뀌는지 보여 줍니다.<br />금리·한도는 더미 데이터입니다. 여기서 계산한 점수는 저장되지 않으며 내 실제 점수에는 영향을 주지 않습니다.</p>
+        <p>조건을 바꾸고 [예상 점수 계산하기]를 누르면 점수와 알아볼 수 있는 대출이 어떻게 바뀌는지 보여 줍니다.<br />금리·한도는 더미 데이터입니다. 여기서 계산한 점수는 저장되지 않으며 내 실제 점수에는 영향을 주지 않습니다.</p>
       </header>
       {sim.currentScore === null && <Notice type="warn">저장된 대안 점수가 없어 예상 점수를 계산할 수 없습니다.</Notice>}
 
@@ -89,7 +89,8 @@ export default function SimulationPage() {
           </div>
           <p className="sim-hint">카드 사용 비율 {usageRatio}</p>
           <div className="sim-row">
-            <span className={sim.status === 'invalid' || sim.status === 'error' ? 'sim-warn sim-status' : 'sim-hint sim-status'} role="status">{statusText(sim.status, Boolean(sim.result))}</span>
+            <Button variant="primary" onClick={sim.calculate} disabled={!sim.canCalculate}>예상 점수 계산하기</Button>
+            <span className={sim.status === 'invalid' || sim.status === 'error' || (sim.status === 'idle' && sim.canCalculate) ? 'sim-warn sim-status' : 'sim-hint sim-status'} role="status">{statusText(sim.status, Boolean(sim.result), sim.canCalculate)}</span>
           </div>
           {sim.calcError && !(sim.status === 'invalid' && HIDDEN_INVALID_MESSAGES.includes(sim.calcError)) && <Notice type="warn">{sim.calcError}{sim.status === 'error' && <> <Button size="sm" onClick={sim.retry}>다시 계산</Button></>}</Notice>}
         </Card>
@@ -98,6 +99,7 @@ export default function SimulationPage() {
 
       <Card title="이 점수로 알아볼 수 있는 대출 상품" className="sim-products">
         <div className="sim-row"><span className="sim-hint">더미 상품 · 실제 상품 아님. 같은 점수대의 참고 정보이며 대출 승인을 뜻하지 않습니다.</span><Link to={PATHS.LOANS}>상품 페이지 가기 ›</Link></div>
+        <p className={stale ? 'sim-warn' : 'sim-warn sim-reserve'}>위 상품은 이전 조건으로 계산한 점수 기준입니다. 지금 입력으로 다시 계산되면 바뀝니다.</p>
         {products.error ? <Notice type="warn">{products.error}</Notice>
           : recommendations.length ? <div className="sim-product-grid">{recommendations.map((product) => <LoanProductCard key={product.productId} product={product} score={shownScore} workerTypeCode={user?.jobType} />)}</div>
             : <p className="sim-hint">{shownScore === null ? '점수가 없어 상품을 고를 수 없습니다.' : '이 점수와 직군에 맞는 상품이 없습니다.'}</p>}
@@ -119,13 +121,13 @@ function sliderText(value, field, missing) {
   return value > field.max ? `실제 값 ${value}${field.unit}` : `${value}${field.unit}`
 }
 
-// N-18-4 자동 계산 상태 안내 문구.
-function statusText(status, hasResult) {
-  if (status === 'waiting') return '입력이 멈추면 0.5초 뒤 자동으로 계산합니다.'
+// N-18-4 버튼 계산 상태 안내 문구.
+function statusText(status, hasResult, canCalculate) {
   if (status === 'calculating') return '예상 점수를 계산하는 중입니다.'
   if (status === 'invalid') return '입력값을 확인해 주세요. 올바른 값이 될 때까지 계산을 요청하지 않습니다.'
   if (status === 'error') return '계산하지 못했습니다.'
-  return hasResult ? '지금 조건으로 계산한 결과입니다.' : '값을 바꾸면 자동으로 예상 점수를 계산합니다.'
+  if (canCalculate) return '조건이 바뀌었습니다. 계산하기를 눌러 주세요.'
+  return hasResult ? '지금 조건으로 계산한 결과입니다.' : '조건을 바꾸고 계산하기를 눌러 주세요.'
 }
 
 // N-18-7 대출 상품 화면과 같은 카탈로그(getLoanProducts)를 읽는다. 상품을 따로 정의하지 않는다.
