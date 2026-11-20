@@ -43,7 +43,7 @@
 - 확인함
   - `./mvnw clean test`: 394개 통과(실패 0). `GlossaryServiceTest` 2개, `GlossaryControllerTest` 2개 포함.
   - `npm run lint` 오류 0, `npm run build` 성공
-  - 시드 SQL: 20행, 문자열 길이가 DDL 제한 안에 있음(쉬운 말 최대 37자/200, 뜻 풀이 최대 133자/1000)을 스크립트로 확인
+  - 시드 SQL: 20행, 문자열 길이가 DDL 제한 안에 있음(쉬운 말 최대 37자/200, 뜻 풀이 최대 133자/1000)을 스크립트로 확인. 🆕 11/20 '성수기·비수기' 뜻 풀이에 "실제 계절을 뜻하지 않습니다."를 더해 최대 157자/1000
   - 🆕 11/20 최신 develop(#106까지) 반영 후 다시 확인: `./mvnw clean test` 394개 통과, `npm run lint` 오류 0, DB 통합 테스트(`-Ddb.it=true`, 로컬 DB, 키는 일회용 값으로 덮어씀) `GlossaryMapperIT` 포함 5종 통과
 - 확인 못 함
   - 시드 SQL을 실제 Oracle에 실행해 보지 않았다.
