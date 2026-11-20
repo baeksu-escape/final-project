@@ -752,7 +752,7 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 - 인증: 로그인 필요(보안 설정 "그 밖의 `/api/**`"). 토큰이 없으면 `401 UNAUTHORIZED`다. 회원 데이터를 읽지 않으므로 관리자 계정도 부를 수 있다.
 - 요청 값은 없다. 사전 전체를 **용어 이름 순서**(`ORDER BY TERM`)로 한 번에 돌려준다(수십 행).
 - 사전이 비어 있어도 오류가 아니라 `{ "terms": [] }`다. 화면은 사전에 없는 말을 원래 말 그대로 보여 준다.
-- 기준 데이터: [`docs/spec/sql/add_glossary_term.sql`](../sql/add_glossary_term.sql)(합성 교육용 문구 20개, 다시 실행해도 됨). dummy_db 생성기에는 들어 있지 않아 DDL·시드 다음에 따로 실행한다. 공용 DB 실행은 병합 후 DB 담당(범영)이 한다.
+- 기준 데이터: [`docs/spec/sql/add_glossary_term.sql`](../sql/add_glossary_term.sql)(합성 교육용 문구 20개, 다시 실행해도 됨). dummy_db 생성기에는 들어 있지 않아 DDL·시드 다음에 따로 실행한다. 공용 DB는 PR 작성자가 병합 후 실행한다(sql README 「공용 DB 적용 규칙」).
 
 응답 `200`:
 
