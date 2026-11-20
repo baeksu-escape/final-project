@@ -6,21 +6,18 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * N-17-4 시나리오 상환 여력 재계산 요청 DTO.
- * 기준 소득·지출·대출 정보 및 금리/소득/지출 변동폭을 받는다.
- * 아직 쓰는 곳이 없으며, FP-167(시나리오 재계산) 구현 때 모양을 고치거나 지운다.
+ * FP-167 N-17-2 시나리오 조건 — 금리 변화(%p), 소득 변화(%), 지출 변화(%). 기준값은 서버가 저장 데이터에서 읽으므로 받지 않는다.
+ * 생략하면 0(변화 없음)이다. 직접 입력 범위: 금리 −5~+10%p, 소득 −100~+100%, 지출 −50~+100%.
  */
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ScenarioRecalculateRequest {
-    private long baseMonthlyIncome;
-    private long baseMonthlyFixedExpense;
-    private long baseLoanBalance;
-    private double baseInterestRate;
-    private double interestRateChange;
-    private double incomeChangePercent;
-    private double expenseChangePercent;
+    /** 금리 변화 (%p). 변동금리 대출 잔액에만 반영한다 */
+    private Double ratePctPoint;
+    /** 월 소득 변화 (%) */
+    private Double incomePct;
+    /** 월 지출 변화 (%) */
+    private Double expensePct;
 }
-

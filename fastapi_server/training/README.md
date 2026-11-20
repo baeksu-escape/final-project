@@ -26,6 +26,24 @@ python -m training.train --data-dir <학습 데이터 폴더>
 - 범주형 5개는 `config.CATEGORY_CODES`의 고정 부호표로 정수 부호화한다(표에 없는 값은 -1). 알파벳 자동 부호를 쓰지 않는다.
 - TRAIN으로 학습하고 VALID로 평가한다(시드 5개 평균 ± 표준편차). 저장하는 모델은 첫 시드(11) 것이다. TEST는 쓰지 않는다.
 
+## 학습 옵션 (모델 0.2, 11/20)
+
+옵션 없이 실행하면 `LGBM-BASE-0.1`과 같은 결과가 나온다. 0.2는 `--monotone`만 켜서 만든다(학습 행은 0.1과 같은 기존 집단 TRAIN 8,400행).
+
+```
+python -m training.train --monotone --model-version LGBM-BASE-0.2 --out-dir <저장할 폴더>
+```
+
+| 옵션 | 하는 일 |
+|---|---|
+| `--monotone` | `config.MONOTONE_CONSTRAINTS`의 8개 피처에 단조 제약을 건다. 지출 비율·DSR·적자 개월 수·카드 한도소진율·연체 건수·월 평균 지출 금액은 클수록 불량 확률이 높게, 최저 월 순현금흐름·12개월 소득 금액은 클수록 낮게. 소득·지출 금액은 학습 데이터가 소득↑ 연체↑ 방향이고 둘의 상관이 0.88이라 처음엔 뺐지만, 걸어도 AUC가 0.1 수준 이상이고 반대 방향 사례가 사라져서 넣었다(부채 금액까지는 반응이 과해 뺌) |
+| `--with-thinfile` | **c안 시험용, 0.2에는 쓰지 않음**(시험에서 신용 이력 없음이 불리해지고 기존 모델에 새 이상이 생겨 채택하지 않았다, 정의서 C25). 씬파일 표에서 `eval_future_credit_exposure = 1`인 TRAIN 행을 학습에 더한다. 기존 집단에는 신용 이력 피처의 결측이 없어서 모델이 결측을 0으로 읽는 문제(신용 이력 없음 = 사용률 0%)를 줄이려는 것이다(결측 처리 c안) |
+| `--model-version` | 설명 파일에 적을 모델 버전. 기본은 `config.MODEL_VERSION`(0.1)이고 코드 상수는 바꾸지 않는다. 서비스는 묶음 `meta.json`의 `model_version`을 읽는다(PR #110). DB 등록(`register_model_lgbm_base_0_2.sql`)과 전환 SQL은 따로 실행한다 |
+
+- `valid_auc`는 두 경우 모두 **기존 집단 VALID** 기준이라 0.1과 그대로 비교할 수 있다. 씬파일 VALID는 `valid_auc_thinfile`(228행, 양성 22·14로 흔들림이 크다)에 따로 남는다.
+- 씬파일 TRAIN을 학습에 썼으면 그 행은 평가에 쓰지 않는다(누수). `export_eval_scores.py --with-thinfile`은 씬파일을 VALID 행만 낸다. `compare_labels.py`도 같은 두 옵션을 받는다.
+- 설명 파일에 `options`, `monotone_constraints`, 씬파일 표 해시·행 수가 남는다.
+
 ## 지켜야 할 것
 
 - **TEST는 최종 평가에서 한 번만** 쓴다. 이 스크립트에 TEST 평가를 넣지 않는다.

@@ -33,15 +33,18 @@
 | 데이터가 있는 기존 DB에 대출 상품 문구 보강만 적용 | [update_loan_product_copy.sql](update_loan_product_copy.sql) | LP001~LP017의 ID·코드 대응을 확인한 뒤 지정 문구와 상품 특징만 갱신한다. 자동 실행 묶음에는 연결하지 않는다 |
 | 데이터가 있는 기존 DB에 산출 불가 사유 `ALT_DATA_EMPTY` 1행만 추가 | [add_not_scorable_reason_alt_data_empty.sql](add_not_scorable_reason_alt_data_empty.sql) | 이미 있으면 넣지 않으므로 다시 실행해도 된다. 새로 DDL을 실행하는 DB에는 필요 없다 |
 | 금융 용어 사전(쉬운 금융사전 N-30, FP-180) 넣기 | [add_glossary_term.sql](add_glossary_term.sql) | 새 DB·기존 DB 모두 이 파일로 넣는다(DDL·시드에는 용어가 없다). DDL → `run_seed_only.sql` 다음에 실행한다. `GLOSSARY_TERM` 20행(합성 교육용 문구)이며 같은 용어는 문구를 덮어써 다시 실행해도 같은 결과다. 적용 후 `99_check.sql`의 `GLOSSARY_TERM` 기대값 0과 다르게 나오는 것은 정상 |
-| 데이터가 있는 기존 DB에 피처 세트 `FS-V1`(DRAFT)과 모델 버전 `LGBM-BASE-0.1`(CANDIDATE) 추가 | 1단계 [add_fs_v1_feature_set.sql](add_fs_v1_feature_set.sql), 2단계 [seed/avenue_seed_dim_feature_fs_v1.sql](seed/avenue_seed_dim_feature_fs_v1.sql) | 1단계는 이미 있으면 넣지 않아 다시 실행해도 된다. **2단계 `DIM_FEATURE` 38행은 한 번만** 실행한다(다시 실행하면 PK 중복). 서비스는 바뀌지 않는다(ACTIVE 모델은 그대로, 전환은 DB 담당이 따로). 새로 DDL을 실행하는 DB는 `run_seed_only.sql`이 포함한다 |
+| 데이터가 있는 기존 DB에 피처 세트 `FS-V1`(DRAFT)과 모델 버전 `LGBM-BASE-0.1`(CANDIDATE) 추가 | 1단계 [add_fs_v1_feature_set.sql](add_fs_v1_feature_set.sql), 2단계 [seed/avenue_seed_dim_feature_fs_v1.sql](seed/avenue_seed_dim_feature_fs_v1.sql) | 1단계는 이미 있으면 넣지 않아 다시 실행해도 된다. **2단계 `DIM_FEATURE` 38행은 한 번만** 실행한다(다시 실행하면 PK 중복). 서비스는 바뀌지 않는다(ACTIVE 모델은 그대로, 전환은 activate SQL이 따로). 새로 DDL을 실행하는 DB는 `run_seed_only.sql`이 포함한다 |
 | 데이터가 있는 기존 DB에 게시글 본문 열 변경(`BOARD_POST.CONTENT` CLOB → `VARCHAR2(1300 CHAR)`, DDL C9)만 적용 | [alter_board_post_content_varchar2.sql](alter_board_post_content_varchar2.sql) | 글 데이터는 유지한다. 1300자를 넘는 글이 있으면 자르지 않고 멈춘다. 이미 바뀐 DB에서 다시 실행해도 된다. `CONTENT`는 표의 맨 뒤 열이 된다 |
-| 서비스 모델을 Mock(`DEV-DUMMY`)에서 실제 모델(`LGBM-BASE-0.1`)로 전환 | [activate_model_lgbm_base_0_1.sql](activate_model_lgbm_base_0_1.sql) | **실행 전 FastAPI `/v1/health`가 `"modelLoaded": true`인지 확인**(모델 파일 없이 바꾸면 모든 점수가 503). FS-V1 기준 데이터(위 행)가 없으면 멈추고 아무것도 바꾸지 않는다. 다시 실행해도 된다. 공용 DB는 DB 담당이 팀에 알린 뒤 실행. 절차: `fastapi_server/README.md` 「공용 DB를 실제 모델로 전환하는 절차」 |
+| 서비스 모델을 Mock(`DEV-DUMMY`)에서 실제 모델(`LGBM-BASE-0.1`)로 전환 | [activate_model_lgbm_base_0_1.sql](activate_model_lgbm_base_0_1.sql) | **실행 전 FastAPI `/v1/health`가 `"modelLoaded": true`인지 확인**(모델 파일 없이 바꾸면 모든 점수가 503). FS-V1 기준 데이터(위 행)가 없으면 멈추고 아무것도 바꾸지 않는다. 다시 실행해도 된다. 공용 DB는 전환 PR 작성자가 실행하고 채널에 남김. 절차: `fastapi_server/README.md` 「공용 DB를 실제 모델로 전환하는 절차」 |
 | 실제 모델 LGBM-BASE-0.1의 학습 데이터·모델 파일 기록(N-25 모형 성능 비교 근거) | [register_model_lgbm_base_0_1.sql](register_model_lgbm_base_0_1.sql) | `DATASET_VERSION` 1행(학습 표 해시·12,000행·252열) + `MODEL_ARTIFACT` 2행(모델 파일 해시·검증 AUC). 기록만 하고 ACTIVE는 바꾸지 않는다. 다시 실행해도 된다. 적용 후 `99_check.sql`의 두 표 기대값 0과 다르게 나오는 것은 정상 |
 | 위 모델 파일 두 행의 `METRICS_JSON`에 두 모델 AUC를 같은 라벨로 맞춘 값(`same_label_comparison`) 추가(N-25, 정의서 C20) | [update_model_metrics_same_label_lgbm_base_0_1.sql](update_model_metrics_same_label_lgbm_base_0_1.sql) | 위 기록 SQL을 먼저 실행해야 한다(없으면 멈춤). `AUC_VALID`·해시는 바꾸지 않고 `METRICS_JSON`만 바꾼다. 다시 실행해도 된다. 같은 라벨 값은 라벨마다 두 모델을 새로 학습한 실험값이다 |
 | 기존 DB에 모형 성능 비교용 평가 표본 표 `MODEL_EVAL_SAMPLE`(DDL C10, N-25) 추가 | [create_model_eval_sample.sql](create_model_eval_sample.sql) | 고객별 기존·대안 모델 점수와 정답 라벨을 담는 빈 표만 만든다. `MODEL_REGISTRY`·`DIM_WORKER_TYPE`이 있는 스키마에서 한 번 실행하고, 같은 표가 있으면 오류로 멈춘다. 새로 DDL을 실행하는 DB에는 필요 없다 |
 | 모형 성능 비교용 평가 표본 적재(`MODEL_EVAL_SAMPLE` 3,085행) | [load_model_eval_sample_lgbm_base_0_1.sql](load_model_eval_sample_lgbm_base_0_1.sql) | 위 표를 만든 뒤 한 번만 실행한다(이 모델 버전의 행이 있으면 오류로 멈춤). 기본 시드(`run_seed_only.sql`)에는 넣지 않는다. 적용한 DB에서는 `99_check.sql`의 `MODEL_EVAL_SAMPLE` 기대값 0과 실제 3,085가 다르게 나오는 것이 정상. 원본 CSV는 `#파일공유` |
 | 기존 DB에 등급 구간 버전 `CUT-0.2`(DRAFT, 25/50/25 임시 결정 D-01: 0~659 / 660~730 / 731~1000) 추가 | [add_cutoff_cut_0_2.sql](add_cutoff_cut_0_2.sql) | 버전 1행과 구간 3행을 없을 때만 넣어 다시 실행해도 된다. **서비스는 바뀌지 않는다**: ACTIVE는 계속 `CUT-0.1`이고 `CUT-0.2`를 ACTIVE로 옮기는 일(FastAPI 상수 변경 포함)은 팀이 시점을 정한 뒤 따로 한다. 새로 DDL을 실행하는 DB는 기준 데이터에 이미 들어 있다 |
-| 실제 모델을 `LGBM-BASE-0.1`에서 `0.2`로 전환 | [activate_model_lgbm_base_0_2.sql](activate_model_lgbm_base_0_2.sql) | **먼저 서버 PC `artifacts/`를 0.2 묶음으로 바꾸고 `/v1/health` `modelVersion`이 0.2인지 확인**(파일을 안 바꾸면 모든 점수가 409). **파일을 바꾼 뒤엔 바로 실행**한다(그 사이 점수 요청도 409라 공용 DB는 사용자가 없는 시간에). 0.2 모델 행·파일 기록이 없으면 멈추고 아무것도 바꾸지 않는다. 다시 실행해도 된다. 공용 DB는 팀이 시점을 정한 뒤 |
+| 모델 `LGBM-BASE-0.2`(단조 제약 후보 B)의 평가 표본 적재(`MODEL_EVAL_SAMPLE` 3,085행, 0.1 행은 그대로 두고 같은 표에 모델 버전으로 구분해 쌓임) | [load_model_eval_sample_lgbm_base_0_2.sql](load_model_eval_sample_lgbm_base_0_2.sql) | **0.2를 `MODEL_REGISTRY`에 등록한 뒤**(`register_model_lgbm_base_0_2.sql`)(모델 버전 FK) 한 번만 실행한다(0.2 행이 있으면 오류로 멈춤). 읽는 쪽(FP-184)은 쿼리에서 `MODEL_VERSION`으로 거른다 |
+| 위 0.2 모델 파일 두 행의 `METRICS_JSON`에 같은 라벨 AUC(`same_label_comparison`) 추가 | [update_model_metrics_same_label_lgbm_base_0_2.sql](update_model_metrics_same_label_lgbm_base_0_2.sql) | 0.2 등록 SQL을 먼저 실행한다(행이 없으면 멈춤). `JSON_MERGEPATCH`로 이 키만 더해서 등록 SQL이 넣은 기존 항목은 그대로이고, 오류가 나면 두 행이 함께 취소된다. `AUC_VALID`·`AUC_TEST`는 바꾸지 않는다 |
+| 기존 DB에 등급 구간 버전 `CUT-0.3`(DRAFT, 모델 0.2 분포로 다시 계산한 25/50/25 경계: 0부터 653 / 654부터 726 / 727부터 1000) 추가 | [add_cutoff_cut_0_3.sql](add_cutoff_cut_0_3.sql) | 버전 1행과 구간 3행을 없을 때만 넣어 다시 실행해도 되고, 오류가 나면 두 단계가 함께 취소된다. `CUT-0.1`·`CUT-0.2`는 건드리지 않는다. **서비스는 바뀌지 않는다**: ACTIVE는 계속 `CUT-0.1`이다. 새로 DDL을 실행하는 DB는 기준 데이터에 이미 들어 있다 |
+| 실제 모델을 `LGBM-BASE-0.1`에서 `0.2`로 전환 | [activate_model_lgbm_base_0_2.sql](activate_model_lgbm_base_0_2.sql) | **먼저 서버 PC `artifacts/`를 0.2 묶음으로 바꾸고 `/v1/health` `modelVersion`이 0.2인지 확인**(파일을 안 바꾸면 모든 점수가 409). **파일을 바꾼 뒤엔 바로 실행**한다(그 사이 점수 요청도 409라 공용 DB는 사용자가 없는 시간에). 0.2 모델 행·파일 기록이 없으면 멈추고 아무것도 바꾸지 않는다. 다시 실행해도 된다. 공용 DB는 전환 PR 작성자가 실행하고 DB 변경 채널에 남긴다(11/20 공용 DB 전환 완료) 🆕 11/20 |
 | 0.2 전환 뒤 0.1로 되돌리기 | [rollback_model_lgbm_base_0_2_to_0_1.sql](rollback_model_lgbm_base_0_2_to_0_1.sql) | 파일도 0.1 묶음으로 되돌린다. 저장된 0.2 평가는 지우지 않는다. 다시 실행해도 된다 |
 | 실제 모델 전환 뒤 문제가 생겨 Mock으로 되돌리기 | [rollback_model_to_dev_dummy.sql](rollback_model_to_dev_dummy.sql) | 저장된 평가는 지우지 않는다(평가마다 자기 모델 버전이 남음). 다시 실행해도 된다 |
 | 정책금리(한국은행 기준금리, 2024.01~2026.10 월별) 넣기(N-17, FP-153) | [add_policy_rate_bok_base_rate.sql](add_policy_rate_bok_base_rate.sql) | 새 DB·기존 DB 모두 이 파일로 넣는다(DDL에는 데이터가 없다). DDL → `run_seed_only.sql` 다음에 실행한다. `FACT_POLICY_RATE` 34행(월 값을 그 달 마지막 날로)이며 다시 실행해도 같은 결과다. 새 달 값은 같은 형식으로 행을 더해 다시 실행한다. `99_check.sql`의 `FACT_POLICY_RATE` 기대값 0은 기본 시드만 적용한 상태 기준이라, 이 파일을 실행한 뒤에는 EXPECTED=0, ACTUAL=34로 보이는 것이 정상이다. 적재된 행 수와 최신 기준금리는 이 파일 마지막의 확인 쿼리로 본다 |
@@ -84,6 +87,26 @@ C조 담당자의 결정과 사용자 승인에 따라 상권 분석은 DB·API 
 
 회의 결정에 따라 `USER_NOTIFICATION`은 빈 테이블로만 만든다. 알림 시드·API·생성·발송 로직은 추가하지 않는다. 기존 DB에는 [create_user_notification.sql](create_user_notification.sql)을 한 번 실행한다. `APP_USER`가 먼저 있어야 하며, 테이블이 이미 있으면 재실행하지 않는다. 새 스키마에는 기준 DDL에 포함되어 있으므로 별도 실행하지 않는다. 실제 Oracle 적용은 아직 확인하지 않았다.
 
+## 공용 DB 적용 규칙 🆕 11/20
+
+팀원은 각자 **로컬 DB**로 개발·테스트한다. 공용 DB(SQL Developer 접속 이름 BACKSU)는 최신 상태를 모아 두고 최종 발표 때 쓰는 DB다. 그래서 공용 DB에서는 테스트하지 않는다.
+
+1. 기존 DB용 변경 SQL(`add_*`·`alter_*`·`update_*`·`load_*`·`register_*` 등)이 들어간 PR이 **병합되면, 작성자가** 공용 DB에 직접 실행한다. 순서는 위 「먼저 내 상황에 맞는 경로를 고른다」 표와 파일 머리말을 따른다. 실행 결과 맨 아래 확인 조회가 기대값과 같은지 본다.
+2. 실행한 뒤 **팀 디스코드 DB 변경 채널**에 아래 형식으로 한 줄 남기고, 그 글에 답글로 `공용 DB 적용 완료`를 단다.
+   ```
+   [MM/DD] / 무엇이 바뀜(표·열 이름) / 기존 DB에 실행할 SQL(여러 개면 → 로 순서) / PR #번호
+     └ 왜 바꿨는지, 무엇이 달라지는지 한두 문장
+   ```
+   예: `[11/14] / 대출 "해당 없음" 칸(NO_LOAN_YN) 추가 / alter_user_asset_snapshot_no_loan.sql / PR #49`
+   `  └ 대출이 없는 회원이 "해당 없음"을 고르면 Y로 저장. "아직 안 적음"과 "대출 없음"을 구분해서, 대출 없는 회원도 점수 산출 가능`
+   다른 팀원은 이 글을 보고 자기 로컬 DB에도 같은 SQL을 실행한다.
+3. **모델 전환·되돌리기(`activate_model_*`·`rollback_model_*`)와 등급 구간 ACTIVE 전환도 그 PR 작성자가 한다.** 공용 DB로 점수를 내는 PC의 모델 파일(`fastapi_server/artifacts/`)이나 FastAPI 코드와 같은 시점에 바꿔야 하므로, 실행 전에 채널에 미리 알린다. 등급 구간 ACTIVE 전환은 팀이 시점을 정한 뒤 한다.
+4. 실행하다 오류가 나면 그 메시지를 채널에 남기고 멈춘다. 직접 지우거나 고치지 않는다(일부만 들어간 상태를 DB 담당과 함께 확인해 정리한다).
+5. **DB 담당(범영)은 공용 DB에 SQL을 대신 실행하지 않고 검수만 한다.** PR 리뷰에서 변경 SQL·실행 순서를 보고, 적용 뒤 공용 DB가 DDL·변경 SQL과 맞는지 점검 조회로 확인해 다르면 채널에 알린다.
+6. 공용 DB에는 서비스 DDL 밖의 감사 표 `ACCESS_LOG`·`DDL_CHANGE_LOG`(로그인·DDL 기록 트리거)가 있다. 지우거나 고치지 않는다.
+
+SQL 파일 머리말의 공용 DB 실행 문구도 11/20에 이 규칙으로 맞췄다("PR 작성자가 병합 후 실행").
+
 ## DDL을 고칠 때 같이 고칠 것 (체크리스트)
 
 `avenue_ddl.sql`을 한 글자라도 고치면 아래 짝꿍 파일도 **같은 PR에서** 함께 맞춘다. DB 생성 도구 테스트가 DDL의 지문(해시)·행 수를 고정해 두고 비교하기 때문이다. 저장소에 자동 검사(CI)가 없어서, 이 테스트는 누가 직접 돌려야만 실패가 보인다(11/16 DDL 한 줄 변경 두 건이 이 파일들을 놓쳐 테스트가 깨진 뒤 추가).
@@ -105,4 +128,4 @@ C조 담당자의 결정과 사용자 승인에 따라 상권 분석은 DB·API 
    ```
    `No module named 'bcrypt'` 오류 1건은 PC 환경 문제다(`fastapi_server/data_generation/requirements.txt` 설치 시 사라짐). 그 밖의 실패가 없어야 한다.
 8. **작업 로그:** DB 변경이므로 `docs/logs/`에 남긴다(AGENTS.md 3-4).
-9. **공용 DB 적용:** 실제 공용 DB에 변경 SQL을 실행하는 일은 DB 담당에게 알려 순서를 맞춘다.
+9. **공용 DB 적용 🆕 11/20:** PR이 병합되면 **작성자가** 아래 「공용 DB 적용 규칙」대로 공용 DB에 실행하고 DB 변경 채널에 남긴다.

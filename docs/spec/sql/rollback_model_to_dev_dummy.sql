@@ -5,7 +5,7 @@
 -- - 이미 저장된 평가는 지우지 않는다. 평가마다 자기 MODEL_VERSION·FEATURE_SET_VERSION이 남아 있어 리포트는 그대로 보인다.
 -- - 순서가 중요하다: ACTIVE는 한 행만 허용(UX_MRG_ACTIVE)이라 지금 ACTIVE를 먼저 RETIRED로 바꾼 뒤 DEV-DUMMY를 ACTIVE로 바꾼다.
 -- - 이미 DEV-DUMMY가 ACTIVE면 아무것도 바꾸지 않으므로 다시 실행해도 된다.
--- - 공용 DB는 DB 담당이 팀에 알린 뒤 실행한다. SQL*Plus/SQLcl/SQL Developer(F5)에서 대상 스키마 소유자로 실행한다.
+-- - 공용 DB는 전환 PR 작성자가 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」). SQL*Plus/SQLcl/SQL Developer(F5)에서 대상 스키마 소유자로 실행한다.
 -- ====================================================================
 WHENEVER SQLERROR EXIT SQL.SQLCODE
 WHENEVER OSERROR EXIT FAILURE
