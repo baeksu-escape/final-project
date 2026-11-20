@@ -75,7 +75,6 @@ function hasExactInputKeys(input) {
 
 // N-18 신용케어 시뮬레이터 API 경로 정의
 export const SIMULATION_API = Object.freeze({
-  RECOMMEND_LOANS: '/api/simulation/loans/recommend',
   // 내 평가로 계산하는 SIM-01·02는 팀 공통 규칙대로 /api/members/me 아래에 있다(FP-170 11/19 이동).
   RECALCULATE_CREDIT_CARE: '/api/members/me/credit-care-recalculate',
   CREDIT_CARE_BASE: '/api/members/me/credit-care-base',
@@ -85,11 +84,6 @@ export const SIMULATION_API = Object.freeze({
 // N-18-7 점수(0~1000)에 맞는 점수대의 참고 금리 범위·평균·한도와 등급을 조회한다. 더미 데이터라 dummyNotice가 항상 true다.
 export function getScoreBandOfferInfo(score) {
   return apiGet(`${SIMULATION_API.SCORE_BAND_OFFER}?score=${score}`)
-}
-
-// N-18-7 같은 점수대 금리·한도·추천 대출상품 3종 조회
-export function recommendLoans(score, jobType) {
-  return apiGet(`${SIMULATION_API.RECOMMEND_LOANS}?score=${score}&jobType=${jobType}`)
 }
 
 // N-18-1·10 입력 10개의 내 실제 값과 출발 점수(SIM-01). [내 실제 값으로 되돌리기]도 이 값을 쓴다.
