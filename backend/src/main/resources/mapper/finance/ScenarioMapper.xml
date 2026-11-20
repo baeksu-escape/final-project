@@ -4,13 +4,15 @@
 <!-- N-17-1·N-17-2 시나리오 테스트용 저장 데이터 조회 (FP-167). 기준월은 소득 기준월(USER_INCOME_MONTH의 가장 늦은 달)로 현금흐름 전망과 같다 -->
 <mapper namespace="com.baeksuescape.finance.mapper.ScenarioMapper">
 
-    <!-- 금리 변화를 반영할 변동금리 대출 잔액 합계. 고정(FIXED)·금리 방식 모름(UNKNOWN)은 빼고, 대출이 없으면 0 -->
-    <select id="selectLatestVariableLoanBalance" resultType="long">
-        SELECT NVL(SUM(BALANCE_AMT), 0)
+    <!-- 금리 변화를 반영할 변동금리 대출 행(잔액·연 금리·월 원리금). 고정(FIXED)·금리 방식 모름(UNKNOWN)은 빼고, 대출이 없으면 빈 목록.
+         대출마다 금리 하한(0%)을 두고 변동금리 상환액만 바꾸기 위해 합계가 아닌 행으로 읽는다 -->
+    <select id="selectLatestVariableLoans" resultType="com.baeksuescape.finance.dto.scenario.VariableLoanRow">
+        SELECT BALANCE_AMT AS balanceAmount, ANNUAL_RATE_PCT AS annualRatePct, MONTHLY_PAYMENT_AMT AS monthlyPaymentAmount
           FROM USER_LOAN
          WHERE USER_ID = #{userId}
            AND RATE_TYPE_CODE = 'VARIABLE'
            AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
+         ORDER BY LOAN_ID
     </select>
 
     <!-- 버틸 수 있는 개월 수 계산용 총자산. 행이 없거나 미입력(NULL)이면 NULL을 그대로 돌려준다(0으로 바꾸지 않음) -->

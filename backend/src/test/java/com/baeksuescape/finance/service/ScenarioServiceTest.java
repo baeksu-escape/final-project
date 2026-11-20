@@ -13,6 +13,7 @@ import com.baeksuescape.finance.dto.scenario.PolicyRateRow;
 import com.baeksuescape.finance.dto.scenario.ScenarioBaseResponse;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateRequest;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateResponse;
+import com.baeksuescape.finance.dto.scenario.VariableLoanRow;
 import com.baeksuescape.finance.mapper.IncomeVolatilityMapper;
 import com.baeksuescape.finance.mapper.ScenarioMapper;
 import com.baeksuescape.global.exception.ApiException;
@@ -49,13 +50,21 @@ class ScenarioServiceTest {
         return MonthlyIncomeItem.builder().yearMonth(yearMonth).income(income).expense(0L).build();
     }
 
-    /** 월 소득 300만(두 달 평균), 지출 180만, 원리금 50만, 변동금리 잔액 3,000만, 총자산 4,000만 */
+    private static VariableLoanRow loan(long balance, String annualRatePct, long monthlyPayment) {
+        VariableLoanRow row = new VariableLoanRow();
+        row.setBalanceAmount(balance);
+        row.setAnnualRatePct(new BigDecimal(annualRatePct));
+        row.setMonthlyPaymentAmount(monthlyPayment);
+        return row;
+    }
+
+    /** 월 소득 300만(두 달 평균), 지출 180만, 원리금 50만(그중 변동금리 대출 3,000만·연 5%·월 20만), 총자산 4,000만 */
     private void givenStored(Long totalAsset) {
         when(incomeVolatilityService.loadIncomeHistory(USER_ID, 0L))
                 .thenReturn(List.of(month("2026-07", 2_800_000L), month("2026-08", 3_200_000L)));
         when(incomeMapper.selectLatestTotalExpense(USER_ID)).thenReturn(1_800_000L);
         when(incomeMapper.selectLatestLoanMonthlyPayment(USER_ID)).thenReturn(500_000L);
-        when(scenarioMapper.selectLatestVariableLoanBalance(USER_ID)).thenReturn(30_000_000L);
+        when(scenarioMapper.selectLatestVariableLoans(USER_ID)).thenReturn(List.of(loan(30_000_000L, "5", 200_000L)));
         when(scenarioMapper.selectLatestTotalAsset(USER_ID)).thenReturn(totalAsset);
     }
 
@@ -142,18 +151,57 @@ class ScenarioServiceTest {
         assertEquals(475_000L, r.changed().monthlyPaymentAmount());
         assertEquals(ScenarioService.IMPROVED, r.verdict());
 
-        // 원리금보다 이자 감소가 크면 0에서 멈춘다: 원리금 1만, 잔액 3,000만, -5%p → 이자 -125,000
+        // 원리금보다 이자 감소가 크면 0에서 멈춘다: 변동금리 대출 1건(3,000만, 연 5%, 원리금 1만), -5%p → 이자 -125,000
         ScenarioRecalculateResponse floor = ScenarioService.calculate(
-                new ScenarioService.Baseline(3_000_000L, 1_800_000L, 10_000L, 30_000_000L, null),
+                new ScenarioService.Baseline(3_000_000L, 1_800_000L, 10_000L, List.of(loan(30_000_000L, "5", 10_000L)), null),
                 new BigDecimal("-5"), BigDecimal.ZERO, BigDecimal.ZERO);
         assertEquals(-125_000L, floor.monthlyInterestChangeAmount());
         assertEquals(0L, floor.changed().monthlyPaymentAmount());
     }
 
     @Test
+    @DisplayName("금리가 크게 내려가도 고정금리·금리 방식 모름 대출의 상환액은 그대로다(변동금리 상환액만 0까지 줄어든다)")
+    void fixedPaymentKept() {
+        // 전체 원리금 50만 = 고정 45만 + 변동 5만. 변동 3,000만·연 4%에 -5%p → 금리 0%까지만 내려가 이자 -100,000
+        ScenarioRecalculateResponse r = ScenarioService.calculate(
+                new ScenarioService.Baseline(3_000_000L, 1_800_000L, 500_000L, List.of(loan(30_000_000L, "4", 50_000L)), null),
+                new BigDecimal("-5"), BigDecimal.ZERO, BigDecimal.ZERO);
+
+        assertEquals(-100_000L, r.monthlyInterestChangeAmount());
+        assertEquals(450_000L, r.changed().monthlyPaymentAmount(), "변동 5만은 0이 되고 고정 45만은 남는다");
+    }
+
+    @Test
+    @DisplayName("금리 하한은 대출마다 0%다: 연 3%·연 8% 대출에 -5%p면 각각 0%·3%가 된다")
+    void rateFloorPerLoan() {
+        // 3,000만 × (0 − 3) ÷ 1200 = -75,000, 1,200만 × (3 − 8) ÷ 1200 = -50,000 → 합계 -125,000
+        ScenarioService.Baseline b = new ScenarioService.Baseline(3_000_000L, 1_800_000L, 400_000L,
+                List.of(loan(30_000_000L, "3", 200_000L), loan(12_000_000L, "8", 150_000L)), null);
+
+        ScenarioRecalculateResponse r = ScenarioService.calculate(b, new BigDecimal("-5"), BigDecimal.ZERO, BigDecimal.ZERO);
+
+        assertEquals(-125_000L, r.monthlyInterestChangeAmount());
+        // 고정 5만 + (변동 35만 − 125,000)
+        assertEquals(275_000L, r.changed().monthlyPaymentAmount());
+    }
+
+    @Test
+    @DisplayName("월 이자 변화는 원 단위 HALF_UP 반올림이다: -0.5원은 -1원, +0.5원은 +1원(프론트 mock과 같은 규칙)")
+    void interestRoundingHalfUp() {
+        // 잔액 600원, 연 5%, ±1%p → 600 × (±1) ÷ 1200 = ±0.5원
+        ScenarioService.Baseline b = new ScenarioService.Baseline(3_000_000L, 1_800_000L, 0L,
+                List.of(loan(600L, "5", 0L)), null);
+
+        assertEquals(-1L, ScenarioService.calculate(b, new BigDecimal("-1"), BigDecimal.ZERO, BigDecimal.ZERO)
+                .monthlyInterestChangeAmount());
+        assertEquals(1L, ScenarioService.calculate(b, BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ZERO)
+                .monthlyInterestChangeAmount());
+    }
+
+    @Test
     @DisplayName("소득이 0이 되면 상환 부담률은 null(계산 불가), 총자산 미입력이면 적자여도 버틸 개월은 null, 총자산 0이면 0개월")
     void nullCases() {
-        ScenarioService.Baseline b = new ScenarioService.Baseline(3_000_000L, 1_800_000L, 500_000L, 0L, null);
+        ScenarioService.Baseline b = new ScenarioService.Baseline(3_000_000L, 1_800_000L, 500_000L, List.of(), null);
         ScenarioRecalculateResponse r = ScenarioService.calculate(b, BigDecimal.ZERO, new BigDecimal("-100"), BigDecimal.ZERO);
         assertEquals(0L, r.changed().monthlyIncomeAmount());
         assertNull(r.changed().dsrPct());

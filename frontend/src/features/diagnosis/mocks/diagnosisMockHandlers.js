@@ -294,6 +294,11 @@ function handleScenarioBase({ token }) {
   })
 }
 
+// 서버 BigDecimal HALF_UP과 같은 원 단위 반올림: 0.5는 0에서 먼 쪽(-0.5 → -1). Math.round는 -0.5를 0으로 올려 서버와 달라진다.
+function roundHalfUp(value) {
+  return Math.sign(value) * Math.round(Math.abs(value)) || 0 // -0은 0으로
+}
+
 // 한쪽(지금 또는 조건 반영 후)의 상환 여력. 상환 부담률은 서버(N-16-1)처럼 연 원리금 ÷ 연소득 × 100, 소수 둘째 자리, 소득 0 이하면 null.
 function scenarioSide(income, expense, payment) {
   const dsrPct = income > 0 ? Math.round(((payment * 12) / (income * 12)) * 10000) / 100 : null
@@ -323,13 +328,21 @@ function handleMemberScenarioRecalculate({ body, token }) {
   const expensePct = readPct('expensePct', -50, 100, '지출 변화는 -50~+100% 사이로 입력해 주세요.')
 
   const b = SAMPLE_SCENARIO_BASE
-  // 월 이자 변화 = 변동금리 잔액 × 금리 변화(%p) ÷ 100 ÷ 12, 원 단위 반올림
-  const interestChange = Math.round((b.variableLoanBalanceAmount * ratePctPoint) / 1200)
+  // 월 이자 변화 = Σ 변동금리 잔액 × (max(금리 + 변화, 0) − 금리) ÷ 100 ÷ 12. 대출마다 금리는 0% 아래로 내려가지 않고,
+  // 합계를 낸 뒤 서버와 같은 HALF_UP으로 한 번만 반올림한다.
+  const interestSum = b.variableLoans.reduce(
+    (sum, loan) => sum + loan.balanceAmount * (Math.max(loan.annualRatePct + ratePctPoint, 0) - loan.annualRatePct),
+    0,
+  )
+  const interestChange = roundHalfUp(interestSum / 1200)
+  // 이자 변화는 변동금리 대출의 상환액에만 더한다(0 아래로는 내려가지 않음). 고정금리 상환액은 그대로다.
+  const variablePayment = b.variableLoans.reduce((sum, loan) => sum + loan.monthlyPaymentAmount, 0)
+  const fixedPayment = b.monthlyPaymentAmount - variablePayment
   const current = scenarioSide(b.monthlyIncomeAmount, b.monthlyExpenseAmount, b.monthlyPaymentAmount)
   const changed = scenarioSide(
-    Math.round(b.monthlyIncomeAmount * (1 + incomePct / 100)),
-    Math.round(b.monthlyExpenseAmount * (1 + expensePct / 100)),
-    Math.max(0, b.monthlyPaymentAmount + interestChange),
+    roundHalfUp(b.monthlyIncomeAmount * (1 + incomePct / 100)),
+    roundHalfUp(b.monthlyExpenseAmount * (1 + expensePct / 100)),
+    fixedPayment + Math.max(0, variablePayment + interestChange),
   )
   const surplusDiffAmount = changed.monthlySurplusAmount - current.monthlySurplusAmount
   // 적자일 때만 ⌊총자산 × 25% ÷ 월 부족액⌋. 흑자이거나 총자산 미입력이면 null

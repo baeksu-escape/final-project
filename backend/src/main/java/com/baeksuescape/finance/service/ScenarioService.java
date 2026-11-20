@@ -6,6 +6,7 @@ import com.baeksuescape.finance.dto.scenario.ScenarioBaseResponse;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateRequest;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateResponse;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateResponse.Side;
+import com.baeksuescape.finance.dto.scenario.VariableLoanRow;
 import com.baeksuescape.finance.mapper.IncomeVolatilityMapper;
 import com.baeksuescape.finance.mapper.ScenarioMapper;
 import com.baeksuescape.finance.util.FinancialHealthCalculator;
@@ -57,8 +58,8 @@ public class ScenarioService {
 
     /** 화면에 그대로 보여 줄 계산 가정 (기준값·결과 공통) */
     static final List<String> ASSUMPTIONS = List.of(
-            "금리 변화는 변동금리 대출 잔액에만 반영하고, 고정금리·금리 방식을 모르는 대출은 반영하지 않습니다.",
-            "월 이자 변화는 변동금리 대출 잔액 × 금리 변화 ÷ 12로 간단히 어림한 값입니다.",
+            "금리 변화는 변동금리 대출에만 반영하고, 고정금리·금리 방식을 모르는 대출의 상환액은 바꾸지 않습니다.",
+            "월 이자 변화는 변동금리 대출 잔액 × 금리 변화 ÷ 12로 간단히 어림한 값이며, 대출마다 금리는 0% 아래로 내려가지 않는 것으로 봅니다.",
             "적자가 나면 총자산의 " + SURVIVABLE_ASSET_RATIO_PCT + "%를 부족액에 쓸 수 있다고 가정해 버틸 수 있는 개월 수를 계산합니다.",
             "월 소득은 최근 12개월 평균입니다.");
 
@@ -102,10 +103,19 @@ public class ScenarioService {
                 new ValueChange(INCOME, ChangeType.PERCENT, incomePct),
                 new ValueChange(EXPENSE, ChangeType.PERCENT, expensePct)));
 
-        // 월 이자 변화 = 변동금리 잔액 × 금리 변화(%p) ÷ 100 ÷ 12 (원 단위 반올림)
-        long interestChange = BigDecimal.valueOf(b.variableBalance()).multiply(ratePctPoint)
-                .divide(HUNDRED.multiply(TWELVE), 0, RoundingMode.HALF_UP).longValueExact();
-        long changedPayment = Math.max(0L, b.payment() + interestChange);
+        // 월 이자 변화 = Σ 변동금리 잔액 × (max(금리 + 변화, 0) − 금리) ÷ 100 ÷ 12. 대출마다 금리는 0% 아래로 내려가지 않고,
+        // 합계를 낸 뒤 원 단위로 한 번만 반올림한다(HALF_UP, 음수 0.5는 0에서 먼 쪽 — 프론트 mock도 같은 규칙).
+        BigDecimal interestSum = BigDecimal.ZERO;
+        for (VariableLoanRow loan : b.variableLoans()) {
+            BigDecimal rate = loan.getAnnualRatePct();
+            BigDecimal changedRate = rate.add(ratePctPoint).max(BigDecimal.ZERO);
+            interestSum = interestSum.add(BigDecimal.valueOf(loan.getBalanceAmount()).multiply(changedRate.subtract(rate)));
+        }
+        long interestChange = interestSum.divide(HUNDRED.multiply(TWELVE), 0, RoundingMode.HALF_UP).longValueExact();
+        // 이자 변화는 변동금리 대출의 상환액에만 더한다(0 아래로는 내려가지 않음). 고정·금리 방식 모름 대출의 상환액은 그대로다.
+        long variablePayment = b.variablePayment();
+        long fixedPayment = b.payment() - variablePayment;
+        long changedPayment = fixedPayment + Math.max(0L, variablePayment + interestChange);
 
         Side now = side(b.income(), b.expense(), b.payment());
         Side after = side(toWon(changedValues.get(INCOME)), toWon(changedValues.get(EXPENSE)), changedPayment);
@@ -142,7 +152,7 @@ public class ScenarioService {
 
     /**
      * 저장된 기준값을 읽는다. 기준월은 소득 기준월이고, 월 소득은 최근 12개월 평균(급여소득자는 월급을 12개월로 펼침)이다.
-     * 지출·월 원리금·변동금리 잔액은 없으면 0, 총자산은 미입력이면 null이다.
+     * 지출·월 원리금은 없으면 0, 변동금리 대출은 없으면 빈 목록, 총자산은 미입력이면 null이다.
      */
     private Baseline loadBaseline(long userId) {
         List<MonthlyIncomeItem> history = incomeVolatilityService.loadIncomeHistory(userId, 0L);
@@ -150,7 +160,7 @@ public class ScenarioService {
         return new Baseline(income,
                 incomeVolatilityMapper.selectLatestTotalExpense(userId),
                 incomeVolatilityMapper.selectLatestLoanMonthlyPayment(userId),
-                scenarioMapper.selectLatestVariableLoanBalance(userId),
+                scenarioMapper.selectLatestVariableLoans(userId),
                 scenarioMapper.selectLatestTotalAsset(userId));
     }
 
@@ -177,7 +187,20 @@ public class ScenarioService {
         return value.setScale(0, RoundingMode.HALF_UP).longValueExact();
     }
 
-    /** 시나리오 기준값 (원). 총자산만 미입력이면 null */
-    record Baseline(long income, long expense, long payment, long variableBalance, Long totalAsset) {
+    /**
+     * 시나리오 기준값 (원). payment는 기준월 전체 대출의 월 원리금 합계이고, variableLoans는 그중 변동금리 대출 행이다.
+     * 총자산만 미입력이면 null
+     */
+    record Baseline(long income, long expense, long payment, List<VariableLoanRow> variableLoans, Long totalAsset) {
+
+        /** 변동금리 대출 잔액 합계 (기준값 응답의 variableLoanBalanceAmount) */
+        long variableBalance() {
+            return variableLoans.stream().mapToLong(VariableLoanRow::getBalanceAmount).sum();
+        }
+
+        /** 변동금리 대출 월 원리금 합계. 전체 원리금에서 빼면 고정·금리 방식 모름 대출의 원리금이다 */
+        long variablePayment() {
+            return variableLoans.stream().mapToLong(VariableLoanRow::getMonthlyPaymentAmount).sum();
+        }
     }
 }

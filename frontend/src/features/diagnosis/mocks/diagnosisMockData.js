@@ -84,9 +84,13 @@ export const SAMPLE_SCENARIO_BASE = Object.freeze({
   totalAssetAmount: 30000000,
   policyRate: Object.freeze({ baseDate: '2026-10-31', ratePct: 3 }),
   survivableAssetRatioPct: 25,
+  // mock 계산용 변동금리 대출 행(응답에는 넣지 않음). 전체 상환액 35만 중 변동 20만, 나머지 15만은 고정금리로 본다.
+  variableLoans: Object.freeze([
+    Object.freeze({ balanceAmount: 12000000, annualRatePct: 5, monthlyPaymentAmount: 200000 }),
+  ]),
   assumptions: Object.freeze([
-    '금리 변화는 변동금리 대출 잔액에만 반영하고, 고정금리·금리 방식을 모르는 대출은 반영하지 않습니다.',
-    '월 이자 변화는 변동금리 대출 잔액 × 금리 변화 ÷ 12로 간단히 어림한 값입니다.',
+    '금리 변화는 변동금리 대출에만 반영하고, 고정금리·금리 방식을 모르는 대출의 상환액은 바꾸지 않습니다.',
+    '월 이자 변화는 변동금리 대출 잔액 × 금리 변화 ÷ 12로 간단히 어림한 값이며, 대출마다 금리는 0% 아래로 내려가지 않는 것으로 봅니다.',
     '적자가 나면 총자산의 25%를 부족액에 쓸 수 있다고 가정해 버틸 수 있는 개월 수를 계산합니다.',
     '월 소득은 최근 12개월 평균입니다.',
   ]),
