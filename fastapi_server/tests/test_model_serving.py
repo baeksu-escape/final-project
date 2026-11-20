@@ -126,6 +126,58 @@ class ModelFileLoadingTest(unittest.TestCase):
             self.assertTrue(load_from_artifacts(directory).ready)
 
 
+class ModelVersionFromBundleTest(ScorerSwitchTestBase):
+    """FP-237 실제 모델 버전은 불러온 묶음의 meta.json에서 정한다 — 0.1·0.2 어느 묶음을 넣어도 그 버전으로 동작한다."""
+
+    def bundle(self, directory: Path, versions: dict):
+        import joblib
+        for name in ("legacy", "alternative"):
+            joblib.dump(tiny_model(name), directory / f"{name}.joblib")
+            meta = {"feature_set_version": REAL_FEATURE_SET_VERSION}
+            if versions.get(name) is not None:
+                meta["model_version"] = versions[name]
+            (directory / f"{name}.meta.json").write_text(json.dumps(meta), encoding="utf-8")
+
+    def test_version_comes_from_meta(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.bundle(Path(folder), {"legacy": "LGBM-BASE-0.2", "alternative": "LGBM-BASE-0.2"})
+            scorer = load_from_artifacts(Path(folder))
+            self.assertTrue(scorer.ready)
+            self.assertEqual(scorer.version, "LGBM-BASE-0.2")
+
+    def test_old_bundle_without_version_uses_default(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.bundle(Path(folder), {})
+            self.assertEqual(load_from_artifacts(Path(folder)).version, REAL_MODEL_VERSION)
+
+    def test_mixed_versions_are_not_loaded(self):
+        """두 설명 파일의 버전이 다르면(다른 학습의 파일이 섞임) 열지 않는다."""
+        with tempfile.TemporaryDirectory() as folder:
+            self.bundle(Path(folder), {"legacy": "LGBM-BASE-0.1", "alternative": "LGBM-BASE-0.2"})
+            self.assertFalse(load_from_artifacts(Path(folder)).ready)
+
+    def test_loaded_02_scores_02_and_rejects_01(self):
+        """0.2 묶음을 불러온 서버: 0.2 요청은 실제 모델, 0.1 요청은 409(평가를 다시 산출하라는 신호), health는 0.2."""
+        self.use(ModelScorer(tiny_model("legacy"), tiny_model("alternative"), "LGBM-BASE-0.2"))
+        r = score(ScoreRequest(**sample_request(expectedModelVersion="LGBM-BASE-0.2")), None)
+        self.assertEqual((r["modelVersion"], r["featureSetVersion"]), ("LGBM-BASE-0.2", REAL_FEATURE_SET_VERSION))
+        with self.assertRaises(ApiError) as e:
+            score(ScoreRequest(**sample_request(expectedModelVersion="LGBM-BASE-0.1")), None)
+        self.assertEqual((e.exception.status, e.exception.code), (409, "VERSION_MISMATCH"))
+        h = health()
+        self.assertEqual((h["modelLoaded"], h["modelVersion"], h["supportedModelVersions"]),
+                         (True, "LGBM-BASE-0.2", [MODEL_VERSION, "LGBM-BASE-0.2"]))
+
+    def test_not_loaded_any_real_version_is_503(self):
+        """묶음이 없는 서버에 실제 모델 버전(0.1이든 0.2든)을 요청하면 Mock으로 바꾸지 않고 503."""
+        self.use(ModelScorer())
+        for version in ("LGBM-BASE-0.1", "LGBM-BASE-0.2"):
+            with self.subTest(version=version), self.assertRaises(ApiError) as e:
+                score(ScoreRequest(**sample_request(expectedModelVersion=version)), None)
+            self.assertEqual((e.exception.status, e.exception.code), (503, "MODEL_NOT_READY"))
+        self.assertEqual(health()["supportedModelVersions"], [MODEL_VERSION])
+
+
 class ModelHashCheckTest(unittest.TestCase):
     """SHA256SUMS.txt가 있으면 joblib을 열기 전에 해시를 대조한다(#74 리뷰 ④)."""
 
