@@ -41,7 +41,9 @@ export default function SimulationPage() {
     sim.fillValues(example)
     const keys = Object.keys(example)
     setFocusKeys(keys)
-    setToast('예시 값을 넣었습니다. [예상 점수 계산하기]를 눌러 확인해 보세요.')
+    setToast(sameInputs({ ...values, ...example }, sim.applied ?? sim.baseline)
+      ? '이미 계산한 조건입니다. 결과를 확인해 보세요.'
+      : '예시 값을 넣었습니다. [예상 점수 계산하기]를 눌러 확인해 보세요.')
     setTimeout(() => {
       const input = document.querySelector(`#sim-field-${keys[0]} input`)
       input?.scrollIntoView({ block: 'center', behavior: 'smooth' })
