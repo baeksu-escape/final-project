@@ -18,6 +18,7 @@ import com.baeksuescape.global.util.PiiMasking;
 import com.baeksuescape.user.dto.AuthResponses;
 import com.baeksuescape.user.dto.MyPageDtos;
 import com.baeksuescape.user.dto.UserAccount;
+import com.baeksuescape.user.mapper.FinancialInputMapper;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 
 // FP-87 N-04 마이페이지(MEM-01~04)와 N-05-1 직군 선택(MEM-05). 로그인한 본인(USER_ID는 토큰에서)만 다룬다.
@@ -28,6 +29,7 @@ public class MyPageService {
     static final Set<String> JOB_TYPES = Set.of("EMPLOYEE", "SELF_EMPLOYED", "FREELANCER");
 
     private final UserAccountMapper userMapper;
+    private final FinancialInputMapper financialInputMapper;
     private final EmailVerificationService emailVerification;
     private final UserViewFactory userViews;
     private final PasswordEncoder passwordEncoder;
@@ -35,9 +37,10 @@ public class MyPageService {
     private final PiiHmac hmac;
     private final Clock clock;
 
-    public MyPageService(UserAccountMapper userMapper, EmailVerificationService emailVerification, UserViewFactory userViews,
-            PasswordEncoder passwordEncoder, PiiCrypto crypto, PiiHmac hmac, Clock clock) {
+    public MyPageService(UserAccountMapper userMapper, FinancialInputMapper financialInputMapper, EmailVerificationService emailVerification,
+            UserViewFactory userViews, PasswordEncoder passwordEncoder, PiiCrypto crypto, PiiHmac hmac, Clock clock) {
         this.userMapper = userMapper;
+        this.financialInputMapper = financialInputMapper;
         this.emailVerification = emailVerification;
         this.userViews = userViews;
         this.passwordEncoder = passwordEncoder;
@@ -101,17 +104,34 @@ public class MyPageService {
         userMapper.updatePassword(userId, passwordEncoder.encode(request.newPassword()), LocalDateTime.now(clock));
     }
 
-    // MEM-05 직군 선택 — 직군이 비어 있을 때만 저장한다(프론트 mock과 같음). 관리자는 /api/members/me/**에서 이미 403이다.
-    // TODO(N-04-8) 직군 변경은 우선순위 미정(D-27)이라 막는다. 정해지면 updateWorkerTypeIfEmpty 대신 변경 쿼리를 쓰고 소득 재입력 안내를 붙인다.
+    // MEM-05 직군 선택·저장 전 변경(FP-227) — 비어 있으면 저장, 같은 직군이면 그대로 200, 다른 직군이면 저장한 입력도 평가도 없을 때만 바꾼다.
+    // 저장한 입력 = 데이터 입력 저장 기록(USER_ASSET_SNAPSHOT, FinancialInputMapper.selectSavedBaseMonths, 기준월 무관), 평가 = ASSESSMENT 행.
+    // 관리자는 /api/members/me/**에서 이미 403이다.
+    // TODO(N-04-8) 저장 전 변경만 허용(11/19 결정). 저장 후 변경은 미정(D-27).
     @Transactional
     public AuthResponses.Me selectJobType(long userId, MyPageDtos.JobType request) {
         if (request.jobType() == null || !JOB_TYPES.contains(request.jobType())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "직군을 선택해 주세요.",
                     List.of(new FieldErrorItem("jobType", "직군을 선택해 주세요.")));
         }
-        require(userId);
-        if (userMapper.updateWorkerTypeIfEmpty(userId, request.jobType(), LocalDateTime.now(clock)) == 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "JOB_TYPE_ALREADY_SELECTED", "이미 직군이 선택되어 있습니다.");
+        // 같은 회원의 입력 저장(INP-02)도 회원 행을 먼저 잠그므로, 확인과 변경 사이에 입력이 저장되지 않는다.
+        userMapper.lockUser(userId);
+        UserAccount account = require(userId);
+        String current = account.getWorkerTypeCode();
+        if (request.jobType().equals(current)) return new AuthResponses.Me(userViews.of(account));
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (current == null) {
+            if (userMapper.updateWorkerTypeIfEmpty(userId, request.jobType(), now) == 0) {
+                throw new ApiException(HttpStatus.CONFLICT, "JOB_TYPE_ALREADY_SELECTED", "이미 직군이 선택되어 있습니다.");
+            }
+        } else {
+            if (!financialInputMapper.selectSavedBaseMonths(userId).isEmpty() || userMapper.countAssessments(userId) > 0) {
+                throw new ApiException(HttpStatus.CONFLICT, "JOB_TYPE_LOCKED", "입력을 저장한 뒤에는 직군을 바꿀 수 없습니다.");
+            }
+            if (userMapper.updateWorkerTypeFrom(userId, current, request.jobType(), now) == 0) {
+                throw new ApiException(HttpStatus.CONFLICT, "JOB_TYPE_ALREADY_SELECTED", "이미 직군이 바뀌었습니다. 새로고침해 주세요.");
+            }
         }
         return new AuthResponses.Me(userViews.of(require(userId)));
     }

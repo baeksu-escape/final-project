@@ -7,10 +7,11 @@ import {
   ALT_DATA_CONSENT_TYPE,
   ALT_DATA_MONTHS,
   ALT_DATA_SOURCES,
+  ALT_DATA_TITLE,
   PAYMENT_STATUS_LABELS,
 } from '../config/altDataSources.js'
 
-// 동의 창에서 필수 체크를 하지 않고 [동의하고 불러오기]를 눌렀을 때의 문구.
+// 동의 창에서 필수 체크를 하지 않고 [동의하고 불러오기]를 눌렀을 때의 문구. FP-227부터 체크 전에는 버튼이 꺼져 있어 안전장치로만 쓴다.
 const CONSENT_REQUIRED_MESSAGE = '필수 동의에 체크해 주세요.'
 // [연결 해제]가 끝났을 때의 안내 문구.
 const DISCONNECTED_MESSAGE = '연결을 해제하고 동의를 거뒀습니다.'
@@ -156,7 +157,7 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
 
   return (
     <section className="alt-data">
-      <h2 className="alt-data__title">대안 데이터 불러오기 (모의 연동)</h2>
+      <h2 className="alt-data__title">{ALT_DATA_TITLE}</h2>
       <p className="alt-data__notice">
         실제 외부 기관에 연결하지 않고, 기준월을 포함한 최근 {ALT_DATA_MONTHS}개월의 더미 데이터를 불러옵니다.
       </p>
@@ -246,7 +247,9 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
               }}
               error={consentError}
             />
-            <Button type="submit" variant="primary" disabled={pendingKey !== null}>
+            {/* FP-227 필수 동의에 체크하기 전에는 [동의하고 불러오기]를 꺼 두고 안내를 보인다(위 오류 문구는 안전장치로만 남긴다). */}
+            {!consentChecked && <p className="hint">필수 동의에 체크하면 불러올 수 있습니다.</p>}
+            <Button type="submit" variant="primary" disabled={pendingKey !== null || !consentChecked}>
               동의하고 불러오기
             </Button>
             <Button onClick={closeConsent}>취소</Button>

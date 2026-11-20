@@ -1,3 +1,6 @@
+// N-05-6 대안 데이터 카드 제목 — 카드(AltDataImport)·입력 완료 현황·단계 이름이 함께 쓴다.
+export const ALT_DATA_TITLE = '대안 데이터 불러오기 (모의 연동)'
+
 // N-05-6 대안 데이터 모의 연동 설정(5종) — 실제 외부 기관은 호출하지 않고 [불러오기]로 더미 데이터를 가져온다.
 //   apiSegment: 요청 경로의 일부(/api/members/me/alt-data/{apiSegment}/import)
 //   columns: 결과 표의 열. format은 'money'(원) | 'count'(건) | 'paymentStatus'(납부 상태 코드 → 이름) | 없음(그대로)
