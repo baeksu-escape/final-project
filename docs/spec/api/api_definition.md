@@ -7,16 +7,17 @@
   - C팀(재무 진단·시뮬레이터 등): [api_spec_c.md](api_spec_c.md)
 - **기준:** DDL v0.3.2 `docs/spec/sql/avenue_ddl.sql`(표 48개 — 11/19 `MODEL_EVAL_SAMPLE` 추가 🆕 11/20), 피처 정의서 v1.0 `docs/spec/feature_definition.md`(FP-132). DB 제약은 DDL을, 피처는 피처 정의서를 따르고, 서로 다르면 확인 대상으로 적는다.
 
-> **🆕 최근 변경 (11/20, FP-143)** — 바뀐 곳에 🆕 11/20 표시
-> 1. 2-5·2-6 **경로 이동(광희, PR #103)**: DIAG-07-1·08-1·09, SIM-01·02를 `/api/members/me/…`로 → Q-8 해결
-> 2. 2-7 **대출 상품 LOAN-01~05 ✅(경환, FP-90 PR #101)**, SIM-03은 만들지 않음 → Q-9 해결, 오류 `PRODUCT_NOT_FOUND`
-> 3. 2-10 N-25 모형 성능 비교의 재료를 평가 표본 표 `MODEL_EVAL_SAMPLE`(PR #99, 표 48개)로, 1장 등급 구간 `CUT-0.2`(DRAFT, PR #106)
-> 4. 광희 님 요청: SIM-01 주요 표에 `USER_CREDIT_PROFILE`, DIAG-09 409에 "같은 달 겹침"
-> 5. 2-9 **용어 사전 HELP-01 ✅**(FP-180 PR #108)
-> 6. 2-5 **DIAG-01 ✅ 경로 `/api/members/me/peer-benchmark`·원천 회원 표(동주, FP-160 PR #120)**, DIAG-02·05 ⛔(쓰는 화면 없음 / `scenario-base`가 기준금리 제공), 2-10 ADM-01·02 쿼리·담당 FP-184
-> 7. 2-5 **(광희, FP-239)** DIAG-03-1 자산·부채 저장값 `GET /api/members/me/financial-health` ✅, DIAG-04 시나리오 새 경로 2개 ✅(PR #118), DIAG-09 '밀림' 반영(연체 +1, `assumedDelinquencyCount`). 이번부터 API를 만든 사람이 PR에서 정의서를 같이 고친다(범영 11/20)
-> 8. 2-2·2-3 **(우찬, FP-227)** MEM-05 입력 저장 전 직군 다시 고르기·409 `JOB_TYPE_LOCKED`, INP-02 자산 4종 각각 저장(DDL C13)
-> 9. 2-10 **모형 성능 비교 ADM-01·02 ✅(동주, FP-184)** — ACTIVE 모델(지금 0.2)의 평가 표본 기준
+> **🆕 최근 변경 (11/20)** — 바뀐 곳에 🆕 11/20 표시. 번호 없이 문서 관리자가 모아 정리한다(기능 PR은 이 블록을 고치지 않는다, [README](README.md) 2장)
+> - 2-5·2-6 **경로 이동(광희, PR #103)**: DIAG-07-1·08-1·09, SIM-01·02를 `/api/members/me/…`로 → Q-8 해결
+> - 2-7 **대출 상품 LOAN-01~05 ✅(경환, FP-90 PR #101)**, SIM-03은 만들지 않음 → Q-9 해결, 오류 `PRODUCT_NOT_FOUND`
+> - 2-10 N-25 모형 성능 비교의 재료를 평가 표본 표 `MODEL_EVAL_SAMPLE`(PR #99, 표 48개)로, 1장 등급 구간 `CUT-0.2`(DRAFT, PR #106)
+> - 광희 님 요청: SIM-01 주요 표에 `USER_CREDIT_PROFILE`, DIAG-09 409에 "같은 달 겹침"
+> - 2-9 **용어 사전 HELP-01 ✅**(FP-180 PR #108)
+> - 2-5 **DIAG-01 ✅ 경로 `/api/members/me/peer-benchmark`·원천 회원 표(동주, FP-160 PR #120)**, DIAG-02·05 ⛔(쓰는 화면 없음 / `scenario-base`가 기준금리 제공), 2-10 ADM-01·02 쿼리·담당 FP-184
+> - 2-5 **(광희, FP-239)** DIAG-03-1 자산·부채 저장값 `GET /api/members/me/financial-health` ✅, DIAG-04 시나리오 새 경로 2개 ✅(PR #118), DIAG-09 '밀림' 반영(연체 +1, `assumedDelinquencyCount`). 이번부터 API를 만든 사람이 PR에서 정의서를 같이 고친다(범영 11/20)
+> - 2-2·2-3 **(우찬, FP-227)** MEM-05 입력 저장 전 직군 다시 고르기·409 `JOB_TYPE_LOCKED`, INP-02 자산 4종 각각 저장(DDL C13)
+> - 2-10 **모형 성능 비교 ADM-01·02 ✅(동주, FP-184)** — ACTIVE 모델(지금 0.2)의 평가 표본 기준
+> - **(범영, FP-246)** 1장 오류 응답 ✅(D-20 확정), 2-11 공용 DB 모델 0.2, Q-7 해결
 >
 > 이전 변경 (11/19): FP-219 AUTH-13~15·AUTH-06 휴대폰 인증 필수, FP-170 SIM-01·02·DIAG-09 ✅, 1-2 C팀 오류 표 정리
 > 이전 변경 (11/18): 저장소 `docs/spec/api/`로 이관, PR #83(DIAG-07 표준편차·DIAG-08 `months[]`·전망 조건) 반영, 간편결제 × 12 🟡 정정, `isXxx` 필드 규칙
@@ -58,7 +59,7 @@
 | 금액·비율 | 금액은 원 단위 정수, 금리는 연 %(8.9 = 8.9%), 확률은 0~1 | DDL 머리말 |
 | 점수 | **0~1000** 정수. 등급은 `GOOD` / `STANDARD` / `CAUTION`(ACTIVE CUT-0.1: 0~664 / 665~779 / 780~1000, 🟡 임시값. 11/19 `CUT-0.2` 0~659 / 660~730 / 731~1000이 DRAFT로 추가됐고 전환 시점은 팀이 정함, PR #106 🆕 11/20) | DDL v0.3.1 A-1 |
 | 날짜 | 월 `"YYYY-MM"`, 날짜 `"YYYY-MM-DD"`, 시각은 ISO-8601 | DDL CHECK |
-| 오류 응답 | HTTP 상태 + `{ "code", "message", "fieldErrors": [{ "field", "message" }] }`. 🟡 A팀이 쓰는 임시 형식(D-20 결정 전) | 프론트 `serverErrors.js` |
+| 오류 응답 | HTTP 상태 + `{ "code", "message", "fieldErrors": [{ "field", "message" }] }`. ✅ 전 API 공통(FP-87 `GlobalExceptionHandler`, D-20 확정 🆕 11/20) | 프론트 `serverErrors.js` |
 | 개인정보 | 이름·휴대폰·이메일은 마스킹해서 응답한다. 원문은 로그에 남기지 않는다. 관리자가 회원 신용정보를 열람하면 `ACCESS_AUDIT_LOG`에 남긴다 | AGENTS.md 5장, DDL N-35 |
 | 토큰 종류 | JWT에 `scope` 클레임이 있다. 일반 API는 `ACCESS`만 받는다. 관리자 2단계 인증용 1회용 토큰(`ADMIN_LOGIN_CHALLENGE`·`ADMIN_PASSWORD_SETUP`·`ADMIN_STEP_UP`)으로 일반 API를 부르면 401. `scope` 없는 옛 토큰(PR #53 이전)도 401 → 다시 로그인 | A팀 명세 0장 |
 | 잠긴 계정 | `ACCOUNT_STATUS_CODE = LOCKED`면 이미 받은 토큰도 401 `ACCOUNT_LOCKED`. 잠금을 풀면 같은 토큰이 다시 동작 | A팀 명세 0장 |
@@ -316,7 +317,7 @@
 
 - FastAPI는 DB를 읽거나 쓰지 않는다. 저장은 Spring이 한다. 상세는 B팀 명세서 4장에 있다.
 - **모델 선택 (PR #74):** Spring이 보내는 모델 버전(= DB `MODEL_REGISTRY`의 ACTIVE)으로 FastAPI가 계산기를 고른다. `DEV-DUMMY` → Mock(`FS-DRAFT` 39개), `LGBM-BASE-0.1` → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`. 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503 `MODEL_NOT_READY`.
-- **모델 파일 확인 (PR #77):** `fastapi_server/artifacts/SHA256SUMS.txt`가 있으면 서버가 켜질 때 모델 파일 해시를 대조하고, 다르면 열지 않는다. 공용 DB는 11/18 17:52 `LGBM-BASE-0.1`로 전환 완료, 학습 데이터·모델 파일 기록 등록(FP-216, PR #88). `/v1/health`의 해시 확인 표시(`hashVerified`)는 2차 후보(FP-215).
+- **모델 파일 확인 (PR #77):** `fastapi_server/artifacts/SHA256SUMS.txt`가 있으면 서버가 켜질 때 모델 파일 해시를 대조하고, 다르면 열지 않는다. 공용 DB는 11/18 `LGBM-BASE-0.1`(FP-216, PR #88)에 이어 **11/20 `LGBM-BASE-0.2`로 전환**(FP-237, PR #110·#113) 🆕 11/20. `/v1/health`의 해시 확인 표시(`hashVerified`)는 2차 후보(FP-215).
 
 ### 2-12. 내부 연동: Spring → 가상 기관(mock 서버) — A팀
 
@@ -347,7 +348,7 @@
 | ~~Q-4~~ | ~~SIM-02 mock의 점수 범위, 출발점, 필드 이름~~ ✅ **해결:** PR #78에서 모두 고침(2-6) | — |
 | Q-5 | RPT-05(N-13 백분위) 담당. ~~DIAG-03(N-16 건전성)~~ ✅ 광희(FP-166) | 팀 전체 |
 | Q-6 | 🟡 경로 전체 확정 (각 담당) | 각 팀 |
-| Q-7 | 오류 응답 형식(D-20)과 타임아웃(D-18). 지금은 A팀 임시 형식을 따르고, 광희(1-2)·동주(PR #80)도 같은 `{ code, message, fieldErrors }`를 쓴다 | 팀 전체 |
+| ~~Q-7~~ | ✅ 해결(🆕 11/20): 오류 응답 형식은 D-20 확정(1장 공통 형식), FastAPI 타임아웃은 설정값으로 분리(D-18, Gemini만 남음) | 팀 전체 |
 | ~~Q-8~~ | ~~DIAG-07-1·08-1 경로~~ ✅ **해결:** `/api/members/me/…`로 이동(광희 PR #103, 우찬 합의, SIM-01·02·DIAG-09 포함) 🆕 11/20 | — |
 | ~~Q-9~~ | ~~SIM-03·대출 상품 담당~~ ✅ **해결:** 대출 상품 LOAN-01~05 경환(FP-90, PR #101), SIM-03은 만들지 않고 SIM-04 + LOAN-01로 대신 🆕 11/20 | — |
 | Q-10 | ADM-03(N-26 관리자 통계) 담당과 Jira 번호. 정의서에 있던 FP-191은 커뮤니티 카드였다. 비교 통계는 FP-159(광희) | 광희·동주 |

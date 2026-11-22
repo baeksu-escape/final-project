@@ -53,7 +53,7 @@
 | ✅ | 화면에는 `shapScore`(점수 단위 증감)만 보낸다. "작용한 정도"로만 표시하고 원인처럼 설명하지 않는다 | AGENTS.md 5장 |
 | ✅ | `FEATURE_SNAPSHOT`(모델 입력 전체)은 개인 금융정보라 **회원 화면 응답에 넣지 않는다.** 관리자가 열람하면 `ACCESS_AUDIT_LOG`에 남긴다 | DDL `FEATURE_SNAPSHOT` 주석 |
 
-### 1-1. 오류 응답 (🟡 D-20 결정 전 임시)
+### 1-1. 오류 응답 (✅ D-20 확정, 🆕 11/20)
 
 ```json
 { "code": "INVALID_INPUT", "message": "입력값을 확인해 주세요.", "fieldErrors": [{ "field": "baseMonth", "message": "기준월을 입력해 주세요." }] }
@@ -236,7 +236,7 @@
   - ML-04: Spring SIM-02는 ACTIVE가 아니라 **출발 평가(최근 SCORED)에 저장된** `MODEL_VERSION`을 `baseAssessment.modelVersion`으로 보낸다. 저장된 피처값과 같은 모델로 다시 계산해야 하기 때문이다(4-4, FP-170 PR #93). 정정
   - `DEV-DUMMY`(또는 버전 없음) → Mock(`FS-DRAFT` 39개), `LGBM-BASE-0.1` → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`
   - 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503 `MODEL_NOT_READY`(11/17 범영·재욱 합의)
-  - 공용 DB는 **11/18 17:52 `LGBM-BASE-0.1`로 전환 완료**(FP-216). 학습 데이터·모델 파일 기록은 `docs/spec/sql/register_model_lgbm_base_0_1.sql`(PR #88). 전환은 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`, 되돌리기는 `rollback_model_to_dev_dummy.sql`(PR #77, 절차: `fastapi_server/README.md`)
+  - 공용 DB는 11/18 `LGBM-BASE-0.1`(FP-216)에 이어 **11/20 `LGBM-BASE-0.2`로 전환 완료**(FP-237, 🆕 11/20). 학습 데이터·모델 파일 기록은 `docs/spec/sql/register_model_lgbm_base_0_1.sql`(PR #88). 전환은 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`, 되돌리기는 `rollback_model_to_dev_dummy.sql`(PR #77, 절차: `fastapi_server/README.md`). 0.2는 `register_model_lgbm_base_0_2.sql` → `activate_model_lgbm_base_0_2.sql`, 되돌리기 `rollback_model_lgbm_base_0_2_to_0_1.sql`(PR #110·#113)
 
 ### 4-1. ML-01 `GET /v1/health`
 ```json
@@ -469,7 +469,7 @@ C팀 SIM-02 `POST /api/members/me/credit-care-recalculate`가 부른다(11/19 �
 | ~~O-6~~ | ~~N-21-8 예상 대안 점수 (DIAG-09)~~ | ✅ **해결 (11/16 범영, 추천안):** Spring이 바꾼 입력으로 ML-03을 부르고 저장하지 않음. FastAPI 추가 작업 없음 | — |
 | O-8 | 내부 호출 인증 헤더 | 시연 범위에서는 한 PC 안(localhost)에서만 부르고 헤더 없음 | 우찬 |
 | ~~O-9~~ | ~~시뮬레이터 결과 저장~~ | ✅ **해결 (11/16 범영, 추천안):** 저장하지 않음 (진단 내역에는 진짜 평가만) | — |
-| O-10 | 오류 응답 형식 (D-20) | 프론트 임시 형식 유지 | 전체 |
+| O-10 | 오류 응답 형식 (D-20) | ✅ 확정(11/20): 프론트가 쓰던 형식을 전 API 공통으로(FP-87) | 전체 |
 | O-11 | 타임아웃 (D-18) | 연결 1초 / 응답 3초 | 전체 |
 | ~~O-12~~ | ~~꼭 필요한 동의 항목~~ | ✅ **해결:** 대안 데이터 5개 모두 필수. 대출 동의는 선택. 신용평가사는 1차 없음 | — |
 | ~~O-13~~ | ~~입력이 덜 찼을 때 409 차단 vs `NOT_SCORABLE` 저장~~ | ✅ **해결 (11/16 범영):** 입력·동의가 덜 차면 409 `INPUT_INCOMPLETE`로 막고 평가 행을 저장하지 않는다(화면 FP-86과 같음) | — |
@@ -514,6 +514,7 @@ C팀 SIM-02 `POST /api/members/me/credit-care-recalculate`가 부른다(11/19 �
 **O-10. 오류 응답 형식 (D-20)**
 - **질문:** 뭔가 잘못됐을 때 서버가 **어떤 모양의 안내문**을 돌려줄지 정해요.
 - **추천:** 지금 화면 팀이 이미 쓰는 모양을 그대로 써요: "무슨 문제인지(`code`) + 안내 문장(`message`) + 어느 칸이 틀렸는지(`fieldErrors`)"
+- **결과(🆕 11/20):** 추천대로 확정. FP-87 `GlobalExceptionHandler`가 전 API에 같은 모양을 쓴다(decisions.md D-20).
 
 **O-11. 타임아웃 (D-18)**
 - **질문:** 선생님께 물어보고 **얼마나 기다렸다가 포기할지** 정해요.
