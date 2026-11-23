@@ -1,0 +1,28 @@
+{
+  "runs": [
+    {
+      "status": "finished",
+      "started_at": "2026-11-23T08:15:20+00:00",
+      "provenance": {
+        "commit": "57e1a38cd6229e4c1284507a6fe5dfa227fb23cb",
+        "working_tree_clean": true,
+        "untracked_files_count": 0,
+        "untracked_files": []
+      },
+      "model_files_sha256": {
+        "legacy.joblib": "88e4ff34d26f62b32b77d823e2711c961992dc925de4eb7da8b8252d31421494",
+        "alternative.joblib": "f676753436f6d6ef7d189dcf1fcf5c54533ed7324c0a577ae057c80dc9971e17",
+        "legacy.meta.json": "34744810a2e005f6fcc1240793796fe088815868eed7f89428129392e37dfc1a",
+        "alternative.meta.json": "2cf611a3291d470ac58c6ae5106783361f781ad53891b438226e2ef329019d8c"
+      },
+      "tables_sha256_8": {
+        "legacy": "79511b5d",
+        "thinfile": "bb10ebb4"
+      },
+      "out_dir": "C:\\FinalProject\\final-project\\docs\\spec",
+      "rerun_reason": null,
+      "finished_at": "2026-11-23T08:15:21+00:00",
+      "result_json_sha256": "da2e5bbb8969f96d21ede4d503eca9264674755c1634b4eb7e205c7402532a55"
+    }
+  ]
+}
