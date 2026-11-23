@@ -26,6 +26,8 @@
 .credit-gauge__seg--good { stroke: color-mix(in srgb, var(--mint) 18%, var(--panel2)); }
 .credit-gauge__value { fill: none; stroke: var(--gauge); stroke-width: 20; stroke-linecap: butt; transition: stroke-dashoffset 1.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .credit-gauge__band-label { fill: var(--mut2); font-size: 12px; font-weight: 600; }
+.credit-gauge__tick line { stroke: var(--panel); stroke-width: 2.5; }
+.credit-gauge__tick text { fill: var(--mut2); font-size: 10.5px; font-weight: 700; }
 .credit-gauge__band-label.is-mine { fill: var(--gauge); font-weight: 800; }
 .credit-gauge__score { fill: var(--gauge); font-size: 60px; font-weight: 800; letter-spacing: -0.04em; }
 .credit-gauge__unit { fill: var(--mut2); font-size: 13px; font-weight: 600; }

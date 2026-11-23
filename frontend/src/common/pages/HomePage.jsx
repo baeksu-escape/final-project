@@ -20,14 +20,27 @@ const NEXT_ACTIONS = [
 export default function HomePage() {
   const { user } = useAuth()
   const [report, setReport] = useState(null)
+  const [reportError, setReportError] = useState(false)
   const [history, setHistory] = useState([])
+  // [다시 시도]를 누르면 1씩 올려 다시 불러온다
+  const [reloadKey, setReloadKey] = useState(0)
 
+  // 점수(RPT-02)와 진단 내역(MEM-06)을 불러온다. 점수 조회가 실패하면 로딩에 머물지 않고 안내와 [다시 시도]를 보여 준다(FP-252 검수 반영).
+  // 진단 내역 실패는 추이 카드만 비고 나머지는 그대로 보이게 둔다.
   useEffect(() => {
     let active = true
-    fetchCreditReport().then((data) => { if (active) setReport(data) }).catch(() => {})
+    fetchCreditReport()
+      .then((data) => { if (active) { setReport(data); setReportError(false) } })
+      .catch(() => { if (active) setReportError(true) })
     fetchDiagnosisHistory().then(({ items }) => { if (active) setHistory(items ?? []) }).catch(() => {})
     return () => { active = false }
-  }, [])
+  }, [reloadKey])
+
+  const retry = () => {
+    setReportError(false)
+    setReport(null)
+    setReloadKey((key) => key + 1)
+  }
 
   const alt = report?.alternative
   const scored = report?.gradeStatusCode === 'SCORED' && alt?.score != null
@@ -58,9 +71,15 @@ export default function HomePage() {
               <ScoreRing value={alt.score} size={210} label="대안 모델" sub={GRADE_TEXT[alt.gradeBandCode] ?? ''} />
               <dl className="dash-score__facts">
                 <div><dt>기존 모델</dt><dd className="num">{report.traditional?.score ?? '-'}<small>점</small></dd></div>
-                <div><dt>대안 데이터 효과</dt><dd className={`num ${diff >= 0 ? 'is-up' : 'is-down'}`}>{diff == null ? '-' : `${diff > 0 ? '+' : ''}${diff}`}<small>점</small></dd></div>
+                <div><dt>두 모델 점수 차이</dt><dd className={`num ${diff >= 0 ? 'is-up' : 'is-down'}`}>{diff == null ? '-' : `${diff > 0 ? '+' : ''}${diff}`}<small>점</small></dd></div>
                 <div><dt>등급</dt><dd>{GRADE_TEXT[alt.gradeBandCode] ?? '-'}</dd></div>
               </dl>
+            </div>
+          ) : reportError ? (
+            <div className="dash-error" role="alert">
+              <p>점수를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.</p>
+              {/* 카드 전체가 링크라 버튼을 누를 때 리포트로 이동하지 않게 막는다 */}
+              <button type="button" className="button button--weak button--sm" onClick={(event) => { event.preventDefault(); retry() }}>다시 시도</button>
             </div>
           ) : (
             <p className="hint">{report ? '아직 표시할 점수가 없어요.' : '점수를 불러오는 중이에요'}</p>

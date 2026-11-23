@@ -36,14 +36,14 @@
 @media (max-width: 640px) { .loan-grid, .loan-detail-facts { grid-template-columns: 1fr; } .loan-detail-conditions { grid-template-columns: 1fr; gap: 6px; } .loan-detail-conditions dd { margin-bottom: 10px; } }
 
 /* UI 리뉴얼 — 상품마다 다른 색(9가지를 돌려 쓴다). 상품 종류 색보다 우선 */
-.loan-grid > :nth-child(9n+1) .loan-banner { --tone: #3478f6; }
-.loan-grid > :nth-child(9n+2) .loan-banner { --tone: #0e9f6e; }
-.loan-grid > :nth-child(9n+3) .loan-banner { --tone: #7c5cff; }
-.loan-grid > :nth-child(9n+4) .loan-banner { --tone: #f07c1d; }
-.loan-grid > :nth-child(9n+5) .loan-banner { --tone: #1aa3d9; }
-.loan-grid > :nth-child(9n+6) .loan-banner { --tone: #e0457b; }
-.loan-grid > :nth-child(9n+7) .loan-banner { --tone: #14b8a6; }
-.loan-grid > :nth-child(9n+8) .loan-banner { --tone: #d4a017; }
-.loan-grid > :nth-child(9n+9) .loan-banner { --tone: #5b6cff; }
+.loan-grid > :nth-child(9n+1) .loan-banner { --tone: var(--c-blue); }
+.loan-grid > :nth-child(9n+2) .loan-banner { --tone: var(--c-green); }
+.loan-grid > :nth-child(9n+3) .loan-banner { --tone: var(--c-violet); }
+.loan-grid > :nth-child(9n+4) .loan-banner { --tone: var(--c-orange); }
+.loan-grid > :nth-child(9n+5) .loan-banner { --tone: var(--c-sky); }
+.loan-grid > :nth-child(9n+6) .loan-banner { --tone: var(--c-pink); }
+.loan-grid > :nth-child(9n+7) .loan-banner { --tone: var(--c-teal); }
+.loan-grid > :nth-child(9n+8) .loan-banner { --tone: var(--c-gold); }
+.loan-grid > :nth-child(9n+9) .loan-banner { --tone: var(--c-indigo); }
 .loan-banner { background: linear-gradient(135deg, color-mix(in srgb, var(--tone) 22%, var(--panel)), color-mix(in srgb, var(--tone) 6%, var(--panel))); }
 .loan-banner::before { width: 40px; height: 5px; }

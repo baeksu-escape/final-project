@@ -29,6 +29,17 @@
   --link: #2563d9;
   --acc: #3478f6;
 
+  /* 구분용 색 9가지(대출 카드·분류 타일·기록 카드·라운지 얼굴) — 의미 없는 장식 색은 이것만 쓴다 */
+  --c-blue: #3478f6;
+  --c-green: #0e9f6e;
+  --c-violet: #7c5cff;
+  --c-orange: #f07c1d;
+  --c-sky: #1aa3d9;
+  --c-pink: #e0457b;
+  --c-teal: #14b8a6;
+  --c-gold: #d4a017;
+  --c-indigo: #5b6cff;
+
   /* 안내 박스·오버레이 */
   --note-bg: #edf4ff;
   --note-line: #d3e0fa;

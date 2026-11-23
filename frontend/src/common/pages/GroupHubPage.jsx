@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CountUp, FactorBars, ScoreRing, TrendArea } from '../components/viz.jsx'
+import { GRADE_BOUNDARIES } from '../config/grades.js'
 import { NAV_GROUPS } from '../config/navigation.js'
 import ScoreGauge from '../../features/credit/components/ScoreGauge.jsx'
 import '../../features/credit/credit.css'
 import './hub.css'
 
+// 예시 게이지의 등급 경계 — 지금 서비스 등급 구간(CUT-0.3, grades.js GRADE_BOUNDARIES)과 같게
 const SAMPLE_BANDS = [
-  { gradeBandCode: 'CAUTION', minScore: 0, maxScore: 664 },
-  { gradeBandCode: 'STANDARD', minScore: 665, maxScore: 779 },
-  { gradeBandCode: 'GOOD', minScore: 780, maxScore: 1000 },
+  { gradeBandCode: 'CAUTION', minScore: 0, maxScore: GRADE_BOUNDARIES.STANDARD - 1 },
+  { gradeBandCode: 'STANDARD', minScore: GRADE_BOUNDARIES.STANDARD, maxScore: GRADE_BOUNDARIES.GOOD - 1 },
+  { gradeBandCode: 'GOOD', minScore: GRADE_BOUNDARIES.GOOD, maxScore: 1000 },
 ]
 
 // 시뮬레이터 미리보기 — 카드 사용률을 90 → 60 → 30%로 스스로 옮기며 예상 점수가 따라 오른다(예시 값)
@@ -95,15 +97,14 @@ const COPY = {
     ),
   },
   scenario: {
-    headline: '금리가 오르거나\n소득이 줄면 어떻게 될까요',
-    body: '금리 상승, 소득 감소 같은 상황을 골라 보면 상환 부담과 점수가 어떻게 바뀌는지 미리 계산합니다. 나빠질 때와 좋아질 때를 모두 볼 수 있어요.',
+    headline: '금리가 오르거나\n소득이 줄면 버틸 수 있을까요',
+    body: '금리 상승·소득 감소 같은 상황을 골라 보면 매달 갚을 돈과 상환 여력(소득 대비 상환 부담)이 어떻게 바뀌는지 계산합니다. 나빠질 때와 좋아질 때를 모두 볼 수 있어요.',
     preview: () => (
-      <FactorBars unit="%p" items={[
-        { label: '금리 +2%p', value: -6 },
-        { label: '소득 -10%', value: -4 },
-        { label: '대출 일부 상환', value: 5 },
-        { label: '소득 +10%', value: 3 },
-      ]} />
+      <div className="hub-preview__rings">
+        <ScoreRing value={17} max={100} label="지금" sub="상환 부담 17%" tone="var(--mint)" size={160} />
+        <ScoreRing value={23} max={100} label="금리 +2%p" sub="상환 부담 23%" tone="var(--warn)" size={160} />
+        <ScoreRing value={28} max={100} label="소득 -15%" sub="상환 부담 28%" tone="var(--bad)" size={160} />
+      </div>
     ),
   },
   market: {

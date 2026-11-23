@@ -49,6 +49,20 @@ export default function ScoreGauge({ score, bands, label, alternative }) {
         d={arc(0, 1000, R)}
         style={{ strokeDasharray: fullLen, strokeDashoffset: seen ? fullLen * (1 - clamped / 1000) : fullLen }}
       />
+      {/* 등급이 바뀌는 경계 점수 — 띠 안쪽에 눈금과 숫자(몇 점부터 다음 등급인지) */}
+      {sorted.filter((band) => band.minScore > 0 && band.minScore < 1000).map((band, index) => {
+        const [ox, oy] = point(band.minScore, R + 11)
+        const [ix, iy] = point(band.minScore, R - 11)
+        // 경계가 가까워도 숫자가 겹치지 않게 첫 경계는 눈금 왼쪽 아래, 다음 경계는 오른쪽 아래에 붙인다
+        const [nx, ny] = point(band.minScore, R - 24)
+        const first = index === 0
+        return (
+          <g key={`tick-${band.gradeBandCode}`} className="credit-gauge__tick">
+            <line x1={ox} y1={oy} x2={ix} y2={iy} />
+            <text x={nx + (first ? -4 : 4)} y={ny + (first ? 2 : 10)} textAnchor={first ? 'end' : 'start'}>{band.minScore}</text>
+          </g>
+        )
+      })}
       <text className="credit-gauge__score num" x={CX} y={CY - 10} textAnchor="middle">{shown}</text>
       <text className="credit-gauge__unit" x={CX} y={CY + 16} textAnchor="middle">/ 1000점</text>
     </svg>

@@ -1,7 +1,7 @@
 import { formatDate } from '../config/communityCodes.js'
 
 // 닉네임 첫 글자로 만든 동그란 얼굴 — 닉네임마다 색이 고정된다(실제 사진·개인정보 아님)
-const AVATAR_TONES = ['#3478f6', '#0e9f6e', '#7c5cff', '#f07c1d', '#1aa3d9', '#e0457b']
+const AVATAR_TONES = ['var(--c-blue)', 'var(--c-green)', 'var(--c-violet)', 'var(--c-orange)', 'var(--c-sky)', 'var(--c-pink)']
 function Avatar({ name = '?' }) {
   const code = [...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0)
   return <span className="lounge-avatar" style={{ '--tone': AVATAR_TONES[code % AVATAR_TONES.length] }} aria-hidden="true">{name.slice(0, 1)}</span>

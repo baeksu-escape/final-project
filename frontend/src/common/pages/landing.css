@@ -81,7 +81,7 @@
   line-height: 1.75;
 }
 
-/* 휴대폰 틀(그림 없이 CSS로) */
+/* 휴대폰 틀(그림 없이 CSS로) — 휴대폰 화면·무대 배경은 테마와 상관없이 같은 그림이라 색을 고정한다 */
 .landing-phone {
   position: relative;
   justify-self: center;
@@ -275,7 +275,7 @@
 }
 
 .record-card {
-  --tone: #3478f6;
+  --tone: var(--c-blue);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -317,11 +317,11 @@
   font-weight: 600;
 }
 
-.record-card--blue { --tone: #3478f6; }
-.record-card--green { --tone: #0e9f6e; }
-.record-card--violet { --tone: #7c5cff; }
-.record-card--orange { --tone: #f07c1d; }
-.record-card--sky { --tone: #1aa3d9; }
+.record-card--blue { --tone: var(--c-blue); }
+.record-card--green { --tone: var(--c-green); }
+.record-card--violet { --tone: var(--c-violet); }
+.record-card--orange { --tone: var(--c-orange); }
+.record-card--sky { --tone: var(--c-sky); }
 
 .landing-collage__note {
   text-align: center;
