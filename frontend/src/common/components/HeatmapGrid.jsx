@@ -13,9 +13,15 @@
 //   rowSummary   : 행마다 오른쪽 끝에 붙일 요약값 배열 (제목 '직군 평균'). 비우면 열을 그리지 않는다
 //   colSummary   : 열마다 맨 아래에 붙일 요약값 배열 (제목 '연령 평균')
 //   totalSummary : 맨 아래 오른쪽 끝 전체 평균 (colSummary가 있을 때만 보인다)
+//   formatValue  : 숫자 표시 함수 (예: v => `+${v}점`). 없으면 숫자 뒤에 unit을 붙인다
 // 칸 색은 data 안의 최솟값~최댓값 기준으로 진하기가 정해진다.
+// 값이 null·undefined이거나 숫자가 아니면(예: 인원이 적어 숨긴 값) '—'로 보이고 색 범위 계산에서 빠진다(가장 옅은 칸).
+//   요약값(rowSummary·colSummary·totalSummary)도 같다. (11/23 FP-164 광희, 동주 동의)
 // 사용 예: <HeatmapGrid data={scores} myCell={[1, 2]} onSelectCell={(r, c, cell) => setPicked([r, c])} />
 import React from 'react';
+
+// 숨긴 값(빈 값·숫자가 아님)이면 true — 0점으로 그리지 않는다.
+const isHidden = (value) => value === null || value === undefined || value === '' || Number.isNaN(Number(value));
 
 export default function HeatmapGrid({
   columns = ['20대', '30대', '40대', '50대 이상'],
@@ -28,20 +34,27 @@ export default function HeatmapGrid({
   rowSummary = [], // 각 행의 평균/합계
   colSummary = [], // 각 열의 평균/합계
   totalSummary = null, // 전체 평균
+  formatValue, // 숫자 표시 함수. 없으면 숫자 + unit
 }) {
-  // 값 범위(min, max) 계산
+  // 값 범위(min, max) 계산 — 숨긴 값은 뺀다
   const flatValues = React.useMemo(() => {
     const list = [];
     data.forEach((row) => {
       if (Array.isArray(row)) {
         row.forEach((cell) => {
-          const val = typeof cell === 'object' && cell !== null ? Number(cell.value) : Number(cell);
-          if (!isNaN(val)) list.push(val);
+          const raw = typeof cell === 'object' && cell !== null ? cell.value : cell;
+          if (!isHidden(raw)) list.push(Number(raw));
         });
       }
     });
     return list;
   }, [data]);
+
+  // 칸·요약 글자 — 숨긴 값은 '—'(단위 없이)
+  const display = (value) => {
+    if (isHidden(value)) return '—';
+    return formatValue ? formatValue(Number(value)) : `${value}${unit}`;
+  };
 
   const minVal = flatValues.length > 0 ? Math.min(...flatValues) : 0;
   const maxVal = flatValues.length > 0 ? Math.max(...flatValues) : 100;
@@ -49,12 +62,11 @@ export default function HeatmapGrid({
 
   const getCellData = (rIdx, cIdx) => {
     const row = data[rIdx];
-    if (!row) return { value: 0, count: null };
+    if (!row) return { value: null, count: null };
     const cell = row[cIdx];
-    if (typeof cell === 'object' && cell !== null) {
-      return { value: Number(cell.value) || 0, count: cell.count ?? null };
-    }
-    return { value: Number(cell) || 0, count: null };
+    const raw = typeof cell === 'object' && cell !== null ? cell.value : cell;
+    const count = typeof cell === 'object' && cell !== null ? cell.count ?? null : null;
+    return { value: isHidden(raw) ? null : Number(raw), count };
   };
 
   return (
@@ -116,7 +128,7 @@ export default function HeatmapGrid({
             {/* 행 내의 셀들 */}
             {columns.map((_, cIdx) => {
               const cell = getCellData(rIdx, cIdx);
-              const ratio = Math.min(1, Math.max(0, (cell.value - minVal) / range));
+              const ratio = cell.value === null ? 0 : Math.min(1, Math.max(0, (cell.value - minVal) / range));
               const isMine = myCell && myCell[0] === rIdx && myCell[1] === cIdx;
               const isSelected = selectedCell && selectedCell[0] === rIdx && selectedCell[1] === cIdx;
 
@@ -147,7 +159,7 @@ export default function HeatmapGrid({
                     transition: 'all 0.15s ease',
                   }}
                   aria-pressed={isSelected}
-                  aria-label={`${rowName} ${columns[cIdx]} ${cell.value}${unit}`}
+                  aria-label={`${rowName} ${columns[cIdx]} ${cell.value === null ? '인원 부족으로 숨김' : display(cell.value)}`}
                 >
                   {/* 내 위치 마커 */}
                   {isMine && (
@@ -171,8 +183,7 @@ export default function HeatmapGrid({
                   )}
 
                   <b className="num" style={{ fontSize: '13.5px', fontWeight: 700 }}>
-                    {cell.value}
-                    {unit}
+                    {display(cell.value)}
                   </b>
                   {cell.count != null && (
                     <span style={{ fontSize: '11px', opacity: 0.85 }} className="num">
@@ -200,7 +211,7 @@ export default function HeatmapGrid({
                   fontSize: '13px',
                 }}
               >
-                <b className="num">{rowSummary[rIdx] ?? '-'}{unit}</b>
+                <b className="num">{display(rowSummary[rIdx])}</b>
               </div>
             )}
           </React.Fragment>
@@ -227,10 +238,10 @@ export default function HeatmapGrid({
                   fontSize: '12.5px',
                 }}
               >
-                <b className="num">{avgVal}{unit}</b>
+                <b className="num">{display(avgVal)}</b>
               </div>
             ))}
-            {totalSummary != null && (
+            {rowSummary.length > 0 && (
               <div
                 style={{
                   height: '42px',
@@ -244,7 +255,7 @@ export default function HeatmapGrid({
                   fontSize: '12.5px',
                 }}
               >
-                <b className="num">{totalSummary}{unit}</b>
+                <b className="num">{display(totalSummary)}</b>
               </div>
             )}
           </>
