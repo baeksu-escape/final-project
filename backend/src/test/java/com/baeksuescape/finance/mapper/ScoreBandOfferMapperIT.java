@@ -24,14 +24,15 @@ class ScoreBandOfferMapperIT {
     private ScoreBandOfferMapper mapper;
 
     @Test
-    @DisplayName("등급 구간(DDL 기준 데이터): ACTIVE 버전 CUT-0.1에서 경계별 등급")
+    @DisplayName("등급 구간(DDL 기준 데이터): ACTIVE 버전 CUT-0.3(11/23 전환, FP-248)에서 경계별 등급")
     void selectActiveGradeBand() {
-        GradeBandRow caution = mapper.selectActiveGradeBand(664);
+        GradeBandRow caution = mapper.selectActiveGradeBand(653);
         assertNotNull(caution, "SCORE_GRADE_BAND가 비어 있다. DDL을 실행했는지 확인");
         assertEquals("CAUTION", caution.getGradeBandCode());
-        assertEquals("CUT-0.1", caution.getCutoffVersion());
-        assertEquals("STANDARD", mapper.selectActiveGradeBand(665).getGradeBandCode());
-        assertEquals("GOOD", mapper.selectActiveGradeBand(780).getGradeBandCode());
+        assertEquals("CUT-0.3", caution.getCutoffVersion());
+        assertEquals("STANDARD", mapper.selectActiveGradeBand(654).getGradeBandCode());
+        assertEquals("STANDARD", mapper.selectActiveGradeBand(726).getGradeBandCode());
+        assertEquals("GOOD", mapper.selectActiveGradeBand(727).getGradeBandCode());
     }
 
     @Test
@@ -39,8 +40,8 @@ class ScoreBandOfferMapperIT {
     void selectOfferByScore() {
         ScoreBandOfferRow standard = mapper.selectOfferByScore(720);
         assertNotNull(standard, "SCORE_BAND_OFFER가 비어 있다. dummy_db/run_all.sql 적재 필요");
-        assertEquals(665, standard.getMinScore());
-        assertEquals(779, standard.getMaxScore());
+        assertEquals(654, standard.getMinScore());   // CUT-0.3 전환(FP-248)으로 금리·한도 점수 구간도 0~653 / 654~726 / 727~1000
+        assertEquals(726, standard.getMaxScore());
         assertEquals(0, new java.math.BigDecimal("5.28").compareTo(standard.getRateMinPct()));
         assertEquals(47000000L, standard.getLimitAmt());
         assertEquals(LocalDate.of(2026, 9, 18), standard.getBaseDate());

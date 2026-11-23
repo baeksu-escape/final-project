@@ -9,10 +9,10 @@ export const scoredReport = {
   traditional: { scorableYn: 'Y', score: 612, gradeBandCode: 'CAUTION', defaultProb: 0.183421 },
   alternative: { scorableYn: 'Y', score: 701, gradeBandCode: 'STANDARD', defaultProb: 0.092115 },
   comparison: { scoreDiff: 89, gradeChanged: true },
-  gradeBands: { cutoffVersion: 'CUT-0.1', bands: [
-    { gradeBandCode: 'CAUTION', minScore: 0, maxScore: 664 },
-    { gradeBandCode: 'STANDARD', minScore: 665, maxScore: 779 },
-    { gradeBandCode: 'GOOD', minScore: 780, maxScore: 1000 },
+  gradeBands: { cutoffVersion: 'CUT-0.3', bands: [
+    { gradeBandCode: 'CAUTION', minScore: 0, maxScore: 653 },
+    { gradeBandCode: 'STANDARD', minScore: 654, maxScore: 726 },
+    { gradeBandCode: 'GOOD', minScore: 727, maxScore: 1000 },
   ] },
   shap: { baseScore: 639, factors: [
     { rank: 1, featureCode: 'telecom_on_time_streak', featureName: '통신비 정시 납부 기간', unitName: '개월', featureValue: '18', shapScore: 40, alternativeYn: 'Y', simulatableYn: 'Y' },
