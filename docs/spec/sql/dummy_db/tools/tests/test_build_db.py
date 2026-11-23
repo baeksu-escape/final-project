@@ -346,7 +346,7 @@ class SchemaTests(unittest.TestCase):
     def test_active_unique_indexes(self):
         """ACTIVE 상태는 한 개만 가능하고 비활성 행들은 조건부 UNIQUE에서 제외된다."""
         for table,key in [('SCORE_CUTOFF_VERSION','CUTOFF_VERSION'),('MODEL_REGISTRY','MODEL_VERSION')]:
-            rows=copy.deepcopy(self.base);extra=dict(rows[table][0]);extra[key]='OTHER';rows[table].append(extra)
+            rows=copy.deepcopy(self.base);extra=dict(next(r for r in rows[table] if r['STATUS_CODE']=='ACTIVE'));extra[key]='OTHER';rows[table].append(extra)   # 첫 행이 아니라 ACTIVE 행을 복사한다(CUT-0.3 전환 뒤 첫 행 CUT-0.1은 RETIRED)
             with self.assertRaises(ValueError):db.validate_rows(self.tables,rows)
             extra['STATUS_CODE']='RETIRED';db.validate_rows(self.tables,rows)
 
