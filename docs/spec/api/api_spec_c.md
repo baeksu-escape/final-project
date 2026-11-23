@@ -535,8 +535,7 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 |---|---|---|---|
 | GET | `/api/simulation/score-band-offer?score=` | 점수대의 참고 금리·한도와 등급 | DB `SCORE_BAND_OFFER`, `SCORE_GRADE_BAND`(ACTIVE 버전) |
 
-- **상품 추천(N-18-7 상품 3종)은 A조 담당이라 이 API에 없다.** A조 추천 API는 백엔드 `ScoreBandOfferService.findOffer(score)`를 재사용할 수 있다.
-- 기존 프론트 mock `GET /api/simulation/loans/recommend`(금리·한도 + 상품)는 A조 몫으로 그대로 둔다.
+- **상품 추천(N-18-7 상품 3종)은 이 API에 없다.** 🆕 11/23 금리·한도와 상품을 함께 주려던 SIM-03(`/api/simulation/loans/recommend`)은 만들지 않기로 했다(정의서 Q-9). 화면은 이 API(SIM-04)와 대출 상품 목록 LOAN-01(경환 FP-90)을 합쳐 보여 준다.
 - 금리·한도는 **더미 데이터**다. 화면에는 "같은 점수대의 참고 정보"로만 보여 준다(`dummyNotice`가 항상 `true`).
 - 오류:
   - `score`가 없거나 숫자가 아니거나 0~1000 밖이면 `400 INVALID_INPUT`(범위 밖이면 `fieldErrors`에 `score`)
