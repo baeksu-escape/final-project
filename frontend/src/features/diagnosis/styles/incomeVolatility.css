@@ -1,0 +1,28 @@
+/* N-22 소득 변동성 요약 전용 스타일. 기존 테마 토큰을 사용한다. */
+.iv-section { display: grid; gap: 16px; }
+.iv-title { margin: 0; font-size: 20px; }
+.iv-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.iv-kpi { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.iv-kpi h3 { margin: 0 0 10px; color: var(--mut); font-size: 13px; font-weight: 600; }
+.iv-kpi__value { margin: 0 0 8px; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+.iv-kpi > span { color: var(--mut2); font-size: 12px; line-height: 1.5; }
+.iv-kpi--high { border-color: var(--bad); }
+.iv-kpi--high .iv-kpi__value, .iv-kpi--high > span { color: var(--bad); }
+.iv-details .card__body { display: grid; gap: 14px; }
+.iv-details__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; }
+.iv-details__grid > div { min-width: 0; }
+.iv-details__grid dt { margin-bottom: 6px; color: var(--mut); font-size: 13px; }
+.iv-details__grid dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.iv-details__grid span { display: block; margin-top: 5px; color: var(--mut2); font-size: 12px; }
+.iv-deficits .card__body { display: grid; gap: 12px; }
+.iv-deficits__list { display: grid; gap: 10px; margin: 0; padding-left: 20px; }
+.iv-deficits__list li { display: grid; gap: 4px; padding: 8px 0; }
+.iv-deficits__list li span { color: var(--mut); font-size: 13px; line-height: 1.5; }
+.iv-unavailable { margin: 0; color: var(--mut); font-size: 13px; line-height: 1.6; }
+@media (max-width: 900px) {
+  .iv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .iv-details__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .iv-kpis, .iv-details__grid { grid-template-columns: 1fr; }
+}
