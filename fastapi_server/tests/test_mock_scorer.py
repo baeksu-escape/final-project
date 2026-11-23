@@ -89,10 +89,10 @@ class FeatureCatalogTest(unittest.TestCase):
 
     def test_grade_band_edges(self):
         self.assertEqual(catalog.grade_band(0), "CAUTION")
-        self.assertEqual(catalog.grade_band(664), "CAUTION")
-        self.assertEqual(catalog.grade_band(665), "STANDARD")
-        self.assertEqual(catalog.grade_band(779), "STANDARD")
-        self.assertEqual(catalog.grade_band(780), "GOOD")
+        self.assertEqual(catalog.grade_band(653), "CAUTION")      # CUT-0.3(11/23 전환, FP-248): 0~653 / 654~726 / 727~1000
+        self.assertEqual(catalog.grade_band(654), "STANDARD")
+        self.assertEqual(catalog.grade_band(726), "STANDARD")
+        self.assertEqual(catalog.grade_band(727), "GOOD")
         self.assertEqual(catalog.grade_band(1000), "GOOD")
 
 
@@ -283,7 +283,7 @@ class ScoreEndpointRuleTest(unittest.TestCase):
     def test_response_versions_and_snapshot(self):
         r = score(ScoreRequest(**sample_request()), None)
         self.assertEqual((r["modelVersion"], r["featureSetVersion"], r["cutoffVersion"]),
-                         ("DEV-DUMMY", "FS-DRAFT", "CUT-0.1"))
+                         ("DEV-DUMMY", "FS-DRAFT", "CUT-0.3"))
         self.assertEqual(r["requestId"], REQUEST_ID)
         self.assertEqual(len(r["featureSnapshot"]), 39)
 
