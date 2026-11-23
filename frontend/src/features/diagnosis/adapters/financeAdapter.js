@@ -57,7 +57,7 @@ export function adaptCashFlowForecast(raw) {
     tightestMonth: { baseMonth: raw.worstForecastMonth, netAmount: raw.worstNetCashFlow }, source: 'diag-08-1' }
 }
 
-// N-21-8 DIAG-09 응답을 화면 값으로 바꾼다. 예상 점수에는 특정 미래 시점을 붙이지 않는다.
+// N-21-8 DIAG-09 응답을 화면 값으로 바꾼다. scorePath는 서버가 준 예상 점수 1개만 담으며, 차트가 예측 기간 마지막 달에 현재 점수(마지막 실적 달)와 직선으로 잇는다. 달마다 점수를 만들지 않는다.
 // 납부 밀림 가정과 모델 변경을 안내한다. 점수 차이를 원인처럼 쓰지 않는다.
 export function adaptExpectedScore(raw) {
   const isScore = (value) => Number.isInteger(value) && value >= 0 && value <= 1000
