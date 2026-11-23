@@ -3,18 +3,21 @@
 .loans-heading h1, .loan-detail-banner h1 { margin: 0 0 8px; }
 .loans-heading p, .loan-hint { color: var(--mut); }
 .loan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.loan-card { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel); min-width: 0; }
-.loan-banner { padding: 18px; color: #fff; position: relative; min-height: 130px; }
-.loan-banner--bank { background: #2f6f5e; }
-.loan-banner--neutral { background: var(--mut); }
-.loan-banner--savings { background: #b8742a; }
-.loan-banner--policy { background: #3a5a9a; }
-.loan-banner h2 { margin: 20px 0 0; font-size: 19px; }
-.loan-ribbon { float: right; font-size: 12px; border: 1px solid currentColor; border-radius: 20px; padding: 2px 7px; }
-.loan-card__body { display: grid; gap: 12px; padding: 16px; }
+.loan-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 20px; overflow: hidden; background: var(--panel); min-width: 0; box-shadow: var(--shadow-sm); transition: box-shadow .2s, transform .2s; }
+.loan-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+.loan-banner, .loan-detail-banner { --tone: var(--mut); } .loan-banner { padding: 20px; color: var(--fg); position: relative; min-height: 120px; background: color-mix(in srgb, var(--tone) 12%, var(--panel)); border-bottom: 1px solid color-mix(in srgb, var(--tone) 20%, var(--panel)); }
+.loan-banner::before { content: ''; display: block; width: 32px; height: 4px; border-radius: 2px; background: var(--tone); }
+.loan-banner--bank { --tone: var(--mint); }
+.loan-banner--neutral { --tone: var(--mut); }
+.loan-banner--savings { --tone: var(--warn); }
+.loan-banner--policy { --tone: var(--acc); }
+.loan-banner h2 { margin: 14px 0 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+.loan-ribbon { position: absolute; top: 16px; right: 16px; font-size: 12px; font-weight: 700; border-radius: 20px; padding: 3px 9px; background: var(--panel); color: var(--mut); }
+.loan-card__body { display: grid; flex: 1; align-content: start; gap: 12px; padding: 20px; }
 .loan-card__body p { margin: 0; line-height: 1.65; }
 .loan-card__body > p:first-child, .loan-detail-banner p, .loan-detail-description p { white-space: pre-line; }
-.loan-card__numbers { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; }
+.loan-card__numbers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px; border-radius: 12px; background: var(--panel2); font-size: 13px; }
+.loan-card__numbers b, .loan-card__numbers strong { font-size: 15px; }
 .loan-card__numbers span { display: grid; gap: 5px; }
 .loan-hint { font-size: 13px; }
 .loan-score { color: var(--bad); font-size: 13px; }
@@ -22,12 +25,25 @@
 .loan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .loan-actions a { text-decoration: none; }
 .loan-empty { padding: 32px; border: 1px dashed var(--line); border-radius: 12px; color: var(--mut); }
-.loan-detail-banner { padding: 28px; border-radius: 14px; color: #fff; }
+.loan-detail-banner { padding: 32px; border-radius: 20px; color: var(--fg); background: color-mix(in srgb, var(--tone) 12%, var(--panel)); }
 .loan-detail-banner h1 { margin-top: 12px; }
 .loan-detail-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-.loan-detail-facts > div { display: grid; gap: 8px; padding: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.loan-detail-facts > div { display: grid; gap: 8px; padding: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
 .loan-detail-facts span { color: var(--mut); font-size: 13px; }
 .loan-detail-conditions { display: grid; grid-template-columns: 140px 1fr; gap: 12px; }
 .loan-detail-conditions dd { margin: 0; }
 @media (max-width: 1100px) { .loan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .loan-detail-facts { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .loan-grid, .loan-detail-facts { grid-template-columns: 1fr; } .loan-detail-conditions { grid-template-columns: 1fr; gap: 6px; } .loan-detail-conditions dd { margin-bottom: 10px; } }
+
+/* UI 리뉴얼 — 상품마다 다른 색(9가지를 돌려 쓴다). 상품 종류 색보다 우선 */
+.loan-grid > :nth-child(9n+1) .loan-banner { --tone: var(--c-blue); }
+.loan-grid > :nth-child(9n+2) .loan-banner { --tone: var(--c-green); }
+.loan-grid > :nth-child(9n+3) .loan-banner { --tone: var(--c-violet); }
+.loan-grid > :nth-child(9n+4) .loan-banner { --tone: var(--c-orange); }
+.loan-grid > :nth-child(9n+5) .loan-banner { --tone: var(--c-sky); }
+.loan-grid > :nth-child(9n+6) .loan-banner { --tone: var(--c-pink); }
+.loan-grid > :nth-child(9n+7) .loan-banner { --tone: var(--c-teal); }
+.loan-grid > :nth-child(9n+8) .loan-banner { --tone: var(--c-gold); }
+.loan-grid > :nth-child(9n+9) .loan-banner { --tone: var(--c-indigo); }
+.loan-banner { background: linear-gradient(135deg, color-mix(in srgb, var(--tone) 22%, var(--panel)), color-mix(in srgb, var(--tone) 6%, var(--panel))); }
+.loan-banner::before { width: 40px; height: 5px; }

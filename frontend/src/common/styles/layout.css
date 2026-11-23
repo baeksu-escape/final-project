@@ -1,5 +1,4 @@
-/* 공통 레이아웃·화면 배치 스타일 — 'Avenue 기능 데모 v2'의 .wrap·.top·.brand·.nav·.panel·.cols 등을 옮겼다. 색은 tokens.css 변수만 쓴다.
-   1) 화면 틀(AppLayout·PublicLayout·AppHeader·TabMenu·AppFooter·ThemeToggle)  2) 화면 배치 공통 클래스(page-head·l-*·data-table 등) */
+/* 공통 레이아웃 — 1) 앱 틀(사이드바·위쪽 바·본문·푸터, 로그인 전 바)  2) 클래스 없는 기본 태그  3) 화면 배치 공통 클래스(page-head·l-*·data-table 등) */
 
 *,
 *::before,
@@ -9,10 +8,23 @@
 
 html {
   background: var(--bg);
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
   color: var(--link);
+  text-underline-offset: 3px;
+}
+
+/* 본문 속 일반 링크는 밑줄 없이 파랑 굵게, 올리면 밑줄 */
+:where(.app-main) :where(a:not([class])) {
+  color: var(--acc);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+:where(.app-main) :where(a:not([class])):hover {
+  text-decoration: underline;
 }
 
 h1,
@@ -23,232 +35,409 @@ p {
   margin: 0;
 }
 
-/* ===== 1) 화면 틀 ===== */
+::selection {
+  background: var(--sel);
+}
 
-/* 앱 한 열 — 최대 1320px, 헤더·본문·푸터가 같은 폭을 쓴다(데모 .wrap) */
-.app-layout {
+/* ===== 1) 앱 틀 ===== */
+
+/* 화면 폭 — 큰 모니터(전체 화면)에서도 내용은 가운데 1440px 안에 둔다(토스처럼). 첫 화면 무대만 화면 끝까지 쓴다 */
+:root {
+  --page-max: 1440px;
+  --page-pad: clamp(24px, 4vw, 64px);
+}
+
+/* 로그인 후: 위쪽 바 + 본문 */
+.app-shell {
   display: flex;
   flex-direction: column;
-  gap: 18px;
   min-height: 100vh;
-  max-width: 1320px;
-  margin: 0 auto;
-  padding-top: 16px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 
 .app-main {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--sp-5);
+  width: 100%;
+  max-width: var(--page-max);
   min-width: 0;
-  padding-bottom: 56px;
+  margin: 0 auto;
+  padding: var(--sp-7) var(--page-pad) var(--sp-8);
 }
 
-/* 헤더 — 1줄: 로고 | 버튼, 2줄: 주 메뉴. TabMenu가 header 안에 있어도 자리만 아래 줄로 옮긴다(데모 .top + .nav) */
+/* 경로가 바뀔 때 본문이 흐릿하게 떠올라 선명해진다 */
+.page-enter {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-5);
+  min-width: 0;
+  animation: page-enter 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes page-enter {
+  from { opacity: 0; filter: blur(10px); transform: translateY(18px); }
+}
+
 .app-header {
-  --acc: var(--mint);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    'brand user'
-    'nav nav';
-  gap: 12px 20px;
-  align-items: center;
-}
-
-.app-header--admin {
-  --acc: var(--vio);
-}
-
-.app-header__brand {
-  grid-area: brand;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-self: start;
-  color: var(--fg);
-  text-decoration: none;
-}
-
-.app-header__brand:hover {
-  color: var(--fg);
-}
-
-.app-header__logo {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: 1.5px solid var(--acc);
-  border-radius: 50%;
-  color: var(--acc);
-  font: 700 13px var(--f-d);
-}
-
-.app-header__name {
-  display: block;
-  font: 700 18px var(--f-d);
-}
-
-.app-header__tagline {
-  display: block;
-  color: var(--mut2);
-  font: 500 11px var(--f-d);
-  letter-spacing: 0.14em;
-}
-
-.app-header__user {
-  grid-area: user;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-/* 헤더 버튼·링크 — 데모 .btn.btn-s */
-.app-header__notification,
-.app-header__mypage,
-.app-header__logout,
-.app-header__link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  padding: 4px 12px;
-  border: 1px solid var(--line2);
-  border-radius: 10px;
-  background: var(--inp);
-  color: var(--fg2);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  text-decoration: none;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.app-header__notification:hover,
-.app-header__mypage:hover,
-.app-header__logout:hover,
-.app-header__link:hover {
-  border-color: var(--acc);
-  color: var(--fg);
-}
-
-.app-header__mypage.active,
-.app-header__link.active {
-  border-color: var(--acc);
-  color: var(--fg);
-}
-
-.app-header__link--primary {
-  border-color: var(--pri);
-  background: var(--pri);
-  color: var(--pri-fg);
-  font-weight: 600;
-}
-
-.app-header__link--primary:hover {
-  border-color: var(--pri2);
-  background: var(--pri2);
-  color: var(--pri-fg);
-}
-
-/* 관리자 칩 */
-.app-header__badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border: 1px solid var(--vio);
-  border-radius: 999px;
-  color: var(--vio2);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-/* 주 메뉴·관리자 탭 — 밑줄 탭, 넘치면 가로 스크롤(데모 .nav) */
-.tab-menu {
-  grid-area: nav;
-  min-width: 0;
-  overflow-x: auto;
+  position: sticky;
+  top: 0;
+  z-index: 35;
+  /* backdrop-filter를 쓰면 안쪽 fixed(펼침 판·흐림막)가 바 안에 갇혀서 단색으로 둔다 */
+  background: var(--panel);
   border-bottom: 1px solid var(--line);
 }
 
-.tab-menu__list {
+.app-header__inner,
+.public-bar__inner {
   display: flex;
+  align-items: stretch;
+  gap: var(--sp-7);
+  max-width: var(--page-max);
+  height: 68px;
+  margin: 0 auto;
+  padding: 0 var(--page-pad);
+}
+
+.app-header__brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.app-header__logo {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--pri);
+  color: var(--pri-fg);
+  font: 800 16px var(--f-d);
+}
+
+.app-header__name {
+  font: 800 20px var(--f-d);
+  letter-spacing: -0.03em;
+}
+
+.app-header__name small {
+  margin-left: 4px;
+  color: var(--mut2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 큰 분류 메뉴 + 펼침 판(MegaNav) — 로그인 전·후 공통 */
+.mega {
+  display: flex;
+  flex: 1;
+  align-self: stretch;
+  justify-content: center;
+  min-width: 0;
+}
+
+.mega__bar {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mega__bar > li {
+  display: flex;
+  align-items: center;
+}
+
+.mega__link {
+  display: block;
+  padding: 10px 18px;
+  border-radius: 10px;
+  color: var(--mut);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.mega__link:hover,
+.mega__link[aria-expanded='true'],
+.mega__link[aria-current='page'] {
+  color: var(--fg);
+}
+
+.mega__link[aria-current='page'] {
+  font-weight: 800;
+}
+
+.mega__panel {
+  position: fixed;
+  top: var(--bar-h, 68px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  height: 220px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  animation: mega-in 0.22s ease both;
+}
+
+/* 세부 메뉴 — 그 메뉴 글자 바로 아래로 한 줄씩 */
+.mega__items {
+  position: absolute;
+  top: 22px;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.tab-menu__link {
+.mega__item {
   display: block;
-  padding: 12px 14px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  color: var(--fg2);
+  font-size: 15.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mega__item:hover {
+  background: var(--panel2);
+  color: var(--acc);
+}
+
+/* 판 아래 화면은 흐리게 — 마우스가 판을 벗어나면 닫히도록 클릭·호버는 통과시킨다 */
+.mega__scrim {
+  position: fixed;
+  inset: var(--bar-h, 68px) 0 0;
+  z-index: 39;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  animation: mega-fade 0.22s ease both;
+}
+
+@keyframes mega-in {
+  from { opacity: 0; transform: translateY(-8px); }
+}
+
+@keyframes mega-fade {
+  from { opacity: 0; }
+}
+
+.app-header__user {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-header__text-btn,
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--mut);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.app-header__text-btn:hover,
+.theme-toggle:hover,
+.app-header__text-btn.active {
+  background: var(--panel2);
+  color: var(--fg);
+}
+
+.app-header__text-btn--line {
+  margin-left: 6px;
+  border: 1px solid var(--line2);
+}
+
+.app-header .theme-toggle span,
+.public-bar .theme-toggle span {
+  display: none;
+}
+
+.app-header__badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--sel);
+  color: var(--acc);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* 분류 안 세부 기능 줄 */
+.app-subnav {
+  border-top: 1px solid var(--line);
+}
+
+.app-subnav__inner {
+  display: flex;
+  gap: 28px;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--page-pad);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.app-subnav__link {
+  padding: 14px 0 12px;
   border-bottom: 2px solid transparent;
   color: var(--mut);
+  font-size: 15px;
+  font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
 }
 
-.tab-menu__link:hover {
+.app-subnav__link:hover {
   color: var(--fg);
 }
 
-.tab-menu__link[aria-current='page'] {
-  border-bottom-color: var(--acc);
+.app-subnav__link.active {
+  border-bottom-color: var(--fg);
   color: var(--fg);
-  font-weight: 600;
+  font-weight: 800;
 }
 
-@media (max-width: 640px) {
-  .app-header {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'brand'
-      'user'
-      'nav';
+@media (max-width: 960px) {
+  .app-header__inner,
+  .public-bar__inner {
+    flex-wrap: wrap;
+    gap: 0 var(--sp-3);
+    height: auto;
+    padding: 0 var(--sp-4);
   }
 
-  .app-header__user {
+  .app-header__brand {
+    height: 56px;
+  }
+
+  .app-header__user,
+  .public-bar__actions {
+    margin-left: auto;
+  }
+
+  /* 좁은 화면: 큰 분류 메뉴를 아래 줄에 가로로(넘치면 옆으로 밀기). 펼침 판은 쓰지 않는다 */
+  .mega {
+    order: 3;
+    flex-basis: 100%;
     justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
+
+  .mega__panel,
+  .mega__scrim {
+    display: none;
+  }
+
+  .mega__link {
+    padding: 10px 12px 12px;
+  }
+
+  .app-header__text-btn {
+    padding: 0 8px;
+    font-size: 13.5px;
+  }
+
+  .app-subnav__inner {
+    gap: 20px;
+    padding: 0 var(--sp-4);
+  }
+
+  .app-main {
+    padding: var(--sp-5) var(--sp-4) var(--sp-8);
+  }
+}
+
+/* 로그인 전 틀 */
+.public-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-x: clip;
+}
+
+.public-bar {
+  position: sticky;
+  top: 0;
+  z-index: 35;
+  background: var(--panel);
+}
+
+.public-bar__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.public-bar__cta {
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--panel2);
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.public-bar__cta:hover {
+  background: var(--line);
+}
+
+.public-bar__cta--blue,
+.public-bar__cta--blue:hover {
+  background: var(--pri);
+  color: var(--pri-fg);
+}
+
+.public-bar {
+  border-bottom: 1px solid var(--line);
+}
+
+.public-shell__main {
+  max-width: none;
 }
 
 /* 푸터 — 교육용 고지 한 줄 */
 .app-footer {
-  padding: 14px 0 calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--sp-5) var(--page-pad) calc(var(--sp-6) + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--line);
   color: var(--mut2);
   font-size: 12px;
-}
-
-/* 테마 전환 버튼 — 오른쪽 아래 고정(데모 .themefab) */
-.theme-toggle {
-  position: fixed;
-  right: max(16px, env(safe-area-inset-right, 0px));
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  z-index: 30;
-  min-height: 40px;
-  padding: 8px 16px;
-  border: 1px solid var(--line2);
-  border-radius: 999px;
-  background: var(--panel);
-  color: var(--fg);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-}
-
-.theme-toggle:hover {
-  border-color: var(--acc);
 }
 
 /* 로그인 정보 확인 중 */
@@ -258,18 +447,19 @@ p {
   text-align: center;
 }
 
-/* 클래스 없이 쓴 기본 태그(관리자 화면 등)에도 데모 모양을 입힌다. :where()로 우선순위를 0으로 두어 화면별 클래스가 늘 이긴다. */
+/* ===== 2) 클래스 없는 기본 태그 — :where()로 우선순위 0, 화면별 클래스가 늘 이긴다 ===== */
 :where(.app-main) :where(section:not([class])) {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--sp-5);
   min-width: 0;
 }
 
 :where(.app-main) :where(section:not([class]) > h1:not([class])) {
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.3;
+  letter-spacing: -0.02em;
 }
 
 :where(.app-main) :where(section:not([class]) > p:not([class])) {
@@ -287,26 +477,22 @@ p {
   font-size: 13px;
 }
 
-/* 폼 — 칸을 가로로 채우고 좁으면 줄바꿈. 칸은 위쪽에 맞춰 도움말이 긴 칸이 있어도 입력칸 줄이 어긋나지 않게 한다.
-   버튼은 라벨 높이(12.5px × 줄 높이 1.55 + 간격 5px)만큼 내려 입력칸과 같은 줄에 둔다. */
 :where(.app-main) :where(form:not([class])) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
-  gap: 12px;
+  gap: var(--sp-3);
   align-items: start;
 }
 
 :where(.app-main) :where(form:not([class]) > button, form:not([class]) > .button) {
   justify-self: start;
-  margin-top: calc(12.5px * 1.55 + 5px);
+  margin-top: calc(13px * 1.55 + 6px);
 }
 
-/* 폼 안의 오류·안내 문장은 한 줄 전체를 쓴다 */
 :where(.app-main) :where(form:not([class]) > p) {
   grid-column: 1 / -1;
 }
 
-/* 표 — 데모 .tbl, 카드 안에서 넘치면 가로 스크롤 */
 .card__body:has(> table) {
   overflow-x: auto;
 }
@@ -314,30 +500,30 @@ p {
 :where(.app-main) :where(table:not([class])) {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 13.5px;
 }
 
 :where(.app-main) :where(table:not([class]) th) {
-  padding: 8px;
-  border-bottom: 1px solid var(--line2);
-  color: var(--mut2);
-  font-size: 12px;
-  font-weight: 500;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--mut);
+  font-size: 12.5px;
+  font-weight: 600;
   text-align: left;
   white-space: nowrap;
 }
 
 :where(.app-main) :where(table:not([class]) td) {
-  padding: 10px 8px;
+  padding: 12px;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
 }
 
-/* 이름·값 목록 — 칸으로 나열 */
 :where(.app-main) :where(dl:not([class])) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
-  gap: 12px;
+  gap: var(--sp-4);
   margin: 0;
 }
 
@@ -347,18 +533,18 @@ p {
 }
 
 :where(.app-main) :where(dl:not([class]) dd) {
-  margin: 0;
-  font-family: var(--f-d);
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
-/* 검색 폼이 든 카드 — 검색칸·선택칸·개수 칩을 가로 한 줄로(데모 필터 패널) */
 .card__body:has(> form[role='search']) {
   flex-direction: row;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
 .card__body:has(> form[role='search']) > form {
@@ -369,7 +555,6 @@ p {
   flex: 1 1 150px;
 }
 
-/* 쪽 넘기기 등 클래스 없는 nav — 가운데 한 줄 */
 :where(.app-main) :where(nav:not([class])) {
   display: flex;
   flex-wrap: wrap;
@@ -378,53 +563,103 @@ p {
   gap: 8px;
 }
 
-/* ===== 2) 화면 배치 공통 클래스 — 새 화면은 이 클래스를 가져다 쓴다 ===== */
+/* ===== 3) 화면 배치 공통 클래스 ===== */
 
-/* 페이지 제목 줄: <div class="page-head"><div><span class="page-head__tag">…</span><h1 class="page-head__title">…</h1><p class="page-head__lead">…</p></div>오른쪽 버튼</div> */
+/* 페이지 제목 줄 — 기능 화면 맨 위 큰 띠(움직이는 빛 장식). 오른쪽 버튼은 그대로 */
 .page-head {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--sp-4);
+  min-height: 200px;
+  padding: 44px 48px;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 32px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--acc) 14%, var(--panel)) 0%, var(--panel) 60%);
+  animation: head-in 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.page-head::before,
+.page-head::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  filter: blur(40px);
+  animation: head-drift 12s ease-in-out infinite alternate;
+}
+
+.page-head::before {
+  top: -40%;
+  right: 8%;
+  width: 360px;
+  height: 360px;
+  background: color-mix(in srgb, var(--acc) 35%, transparent);
+}
+
+.page-head::after {
+  bottom: -60%;
+  right: 30%;
+  width: 280px;
+  height: 280px;
+  background: color-mix(in srgb, var(--mint) 28%, transparent);
+  animation-delay: -6s;
+}
+
+@keyframes head-in {
+  from { opacity: 0; filter: blur(8px); transform: translateY(16px); }
+}
+
+@keyframes head-drift {
+  to { transform: translate(-60px, 30px) scale(1.2); }
 }
 
 .page-head__tag,
 .tag {
-  color: var(--mut2);
-  font: 600 11px var(--f-d);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--acc);
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .page-head__title {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.3;
+  font-size: clamp(30px, 3.4vw, 46px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
   text-wrap: balance;
 }
 
 .page-head__lead {
-  max-width: 70ch;
-  margin-top: 4px;
+  max-width: 62ch;
+  margin-top: 10px;
   color: var(--mut);
-  font-size: 14px;
+  font-size: 16px;
+  line-height: 1.65;
 }
 
-/* 카드 = 공통 Card 컴포넌트(.card). 카드 안의 한 단계 낮은 상자 */
+@media (max-width: 760px) {
+  .page-head {
+    min-height: 0;
+    padding: 28px 22px;
+    border-radius: 24px;
+  }
+}
+
+/* 카드 안의 한 단계 낮은 상자 */
 .panel-sunk {
   min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  padding: var(--sp-5);
+  border-radius: var(--r);
   background: var(--panel2);
 }
 
-/* 배치: 2:1(왼쪽 넓게) — 960px 아래에서 한 열 */
 .l-cols {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  gap: var(--sp-5);
   align-items: start;
 }
 
@@ -436,25 +671,23 @@ p {
   grid-column: span 2;
 }
 
-/* 배치: 3열 같은 폭 */
 .l-grid3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  gap: var(--sp-5);
 }
 
 .l-grid3 > * {
   min-width: 0;
 }
 
-/* 배치: 숫자 타일 4개 한 줄 */
 .l-kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
+  gap: var(--sp-4);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1100px) {
   .l-cols,
   .l-grid3 {
     grid-template-columns: minmax(0, 1fr);
@@ -469,22 +702,26 @@ p {
   }
 }
 
-/* 배치: 칸 수 자동(최소 폭 --min, 기본 200px) */
+/* 숫자 타일 안의 큰 숫자 */
+.l-kpis .num:not(.hint) {
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
 .l-g2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--min, 200px)), 1fr));
-  gap: 12px;
+  gap: var(--sp-4);
 }
 
-/* 세로 쌓기 */
 .l-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-3);
   min-width: 0;
 }
 
-/* 가로 줄(넘치면 줄바꿈) */
 .l-row {
   display: flex;
   flex-wrap: wrap;
@@ -492,62 +729,71 @@ p {
   gap: 10px;
 }
 
-/* 표 — 넓으면 바깥 .data-table-wrap이 가로 스크롤 */
 .data-table-wrap {
   min-width: 0;
   overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
 }
 
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 13.5px;
 }
 
 .data-table caption {
-  padding-bottom: 8px;
+  padding: 0 0 8px;
   color: var(--mut);
   font-size: 12.5px;
   text-align: left;
 }
 
 .data-table th {
-  padding: 8px;
-  border-bottom: 1px solid var(--line2);
-  color: var(--mut2);
-  font-size: 12px;
-  font-weight: 500;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--mut);
+  font-size: 12.5px;
+  font-weight: 600;
   text-align: left;
   white-space: nowrap;
 }
 
 .data-table td {
-  padding: 10px 8px;
+  padding: 12px;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.data-table tbody tr:hover td {
+  background: var(--panel2);
 }
 
 .data-table .is-num {
   text-align: right;
 }
 
-/* 글자 */
 .hint {
   color: var(--mut2);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .num {
   font-family: var(--f-d);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .text-error {
   color: var(--bad);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
-/* 화면에는 숨기고 화면 낭독기에만 읽히게 */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -555,4 +801,68 @@ p {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* UI 리뉴얼 — 기능 화면마다 따로 만든 머리(시뮬레이터·진단·시나리오·대출·상권)도 page-head와 같은 큰 띠로 */
+.app-main :is(.ad-heading, .cf-heading, .sc-heading, .sim-heading, .loans-heading, .market-page__head) {
+  position: relative;
+  min-height: 200px;
+  margin: 0;
+  padding: 44px 48px;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 32px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--acc) 14%, var(--panel)) 0%, var(--panel) 60%);
+  animation: head-in 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.app-main :is(.ad-heading, .cf-heading, .sc-heading, .sim-heading, .loans-heading, .market-page__head)::before,
+.app-main :is(.ad-heading, .cf-heading, .sc-heading, .sim-heading, .loans-heading, .market-page__head)::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  filter: blur(40px);
+  animation: head-drift 12s ease-in-out infinite alternate;
+}
+
+.app-main :is(.ad-heading, .cf-heading, .sc-heading, .sim-heading, .loans-heading, .market-page__head)::before {
+  top: -40%;
+  right: 8%;
+  width: 360px;
+  height: 360px;
+  background: color-mix(in srgb, var(--acc) 35%, transparent);
+}
+
+.app-main :is(.ad-heading, .cf-heading, .sc-heading, .sim-heading, .loans-heading, .market-page__head)::after {
+  bottom: -60%;
+  right: 30%;
+  width: 280px;
+  height: 280px;
+  background: color-mix(in srgb, var(--mint) 28%, transparent);
+  animation-delay: -6s;
+}
+
+.app-main :is(.ad-heading, .cf-heading, .sc-heading, .sim-heading, .loans-heading, .market-page__head) h1 {
+  margin: 0;
+  font-size: clamp(30px, 3.4vw, 46px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+
+.app-main :is(.ad-heading, .cf-heading, .sc-heading, .sim-heading, .loans-heading, .market-page__head) p {
+  max-width: 62ch;
+  margin-top: 10px;
+  color: var(--mut);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+@media (max-width: 760px) {
+  .app-main :is(.ad-heading, .cf-heading, .sc-heading, .sim-heading, .loans-heading, .market-page__head) {
+    min-height: 0;
+    padding: 28px 22px;
+    border-radius: 24px;
+  }
 }
