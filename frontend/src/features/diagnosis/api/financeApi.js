@@ -13,8 +13,10 @@ export function getPeerBenchmark() {
 // N-16-1 저장된 자산·부채와 같은 직군 회원 평균을 병렬 조회한다.
 export async function getAssetDebtData(userId) {
   requireUser(userId)
-  const [health, benchmark] = await Promise.all([getMemberFinancialHealth(), getPeerBenchmark()])
-  return adaptAssetDebtData({ ...health, peer: benchmark?.sameWorkerType, assumptions: ['금액은 저장된 입력값 기준이며 실제 심사 결과가 아닙니다.'] })
+  const [health, benchmark] = await Promise.allSettled([getMemberFinancialHealth(), getPeerBenchmark()])
+  if (health.status === 'rejected') throw health.reason
+  // 직군 평균 조회에 실패해도 저장된 자산·부채 정보는 화면에 표시한다.
+  return adaptAssetDebtData({ ...health.value, peer: benchmark.status === 'fulfilled' ? benchmark.value?.sameWorkerType ?? null : null, assumptions: ['금액은 저장된 입력값 기준이며 실제 심사 결과가 아닙니다.'] })
 }
 
 // N-21-1·2 DIAG-08-1 응답의 월별 실적(months)과 기준 고정·기타 지출·월 상환액을 기준 자료로 쓴다.

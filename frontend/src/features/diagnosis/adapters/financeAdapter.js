@@ -61,10 +61,11 @@ export function adaptCashFlowForecast(raw) {
 // 납부 밀림 가정과 모델 변경을 안내한다. 점수 차이를 원인처럼 쓰지 않는다.
 export function adaptExpectedScore(raw) {
   const isScore = (value) => Number.isInteger(value) && value >= 0 && value <= 1000
-  if (!raw || !isScore(raw.currentScore) || !isScore(raw.expectedScore) || typeof raw.paymentStatusApplied !== 'boolean') throw new Error('예상 점수 응답 형식이 올바르지 않습니다.')
+  if (!raw || !isScore(raw.currentScore) || raw.expectedScore != null && !isScore(raw.expectedScore) || typeof raw.paymentStatusApplied !== 'boolean') throw new Error('예상 점수 응답 형식이 올바르지 않습니다.')
   const notices = []
   if (raw.paymentStatusApplied) notices.push('최근 1년 30일 이상 연체 1회 추가로 가정')
   if (raw.modelVersion !== raw.baseModelVersion) notices.push('모델이 바뀌어 점수 차이가 클 수 있습니다.')
+  if (raw.expectedScore == null) return { currentScore: raw.currentScore, endScore: null, paymentStatusApplied: raw.paymentStatusApplied, assumedDelinquencyCount: raw.assumedDelinquencyCount ?? null, scorePath: [], scoreNotices: notices, scoreError: '예상 점수를 계산할 수 없습니다(대안 결과 없음).' }
   return { currentScore: raw.currentScore, endScore: raw.expectedScore, paymentStatusApplied: raw.paymentStatusApplied, assumedDelinquencyCount: raw.assumedDelinquencyCount ?? null, scorePath: [{ score: raw.expectedScore }], scoreNotices: notices, scoreError: '' }
 }
 
