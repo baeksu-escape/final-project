@@ -37,7 +37,7 @@ export default function AdminStatsTable({ groupBy, groups }) {
               상승폭
             </th>
             <th scope="col" className="is-num">
-              Standard 이상 (기존 → 대안)
+              보통 이상 (기존 → 대안)
             </th>
             <th scope="col">대안 등급 분포 (명)</th>
           </tr>
