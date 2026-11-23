@@ -54,6 +54,26 @@
   - 탈퇴 회원 제외를 실제 DB에서 확인하지 못했다(로컬에 탈퇴 회원 없음, 쿼리 조건으로만 확인).
   - 화면(FP-162 전)
 
+## 11/23 보완: 기존 모델 등급 항목 추가
+- **왜:** 11/06 확정 UI 관리자 화면은 등급 값을 **기존 → 대안**으로 나란히 보여 준다. 예시는 Standard 이상 비율 39.6% → 67.1%, 직군별 표 "Standard 이상(기존 → 대안)", 직군마다 기존·대안 두 줄짜리 등급 분포 막대다. 처음 구현은 평균 점수만 기존·대안 둘 다였고, 등급 값은 대안만 있어서 FP-162 화면이 이 칸들을 그릴 수 없었다.
+- **무엇을:** 응답에 필드를 **추가**했다. 기존 필드(`standardOrAboveRatePct`·`gradeDistribution` = 대안)의 이름과 뜻은 그대로다.
+  - `summary.tradStandardOrAboveRatePct`
+  - 최상위 `tradGradeDistribution`
+  - `groups[].tradStandardOrAboveRatePct`·`tradGradeDistribution`
+- **규칙**
+  - 값은 DB에 저장된 기존 등급(`ASSESSMENT.TRAD_GRADE_BAND_CODE`)으로 계산한다. 계산 위치는 대안과 같은 Java 함수이고, "어느 등급을 볼지"만 바꿔 쓴다.
+  - 분모는 **기존 등급이 있는 회원**(기존 모델로 산출된 회원)이다. 산출 못 한 회원은 기존 쪽 분모에서만 빠진다(평균 기존 점수와 같은 처리).
+  - 5명 미만 숨김은 같다.
+- **같이 한 일:** 최신 develop(#132 FP-246)을 반영했다.
+  - 새 규칙("기능 PR은 맨 위 「최근 변경」을 고치지 않는다")에 따라 정의서·C팀 명세서 「최근 변경」의 FP-161 줄을 지웠다.
+  - decisions.md 충돌은 양쪽을 모두 남겼다.
+- **바뀐 파일:** `AdminStatsRows`(기존 등급), `AdminStatsMapper.xml`(`TRAD_GRADE_BAND_CODE` 조회), `AdminStatsDtos`(필드 추가), `AdminStatsService`(등급 함수 일반화), 테스트 3개, mock·api 주석, `api_spec_c.md`·`api_definition.md` ADM-03, decisions D-26·features N-26-2·3 문구
+- **확인**
+  - `./mvnw clean test` 464개 통과(기존 테스트에 기존 등급 검증 추가)
+  - DB 통합 테스트 8종 통과: `AdminStatsMapperIT`가 기존 등급을 읽는 것도 확인했다. 탈퇴 확인 1개는 로컬에 탈퇴 회원이 없어 건너뜀
+  - `npm run lint` 오류 0
+  - node로 mock 직접 호출: 기존 Standard 이상 30.8%(13명 중 4명), 급여소득자 50.0%, 5명 미만 그룹은 null. 명세서 예시와 같다
+
 ## 다음 사람이 알아야 할 것
 - 시연 DB는 점수를 낸 회원이 적어 대부분의 그룹이 5명 미만으로 비어 보일 수 있다. 발표 전에 시연 회원 점수를 E2E 스크립트로 미리 내 두는 것을 검토한다.
 - 평가마다 모델(0.1·0.2)과 등급 구간 버전이 다를 수 있다. 등급은 평가 때 저장된 값을 그대로 쓴다.

@@ -71,6 +71,7 @@ class AdminStatsApiTest {
         m.setTradScore(trad);
         m.setAltScore(alt);
         m.setAltGradeBandCode(grade);
+        m.setTradGradeBandCode(trad >= 665 ? "STANDARD" : "CAUTION");   // 예시는 모두 780 미만
         return m;
     }
 
@@ -107,7 +108,15 @@ class AdminStatsApiTest {
                 .andExpect(jsonPath("$.groups[2].groupCode").value("FREELANCER"))
                 .andExpect(jsonPath("$.groups[2].memberCount").value(1))
                 .andExpect(jsonPath("$.groups[2].avgAltScore").value(nullValue()))
-                .andExpect(jsonPath("$.groups[2].gradeDistribution").value(nullValue()));
+                .andExpect(jsonPath("$.groups[2].gradeDistribution").value(nullValue()))
+                // 기존 모델(11/23 추가): 기존 점수 640·580은 모두 CAUTION
+                .andExpect(jsonPath("$.summary.tradStandardOrAboveRatePct").value(0.0))
+                .andExpect(jsonPath("$.tradGradeDistribution[0].gradeBandCode").value("CAUTION"))
+                .andExpect(jsonPath("$.tradGradeDistribution[0].count").value(6))
+                .andExpect(jsonPath("$.tradGradeDistribution[0].ratePct").value(100.0))
+                .andExpect(jsonPath("$.groups[0].tradStandardOrAboveRatePct").value(0.0))
+                .andExpect(jsonPath("$.groups[0].tradGradeDistribution[0].count").value(5))
+                .andExpect(jsonPath("$.groups[2].tradGradeDistribution").value(nullValue()));
     }
 
     @Test

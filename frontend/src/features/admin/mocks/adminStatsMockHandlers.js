@@ -10,6 +10,8 @@ const GROUP_CODES = Object.freeze({
   AGE_BAND: ['20S', '30S', '40S', '50_PLUS'],
 })
 const GRADE_CODES = ['CAUTION', 'STANDARD', 'GOOD']
+// 예시 회원의 기존 등급은 기존 점수로 정한다(평가 때 저장되는 CUT-0.1 경계 665·780, 예시의 대안 등급도 같은 경계). 기존 점수가 없으면 null
+const gradeOfScore = (score) => (score === null ? null : score >= 780 ? 'GOOD' : score >= 665 ? 'STANDARD' : 'CAUTION')
 
 // [직군, 연령대, 기존 점수(null = 기존 모델로 산출 못 함), 대안 점수, 대안 등급] — 회원별 최근 평가 예시
 const SAMPLE_MEMBERS = Object.freeze([
@@ -19,7 +21,7 @@ const SAMPLE_MEMBERS = Object.freeze([
   ['SELF_EMPLOYED', '30S', 570, 655, 'CAUTION'], ['SELF_EMPLOYED', '50_PLUS', 700, 790, 'GOOD'],
   ['FREELANCER', '20S', 560, 640, 'CAUTION'], ['FREELANCER', '20S', null, 700, 'STANDARD'], ['FREELANCER', '30S', 600, 710, 'STANDARD'],
 ].map(([workerTypeCode, ageBandCode, tradScore, altScore, altGradeBandCode]) =>
-  Object.freeze({ workerTypeCode, ageBandCode, tradScore, altScore, altGradeBandCode })))
+  Object.freeze({ workerTypeCode, ageBandCode, tradScore, altScore, altGradeBandCode, tradGradeBandCode: gradeOfScore(tradScore) })))
 const SAMPLE_REGISTERED_MEMBER_COUNT = 40
 const SAMPLE_TODAY_SCORED_COUNT = 3
 
@@ -28,23 +30,36 @@ const round1 = (value) => Math.round(value * 10) / 10
 const average = (values) => (values.length ? round1(values.reduce((sum, v) => sum + v, 0) / values.length) : null)
 const rate = (count, total) => (total ? round1((count * 100) / total) : null)
 
+// 등급 하나(대안 또는 기존)의 Standard 이상 비율·분포. 분모는 그 등급이 있는 회원(기존은 기존 모델로 산출된 회원만, 서버와 같음)
+function gradeStats(grades) {
+  return {
+    standardOrAboveRatePct: rate(grades.filter((g) => g !== 'CAUTION').length, grades.length),
+    gradeDistribution: GRADE_CODES.map((gradeBandCode) => {
+      const count = grades.filter((g) => g === gradeBandCode).length
+      return { gradeBandCode, count, ratePct: rate(count, grades.length) }
+    }),
+  }
+}
+
 function aggregate(members) {
   const withTrad = members.filter((m) => m.tradScore !== null)
+  const alt = gradeStats(members.map((m) => m.altGradeBandCode))
+  const trad = gradeStats(members.map((m) => m.tradGradeBandCode).filter((g) => g !== null))
   return {
     avgTradScore: average(withTrad.map((m) => m.tradScore)),
     avgAltScore: average(members.map((m) => m.altScore)),
     avgScoreUplift: average(withTrad.map((m) => m.altScore - m.tradScore)),
-    standardOrAboveRatePct: rate(members.filter((m) => m.altGradeBandCode !== 'CAUTION').length, members.length),
-    gradeDistribution: GRADE_CODES.map((gradeBandCode) => {
-      const count = members.filter((m) => m.altGradeBandCode === gradeBandCode).length
-      return { gradeBandCode, count, ratePct: rate(count, members.length) }
-    }),
+    standardOrAboveRatePct: alt.standardOrAboveRatePct,
+    gradeDistribution: alt.gradeDistribution,
+    tradStandardOrAboveRatePct: trad.standardOrAboveRatePct,
+    tradGradeDistribution: trad.gradeDistribution,
   }
 }
 
 // 5명 미만이면 평균·비율·등급 분포를 숨긴다(인원 수는 보인다)
 function hidden() {
-  return { avgTradScore: null, avgAltScore: null, avgScoreUplift: null, standardOrAboveRatePct: null, gradeDistribution: null }
+  return { avgTradScore: null, avgAltScore: null, avgScoreUplift: null, standardOrAboveRatePct: null, gradeDistribution: null,
+    tradStandardOrAboveRatePct: null, tradGradeDistribution: null }
 }
 
 function handleAdminStats({ token, query }) {
@@ -68,8 +83,10 @@ function handleAdminStats({ token, query }) {
       standardOrAboveRatePct: overall.standardOrAboveRatePct,
       registeredMemberCount: SAMPLE_REGISTERED_MEMBER_COUNT,
       todayScoredCount: SAMPLE_TODAY_SCORED_COUNT,
+      tradStandardOrAboveRatePct: overall.tradStandardOrAboveRatePct,
     },
     gradeDistribution: overall.gradeDistribution,
+    tradGradeDistribution: overall.tradGradeDistribution,
     groups: GROUP_CODES[groupBy].map((groupCode) => {
       const group = members.filter((m) => keyOf(m) === groupCode)
       return { groupCode, memberCount: group.length, ...(group.length >= MIN_GROUP_SIZE ? aggregate(group) : hidden()) }

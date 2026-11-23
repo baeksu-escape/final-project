@@ -40,7 +40,16 @@ class AdminStatsServiceTest {
         m.setTradScore(trad);
         m.setAltScore(alt);
         m.setAltGradeBandCode(grade);
+        m.setTradGradeBandCode(tradGrade(trad));
         return m;
+    }
+
+    // 기존 등급은 기존 점수로 정한다(평가 때 저장되는 값과 같은 CUT-0.1 경계 665·780). 기존 점수가 없으면 기존 등급도 없다.
+    private static String tradGrade(Integer trad) {
+        if (trad == null) {
+            return null;
+        }
+        return trad >= 780 ? "GOOD" : trad >= 665 ? "STANDARD" : "CAUTION";
     }
 
     /** 급여소득자 5명(30대 3·40대 2)과 프리랜서 2명(20대) */
@@ -79,6 +88,13 @@ class AdminStatsServiceTest {
         assertEquals(List.of("CAUTION", "STANDARD", "GOOD"), grades.stream().map(GradeCount::gradeBandCode).toList());
         assertEquals(List.of(2, 4, 1), grades.stream().map(GradeCount::count).toList());
         assertEquals(0, d("28.6").compareTo(grades.get(0).ratePct()));
+
+        // 기존 모델(11/23 추가): 기존 등급이 있는 6명만 분모 — CAUTION 4(600·640·580·600)·STANDARD 2(700·750)
+        assertEquals(0, d("33.3").compareTo(r.summary().tradStandardOrAboveRatePct()), "2/6");
+        List<GradeCount> trad = r.tradGradeDistribution();
+        assertEquals(List.of(4, 2, 0), trad.stream().map(GradeCount::count).toList());
+        assertEquals(0, d("66.7").compareTo(trad.get(0).ratePct()), "4/6");
+        assertEquals(0, d("0.0").compareTo(trad.get(2).ratePct()));
     }
 
     @Test
@@ -94,6 +110,8 @@ class AdminStatsServiceTest {
         assertEquals(0, d("55.0").compareTo(employee.avgScoreUplift()), "(50+60+60+50)/4");
         assertEquals(0, d("80.0").compareTo(employee.standardOrAboveRatePct()));
         assertEquals(List.of(1, 3, 1), employee.gradeDistribution().stream().map(GradeCount::count).toList());
+        assertEquals(0, d("50.0").compareTo(employee.tradStandardOrAboveRatePct()), "기존 등급 있는 4명 중 2명");
+        assertEquals(List.of(2, 2, 0), employee.tradGradeDistribution().stream().map(GradeCount::count).toList());
 
         GroupStats selfEmployed = r.groups().get(1);
         assertEquals(0, selfEmployed.memberCount());
@@ -106,6 +124,8 @@ class AdminStatsServiceTest {
         assertNull(freelancer.avgScoreUplift());
         assertNull(freelancer.standardOrAboveRatePct());
         assertNull(freelancer.gradeDistribution());
+        assertNull(freelancer.tradStandardOrAboveRatePct());
+        assertNull(freelancer.tradGradeDistribution());
     }
 
     @Test
@@ -126,6 +146,8 @@ class AdminStatsServiceTest {
         assertNull(few.summary().avgAltScore());
         assertNull(few.summary().standardOrAboveRatePct());
         assertNull(few.gradeDistribution());
+        assertNull(few.summary().tradStandardOrAboveRatePct());
+        assertNull(few.tradGradeDistribution());
         assertEquals(10L, few.summary().registeredMemberCount());
         assertEquals(1L, few.summary().todayScoredCount());
 

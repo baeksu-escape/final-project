@@ -8,8 +8,10 @@
     <!-- 회원마다 가장 최근 SCORED 평가 1건(selectLatestScored와 같은 정렬). 직군·연령대는 평가 시점 값. 잠긴 회원(LOCKED)은 넣는다 -->
     <select id="selectLatestScoredMembers" resultType="com.baeksuescape.admin.dto.AdminStatsRows$MemberScore">
         SELECT USER_ID AS userId, WORKER_TYPE_CODE AS workerTypeCode, AGE_BAND_CODE AS ageBandCode,
-               TRAD_SCORE AS tradScore, ALT_SCORE AS altScore, ALT_GRADE_BAND_CODE AS altGradeBandCode
+               TRAD_SCORE AS tradScore, ALT_SCORE AS altScore, ALT_GRADE_BAND_CODE AS altGradeBandCode,
+               TRAD_GRADE_BAND_CODE AS tradGradeBandCode
           FROM (SELECT A.USER_ID, A.WORKER_TYPE_CODE, A.AGE_BAND_CODE, A.TRAD_SCORE, A.ALT_SCORE, A.ALT_GRADE_BAND_CODE,
+                       A.TRAD_GRADE_BAND_CODE,
                        ROW_NUMBER() OVER (PARTITION BY A.USER_ID ORDER BY A.ASSESSED_AT DESC, A.ASSESSMENT_ID DESC) AS RN
                   FROM ASSESSMENT A
                   JOIN APP_USER U ON U.USER_ID = A.USER_ID

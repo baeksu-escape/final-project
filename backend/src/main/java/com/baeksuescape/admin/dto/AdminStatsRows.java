@@ -23,5 +23,7 @@ public final class AdminStatsRows {
         private Integer altScore;
         /** 대안 점수 등급(CAUTION·STANDARD·GOOD, 평가 때 저장된 값) */
         private String altGradeBandCode;
+        /** 기존 점수 등급(평가 때 저장된 값). 기존 모델로 산출할 수 없었으면 null */
+        private String tradGradeBandCode;
     }
 }

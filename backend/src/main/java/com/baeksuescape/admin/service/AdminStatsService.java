@@ -23,8 +23,8 @@ import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
 
 /**
  * FP-161 N-26-1~4 관리자 직군·연령별 통계(ADM-03).
- * D-26 담당자 결정(11/20, 광희): 11/06 확정 UI대로 요약(평가 고객 수·평균 점수 기존→대안·Standard 이상 비율·가입 회원 수·오늘 산출),
- * 대안 등급 분포, 직군별·연령대별 통계 표를 만든다(v3의 상자 그림·히트맵·통신비 연체 경험은 UI에 없어 만들지 않는다).
+ * D-26 담당자 결정(11/20, 광희): 11/06 확정 UI대로 요약(평가 고객 수·평균 점수 기존→대안·Standard 이상 비율 기존→대안·가입 회원 수·오늘 산출),
+ * 기존·대안 등급 분포, 직군별·연령대별 통계 표를 만든다(v3의 상자 그림·히트맵·통신비 연체 경험은 UI에 없어 만들지 않는다).
  * 데이터는 서비스 회원의 최근 SCORED 평가 1건이고, D-28 결정대로 탈퇴 회원은 뺀다(매퍼).
  */
 @Service
@@ -41,6 +41,9 @@ public class AdminStatsService {
             AGE_BAND, List.of("20S", "30S", "40S", "50_PLUS"));
     static final List<String> GRADE_CODES = List.of("CAUTION", "STANDARD", "GOOD");
     private static final List<String> STANDARD_OR_ABOVE = List.of("STANDARD", "GOOD");
+    /** 등급 꺼내기: 대안 모델(기존 응답 필드) · 기존 모델(trad* 필드, 11/23 추가 — 11/06 UI의 기존 → 대안 비교) */
+    static final Function<MemberScore, String> ALT_GRADE = MemberScore::getAltGradeBandCode;
+    static final Function<MemberScore, String> TRAD_GRADE = MemberScore::getTradGradeBandCode;
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     private final AdminStatsMapper mapper;
@@ -72,8 +75,9 @@ public class AdminStatsService {
                 enough ? avgTrad(members) : null,
                 enough ? avgAlt(members) : null,
                 enough ? avgUplift(members) : null,
-                enough ? standardOrAboveRate(members) : null,
-                registeredMemberCount, todayScoredCount);
+                enough ? standardOrAboveRate(members, ALT_GRADE) : null,
+                registeredMemberCount, todayScoredCount,
+                enough ? standardOrAboveRate(members, TRAD_GRADE) : null);
 
         List<GroupStats> groups = new ArrayList<>();
         for (String code : GROUP_CODES.get(groupBy)) {
@@ -83,10 +87,13 @@ public class AdminStatsService {
                     groupEnough ? avgTrad(group) : null,
                     groupEnough ? avgAlt(group) : null,
                     groupEnough ? avgUplift(group) : null,
-                    groupEnough ? standardOrAboveRate(group) : null,
-                    groupEnough ? gradeDistribution(group) : null));
+                    groupEnough ? standardOrAboveRate(group, ALT_GRADE) : null,
+                    groupEnough ? gradeDistribution(group, ALT_GRADE) : null,
+                    groupEnough ? standardOrAboveRate(group, TRAD_GRADE) : null,
+                    groupEnough ? gradeDistribution(group, TRAD_GRADE) : null));
         }
-        return new StatsResponse(groupBy, MIN_GROUP_SIZE, summary, enough ? gradeDistribution(members) : null, groups);
+        return new StatsResponse(groupBy, MIN_GROUP_SIZE, summary, enough ? gradeDistribution(members, ALT_GRADE) : null, groups,
+                enough ? gradeDistribution(members, TRAD_GRADE) : null);
     }
 
     /** 기존 점수 평균: 기존 모델로 산출된 회원만 */
@@ -105,20 +112,30 @@ public class AdminStatsService {
                 .map(m -> m.getAltScore() - m.getTradScore()).toList());
     }
 
-    /** Standard 이상 비율(%): 대안 등급이 STANDARD·GOOD인 회원 ÷ 대상 회원 */
-    static BigDecimal standardOrAboveRate(List<MemberScore> members) {
-        long count = members.stream().filter(m -> STANDARD_OR_ABOVE.contains(m.getAltGradeBandCode())).count();
-        return rate(count, members.size());
+    /**
+     * Standard 이상 비율(%): 등급이 STANDARD·GOOD인 회원 ÷ 그 등급이 있는 회원.
+     * 대안 등급은 SCORED면 늘 있고, 기존 등급은 기존 모델로 산출된 회원만 있다(없는 회원은 분모에서 빠진다, 평균 기존 점수와 같은 처리).
+     * 등급이 있는 회원이 없으면 null.
+     */
+    static BigDecimal standardOrAboveRate(List<MemberScore> members, Function<MemberScore, String> grade) {
+        List<String> grades = gradesOf(members, grade);
+        long count = grades.stream().filter(STANDARD_OR_ABOVE::contains).count();
+        return rate(count, grades.size());
     }
 
-    /** 대안 등급 분포(CAUTION·STANDARD·GOOD 순서, 0명인 등급도 행이 있다) */
-    static List<GradeCount> gradeDistribution(List<MemberScore> members) {
+    /** 등급 분포(CAUTION·STANDARD·GOOD 순서, 0명인 등급도 행이 있다). 비율의 분모는 그 등급이 있는 회원 수 */
+    static List<GradeCount> gradeDistribution(List<MemberScore> members, Function<MemberScore, String> grade) {
+        List<String> grades = gradesOf(members, grade);
         List<GradeCount> out = new ArrayList<>();
-        for (String grade : GRADE_CODES) {
-            int count = (int) members.stream().filter(m -> grade.equals(m.getAltGradeBandCode())).count();
-            out.add(new GradeCount(grade, count, rate(count, members.size())));
+        for (String code : GRADE_CODES) {
+            int count = (int) grades.stream().filter(code::equals).count();
+            out.add(new GradeCount(code, count, rate(count, grades.size())));
         }
         return out;
+    }
+
+    private static List<String> gradesOf(List<MemberScore> members, Function<MemberScore, String> grade) {
+        return members.stream().map(grade).filter(g -> g != null).toList();
     }
 
     private static BigDecimal average(List<Integer> values) {

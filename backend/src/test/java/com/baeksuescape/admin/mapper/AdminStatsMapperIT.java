@@ -108,6 +108,7 @@ class AdminStatsMapperIT {
         assertEquals(720, m.getAltScore());
         assertEquals(650, m.getTradScore());
         assertEquals("STANDARD", m.getAltGradeBandCode());
+        assertEquals("CAUTION", m.getTradGradeBandCode(), "기존 등급(11/23 추가)");
         assertEquals("FREELANCER", m.getWorkerTypeCode());
         assertEquals("30S", m.getAgeBandCode());
     }

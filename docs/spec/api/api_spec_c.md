@@ -709,19 +709,26 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
   | `summary.registeredMemberCount` | 정수 | 가입 회원 수(일반 회원, 탈퇴 제외, 관리자 계정은 세지 않음) |
   | `summary.todayScoredCount` | 정수 | 오늘 산출: 오늘 0시(서버 시간 Asia/Seoul) 이후 저장된 서비스 SCORED 평가 수(탈퇴 제외). 관리자 전용 수치 |
   | `gradeDistribution` | 배열 또는 `null` | 전체 대안 등급 분포 `[{ gradeBandCode, count, ratePct }]`, CAUTION·STANDARD·GOOD 순서(0명도 있음) |
-  | `groups[]` | 배열 | 직군 3개(`EMPLOYEE`·`SELF_EMPLOYED`·`FREELANCER`) 또는 연령대 4개(`20S`·`30S`·`40S`·`50_PLUS`)를 고정 순서로(0명도 있음). 각각 `groupCode`, `memberCount`, `avgTradScore`, `avgAltScore`, `avgScoreUplift`, `standardOrAboveRatePct`, `gradeDistribution` |
+  | `summary.tradStandardOrAboveRatePct` 🆕 11/23 | 소수 또는 `null` | **기존 모델** Standard 이상 비율(%) = 기존 등급 STANDARD·GOOD ÷ **기존 등급이 있는 회원**(기존 모델로 산출된 회원만. 산출 못 한 회원은 기존 쪽 분모에서만 빠진다) |
+  | `tradGradeDistribution` 🆕 11/23 | 배열 또는 `null` | 전체 **기존** 등급 분포. 모양은 `gradeDistribution`과 같고 비율의 분모는 기존 등급이 있는 회원 수 |
+  | `groups[]` | 배열 | 직군 3개(`EMPLOYEE`·`SELF_EMPLOYED`·`FREELANCER`) 또는 연령대 4개(`20S`·`30S`·`40S`·`50_PLUS`)를 고정 순서로(0명도 있음). 각각 `groupCode`, `memberCount`, `avgTradScore`, `avgAltScore`, `avgScoreUplift`, `standardOrAboveRatePct`, `gradeDistribution`, 🆕 11/23 `tradStandardOrAboveRatePct`, `tradGradeDistribution` |
+
+- 🆕 11/23 등급 값은 11/06 UI처럼 **기존 → 대안**을 나란히 보여 주도록 두 벌이다: `standardOrAboveRatePct`·`gradeDistribution` = 대안 모델(처음부터 있던 필드, 이름·뜻 그대로), `trad*` = 기존 모델. 모든 값은 DB에 저장된 평가의 점수·등급(`ASSESSMENT.TRAD_*`·`ALT_*`)으로 계산한다.
 
   ```json
   { "groupBy": "WORKER_TYPE", "minGroupSize": 5,
     "summary": { "assessedMemberCount": 14, "avgTradScore": 636.9, "avgAltScore": 705.4, "avgScoreUplift": 68.8,
-                 "standardOrAboveRatePct": 71.4, "registeredMemberCount": 40, "todayScoredCount": 3 },
+                 "standardOrAboveRatePct": 71.4, "registeredMemberCount": 40, "todayScoredCount": 3, "tradStandardOrAboveRatePct": 30.8 },
     "gradeDistribution": [ { "gradeBandCode": "CAUTION", "count": 4, "ratePct": 28.6 }, { "gradeBandCode": "STANDARD", "count": 8, "ratePct": 57.1 },
                            { "gradeBandCode": "GOOD", "count": 2, "ratePct": 14.3 } ],
+    "tradGradeDistribution": [ { "gradeBandCode": "CAUTION", "count": 9, "ratePct": 69.2 }, { "gradeBandCode": "STANDARD", "count": 4, "ratePct": 30.8 },
+                               { "gradeBandCode": "GOOD", "count": 0, "ratePct": 0.0 } ],
     "groups": [ { "groupCode": "EMPLOYEE", "memberCount": 6, "avgTradScore": 663.3, "avgAltScore": 720.0, "avgScoreUplift": 56.7,
-                  "standardOrAboveRatePct": 83.3, "gradeDistribution": [ … ] },
+                  "standardOrAboveRatePct": 83.3, "gradeDistribution": [ … ], "tradStandardOrAboveRatePct": 50.0, "tradGradeDistribution": [ … ] },
                 { "groupCode": "FREELANCER", "memberCount": 3, "avgTradScore": null, "avgAltScore": null, "avgScoreUplift": null,
-                  "standardOrAboveRatePct": null, "gradeDistribution": null } ] }
+                  "standardOrAboveRatePct": null, "gradeDistribution": null, "tradStandardOrAboveRatePct": null, "tradGradeDistribution": null } ] }
   ```
+  (예시 14명 중 1명은 기존 모델로 산출되지 않아 기존 쪽 분모는 13명이다)
   (mock 예시값. `SELF_EMPLOYED` 행은 줄였다)
 - 알려진 한계: 평가마다 모델(0.1·0.2)과 등급 구간 버전이 다를 수 있다. 등급은 평가 때 저장된 값을 그대로 쓴다. 시연 DB에서 점수를 낸 회원이 적으면 대부분의 그룹이 5명 미만으로 비어 보인다.
 - 프론트: `features/admin/api/adminStatsApi.js`의 `getAdminStats({ groupBy })`. mock은 예시 회원 14명으로 같은 규칙대로 계산한다.

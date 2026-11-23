@@ -284,7 +284,7 @@
 |---|---|---|---|---|---|
 | ADM-01 | `GET /api/admin/model-performance?group=LEGACY\|THINFILE&label=DELINQ\|NONFIN&cutoff=600~800` 🆕 11/20 | N-25-1 비교 조건 선택, N-25-2 성능 지표 재계산·비교 표, N-25-4 직군별 우량 고객 오거절률 | `MODEL_EVAL_SAMPLE`(평가 표본 3,085건, PR #99 🆕 11/20), `MODEL_ARTIFACT`(같은 라벨 AUC `METRICS_JSON.same_label_comparison`, PR #98 🆕 11/20) | 동주 (FP-184) 🆕 11/20 | ✅ ACTIVE 모델(지금 `LGBM-BASE-0.2`) 기준 🆕 11/20 |
 | ADM-02 | `GET /api/admin/model-performance/roc?group=…&label=…` 🆕 11/20 | N-25-3 ROC 곡선 | 위와 같음 | 동주 (FP-184) 🆕 11/20 | ✅ 🆕 11/20 |
-| ADM-03 | `GET /api/admin/stats?groupBy=WORKER_TYPE\|AGE_BAND` 🆕 11/20 | N-26-1 구분 선택(직군별·연령대별), N-26-2 요약 수치(평가 고객 수·평균 기존·대안 점수·상승폭·Standard 이상 비율·가입 회원 수·오늘 산출), N-26-3 대안 등급 분포, N-26-4 그룹별 통계 표. 서비스 회원별 최근 SCORED 평가, 탈퇴 회원 제외, 5명 미만 그룹은 평균 숨김(D-26·D-28 담당자 결정) | `ASSESSMENT`, `APP_USER` | 광희 (FP-161) 🆕 11/20 | ✅ 🆕 11/20 |
+| ADM-03 | `GET /api/admin/stats?groupBy=WORKER_TYPE\|AGE_BAND` 🆕 11/20 | N-26-1 구분 선택(직군별·연령대별), N-26-2 요약 수치(평가 고객 수·평균 기존·대안 점수·상승폭·Standard 이상 비율 기존·대안·가입 회원 수·오늘 산출), N-26-3 기존·대안 등급 분포, N-26-4 그룹별 통계 표(🆕 11/23 기존 모델 등급 값 추가). 서비스 회원별 최근 SCORED 평가, 탈퇴 회원 제외, 5명 미만 그룹은 평균 숨김(D-26·D-28 담당자 결정) | `ASSESSMENT`, `APP_USER` | 광희 (FP-161) 🆕 11/20 | ✅ 🆕 11/20 |
 | ADM-04 | `GET /api/stats/compare` | N-26-5 비교 분석 화면 (사용자), N-26-6 직군 × 연령 격자·선택한 집단, N-26-7 직군별·연령별 비교 | `ASSESSMENT` | 광희 (FP-159) | ⛔ (사용자 쪽은 미정) |
 | ADM-05 | `GET /api/admin/users?q&role&status&page&size` | N-27-1 계정 목록 조회·검색 (size 최대 100) | `APP_USER` | 경환·우찬 (FP-80) | ✅ |
 | ADM-06 | `PATCH /api/admin/users/{userId}/lock` | N-27-3 회원 계정 잠금 `{ locked, reason }` (잠글 때 reason 필수, 본인·탈퇴 409) | `APP_USER` | 경환·우찬 | ✅ |
