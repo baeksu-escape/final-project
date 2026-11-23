@@ -148,8 +148,13 @@ class ActivateSqlTests(unittest.TestCase):
         text = squeeze(ACTIVATE_SQL)
         self.assertLess(ACTIVATE_SQL.index("WHENEVER SQLERROR"), ACTIVATE_SQL.index("DECLARE"))
         self.assertIn("IF v_status NOT IN ('DRAFT', 'ACTIVE') THEN", text)
-        for code in ("-20151", "-20152", "-20153"):
+        for code in ("-20151", "-20152", "-20153", "-20154"):
             self.assertIn(f"RAISE_APPLICATION_ERROR({code}", text)
+        # 되돌리기가 CUT-0.1만 복원하므로, 전환 전 ACTIVE가 CUT-0.1(또는 이미 CUT-0.3)이 아니면 아무것도 바꾸기 전에 멈춘다(리뷰 반영)
+        self.assertIn("IF v_active IS NULL OR v_active NOT IN ('CUT-0.1', 'CUT-0.3') THEN RAISE_APPLICATION_ERROR(-20154", text)
+        self.assertLess(text.index("-20154"), text.index("UPDATE SCORE_BAND_OFFER"))
+        self.assertLess(text.index("-20154"), text.index("UPDATE LOAN_PRODUCT"))
+        self.assertLess(text.index("-20154"), text.index("UPDATE SCORE_CUTOFF_VERSION"))
         # 사전 확인의 CUT-0.3 구간 값은 DDL과 같다
         for code, low, high, order in (("CAUTION", 0, 653, 1), ("STANDARD", 654, 726, 2), ("GOOD", 727, 1000, 3)):
             self.assertIn(f"GRADE_BAND_CODE = '{code}' AND MIN_SCORE = {low} AND MAX_SCORE = {high} AND DISPLAY_ORDER = {order}", text)
@@ -160,7 +165,8 @@ class ActivateSqlTests(unittest.TestCase):
         self.assertEqual(text.count("COMMIT;"), 1)
         self.assertNotIn("DELETE", text.upper())
         self.assertNotIn("'CUT-0.2'", text)       # CUT-0.2는 건드리지 않는다
-        self.assertNotIn("'CUT-0.1'", text)       # CUT-0.1은 'ACTIVE였던 행'으로만 내린다(이름을 박지 않는다)
+        # CUT-0.1은 이름으로 내리지 않고 'ACTIVE였던 행'으로만 내린다. 이름은 사전 확인 4에서 한 번만 나온다.
+        self.assertEqual(text.count("'CUT-0.1'"), 1)
 
     def test_offer_and_product_scores_move_to_the_new_boundaries(self):
         text = squeeze(ACTIVATE_SQL)

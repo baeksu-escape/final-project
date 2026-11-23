@@ -10,6 +10,7 @@
 --     두 단계를 연달아 하고, 공용 DB는 사용자가 없는 시간(시연·통합 테스트 중이 아닐 때)에 한다.
 --  2. add_cutoff_cut_0_3.sql로 CUT-0.3(DRAFT) 3행이 이미 있어야 한다. 없거나 값이 다르면 아래 사전 확인에서 멈추고 아무것도 바꾸지 않는다.
 --  3. 대출 상품 최소 점수·점수대별 금리·한도의 새 값(727·654 등)은 정의서 C28의 제안값이며 팀 확정 전이다(TODO D-01).
+--  4. 지금 ACTIVE가 CUT-0.1이어야 한다(되돌리기가 CUT-0.1만 복원한다). 다른 버전이 ACTIVE면 -20154로 멈추고 아무것도 바꾸지 않는다.
 --
 -- 다시 실행해도 같은 결과다(이미 전환됐으면 바꾸지 않는다). 저장된 평가 행은 건드리지 않는다(평가마다 자기 구간 버전이 남는다).
 -- 되돌리기는 rollback_cutoff_cut_0_3_to_0_1.sql(FastAPI도 CUT-0.1 상수로 되돌린다).
@@ -57,6 +58,12 @@ BEGIN
         RAISE_APPLICATION_ERROR(-20153, 'SCORE_BAND_OFFER가 옛 구간(0~664 / 665~779 / 780~1000)도 새 구간(0~653 / 654~726 / 727~1000)도 아닙니다. 값을 확인하세요');
     END IF;
 
+    -- 사전 확인 4: 지금 ACTIVE가 CUT-0.1(되돌리기가 복원하는 버전)이거나 이미 CUT-0.3이어야 한다. 다른 버전이 ACTIVE면 되돌릴 수 없으므로 아무것도 바꾸기 전에 멈춘다
+    SELECT MAX(CUTOFF_VERSION) INTO v_active FROM SCORE_CUTOFF_VERSION WHERE STATUS_CODE = 'ACTIVE';
+    IF v_active IS NULL OR v_active NOT IN ('CUT-0.1', 'CUT-0.3') THEN
+        RAISE_APPLICATION_ERROR(-20154, '지금 ACTIVE가 ' || NVL(v_active, '(없음)') || '입니다. CUT-0.1(또는 이미 CUT-0.3)일 때만 전환할 수 있습니다. 되돌리기가 CUT-0.1만 복원하므로 DB 담당과 정하세요');
+    END IF;
+
     -- 점수대별 금리·한도: 옛 구간이면 새 구간으로 옮긴다(금리·한도 값은 그대로)
     IF v_offer_old = 3 THEN
         UPDATE SCORE_BAND_OFFER SET MAX_SCORE = 653 WHERE MIN_SCORE = 0   AND MAX_SCORE = 664;
@@ -68,8 +75,7 @@ BEGIN
     UPDATE LOAN_PRODUCT SET MIN_ALT_SCORE = 727 WHERE MIN_ALT_SCORE = 780;
     UPDATE LOAN_PRODUCT SET MIN_ALT_SCORE = 654 WHERE MIN_ALT_SCORE = 665;
 
-    -- 등급 구간 전환: 지금 ACTIVE를 RETIRED로 내린 뒤 CUT-0.3을 ACTIVE로 올린다(ACTIVE는 한 행만 허용, UX_SCV_ACTIVE)
-    SELECT MAX(CUTOFF_VERSION) INTO v_active FROM SCORE_CUTOFF_VERSION WHERE STATUS_CODE = 'ACTIVE';
+    -- 등급 구간 전환: 지금 ACTIVE(위 사전 확인 4로 CUT-0.1)를 RETIRED로 내린 뒤 CUT-0.3을 ACTIVE로 올린다(ACTIVE는 한 행만 허용, UX_SCV_ACTIVE)
     IF v_active = 'CUT-0.3' THEN
         DBMS_OUTPUT.PUT_LINE('이미 CUT-0.3이 ACTIVE입니다. 등급 구간은 바꾸지 않았습니다(금리·한도·상품 최소 점수는 위에서 맞췄습니다).');
     ELSE
