@@ -327,6 +327,55 @@
 
 ---
 
+## N-13 비교 분석 '내 위치' (RPT-05, FP-251, 담당 동주) 🆕 11/23
+
+비교 분석 화면 맨 위 '내 위치' 카드 3개(N-13-4)에 쓰는 값이다. 내 대안 점수가 같은 직군·같은 연령대·같은 직군+연령대 회원 안에서 어디쯤인지 요청 때마다 계산한다(적재 없음). 화면은 아직 없다.
+
+### GET `/api/members/me/score-percentile` (RPT-05)
+
+- 로그인한 일반 회원만(보안 설정: 토큰 없음 401, 관리자 403). 회원은 토큰에서 꺼내고 쿼리·본문은 없다.
+- 응답 200 (숫자는 예시)
+
+```json
+{
+  "myScore": 709,
+  "workerTypeCode": "SELF_EMPLOYED",
+  "ageBandCode": "30S",
+  "modelVersion": "LGBM-BASE-0.2",
+  "minGroupSize": 5,
+  "groups": [
+    { "groupType": "WORKER_TYPE",     "memberCount": 40, "topPct": 37.5, "avgScore": 690.0, "diffFromAvg": 19.0 },
+    { "groupType": "AGE_BAND",        "memberCount": 30, "topPct": 46.7, "avgScore": 714.0, "diffFromAvg": -5.0 },
+    { "groupType": "WORKER_TYPE_AGE", "memberCount": 3,  "topPct": null, "avgScore": null,  "diffFromAvg": null }
+  ]
+}
+```
+
+| 필드 | 뜻 |
+|---|---|
+| `myScore` | 내 대안 점수(0~1000 정수) — ACTIVE 모델로 낸 가장 최근 SCORED 평가 |
+| `workerTypeCode`·`ageBandCode` | 그 평가에 저장된 내 직군·연령대(평가 시점 값) |
+| `modelVersion` | 비교에 쓴 ACTIVE 모델 |
+| `minGroupSize` | 값을 내는 최소 인원(5). 화면 안내 문구에 쓴다 |
+| `groups` | 항상 `WORKER_TYPE`(직군), `AGE_BAND`(연령대), `WORKER_TYPE_AGE`(직군+연령대) 순서로 3개 |
+| `groups[].memberCount` | 집단 인원(본인 포함) |
+| `groups[].topPct` | 상위 n%(소수 첫째 자리) = (나보다 점수가 높은 사람 수 + 1) ÷ 인원 × 100. 동점은 같은 순위. 1등이어도 0%가 아니다(20명 중 1등 = 5.0) |
+| `groups[].avgScore` | 집단 평균 대안 점수(소수 첫째 자리) |
+| `groups[].diffFromAvg` | `myScore − avgScore`(소수 첫째 자리). 음수면 평균보다 낮다 |
+
+- 비교 대상은 관리자 통계 ADM-03과 같은 쿼리다(`AdminStatsMapper.selectLatestScoredMembers`): 서비스 회원이 ACTIVE 모델로 낸 최근 SCORED 평가 1건, 탈퇴 회원 제외(D-28). 평가 표본(`MODEL_EVAL_SAMPLE`)은 연령대가 없어 쓰지 않는다.
+- 집단 인원이 `minGroupSize`보다 적으면 `topPct`·`avgScore`·`diffFromAvg`가 모두 null이다. 화면은 "표본이 적다"고 안내한다.
+- 상위 n% 식은 명세 N-13-3에 없어 담당자가 정했다(11/23). 중앙값은 명세 처리·출력에 없어 넣지 않았다.
+- 오류
+
+  | 상태 | code | 언제 |
+  |---|---|---|
+  | 401 | `UNAUTHORIZED` | 토큰 없음·만료, 탈퇴·없는 계정 |
+  | 403 | `FORBIDDEN` | 관리자 계정 |
+  | 404 | `ASSESSMENT_NOT_FOUND` | ACTIVE 모델로 낸 내 점수가 없음(옛 모델 점수만 있는 경우 포함) — 화면은 점수 산출 안내 |
+
+---
+
 ## N-17 시나리오 테스트 (FP-167, 담당 광희) 🆕 11/20
 
 로그인 회원의 저장 데이터에 금리·소득·지출 변화를 넣어 **상환 여력**(월 잉여, 상환 부담률, 월 이자 변화, 버틸 수 있는 개월 수)을 다시 계산한다. **점수는 구하지 않고**(점수 예측은 N-21 DIAG-09) **저장하지 않는다**.
