@@ -76,7 +76,7 @@
 | 400 | `INVALID_INPUT` | 입력 형식 오류(`fieldErrors` 포함) |
 | 400 | `INVALID_PASSWORD` | 비밀번호 확인 실패(MEM-02·MEM-07 등) |
 | 400 | `INVALID_VERIFICATION_CODE`, `VERIFICATION_CODE_EXPIRED`, `VERIFICATION_ATTEMPTS_EXCEEDED` | 인증번호 틀림·만료·5회 초과 |
-| 400 | `EMAIL_VERIFICATION_REQUIRED`, `SAME_EMAIL`, `SAME_PASSWORD` | 이메일 인증 누락, 같은 값으로 변경 |
+| 400 | `EMAIL_VERIFICATION_REQUIRED`, `SAME_EMAIL`, `SAME_PASSWORD`, `SAME_NICKNAME` | 이메일 인증 누락, 같은 값으로 변경(SAME_NICKNAME은 MEM-08) 🆕 11/23 |
 | 400 | `ADMIN_CHALLENGE_INVALID`, `PASSWORD_SETUP_INVALID` | 관리자 1회용 토큰 만료·재사용 |
 | 400 | `ACCESS_REASON_REQUIRED` | ADM-08 사유 없음 |
 | 400 | `INVALID_SOCIAL_CODE`, `SOCIAL_LINK_EXPIRED` | 간편 로그인 코드·연결 키 문제 |
@@ -90,7 +90,7 @@
 | 404 | `NOT_FOUND`, `ACCOUNT_NOT_FOUND` | 대상 없음 |
 | 404 | `PRODUCT_NOT_FOUND` | 없는 대출 상품 코드(LOAN-02·04·05, 경환 FP-90) 🆕 11/20 |
 | 409 | `DUPLICATE_LOGIN_ID`, `DUPLICATE_EMAIL`, `DUPLICATE_NICKNAME`, `NICKNAME_UNAVAILABLE` | 중복 |
-| 409 | `JOB_TYPE_REQUIRED`, `JOB_TYPE_ALREADY_SELECTED` | 직군 선택 전 저장 / 직군 재선택 |
+| 409 | `JOB_TYPE_REQUIRED`, `JOB_TYPE_ALREADY_SELECTED`, `JOB_TYPE_LOCKED` | 직군 선택 전 저장 / 직군 재선택 / 입력 저장 뒤 직군 변경(MEM-05) 🆕 11/23 |
 | 409 | `CONSENT_REQUIRED` | 동의 없이 불러오기 |
 | 409 | `CREDIT_PROFILE_IMPORTED` | 같은 기준일에 불러온 신용 정보가 있어 직접 입력 저장 불가 |
 | 409 | `SOCIAL_ALREADY_LINKED` | 이미 연결된 간편 로그인 |
@@ -154,6 +154,8 @@
 | MEM-06 | `GET /api/members/me/diagnoses` | N-04-6 진단 내역 조회 | `ASSESSMENT` | USER | ✅ **구현됨 (FP-142, 실제 연결 확인 11/16)** (응답 상세: B팀 명세서 3-4) |
 | MEM-07 | `DELETE /api/members/me` | N-04-7 회원 탈퇴 `{ password }` — 상태 `WITHDRAWN`·개인정보 덮어쓰기, 소셜 연결·인증 기록·동의로 불러온 데이터 삭제, 직접 입력·평가는 보관. 간편 로그인 전용 계정은 토큰 발급 10분 이내로 확인(넘으면 403 `RECENT_LOGIN_REQUIRED`) | `APP_USER`, `USER_*`, `SYSTEM_LOG` | USER | ✅ |
 | MEM-08 | `PATCH /api/members/me/nickname` 🆕 11/23 | N-04-3 계정 관리 (닉네임 변경 `{ nickname }`, 규칙은 가입과 같음. 중복 확인은 AUTH-13. 같은 닉네임이면 400 `SAME_NICKNAME`, 다른 회원이 쓰면 409 `DUPLICATE_NICKNAME`) | `APP_USER` | USER | ✅ (FP-222) |
+
+- [게시판관리] 탭은 COMM-08·09(🟡, C팀 확정 대기)가 생기면 연결한다. 🆕 11/23
 
 ### 2-3. 데이터 입력 — 담당 우찬 (FP-75)
 
@@ -265,9 +267,12 @@
 | COMM-05 | `DELETE /api/board/posts/{postId}` | N-06-6 내 글 삭제 (`DELETED`, 미처리 신고는 남음) | `BOARD_POST`, `BOARD_POST_LOG` | USER | ✅ (PR #80) |
 | COMM-06 | `GET`·`POST /api/board/posts/{postId}/comments` | N-06-3 댓글 작성·조회 (1000자) | `BOARD_COMMENT` | USER | ✅ (PR #80) |
 | COMM-07 | `POST /api/reports` | N-06-4 신고하기 진입, N-33-1 신고 접수, N-33-2 기준 건수 자동 숨김 (본인 글 불가, 같은 대상 중복 불가, 하루 3번, '기타'만 상세 500자) | `CONTENT_REPORT`, `APP_SETTING` | USER | ✅ (PR #80) |
+| COMM-08 | `GET /api/members/me/posts?page&size` | 마이페이지 [게시판관리] 내가 쓴 글 목록 (N-ID 미정). 본인 글만, 삭제 글 제외, 숨김 글은 `hidden: true`로 표시. `page`·기본 개수는 COMM-01 규칙(1부터, 기본 10개)을 따른다. 응답 `{ items: [{ postId, title, createdAt, commentCount, hidden }], page, size, totalCount }` | `BOARD_POST`, `BOARD_COMMENT` | USER | 🟡 제안 (우찬, FP-222 화면에서 사용 예정. 담당·경로는 C팀 확정) 🆕 11/23 |
+| COMM-09 | `GET /api/members/me/comments?page&size` | 마이페이지 [게시판관리] 내가 쓴 댓글 목록 (N-ID 미정). 본인 댓글만, 삭제된 글의 댓글 제외. `page`·기본 개수는 COMM-01 규칙(1부터, 기본 10개)을 따른다. 응답 `{ items: [{ commentId, postId, postTitle, content(앞부분), createdAt }], page, size, totalCount }` | `BOARD_COMMENT`, `BOARD_POST` | USER | 🟡 제안 (우찬, FP-222 화면에서 사용 예정. 담당·경로는 C팀 확정) 🆕 11/23 |
 
 - 게시글 본문은 DDL C9로 `CLOB` → `VARCHAR2(1300 CHAR)`(PR #80). 기존 DB는 `docs/spec/sql/alter_board_post_content_varchar2.sql`. 공용 DB는 11/18 적용 완료(범영). CLOB 상태의 DB에서도 글쓰기·검색·수정·삭제가 동작하는 것을 11/17 로컬에서 확인했다.
 - 탈퇴 회원 글은 그대로 두고 작성자만 "탈퇴한 회원"으로 표시한다. 알림(D-25)은 넣지 않았다.
+- COMM-08·09는 마이페이지 [게시판관리] 탭(FP-222)이 쓸 API 제안이다. 경로는 1장 공통 규칙(본인 데이터는 `/api/members/me/**`)에 맞췄다. 구현 전까지 화면은 '준비 중' 안내만 보여 준다. 🆕 11/23
 
 ### 2-9. 도움말·AI — 담당 광희 (FP-179)
 
@@ -337,7 +342,7 @@
 | N-23 가산점, N-36 비회원 간이 예측 | 삭제된 기능 |
 | N-24 상권 분석 API (DIAG-10·11) | 화면이 정적 JSON(`frontend/public/data/market/`)을 읽는다. 상권 표 5개는 DDL에서 제거(11/14, C조 결정) |
 | (A팀) 관리자 2단계 인증의 이메일 외 수단(TOTP 등), 1회용 토큰 저장소(DB·Redis), `VERIFICATION_CODE.PURPOSE_CODE`에 `ADMIN_STEP_UP` 추가(DDL 제안) | 2차로 넘김 |
-| (A팀) 자산 4칸 개별 저장(DDL 열 필요), 금융(대출) 불러오기, 간편 로그인 재인증 화면, N-01-5 시연 계정 [채우기] | 2차로 넘김 |
+| (A팀) 금융(대출) 불러오기, 간편 로그인 재인증 화면, N-01-5 시연 계정 [채우기] 🆕 11/23 | 2차로 넘김 |
 
 ## 4. 담당 팀이 정해야 할 것
 
@@ -353,3 +358,4 @@
 | ~~Q-8~~ | ~~DIAG-07-1·08-1 경로~~ ✅ **해결:** `/api/members/me/…`로 이동(광희 PR #103, 우찬 합의, SIM-01·02·DIAG-09 포함) 🆕 11/20 | — |
 | ~~Q-9~~ | ~~SIM-03·대출 상품 담당~~ ✅ **해결:** 대출 상품 LOAN-01~05 경환(FP-90, PR #101), SIM-03은 만들지 않고 SIM-04 + LOAN-01로 대신 🆕 11/20 | — |
 | ~~Q-10~~ | ~~ADM-03(N-26 관리자 통계) 담당과 Jira 번호. 정의서에 있던 FP-191은 커뮤니티 카드였다. 비교 통계는 FP-159(광희)~~ ✅ **해결 🆕 11/20:** 광희, API FP-161·화면 FP-162 | — |
+| Q-11 | COMM-08·09(내가 쓴 글·댓글 목록) 구현 담당·경로·응답 필드 확정, 기능 정의서 N-ID 부여 🆕 11/23 | C팀(동주) |
