@@ -17,7 +17,7 @@ export const scoredReport = {
   shap: { baseScore: 639, factors: [
     { rank: 1, featureCode: 'telecom_on_time_streak', featureName: '통신비 정시 납부 기간', unitName: '개월', featureValue: '18', shapScore: 40, alternativeYn: 'Y', simulatableYn: 'Y' },
     { rank: 2, featureCode: 'income_cv_svc_12m', featureName: '월 소득 변동 정도', unitName: '비율', featureValue: '0.27', shapScore: 0, alternativeYn: 'N', simulatableYn: 'N' },
-    { rank: 3, featureCode: 'utility_late_months', featureName: '공과금 미납 개월', unitName: '개월', featureValue: '12', shapScore: 20, alternativeYn: 'Y', simulatableYn: 'Y' },
+    { rank: 3, featureCode: 'utility_late_months', featureName: '공과금 미납 개월', unitName: '개월', featureValue: '0', shapScore: 20, alternativeYn: 'Y', simulatableYn: 'Y' },
     { rank: 4, featureCode: 'np_on_time_months', featureName: '국민연금 정시 납부 개월', unitName: '개월', featureValue: '48', shapScore: 10, alternativeYn: 'Y', simulatableYn: 'N' },
     { rank: 5, featureCode: 'hi_on_time_months', featureName: '건강보험 정시 납부 개월', unitName: '개월', featureValue: '12', shapScore: 9, alternativeYn: 'Y', simulatableYn: 'N' },
     { rank: 6, featureCode: 'dp_active_months', featureName: '간편결제 이용 개월', unitName: '개월', featureValue: '3', shapScore: -7, alternativeYn: 'Y', simulatableYn: 'N' },
