@@ -18,7 +18,8 @@ export default function MyProfileCard({ profile, unmasked, onUnmask }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
-  const [revealed, setRevealed] = useState(false)
+  // FP-222 v2 내정보 탭은 비밀번호 확인(ProfileUnlockCard)을 거쳐 원래 값을 들고 열리므로, 그때는 원래 값부터 보여 준다.
+  const [revealed, setRevealed] = useState(unmasked != null)
 
   const shown = unmasked && revealed ? unmasked : profile
   const items = [

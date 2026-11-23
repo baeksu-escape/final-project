@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.support.TransactionOperations;
 
 import com.baeksuescape.global.TestKeys;
@@ -186,6 +187,27 @@ class SocialAndMyPageServiceTest {
         verify(userMapper, never()).updatePassword(any(Long.class), anyString(), any());
         myPage.changePassword(7L, new MyPageDtos.PasswordChange(PASSWORD, "newpass99"));
         verify(userMapper).updatePassword(eq(7L), anyString(), any());
+    }
+
+    // FP-222 MEM-08 닉네임 변경 — 형식 오류 400 INVALID_INPUT, 지금 닉네임과 같으면 400 SAME_NICKNAME, 다른 회원이 쓰면 409(저장 직전 겹침 포함), 아니면 저장.
+    @Test
+    void 닉네임_변경은_규칙_같은_값_중복을_막고_새_닉네임을_저장한다() {
+        UserAccount account = UserFixtures.user(7L, "employee");
+        account.setNickname("백수탈출");
+        given(userMapper.selectById(7L)).willReturn(account);
+
+        assertThat(codeOf(() -> myPage.changeNickname(7L, new MyPageDtos.NicknameChange("a")))).isEqualTo("400 INVALID_INPUT");
+        assertThat(codeOf(() -> myPage.changeNickname(7L, new MyPageDtos.NicknameChange("탈퇴회원")))).isEqualTo("400 INVALID_INPUT");
+        assertThat(codeOf(() -> myPage.changeNickname(7L, new MyPageDtos.NicknameChange(" 백수탈출 ")))).isEqualTo("400 SAME_NICKNAME");
+        given(userMapper.countByNickname("남의닉")).willReturn(1);
+        assertThat(codeOf(() -> myPage.changeNickname(7L, new MyPageDtos.NicknameChange("남의닉")))).isEqualTo("409 DUPLICATE_NICKNAME");
+        verify(userMapper, never()).updateNickname(any(Long.class), anyString(), any());
+
+        given(userMapper.updateNickname(eq(7L), eq("동시닉"), any())).willThrow(new DuplicateKeyException("UK_APU_NICKNAME"));
+        assertThat(codeOf(() -> myPage.changeNickname(7L, new MyPageDtos.NicknameChange("동시닉")))).isEqualTo("409 DUPLICATE_NICKNAME");
+
+        myPage.changeNickname(7L, new MyPageDtos.NicknameChange(" 새닉네임 "));
+        verify(userMapper).updateNickname(eq(7L), eq("새닉네임"), any());
     }
 
     // FP-222 새 비밀번호가 지금 비밀번호와 같으면 400 SAME_PASSWORD로 막고 저장하지 않는다. 다르면 저장한다.

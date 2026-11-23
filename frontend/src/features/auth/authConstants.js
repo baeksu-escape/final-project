@@ -39,7 +39,12 @@ export const AUTH_ERROR_CODES = Object.freeze({
   ADMIN_2FA_NOT_READY: 'ADMIN_2FA_NOT_READY',
   // FP-222 MEM-04 새 비밀번호가 지금 비밀번호와 같음(400).
   SAME_PASSWORD: 'SAME_PASSWORD',
+  // FP-222 MEM-08 새 닉네임이 지금 닉네임과 같음(400).
+  SAME_NICKNAME: 'SAME_NICKNAME',
 })
+
+// FP-222 N-04-3 새 닉네임이 지금 닉네임과 같을 때 문구. 서버 MyPageService.SAME_NICKNAME_MESSAGE와 같다.
+export const SAME_NICKNAME_MESSAGE = '지금 쓰는 닉네임과 같습니다.'
 
 // FP-222 N-04-3 새 비밀번호가 지금 비밀번호와 같을 때 문구. 서버 MyPageService.SAME_PASSWORD_MESSAGE와 같다.
 export const SAME_PASSWORD_MESSAGE = '지금 쓰는 비밀번호와 같습니다. 다른 비밀번호를 입력해 주세요.'

@@ -490,6 +490,7 @@
 .my-profile-card__unmask,
 .my-profile-card__unmask-submit,
 .my-profile-card__unmask-cancel,
+.account-manage-card__nickname,
 .account-manage-card__email,
 .account-manage-card__password,
 .account-manage-card__data-input,
@@ -514,6 +515,7 @@
 
 .my-profile-card__unmask:hover,
 .my-profile-card__unmask-cancel:hover,
+.account-manage-card__nickname:hover,
 .account-manage-card__email:hover,
 .account-manage-card__password:hover,
 .account-manage-card__data-input:hover,
