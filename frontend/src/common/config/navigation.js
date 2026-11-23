@@ -32,7 +32,8 @@ export const PATHS = Object.freeze({
   ADMIN_AUDIT: '/admin/audit-logs',
 })
 
-// N-08-1 사용자 주 메뉴 9개(이 순서). 직군과 상관없이 모두 같다. 마이 페이지는 헤더 버튼이다.
+// N-08-1 사용자 기능 9개(이 순서). 직군과 상관없이 모두 같다. 마이 페이지는 헤더 버튼이다.
+// 화면 위쪽 메뉴는 아래 NAV_GROUPS로 큰 분류 5개에 묶어 보인다(UI 리뉴얼 FP-252).
 export const USER_TABS = Object.freeze([
   { key: 'report', label: '신용 리포트', path: PATHS.REPORT, nId: 'N-12' },
   { key: 'asset-debt', label: '자산·부채 건전성', path: PATHS.ASSET_DEBT, nId: 'N-16' },
