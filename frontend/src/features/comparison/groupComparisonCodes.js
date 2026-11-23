@@ -21,6 +21,14 @@ export const CELL_METRICS = Object.freeze([
 ])
 export const DEFAULT_CELL_METRIC = 'ALT_SCORE'
 
+// N-26-7 직군별·연령대별 색 칸의 열 — 지표마다 기존 → 대안을 한 줄 두 칸으로 나란히(같은 단위라 한 색 범위로 비교). 상승폭은 1열.
+// 명세의 점 그래프 대신 쓰는 표현이다(11/23 광희 결정).
+export const STRIP_COLUMNS = Object.freeze({
+  ALT_SCORE: [{ label: '기존 평균', field: 'avgTradScore' }, { label: '대안 평균', field: 'avgAltScore' }],
+  UPLIFT: [{ label: '상승폭', field: 'avgScoreUplift' }],
+  STANDARD_OR_ABOVE: [{ label: '기존', field: 'tradStandardOrAboveRatePct' }, { label: '대안', field: 'standardOrAboveRatePct' }],
+})
+
 // 격자의 행(직군)·열(연령대) 순서 — 서버 응답의 고정 순서와 같다.
 export const WORKER_TYPE_ORDER = Object.freeze(['EMPLOYEE', 'SELF_EMPLOYED', 'FREELANCER'])
 export const AGE_BAND_ORDER = Object.freeze(['20S', '30S', '40S', '50_PLUS'])
