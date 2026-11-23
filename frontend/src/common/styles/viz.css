@@ -56,6 +56,8 @@
   display: block;
   width: 100%;
   height: auto;
+  /* 넓은 카드에서 글자가 과하게 커지지 않게 높이를 묶는다(가로는 비율대로 줄고 가운데 정렬) */
+  max-height: 280px;
   overflow: visible;
 }
 

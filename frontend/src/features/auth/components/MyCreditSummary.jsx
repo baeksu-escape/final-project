@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CountUp, ScoreRing, TrendArea } from '../../../common/components/viz.jsx'
+import { useAuth } from '../../../common/auth/useAuth.js'
+import { CountUp, ScoreRing } from '../../../common/components/viz.jsx'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { PATHS } from '../../../common/config/navigation.js'
 import { fetchDiagnosisHistory } from '../api/diagnosisHistoryApi.js'
@@ -12,9 +13,11 @@ const GRADE_TIP = {
   CAUTION: '점수를 깎은 항목부터 확인해 보세요. 리포트에서 이유를 볼 수 있어요.',
 }
 
-// UI 리뉴얼 — 마이페이지 맨 위 "내 신용 한눈에": 최근 대안 점수(링), 진단 추이(곡선), 숫자 타일(진단 횟수·최고 점수·첫 진단 대비).
-// 진단 내역(MEM-06) 응답만 쓴다. 점수가 없는 평가는 빼고 계산한다.
-export default function MyCreditSummary({ profile }) {
+// UI 리뉴얼(FP-252) — 마이페이지 탭 위 "신용 기록 요약": 최근 대안 점수(링)와 숫자 타일(진단 횟수·최고 점수·첫 진단 대비).
+// 진단 내역(MEM-06) 응답만 쓴다. 점수가 없는 평가는 빼고 계산한다. 점수 변화 그래프는 [진단내역] 탭(FP-222)에 있다.
+// 내 정보는 비밀번호 확인 뒤에만 보이므로(FP-222) 인사말은 로그인 정보(이름·직군)로 만든다.
+export default function MyCreditSummary() {
+  const { user } = useAuth()
   const [items, setItems] = useState(null)
 
   useEffect(() => {
@@ -28,16 +31,12 @@ export default function MyCreditSummary({ profile }) {
   const oldest = scored[scored.length - 1]
   const best = scored.reduce((max, item) => Math.max(max, item.alternativeScore), 0)
   const growth = latest && oldest ? latest.alternativeScore - oldest.alternativeScore : null
-  const trend = [...scored].reverse().slice(-8).map((item) => {
-    const date = new Date(item.calculatedAt)
-    return { label: `${date.getMonth() + 1}/${date.getDate()}`, value: item.alternativeScore }
-  })
 
   return (
     <section className="my-summary" aria-label="내 신용 한눈에">
       <div className="my-summary__hello">
-        <p className="my-summary__eyebrow">{JOB_TYPE_LABELS[profile.jobType] ?? '직군 미선택'}{profile.joinedAt && ` · ${profile.joinedAt} 가입`}</p>
-        <h1 className="my-summary__title">{profile.nickname ?? profile.loginId}님의<br />신용 기록</h1>
+        <p className="my-summary__eyebrow">마이 페이지 · {JOB_TYPE_LABELS[user?.jobType] ?? '직군 미선택'}</p>
+        <h1 className="my-summary__title">{user?.name ? `${user.name}님의` : '나의'}<br />신용 기록</h1>
       </div>
 
       <div className="my-summary__grid">
@@ -58,11 +57,6 @@ export default function MyCreditSummary({ profile }) {
             <Link to={PATHS.REPORT} className="my-summary__link">신용 리포트 →</Link>
             <Link to={PATHS.SIMULATOR} className="my-summary__link">점수 올리기 →</Link>
           </div>
-        </article>
-
-        <article className="my-summary__card my-summary__trend">
-          <h2>진단할 때마다 이렇게 바뀌었어요</h2>
-          {items == null ? <p className="hint">불러오는 중이에요</p> : <TrendArea points={trend} height={230} ariaLabel="진단별 대안 점수 추이" />}
         </article>
 
         <div className="my-summary__tiles">

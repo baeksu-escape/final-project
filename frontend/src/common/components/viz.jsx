@@ -48,7 +48,7 @@ function TrendSvg({ valid, height = 220, unit = '점', tone = 'var(--acc)', aria
   const gradId = useId()
   const W = 640
   const H = height
-  const pad = { l: 16, r: 16, t: 36, b: 34 }
+  const pad = { l: 28, r: 40, t: 36, b: 34 }
   const vals = valid.map((p) => p.value)
   const lo = Math.min(...vals) - 20
   const hi = Math.max(...vals) + 20
