@@ -9,7 +9,6 @@ import GroupHubPage from '../pages/GroupHubPage.jsx'
 import HomePage from '../pages/HomePage.jsx'
 import LandingPage from '../pages/LandingPage.jsx'
 import NotFoundPage from '../pages/NotFoundPage.jsx'
-import PlaceholderPage from '../pages/PlaceholderPage.jsx'
 import { ADMIN_PATHS } from '../../features/admin/adminConstants.js'
 import AdminAccountsPage from '../../features/admin/pages/AdminAccountsPage.jsx'
 import AdminAuditLogsPage from '../../features/admin/pages/AdminAuditLogsPage.jsx'
@@ -37,6 +36,7 @@ import AdminReportsPage from '../../features/admin/pages/AdminReportsPage.jsx'
 import ModelPerformancePage from '../../features/admin/pages/ModelPerformancePage.jsx'
 import AdminStatsPage from '../../features/admin/pages/AdminStatsPage.jsx'
 import LoungePage from '../../features/community/pages/LoungePage.jsx'
+import ComparisonPage from '../../features/comparison/pages/ComparisonPage.jsx'
 import LoanProductsPage from '../../features/loans/pages/LoanProductsPage.jsx'
 import LoanProductDetailPage from '../../features/loans/pages/LoanProductDetailPage.jsx'
 
@@ -67,7 +67,7 @@ export default function AppRoutes() {
           {/* 직군 선택 (FP-85 N-05-1) — 직군이 없는 사용자만 머문다 */}
           <Route path={PATHS.SELECT_JOB} element={<JobSelectPage />} />
 
-          {/* 일반 사용자 전용 + 직군 선택 완료 — N-08-1 주 메뉴 9개 */}
+          {/* 일반 사용자 전용 + 직군 선택 완료 — N-08-1 기능 9개(위쪽 메뉴는 큰 분류 5개로 묶음) */}
           <Route element={<RouteGuard requiredRole={ROLES.USER} requireJobType />}>
             {/* 점수가 있어야 보는 화면 — 점수가 없으면 데이터 입력으로 보낸다(11/06 확정 UI) */}
             <Route element={<RouteGuard requireScore />}>
@@ -85,7 +85,7 @@ export default function AppRoutes() {
             {/* 점수 없이도 여는 화면 */}
             <Route path={PATHS.LOANS} element={<LoanProductsPage />} />
             <Route path={PATHS.LOAN_DETAIL} element={<LoanProductDetailPage />} />
-            <Route path={PATHS.COMPARISON} element={<PlaceholderPage title="비교 분석" nId="N-13·N-26" />} />
+            <Route path={PATHS.COMPARISON} element={<ComparisonPage />} />
             <Route path={PATHS.LOUNGE} element={<LoungePage />} />
             <Route path={DATA_INPUT_PATHS.DATA_INPUT} element={<DataInputPage />} />
           </Route>
