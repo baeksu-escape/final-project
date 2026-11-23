@@ -1,4 +1,4 @@
-import { TrendLineChart } from '../../../common/components/index.js'
+import { TrendArea } from '../../../common/components/viz.jsx'
 import { GRADE_STATUS } from '../../../common/config/scoreStatus.js'
 
 // 그래프를 그리려면 필요한 점 수 — 점이 하나뿐이면 변화를 보여 줄 수 없어 안내로 대신한다.
@@ -18,7 +18,8 @@ export default function DiagnosisScoreChart({ items }) {
   return (
     <>
       <p className="hint">대안 점수 변화(오래된 순, 산출 불가 진단은 빼고 그립니다)</p>
-      <TrendLineChart data={points} width={640} height={180} unit="점" ariaLabel="진단 일시별 대안 점수 변화 그래프" />
+      {/* UI 리뉴얼(FP-252) — 공통 움직이는 곡선으로 그린다 */}
+      <TrendArea points={points} height={230} ariaLabel="진단 일시별 대안 점수 변화 그래프" />
     </>
   )
 }

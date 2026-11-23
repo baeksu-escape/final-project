@@ -1,0 +1,344 @@
+/* UI 리뉴얼 — 큰 분류 화면(GroupHubPage): 큰 제목 → 기능별 넓은 구간(왼쪽 이름표 · 오른쪽 제목/설명/미리보기) */
+
+.hub {
+  display: flex;
+  flex-direction: column;
+}
+
+.hub-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80px 0 104px;
+  text-align: center;
+}
+
+.hub-hero::before {
+  content: '';
+  position: absolute;
+  inset: -40px 0 auto;
+  z-index: -1;
+  height: 340px;
+  background: radial-gradient(45% 60% at 50% 20%, color-mix(in srgb, var(--acc) 20%, transparent), transparent 70%);
+  filter: blur(24px);
+}
+
+.hub-hero__eyebrow {
+  color: var(--acc);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.hub-hero__title {
+  max-width: 16em;
+  margin-top: 14px;
+  font-size: clamp(36px, 5.2vw, 72px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.045em;
+}
+
+.hub-hero__index {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 44px;
+}
+
+.hub-hero__index a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  color: var(--fg2);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.hub-hero__index a:hover {
+  border-color: var(--fg);
+  background: var(--panel);
+}
+
+.hub-hero__index .num {
+  color: var(--mut2);
+  font-size: 13px;
+}
+
+.hub-section {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 48px;
+  padding: 64px 0 112px;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 140px;
+}
+
+.hub-section__tag {
+  position: sticky;
+  top: 160px;
+  align-self: start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fg);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.hub-section__tag .num {
+  color: var(--acc);
+}
+
+.hub-section__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.hub-section__title {
+  font-size: clamp(32px, 4vw, 54px);
+  font-weight: 800;
+  line-height: 1.22;
+  letter-spacing: -0.045em;
+  white-space: pre-line;
+}
+
+.hub-section__text {
+  max-width: 40em;
+  margin-top: 22px;
+  color: var(--mut);
+  font-size: 18px;
+  line-height: 1.75;
+}
+
+.hub-section__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 24px;
+  color: var(--acc);
+  font-size: 17px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.hub-section__cta span {
+  transition: transform 0.15s;
+}
+
+.hub-section__cta:hover span {
+  transform: translateX(4px);
+}
+
+/* 미리보기 — 화면 폭을 크게 쓰는 둥근 판 */
+.hub-preview {
+  position: relative;
+  width: 100%;
+  margin-top: 48px;
+  padding: 56px clamp(24px, 5vw, 72px);
+  border-radius: 32px;
+  background: var(--panel);
+}
+
+.hub-preview__badge {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--panel2);
+  color: var(--mut2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.hub-preview__pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+
+.hub-preview__pair p {
+  color: var(--mut);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.hub-preview__rings {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 32px;
+}
+
+.hub-preview__heat {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.hub-preview__heat i {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bad) calc(var(--v) * 85% + 8%), var(--panel2));
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.4s, transform 0.4s;
+  transition-delay: calc(var(--i) * 18ms);
+}
+
+.hub-preview.is-in .hub-preview__heat i {
+  opacity: 1;
+  transform: none;
+}
+
+/* 등장 — 흐릿하게 아래에서 떠올라 선명해진다 */
+[data-hub-reveal] {
+  opacity: 0;
+  filter: blur(10px);
+  transform: translateY(36px);
+  transition: opacity 0.9s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+[data-hub-reveal].is-in {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-hub-reveal] { opacity: 1; filter: none; transform: none; }
+}
+
+@media (max-width: 900px) {
+  .hub-hero {
+    padding: 40px 0 56px;
+  }
+
+  .hub-section {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    padding: 48px 0 72px;
+  }
+
+  .hub-section__tag {
+    position: static;
+  }
+
+  .hub-preview {
+    padding: 48px 20px 28px;
+  }
+
+  .hub-preview__pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hub-preview__heat {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+/* 시뮬레이터 미리보기(자동 재생) */
+.hub-sim {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.hub-sim__control > span,
+.hub-sim__result > span {
+  color: var(--mut);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.hub-sim__control b {
+  display: block;
+  margin: 6px 0 16px;
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.hub-sim__track {
+  height: 14px;
+  border-radius: 999px;
+  background: var(--panel2);
+}
+
+.hub-sim__track i {
+  position: relative;
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--acc);
+  transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hub-sim__track i::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -14px;
+  width: 28px;
+  height: 28px;
+  margin-top: -14px;
+  border-radius: 50%;
+  background: var(--panel);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+.hub-sim__result {
+  display: flex;
+  flex-direction: column;
+  padding: 28px;
+  border-radius: 24px;
+  background: var(--sel);
+}
+
+.hub-sim__result b {
+  color: var(--acc);
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.05em;
+}
+
+.hub-sim__result small {
+  margin-left: 4px;
+  font-size: 22px;
+}
+
+.hub-sim__result em {
+  color: var(--mint);
+  font-size: 17px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+/* 상권 미리보기 — 칸이 물결처럼 깜빡인다 */
+.hub-preview.is-in .hub-preview__heat i {
+  animation: heat-wave 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 60ms);
+}
+
+@keyframes heat-wave {
+  50% { filter: brightness(1.25) saturate(1.2); transform: scale(0.92); }
+}
+
+@media (max-width: 900px) {
+  .hub-sim {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
