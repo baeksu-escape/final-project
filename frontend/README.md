@@ -102,7 +102,7 @@ frontend/
 ### 새 기능을 붙일 때
 - 화면은 `features/<기능>/pages/`에 만들고, `AppRoutes.jsx`에서 해당 경로의 `element` 한 줄만 바꾼다(가드·경로 구조는 그대로). `AppRoutes.jsx`·`client.js`는 공유 파일이라 고치기 전에 팀에 알린다.
 - API는 `features/<기능>/api/`에서 `common/api/client.js`를 통해 부른다. mock은 같은 기능의 `mocks/`에 실제 응답과 같은 모양으로 만들어 `registerMockHandlers`로 등록한다.
-- 화면 모양은 공통 재료로 맞춘다(기준 UI: 데모 v2). 컴포넌트는 `common/components`(Card·Button·Chip·Notice·Modal·Toast·입력류·차트), 배치는 `layout.css` 클래스를 쓴다.
+- 화면 모양은 공통 재료로 맞춘다(기준 UI: 11/23 UI 리뉴얼 🆕 11/23). 컴포넌트는 `common/components`(Card·Button·Chip·Notice·Modal·Toast·입력류·차트, 움직이는 시각화 `viz.jsx`), 배치는 `layout.css` 클래스, 메뉴는 `navigation.js`의 `NAV_GROUPS`를 쓴다. 자세한 규칙은 `AGENTS.md` 3-2.
   - 제목 줄 `page-head`(`__tag`·`__title`·`__lead`), 2:1 `l-cols`(+`l-cols__main`), 3열 `l-grid3`, 숫자 타일 `l-kpis`, 자동 칸 `l-g2`, 표 `data-table`(+`data-table-wrap`), 안쪽 상자 `panel-sunk`, 글자 `hint`·`num`
   - 색·간격은 `tokens.css` 변수만 쓴다. 이 재료로 안 되는 모양이 필요하면 기능 폴더에 `<기능>.css`를 만들기 전에 프론트 담당에게 알린다. 공통 CSS 4개(`tokens`·`forms`·`components`·`layout.css`)는 프론트 담당만 고친다(AGENTS.md 3-2).
   - 공통으로 올릴 후보: 여러 줄 입력칸(`lounge-textarea`), 쪽 번호(`lounge-pager`), 설명이 붙은 라디오 카드(`report-option`). 지금은 `community.css`에 있으니 필요하면 프론트 담당에게 알린다.

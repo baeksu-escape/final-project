@@ -1,17 +1,18 @@
-/* 기존 공통 컴포넌트(Card·입력류·EditableList)가 이미 쓰는 클래스에 입히는 스타일. 컴포넌트 코드와 클래스명은 바꾸지 않는다. */
+/* 바탕·카드·입력칸 공통 스타일 — 컴포넌트 코드가 쓰는 클래스(card·form-field·*-input 등)에 입힌다. */
 
-/* 바탕 — 화면 전체 배경·글꼴 */
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--f-b);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
+  letter-spacing: -0.005em;
+  word-break: keep-all;
 }
 
 :focus-visible {
-  outline: 2px solid var(--info);
+  outline: 2px solid var(--acc);
   outline-offset: 2px;
 }
 
@@ -22,70 +23,75 @@ body {
   }
 }
 
-/* Card */
+/* Card — 흰 면, 옅은 테두리, 넉넉한 안쪽 여백 */
 .card {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--sp-4);
   min-width: 0;
-  padding: 20px;
+  padding: 28px;
+  border: 0;
+  border-radius: var(--r-lg);
   background: var(--panel);
+}
+
+:root[data-theme='dark'] .card {
   border: 1px solid var(--line);
-  border-radius: 14px;
 }
 
 .card__title {
   margin: 0;
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .card__body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-3);
   min-width: 0;
 }
 
-/* 입력 칸 공통 틀 (TextInput·NumberInput·MoneyInput·Select·Slider·Checkbox) */
+/* 입력 칸 공통 틀 */
 .form-field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
 }
 
 .form-field__label {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--mut);
+  color: var(--fg2);
+  font-size: 13.5px;
+  font-weight: 600;
 }
 
 .form-field__hint {
   margin: 0;
-  font-size: 12.5px;
   color: var(--mut2);
+  font-size: 13px;
 }
 
 .field-error {
   margin: 0;
-  font-size: 12.5px;
   color: var(--bad);
+  font-size: 13px;
 }
 
 .text-input__control,
 .number-input__control,
 .money-input__control,
 .select__control {
-  box-sizing: border-box;
   width: 100%;
-  min-height: 44px;
-  padding: 9px 12px;
+  min-height: 48px;
+  padding: 11px 14px;
   border: 1px solid var(--line2);
-  border-radius: 10px;
+  border-radius: var(--r);
   background: var(--inp);
   color: var(--fg);
   font: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .text-input__control::placeholder,
@@ -94,12 +100,20 @@ body {
   color: var(--mut2);
 }
 
+.text-input__control:hover,
+.number-input__control:hover,
+.money-input__control:hover,
+.select__control:hover {
+  border-color: var(--mut2);
+}
+
 .text-input__control:focus,
 .number-input__control:focus,
 .money-input__control:focus,
 .select__control:focus {
   outline: none;
-  border-color: var(--vio);
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 22%, transparent);
 }
 
 .text-input__control[aria-invalid='true'],
@@ -113,11 +127,12 @@ body {
 .number-input__control:disabled,
 .money-input__control:disabled,
 .select__control:disabled {
-  opacity: 0.55;
+  background: var(--panel2);
+  opacity: 0.7;
   cursor: not-allowed;
 }
 
-/* 숫자·금액 입력 — 입력 칸 오른쪽에 단위를 붙인다 */
+/* 숫자·금액 입력 — 단위를 오른쪽에 */
 .number-input,
 .money-input {
   display: grid;
@@ -133,23 +148,50 @@ body {
   grid-column: 1 / -1;
 }
 
-.number-input__unit,
-.money-input__unit {
-  font-size: 14px;
-  color: var(--mut);
+.number-input__control,
+.money-input__control {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
-/* Slider */
+.number-input__unit,
+.money-input__unit {
+  color: var(--mut);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Slider — 라벨 옆 값은 크게 */
+.slider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  row-gap: 4px;
+}
+
+.slider > .slider__control,
+.slider > .field-error {
+  grid-column: 1 / -1;
+}
+
+.slider > .slider__value {
+  grid-row: 1;
+  grid-column: 2;
+}
+
 .slider__control {
   width: 100%;
   min-height: 28px;
-  accent-color: var(--mint);
+  accent-color: var(--acc);
+  cursor: pointer;
 }
 
 .slider__value {
+  color: var(--acc);
   font-family: var(--f-d);
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: 800;
 }
 
 /* Checkbox */
@@ -162,15 +204,15 @@ body {
 }
 
 .checkbox__control {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   margin: 0;
-  accent-color: var(--mint);
+  accent-color: var(--acc);
 }
 
 .checkbox__label {
-  cursor: pointer;
   color: var(--fg2);
+  cursor: pointer;
 }
 
 .checkbox > .field-error {
@@ -181,7 +223,7 @@ body {
 .editable-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-3);
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -190,21 +232,25 @@ body {
 
 .editable-list__label {
   padding: 0;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--mut);
+  color: var(--fg2);
+  font-size: 13.5px;
+  font-weight: 600;
 }
 
 .editable-list__empty {
   margin: 0;
-  font-size: 13px;
+  padding: var(--sp-4);
+  border: 1px dashed var(--line2);
+  border-radius: var(--r);
   color: var(--mut2);
+  font-size: 13.5px;
+  text-align: center;
 }
 
 .editable-list__items {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-3);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -213,34 +259,34 @@ body {
 .editable-list__item {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--r);
   background: var(--panel2);
-  border: 1px solid var(--line);
-  border-radius: 10px;
 }
 
 .editable-list__add,
 .editable-list__remove {
   align-self: flex-start;
   min-height: 36px;
-  padding: 4px 12px;
-  border: 1px solid var(--line2);
+  padding: 6px 14px;
+  border: 1px dashed var(--line2);
   border-radius: 10px;
-  background: var(--inp);
-  color: var(--fg2);
+  background: transparent;
+  color: var(--acc);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .editable-list__add:hover {
   border-color: var(--acc);
-  color: var(--fg);
+  background: var(--sel);
 }
 
 .editable-list__remove {
-  border-color: var(--bad);
+  border: 0;
   color: var(--bad);
 }
 

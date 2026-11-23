@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom'
 import { Card, Notice, SegmentedControl } from '../../../common/components/index.js'
 import DiagnosisHistoryPanel from '../components/DiagnosisHistoryPanel.jsx'
+import MyCreditSummary from '../components/MyCreditSummary.jsx'
 import MyProfileTab from '../components/MyProfileTab.jsx'
 import '../auth.css'
 
@@ -25,7 +26,8 @@ export default function MyPage() {
 
   return (
     <section className="my-page">
-      <h1 className="my-page__title">마이 페이지</h1>
+      {/* UI 리뉴얼(FP-252) — 탭 위에 신용 기록 요약(점수 링·숫자 타일). 점수 변화 그래프는 [진단내역] 탭에 있다 */}
+      <MyCreditSummary />
       <SegmentedControl label="마이 페이지 메뉴" options={TAB_OPTIONS} value={tab} onChange={changeTab} />
       {tab === TABS.HISTORY && <DiagnosisHistoryPanel />}
       {/* 내정보 탭을 떠나면 MyProfileTab이 사라지며 잠금·원래 값도 함께 지워진다. */}
