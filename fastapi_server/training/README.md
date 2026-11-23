@@ -26,6 +26,24 @@ python -m training.train --data-dir <학습 데이터 폴더>
 - 범주형 5개는 `config.CATEGORY_CODES`의 고정 부호표로 정수 부호화한다(표에 없는 값은 -1). 알파벳 자동 부호를 쓰지 않는다.
 - TRAIN으로 학습하고 VALID로 평가한다(시드 5개 평균 ± 표준편차). 저장하는 모델은 첫 시드(11) 것이다. TEST는 쓰지 않는다.
 
+## 학습 옵션 (모델 0.2, 11/20)
+
+옵션 없이 실행하면 `LGBM-BASE-0.1`과 같은 결과가 나온다. 0.2는 `--monotone`만 켜서 만든다(학습 행은 0.1과 같은 기존 집단 TRAIN 8,400행).
+
+```
+python -m training.train --monotone --model-version LGBM-BASE-0.2 --out-dir <저장할 폴더>
+```
+
+| 옵션 | 하는 일 |
+|---|---|
+| `--monotone` | `config.MONOTONE_CONSTRAINTS`의 8개 피처에 단조 제약을 건다. 지출 비율·DSR·적자 개월 수·카드 한도소진율·연체 건수·월 평균 지출 금액은 클수록 불량 확률이 높게, 최저 월 순현금흐름·12개월 소득 금액은 클수록 낮게. 소득·지출 금액은 학습 데이터가 소득↑ 연체↑ 방향이고 둘의 상관이 0.88이라 처음엔 뺐지만, 걸어도 AUC가 0.1 수준 이상이고 반대 방향 사례가 사라져서 넣었다(부채 금액까지는 반응이 과해 뺌) |
+| `--with-thinfile` | **c안 시험용, 0.2에는 쓰지 않음**(시험에서 신용 이력 없음이 불리해지고 기존 모델에 새 이상이 생겨 채택하지 않았다, 정의서 C25). 씬파일 표에서 `eval_future_credit_exposure = 1`인 TRAIN 행을 학습에 더한다. 기존 집단에는 신용 이력 피처의 결측이 없어서 모델이 결측을 0으로 읽는 문제(신용 이력 없음 = 사용률 0%)를 줄이려는 것이다(결측 처리 c안) |
+| `--model-version` | 설명 파일에 적을 모델 버전. 기본은 `config.MODEL_VERSION`(0.1)이고 코드 상수는 바꾸지 않는다. 서비스는 묶음 `meta.json`의 `model_version`을 읽는다(PR #110). DB 등록(`register_model_lgbm_base_0_2.sql`)과 전환 SQL은 따로 실행한다 |
+
+- `valid_auc`는 두 경우 모두 **기존 집단 VALID** 기준이라 0.1과 그대로 비교할 수 있다. 씬파일 VALID는 `valid_auc_thinfile`(228행, 양성 22·14로 흔들림이 크다)에 따로 남는다.
+- 씬파일 TRAIN을 학습에 썼으면 그 행은 평가에 쓰지 않는다(누수). `export_eval_scores.py --with-thinfile`은 씬파일을 VALID 행만 낸다. `compare_labels.py`도 같은 두 옵션을 받는다.
+- 설명 파일에 `options`, `monotone_constraints`, 씬파일 표 해시·행 수가 남는다.
+
 ## 지켜야 할 것
 
 - **TEST는 최종 평가에서 한 번만** 쓴다. 이 스크립트에 TEST 평가를 넣지 않는다.
@@ -140,6 +158,6 @@ legacy = score_one(joblib.load("artifacts/legacy.joblib"), feature_dict, "legacy
 - **합 규칙**: `baseScore + Σ shapScore = score`. 모델의 `expected_value + Σ SHAP = raw margin`(log-odds)이 정확히 맞고, 점수로 환산한 값을 정수로 반올림하면서 합이 `score`와 같게 맞춘다(최대 잉여 방식). 점수가 0이나 1000으로 잘리는 경우에도 합은 잘린 `score`와 같다.
 - **환산**: 명세서 O-3. `score = OFFSET − FACTOR × log-odds`(700점 = 우량:불량 20:1, 40점마다 오즈 2배, 0~1000). SHAP 점수 = `−FACTOR × SHAP(log-odds)`로, 불량 쪽으로 미는 항목이 점수를 깎는다. 같은 상수가 `pipeline/mock_scorer.py`에도 있고 시험이 두 곳이 같은지 검사한다.
 - **순서**: `rank`는 `|shapScore|` 큰 순서, 같으면 항목 이름 가나다순(DDL `FEATURE_RANK` 주석). 피처 38개를 모두 담는다. `featureValue`는 서비스가 만든 원래 값의 글자이고 결측이면 `None`이다.
-- **기준점**: `TreeExplainer`의 `expected_value`(학습 데이터에서 모델의 평균 log-odds)를 점수로 바꾼 값이다. 현재 베이스라인 대안 모델은 694점이다(시연용 Mock은 639점).
+- **기준점**: `TreeExplainer`의 `expected_value`(학습 데이터에서 모델의 평균 log-odds)를 점수로 바꾼 값이다. 모델 0.1 대안 모델은 694점, 지금 서비스 모델 0.2는 689점이다(시연용 Mock은 639점, 🆕 11/20).
 - **등급은 만들지 않는다**: 등급 경계(D-01)는 팀 결정이라 `gradeBandCode`는 서비스가 정한다.
 - **주의**: SHAP 결과는 모델이 쓴 기여도이며 인과관계가 아니다. 화면에는 "작용한 정도"로만 보여 준다. 설명기 생성에 약 0.2초가 걸리고 요청마다 SHAP 계산 비용이 든다(응답 시간은 확인하지 못했다).

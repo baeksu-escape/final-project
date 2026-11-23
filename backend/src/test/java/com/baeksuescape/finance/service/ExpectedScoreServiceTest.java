@@ -3,6 +3,8 @@ package com.baeksuescape.finance.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -174,6 +176,54 @@ class ExpectedScoreServiceTest {
         assertEquals(List.of(200000L, 700000L), expenseAmounts(noFixed));
     }
 
+    @Test
+    @DisplayName("FP-239 납부 상태: 밀림이면 최근 1년 연체(delinqCount12m)에 1을 더해 그 값을 돌려주고, 저장값이 없으면 1이다. 제때·생략은 바꾸지 않고 null")
+    @SuppressWarnings("unchecked")
+    void paymentStatus() {
+        CashFlowConditionRequest delayed = condition(null, 0, null, 0);
+        delayed.setPaymentStatus("DELAYED");
+
+        Map<String, Object> stored = request();
+        stored.put("creditProfile", new LinkedHashMap<>(Map.of("delinqCount12m", 2)));
+        assertEquals(3, ExpectedScoreService.applyPaymentStatus(stored, delayed));
+        assertEquals(3, ((Map<String, Object>) stored.get("creditProfile")).get("delinqCount12m"));
+
+        // 신용 이력 없음(값 null)은 0으로 보고 더한다(모델 0.2가 null을 0으로 읽는 것과 같음, D-31)
+        Map<String, Object> noHistory = request();
+        Map<String, Object> nullCredit = new LinkedHashMap<>();
+        nullCredit.put("delinqCount12m", null);
+        noHistory.put("creditProfile", nullCredit);
+        assertEquals(1, ExpectedScoreService.applyPaymentStatus(noHistory, delayed));
+        assertEquals(1, nullCredit.get("delinqCount12m"));
+
+        CashFlowConditionRequest onTime = condition(null, 0, null, 0);
+        onTime.setPaymentStatus("ON_TIME");
+        Map<String, Object> untouched = request();
+        untouched.put("creditProfile", new LinkedHashMap<>(Map.of("delinqCount12m", 2)));
+        assertNull(ExpectedScoreService.applyPaymentStatus(untouched, onTime));
+        assertNull(ExpectedScoreService.applyPaymentStatus(untouched, condition(null, 0, null, 0)));
+        assertEquals(2, ((Map<String, Object>) untouched.get("creditProfile")).get("delinqCount12m"));
+    }
+
+    @Test
+    @DisplayName("FP-239 밀림이면 ML-03에 연체 +1을 보내고 paymentStatusApplied=true, assumedDelinquencyCount에 넣은 값을 돌려준다")
+    @SuppressWarnings("unchecked")
+    void expectedScoreDelayed() {
+        readyToScore(current());
+        when(predictionClient.score(any())).thenReturn(Map.of("modelVersion", "REAL-V1",
+                "alternative", Map.of("score", 560, "gradeBandCode", "CAUTION", "defaultProb", 0.3)));
+        CashFlowConditionRequest delayed = condition(null, 0, null, 0);
+        delayed.setPaymentStatus("DELAYED");
+
+        ExpectedScoreResponse response = service.expectedScore(USER_ID, delayed);
+
+        assertTrue(response.paymentStatusApplied());
+        assertEquals(1, response.assumedDelinquencyCount(), "시험 요청에는 신용 정보가 없어 0 + 1");
+        ArgumentCaptor<Map<String, Object>> sent = ArgumentCaptor.forClass(Map.class);
+        verify(predictionClient).score(sent.capture());
+        assertEquals(1, ((Map<String, Object>) sent.getValue().get("creditProfile")).get("delinqCount12m"));
+    }
+
     private void readyToScore(AssessmentRow current) {
         when(assessmentMapper.selectLatestScored(USER_ID)).thenReturn(current);
         UserAccount user = new UserAccount();
@@ -213,6 +263,7 @@ class ExpectedScoreServiceTest {
         assertEquals("REAL-V1", response.modelVersion());
         assertEquals("DEV-DUMMY", response.baseModelVersion(), "현재 점수를 낸 모델을 함께 보내 화면이 모델 변경을 안내할 수 있다");
         assertFalse(response.paymentStatusApplied());
+        assertNull(response.assumedDelinquencyCount(), "납부 상태를 보내지 않으면 연체를 바꾸지 않는다");
 
         ArgumentCaptor<String> requestIds = ArgumentCaptor.forClass(String.class);
         verify(assembler, times(2)).build(requestIds.capture(), eq("REAL-V1"), any(), eq("2026-08"), eq(31));

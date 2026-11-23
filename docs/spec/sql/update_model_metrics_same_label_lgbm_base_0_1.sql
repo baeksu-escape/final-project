@@ -16,7 +16,7 @@
 --
 -- 먼저 register_model_lgbm_base_0_1.sql을 실행해 두 행이 있어야 한다(없으면 멈춘다). 다시 실행해도 같은 결과가 된다.
 -- 두 행의 METRICS_JSON을 통째로 바꾼다. 기존 항목(label, valid_auc_mean 등)은 그대로 들어 있고 same_label_comparison만 더해졌다.
--- 공용 DB 실행은 DB 담당이 한다. SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다.
+-- 공용 DB는 PR 작성자가 병합 후 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」). SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다.
 -- ====================================================================
 WHENEVER SQLERROR EXIT SQL.SQLCODE
 WHENEVER OSERROR EXIT FAILURE

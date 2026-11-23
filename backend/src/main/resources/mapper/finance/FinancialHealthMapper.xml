@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- FP-239 N-16-1·2·4 DIAG-03-1 자산·부채 저장값 조회. 기준월은 소득 기준월(USER_INCOME_MONTH의 가장 늦은 달)로 현금흐름·시나리오와 같다 -->
+<mapper namespace="com.baeksuescape.finance.mapper.FinancialHealthMapper">
+
+    <!-- 기준월 자산 행. 총자산 NULL은 미입력이라 그대로 둔다(0으로 바꾸지 않음). NO_LOAN_YN은 대출 "해당 없음" 판단에 쓴다 -->
+    <select id="selectLatestAsset" resultType="com.baeksuescape.finance.dto.health.HealthAssetRow">
+        SELECT TOTAL_ASSET_AMT AS totalAssetAmount, NO_LOAN_YN AS noLoanYn
+          FROM USER_ASSET_SNAPSHOT
+         WHERE USER_ID = #{userId}
+           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
+    </select>
+
+    <!-- N-16-4 기준월 보유 대출과 종류 이름(DIM_LOAN_TYPE), 대출 번호 순 -->
+    <select id="selectLatestLoans" resultType="com.baeksuescape.finance.dto.health.HealthLoanRow">
+        SELECT L.LOAN_ID AS loanId, L.LOAN_TYPE_CODE AS loanTypeCode, T.LOAN_TYPE_NAME AS loanTypeName,
+               L.BALANCE_AMT AS balanceAmount, L.ANNUAL_RATE_PCT AS annualRatePct, L.RATE_TYPE_CODE AS rateTypeCode,
+               L.REMAINING_MONTHS AS remainingMonths, L.MONTHLY_PAYMENT_AMT AS monthlyPaymentAmount
+          FROM USER_LOAN L
+          JOIN DIM_LOAN_TYPE T ON T.LOAN_TYPE_CODE = L.LOAN_TYPE_CODE
+         WHERE L.USER_ID = #{userId}
+           AND L.BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
+         ORDER BY L.LOAN_ID
+    </select>
+</mapper>

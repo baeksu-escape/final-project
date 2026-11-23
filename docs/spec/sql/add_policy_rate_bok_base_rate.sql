@@ -6,7 +6,7 @@
 -- 새 달 값이 나오면 같은 형식으로 행을 더해 다시 실행하면 된다.
 -- 실행 순서: avenue_ddl.sql → (시드가 필요하면) dummy_db/run_seed_only.sql → 이 파일.
 -- MERGE라서 다시 실행해도 같은 결과가 된다(있으면 값을 고치고, 없으면 넣는다).
--- SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다. 공용 DB 실행은 DB 담당이 한다.
+-- SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다. 공용 DB는 PR 작성자가 병합 후 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」).
 WHENEVER SQLERROR EXIT SQL.SQLCODE
 WHENEVER OSERROR EXIT FAILURE
 

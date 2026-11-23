@@ -26,8 +26,13 @@ import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import DataInputPage from '../../features/dataInput/pages/DataInputPage.jsx'
 import JobSelectPage from '../../features/dataInput/pages/JobSelectPage.jsx'
 import CreditReportPage from '../../features/credit/pages/CreditReportPage.jsx'
+import SimulationPage from '../../features/simulation/pages/SimulationPage.jsx'
 import MarketPage from '../../features/market/pages/MarketPage.jsx'
+import AssetDebtPage from '../../features/diagnosis/pages/AssetDebtPage.jsx'
+import CashFlowPage from '../../features/diagnosis/pages/CashFlowPage.jsx'
+import ScenarioPage from '../../features/scenario/pages/ScenarioPage.jsx'
 import AdminReportsPage from '../../features/admin/pages/AdminReportsPage.jsx'
+import ModelPerformancePage from '../../features/admin/pages/ModelPerformancePage.jsx'
 import LoungePage from '../../features/community/pages/LoungePage.jsx'
 import LoanProductsPage from '../../features/loans/pages/LoanProductsPage.jsx'
 import LoanProductDetailPage from '../../features/loans/pages/LoanProductDetailPage.jsx'
@@ -64,11 +69,11 @@ export default function AppRoutes() {
             {/* 점수가 있어야 보는 화면 — 점수가 없으면 데이터 입력으로 보낸다(11/06 확정 UI) */}
             <Route element={<RouteGuard requireScore />}>
               <Route path={PATHS.REPORT} element={<CreditReportPage />} />
-              <Route path={PATHS.ASSET_DEBT} element={<PlaceholderPage title="자산·부채 건전성" nId="N-16" />} />
-              <Route path={PATHS.SCENARIO} element={<PlaceholderPage title="시나리오 테스트" nId="N-17" />} />
-              <Route path={PATHS.CASH_FLOW} element={<PlaceholderPage title="현금흐름·소득 변동성" nId="N-21·N-22" />} />
+              <Route path={PATHS.ASSET_DEBT} element={<AssetDebtPage />} />
+              <Route path={PATHS.SCENARIO} element={<ScenarioPage />} />
+              <Route path={PATHS.CASH_FLOW} element={<CashFlowPage />} />
               <Route path={PATHS.MARKET} element={<MarketPage />} />
-              <Route path={PATHS.SIMULATOR} element={<PlaceholderPage title="신용케어 시뮬레이터" nId="N-18" />} />
+              <Route path={PATHS.SIMULATOR} element={<SimulationPage />} />
             </Route>
             {/* 점수 없이도 여는 화면 */}
             <Route path={PATHS.LOANS} element={<LoanProductsPage />} />
@@ -85,7 +90,7 @@ export default function AppRoutes() {
 
           {/* 관리자 전용 — N-08-1 관리자 탭 5개 */}
           <Route element={<RouteGuard requiredRole={ROLES.ADMIN} />}>
-            <Route path={PATHS.ADMIN_MODEL} element={<PlaceholderPage title="모형 성능 비교" nId="N-25" />} />
+            <Route path={PATHS.ADMIN_MODEL} element={<ModelPerformancePage />} />
             <Route path={PATHS.ADMIN_STATS} element={<PlaceholderPage title="직군·연령별 통계" nId="N-26" />} />
             <Route path={PATHS.ADMIN_ACCOUNTS} element={<AdminAccountsPage />} />
             <Route path={PATHS.ADMIN_REPORTS} element={<AdminReportsPage />} />

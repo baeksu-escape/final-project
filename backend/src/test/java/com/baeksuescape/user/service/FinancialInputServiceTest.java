@@ -139,6 +139,73 @@ class FinancialInputServiceTest {
         assertThat(FinancialInputService.totalAsset(new DataInputDtos.Assets(n("0"), null, null, null))).isZero();
     }
 
+    // FP-227 DDL C13 — 저장한 자산 행을 기준월 2026-10의 저장본으로 두고 조회한다.
+    private DataInputDtos.FinancialInputResponse loadWithAsset(AssetRow asset) {
+        asset.setBaseMonth("2026-10");
+        asset.setCreatedAt(DataInputFixtures.NOW);
+        given(mapper.selectAsset(1L, "2026-10")).willReturn(asset);
+        return service.load(1L);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> assetsOf(DataInputDtos.FinancialInputResponse response) {
+        return (Map<String, Object>) response.input().get("assets");
+    }
+
+    @Test
+    void fourAssetKindsAreSavedAndLoadedAsTheyAre() {
+        // (1) 4종을 저장하면 각 열에 그대로, 총자산은 합계. 다시 조회하면 4종이 각 칸에 그대로 돌아온다.
+        service.save(1L, employee(noLoans(), null, new DataInputDtos.Assets(n("10000000"), n("5000000"), n("200000000"), n("0")), null));
+        AssetRow saved = savedAsset();
+        assertThat(saved.getDepositAmt()).isEqualTo(10000000L);
+        assertThat(saved.getInvestmentAmt()).isEqualTo(5000000L);
+        assertThat(saved.getRealEstateAmt()).isEqualTo(200000000L);
+        assertThat(saved.getOtherAssetAmt()).isZero();
+        assertThat(saved.getTotalAssetAmt()).isEqualTo(215000000L);
+
+        Map<String, Object> assets = assetsOf(loadWithAsset(saved));
+        assertThat(assets).containsEntry("depositAmount", 10000000L).containsEntry("investmentAmount", 5000000L)
+                .containsEntry("realEstateAmount", 200000000L).containsEntry("otherAmount", 0L).containsEntry("totalAmount", 215000000L);
+    }
+
+    @Test
+    void partlyFilledAssetsKeepEmptyKindsNull() {
+        // (2) 예금·투자만 넣으면 나머지 두 칸은 NULL, 총자산은 넣은 칸의 합. 조회할 때 기타 자산에 합계를 넣지 않는다.
+        service.save(1L, employee(noLoans(), null, new DataInputDtos.Assets(n("10000000"), n("5000000"), null, null), null));
+        AssetRow saved = savedAsset();
+        assertThat(saved.getRealEstateAmt()).isNull();
+        assertThat(saved.getOtherAssetAmt()).isNull();
+        assertThat(saved.getTotalAssetAmt()).isEqualTo(15000000L);
+
+        Map<String, Object> assets = assetsOf(loadWithAsset(saved));
+        assertThat(assets).containsEntry("depositAmount", 10000000L).containsEntry("investmentAmount", 5000000L)
+                .containsEntry("realEstateAmount", null).containsEntry("otherAmount", null).containsEntry("totalAmount", 15000000L);
+    }
+
+    @Test
+    void oldRowWithOnlyTotalPutsTotalIntoOtherAmount() {
+        // (3) C13 전에 저장한 행(4종 NULL, 총자산만)은 기타 자산 칸에 총자산을 넣는다.
+        AssetRow old = new AssetRow();
+        old.setTotalAssetAmt(30000000L);
+        Map<String, Object> assets = assetsOf(loadWithAsset(old));
+        assertThat(assets).containsEntry("depositAmount", null).containsEntry("investmentAmount", null)
+                .containsEntry("realEstateAmount", null).containsEntry("otherAmount", 30000000L).containsEntry("totalAmount", 30000000L);
+    }
+
+    @Test
+    void allEmptyAssetsSaveNullTotalAndStayIncomplete() {
+        // (4) 4칸을 모두 비우면 4종·총자산 모두 NULL이고, 입력 완료 현황의 자산은 미완료다.
+        service.save(1L, employee(noLoans(), null, emptyAssets(), null));
+        AssetRow saved = savedAsset();
+        assertThat(saved.getDepositAmt()).isNull();
+        assertThat(saved.getOtherAssetAmt()).isNull();
+        assertThat(saved.getTotalAssetAmt()).isNull();
+
+        DataInputDtos.FinancialInputResponse response = loadWithAsset(saved);
+        assertThat(assetsOf(response)).containsEntry("otherAmount", null).containsEntry("totalAmount", null);
+        assertThat(response.status().sections()).containsEntry("assets", false);
+    }
+
     @Test
     void loanRateAbove20PercentIsRejected() {
         List<FieldErrorItem> errors = fieldErrorsOf(
@@ -360,7 +427,7 @@ class FinancialInputServiceTest {
         Map<String, Object> input = response.input();
         assertThat(input).containsEntry("baseMonth", "2026-10").containsEntry("jobType", "EMPLOYEE");
         assertThat((Map<String, Object>) input.get("income")).containsEntry("monthlySalary", 3000000L);
-        // 자산은 합계만 저장하므로 '기타 자산'에 합계를 넣어 돌려준다.
+        // FP-227 (3) DDL C13 전에 저장해 4종이 모두 NULL이고 합계만 있는 행은 '기타 자산'에 합계를 넣어 돌려준다.
         assertThat((Map<String, Object>) input.get("assets")).containsEntry("otherAmount", 3000000L).containsEntry("depositAmount", null);
         // 불러온 대출은 화면 목록에 넣지 않는다(다시 저장해도 IMPORTED 행은 그대로).
         assertThat((Map<String, Object>) input.get("loans")).containsEntry("items", List.of()).containsEntry("noItems", true);

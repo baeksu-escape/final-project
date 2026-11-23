@@ -4,10 +4,43 @@
 -- 새로 DDL을 실행하는 DB는 avenue_ddl.sql 기준 데이터에 이미 들어 있으므로 이 파일이 필요 없다.
 -- DRAFT라서 서비스는 바뀌지 않는다: ACTIVE는 계속 CUT-0.1(665·780)이고, CUT-0.2를 ACTIVE로 옮기는 일은 이 파일에 없다
 -- (팀이 전환 시점을 정한 뒤 FastAPI 상수와 함께 따로 한다. ACTIVE는 동시에 1개만 허용된다).
--- 이미 같은 버전·구간이 있으면 넣지 않으므로 다시 실행해도 된다. CUT-0.1은 건드리지 않는다.
--- SQL*Plus/SQLcl/SQL Developer에서 대상 스키마 소유자로 실행한다. 공용 DB 실행은 DB 담당이 한다.
+-- 이미 같은 버전·구간이 있고 값이 같으면 넣지 않으므로 다시 실행해도 된다. 상태가 DRAFT가 아니거나 경계·표시 순서가 다르면 아무것도 바꾸지 않고 오류(-20141~-20143)로 멈춘다. 일부 구간만 있으면 있는 구간이 같은 값일 때만 빠진 구간을 채운다. CUT-0.1은 건드리지 않는다.
+-- SQL*Plus/SQLcl/SQL Developer에서 대상 스키마 소유자로 실행한다. 공용 DB는 PR 작성자가 병합 후 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」).
 WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
 WHENEVER OSERROR EXIT FAILURE ROLLBACK
+
+-- 이미 있는 CUT-0.2 행이 이 파일의 값과 다르면 아무것도 바꾸기 전에 멈춘다.
+-- -20141 상태가 DRAFT가 아님 / -20142 경계·표시 순서가 다름 / -20143 CAUTION·STANDARD·GOOD 외의 등급 코드가 있음. 없는 행은 아래 MERGE가 채운다.
+DECLARE
+  v_status SCORE_CUTOFF_VERSION.STATUS_CODE%TYPE;
+  v_extra  NUMBER;
+BEGIN
+  BEGIN
+    SELECT STATUS_CODE INTO v_status FROM SCORE_CUTOFF_VERSION WHERE CUTOFF_VERSION = 'CUT-0.2';
+    IF v_status <> 'DRAFT' THEN
+      RAISE_APPLICATION_ERROR(-20141, 'CUT-0.2의 상태가 DRAFT가 아닙니다(' || v_status || '). 값을 확인한 뒤 팀과 정하세요.');
+    END IF;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN NULL;
+  END;
+  FOR r IN (SELECT b.GRADE_BAND_CODE, b.MIN_SCORE, b.MAX_SCORE, b.DISPLAY_ORDER
+              FROM SCORE_GRADE_BAND b
+              JOIN (
+            SELECT 'CUT-0.2' AS CUTOFF_VERSION, 'CAUTION' AS GRADE_BAND_CODE, 0 AS MIN_SCORE, 659 AS MAX_SCORE, 1 AS DISPLAY_ORDER FROM DUAL
+            UNION ALL SELECT 'CUT-0.2', 'STANDARD', 660, 730, 2 FROM DUAL
+            UNION ALL SELECT 'CUT-0.2', 'GOOD', 731, 1000, 3 FROM DUAL
+                   ) e ON e.CUTOFF_VERSION = b.CUTOFF_VERSION AND e.GRADE_BAND_CODE = b.GRADE_BAND_CODE
+             WHERE b.MIN_SCORE <> e.MIN_SCORE OR b.MAX_SCORE <> e.MAX_SCORE OR b.DISPLAY_ORDER <> e.DISPLAY_ORDER
+             ORDER BY b.DISPLAY_ORDER) LOOP
+    RAISE_APPLICATION_ERROR(-20142, 'CUT-0.2 ' || r.GRADE_BAND_CODE || ' 구간이 다릅니다(DB: ' || r.MIN_SCORE || '~' || r.MAX_SCORE || ', 순서 ' || r.DISPLAY_ORDER || ').');
+  END LOOP;
+  SELECT COUNT(*) INTO v_extra FROM SCORE_GRADE_BAND
+   WHERE CUTOFF_VERSION = 'CUT-0.2' AND GRADE_BAND_CODE NOT IN ('CAUTION', 'STANDARD', 'GOOD');
+  IF v_extra > 0 THEN
+    RAISE_APPLICATION_ERROR(-20143, 'CUT-0.2에 CAUTION·STANDARD·GOOD 외의 등급 코드가 ' || v_extra || '개 있습니다.');
+  END IF;
+END;
+/
 
 MERGE INTO SCORE_CUTOFF_VERSION t
 USING (SELECT 'CUT-0.2' AS CUTOFF_VERSION,
