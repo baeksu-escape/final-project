@@ -1,7 +1,10 @@
 package com.baeksuescape.global.exception;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,9 +19,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 // FP-87 공통 오류 처리 — 모든 오류를 { code, message, fieldErrors } 모양으로 돌려준다.
 // 응답과 로그에는 SQL·개인정보·키가 들어가지 않게, 예상 못 한 오류는 고정 문구만 보내고 로그에는 예외 종류만 남긴다.
@@ -30,8 +36,16 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     // 업무 오류: 던진 쪽이 정한 상태·코드·문구를 그대로 쓴다.
+    // FP-143 서버 로그에 상태·오류 코드·요청 방식·경로만 한 줄 남긴다(409 INPUT_INCOMPLETE처럼 응답만 보고 끝나서 원인을 찾기 어렵던 문제).
+    // 문구·칸 오류·요청 본문은 남기지 않는다. 경로는 실제 주소가 아니라 경로 템플릿(logPath)으로 남긴다.
     @ExceptionHandler(ApiException.class)
-    public ResponseEntity<ErrorResponse> handleApi(ApiException e) {
+    public ResponseEntity<ErrorResponse> handleApi(ApiException e, HttpServletRequest request) {
+        int status = e.getStatus().value();
+        if (status >= 500) {
+            log.warn("API 오류 {} {} {} {}", status, e.getCode(), request.getMethod(), logPath(request));
+        } else {
+            log.info("API 오류 {} {} {} {}", status, e.getCode(), request.getMethod(), logPath(request));
+        }
         return ResponseEntity.status(e.getStatus()).body(new ErrorResponse(e.getCode(), e.getMessage(), e.getFieldErrors()));
     }
 
@@ -86,12 +100,40 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ErrorResponse.of("METHOD_NOT_ALLOWED", "지원하지 않는 요청 방식입니다."));
     }
 
-    // 예상 못 한 오류 → 500 INTERNAL_ERROR. 예외 메시지에 SQL·값이 섞일 수 있어 응답·로그 모두 예외 종류만 쓴다.
+    // 예상 못 한 오류 → 500 INTERNAL_ERROR. 예외 메시지에 SQL·값이 섞일 수 있어 응답·로그 모두 메시지는 쓰지 않는다.
+    // FP-143 로그에는 예외 종류와 우리 코드에서 처음 만난 위치(클래스.메서드:줄)를 남겨 어디서 났는지 찾을 수 있게 한다.
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {
-        log.error("처리하지 못한 오류: {}", e.getClass().getName());
+    public ResponseEntity<ErrorResponse> handleUnexpected(Exception e, HttpServletRequest request) {
+        log.error("처리하지 못한 오류: {} at {} ({} {})", e.getClass().getName(), firstAppFrame(e),
+                request.getMethod(), logPath(request));
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ErrorResponse.of("INTERNAL_ERROR", "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."));
+    }
+
+    // FP-143 로그에 남길 경로. 실제 주소(getRequestURI) 대신 컨트롤러의 경로 템플릿을 쓴다
+    // (예: /api/products/{productCode}, /api/admin/users/{userId}/lock, /api/report/{requestId}).
+    // 경로 변수에 들어온 값(사용자가 넣은 임의 문자열, 관리자 경로의 회원 번호, 평가 requestId)은 남기지 않는다(AGENTS.md 5장).
+    // 컨트롤러가 정해지기 전에 난 오류라 템플릿이 없으면 주소 대신 고정 문구를 남긴다.
+    static String logPath(HttpServletRequest request) {
+        Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        return pattern instanceof String template ? template : "(경로 템플릿 없음)";
+    }
+
+    // 원인 예외까지 따라가며 com.baeksuescape 코드의 첫 위치를 찾는다. 없으면 맨 위 위치. 메시지는 읽지 않는다.
+
+    // 원인 체인이 A→B→A처럼 돌아도 끝나도록 이미 본 예외는 다시 보지 않는다.
+    static String firstAppFrame(Throwable e) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Throwable t = e; t != null && seen.add(t); t = t.getCause()) {
+            for (StackTraceElement frame : t.getStackTrace()) {
+                if (frame.getClassName().startsWith("com.baeksuescape.")) {
+                    String cls = frame.getClassName();
+                    return cls.substring(cls.lastIndexOf('.') + 1) + "." + frame.getMethodName() + ":" + frame.getLineNumber();
+                }
+            }
+        }
+        StackTraceElement[] top = e.getStackTrace();
+        return top.length == 0 ? "(위치 없음)" : top[0].getClassName() + "." + top[0].getMethodName() + ":" + top[0].getLineNumber();
     }
 
     private static ResponseEntity<ErrorResponse> badRequest(List<FieldErrorItem> items) {

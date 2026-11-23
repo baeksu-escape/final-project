@@ -6,6 +6,12 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
+> - 🆕 11/20 (동주, FP-184) N-25 모형 성능 비교 ADM-01 `GET /api/admin/model-performance`·ADM-02 `/roc` 구현. ACTIVE 모델의 평가 표본(`MODEL_EVAL_SAMPLE`)으로 계산하고, 표본이 없으면 409 `MODEL_EVAL_NOT_READY`(새 오류 code). 맨 아래 「N-25 모형 성능 비교」 절.
+> - 🆕 11/20 N-17 버틸 수 있는 개월 수의 총자산 사용 비율을 25%에서 15%로 변경했다(D-33 합의).
+> - 🆕 11/20 (광희, FP-239) N-16 자산·부채 저장값 `GET /api/members/me/financial-health`(DIAG-03-1) 추가: 총자산·연소득·총부채·연 원리금·보유 대출 목록, 미입력은 null. 정의서의 옛 경로 `GET /api/diagnosis/health`를 대신한다. 비율은 화면이 이 값으로 DIAG-03 POST를 불러 구한다. 같은 PR에서 DIAG-09 '밀림' 반영: `paymentStatus=DELAYED`면 최근 1년 30일 이상 연체 +1로 예상 점수를 구하고 응답에 `assumedDelinquencyCount`를 추가, `paymentStatusApplied`는 밀림일 때 `true`(범영 11/20 동의).
+> - 🆕 11/20 (동주, FP-160) N-15 같은 직군·연령대 회원 평균 `GET /api/members/me/peer-benchmark`(DIAG-01) 추가. 11/19 팀 결정대로 공공통계 대신 회원 표에서 계산한다. 정의서의 옛 경로 `/api/finance/peer-benchmark`·원천(FACT_*)은 범영 님이 정의서에 반영한다. DIAG-02(`/all`)는 쓰는 화면이 없어 만들지 않았다. PR 리뷰 반영: 미입력 자산·대출은 평균에서 빼고(O-15), 금액별 인원 3개를 추가했으며, 소득은 기준월 포함 최근 12개월만 쓴다.
+> - 🆕 11/20 (광희, FP-167) N-17 시나리오 테스트 API 2개 추가: `GET /api/members/me/scenario-base`(기준값)·`POST /api/members/me/scenario-recalculate`(상환 여력 재계산). 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다. 버틸 수 있는 개월 수의 총자산 사용 비율 15%는 D-33 11/20 합의다. 금리 변화는 변동금리 대출의 상환액에만 반영하고 대출마다 금리 하한은 0%다(리뷰 반영, 고정 상환액은 줄지 않음).
+> - 🆕 11/19 (광희, FP-180) N-30-1 용어 사전 `GET /api/glossary`(HELP-01) 추가, 기준 데이터 `docs/spec/sql/add_glossary_term.sql`(20개).
 > - 🆕 11/19 (광희, FP-170 추가 수정) 저장 데이터를 읽는 API 5개를 팀 공통 규칙대로 `/api/members/me/**`로 옮기고 옛 경로를 지웠다(우찬 님 합의): SIM-01 `credit-care-base`, SIM-02 `credit-care-recalculate`, DIAG-07-1 `income-volatility`, DIAG-08-1 `cash-flow-forecast`, DIAG-09 `cash-flow-expected-score`. 로그인 확인은 보안 설정이 한다(토큰 없음 401, 관리자 403). SIM-01에 `topReductionFactors`, DIAG-08-1에 기준값 3개(`baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`)를 추가했다(경환 님 요청).
 > - 🆕 11/18 (광희, FP-170) SIM-01 `credit-care/base`·DIAG-09 `cash-flow/expected-score` 추가, SIM-02 Spring 구현(출발 평가 = 최근 SCORED, 404 `ASSESSMENT_NOT_FOUND`).
 
@@ -115,7 +121,7 @@
 | `forecastMonths` | 정수 | 아니오 (기본 6) | 예측 기간. **3·6·12만** 받는다(없거나 0이면 6). 그 밖의 값은 `400 INVALID_INPUT`, `fieldErrors[0].field = forecastMonths` |
 | `incomeVariationPct` | 정수 0~200 | 아니오 | 소득 변동 폭(%). 과거 같은 달 패턴을 얼마나 반영할지 (11/17 추가) |
 | `fixedExpenseAmount` | 정수 ≥ 0 | 아니오 (기본 저장값) | 월 고정지출(원). 저장된 고정지출(FIXED) 자리만 이 값으로 바꾼다 (11/17 추가) |
-| `paymentStatus` | `ON_TIME`·`DELAYED` | 아니오 | 납부 상태. 지금은 값만 검사하고 계산에 쓰지 않는다. 예상 점수(DIAG-09, N-21-8)에서 쓸 예정 (11/17 추가) |
+| `paymentStatus` | `ON_TIME`·`DELAYED` | 아니오 | 납부 상태. 현금흐름 전망은 값만 검사하고 계산에 쓰지 않는다(11/17 추가). 🆕 11/20 예상 점수(DIAG-09, N-21-8)는 `DELAYED`면 최근 1년 연체 +1로 계산한다(FP-239) |
 
 계산 규칙:
 
@@ -218,7 +224,7 @@
   - 회원 번호는 넘기지 않는다. 공통 `client.js`가 로그인 토큰을 붙인다.
 - mock 모드(`VITE_USE_MOCK`)에서는 로그인한 mock 회원이 누구든 위 예시와 같은 회원 2번 값을 돌려준다(로그인하지 않았으면 401). 전망 mock은 쿼리 조건을 반영해 계산한다.
 
-### POST `/api/members/me/cash-flow-expected-score` (DIAG-09, N-21-8, FP-170) 🆕 11/18 · 🆕 11/19 경로 이동
+### POST `/api/members/me/cash-flow-expected-score` (DIAG-09, N-21-8, FP-170) 🆕 11/18 · 🆕 11/19 경로 이동 · 🆕 11/20 밀림 반영(FP-239)
 
 전망 조건 중 소득·지출 변화를 저장된 입력에 반영해 예상 대안 점수를 FastAPI ML-03으로 **다시 구한다. 저장하지 않는다**(O-6).
 
@@ -230,11 +236,11 @@
   | `incomeChangePercent` | 소수 | 위 결과 × (1 + %/100). 0원 아래는 0, 원 단위 반올림. 급여소득자(1개월)는 이 값만 적용된다 |
   | `fixedExpenseAmount` | 정수 ≥ 0 | 저장된 FIXED 항목들의 비율을 지킨 채 합계를 이 값으로 맞춘다(반올림 차이는 마지막 항목). FIXED 항목이 없으면 FIXED 1행을 더한다 |
   | `expenseChangePercent` | 소수 | 위 결과의 모든 지출 항목 × (1 + %/100) |
-  | `paymentStatus` | `ON_TIME`·`DELAYED` | **값만 검사하고 점수에는 아직 반영하지 않는다**(반영할 피처는 범영·경환 님과 정한 뒤 추가). `forecastMonths`·`loanPaymentChangePercent`는 보내도 점수에 쓰지 않는다 |
+  | `paymentStatus` | `ON_TIME`·`DELAYED` | 🆕 11/20 `DELAYED`(밀림)면 요청의 최근 1년 30일 이상 연체 건수(`creditProfile.delinqCount12m`, 피처 `DQ1200001`)를 **+1**한다. 저장값이 없으면(신용 이력 없음) 0으로 보고 1이 된다(모델 0.2가 null을 0으로 읽는 것과 같음, D-31). `ON_TIME`·생략이면 바꾸지 않는다(경환 제안, 범영 11/20 동의). `forecastMonths`·`loanPaymentChangePercent`는 보내도 점수에 쓰지 않는다 |
 
 - 처리 순서(범영 11/18):
   1. 현재 점수는 점수가 나온(SCORED) 최근 평가다.
-  2. 요청은 `ScoreInputAssembler.build()`로 만들고 소득·지출만 바꾼다. requestId는 매번 새 UUID, 모델은 ACTIVE 버전이다.
+  2. 요청은 `ScoreInputAssembler.build()`로 만들고 소득·지출과(🆕 11/20) 밀림이면 연체 건수만 바꾼다. requestId는 매번 새 UUID, 모델은 ACTIVE 버전이다.
   3. `PredictionClient.score()`를 한 번만 부른다.
 - 응답 `200`:
 
@@ -246,13 +252,15 @@
   | `modelVersion` | 문자열 | 예상 점수를 계산한 모델(ACTIVE) |
   | `baseModelVersion` | 문자열 | 🆕 11/19 현재 점수를 낸 모델. `modelVersion`과 다르면 화면이 "모델이 바뀌어 점수 차이가 클 수 있습니다"를 안내한다 |
   | `baseRequestId` | 문자열 | 현재 점수를 가져온 평가 |
-  | `paymentStatusApplied` | 불리언 | 납부 상태가 점수에 반영됐는지. 지금은 항상 `false` |
+  | `paymentStatusApplied` | 불리언 | 🆕 11/20 납부 상태가 점수에 반영됐는지. `paymentStatus`가 `DELAYED`면 `true`, `ON_TIME`·생략이면 `false` |
+  | `assumedDelinquencyCount` | 정수 또는 `null` | 🆕 11/20 밀림일 때 점수 계산에 넣은 최근 1년 30일 이상 연체 건수(저장값 + 1). 밀림이 아니면 `null`. 화면 문구: "최근 1년 30일 이상 연체 1회 추가로 가정" |
 
   ```json
-  { "currentScore": 588, "currentGradeBandCode": "CAUTION", "expectedScore": 578, "expectedGradeBandCode": "CAUTION",
-    "scoreDiff": -10, "modelVersion": "DEV-DUMMY", "baseModelVersion": "DEV-DUMMY",
-    "baseRequestId": "00000000-0000-4000-8000-000000000588", "paymentStatusApplied": false }
+  { "currentScore": 588, "currentGradeBandCode": "CAUTION", "expectedScore": 563, "expectedGradeBandCode": "CAUTION",
+    "scoreDiff": -25, "modelVersion": "DEV-DUMMY", "baseModelVersion": "DEV-DUMMY",
+    "baseRequestId": "00000000-0000-4000-8000-000000000588", "paymentStatusApplied": true, "assumedDelinquencyCount": 1 }
   ```
+  (예: 소득 −10%·밀림. 밀림이 아니면 `"paymentStatusApplied": false, "assumedDelinquencyCount": null`)
 - 오류:
 
   | 상태 | code | 언제 |
@@ -263,7 +271,135 @@
   | 404 | `ASSESSMENT_NOT_FOUND` | 점수가 나온 평가가 하나도 없음(리포트와 같은 코드) |
   | 409 | `INPUT_INCOMPLETE` | 저장된 입력 기준월이 없거나 출생연도가 없음(점수 산출과 같은 문구). 🆕 11/19 소득이 직군에 필요한 개월 수(자영업자·프리랜서 12, 급여소득자 1)보다 적거나 같은 달이 겹치면 ML-03을 부르지 않고 "소득을 필요한 개월 수만큼 입력해 주세요."(점수 산출과 같음, 0원으로 채워 계산하지 않음) |
   | 503 | `MODEL_NOT_READY` | ML-03 연결 실패·시간 초과·5xx. 저장하지 않으므로 MODEL_ERROR 기록을 남기지 않는다 |
-- 프론트: `diagnosisApi.js`의 `getExpectedScore({ incomeVariationPct, incomeChangePercent, fixedExpenseAmount, expenseChangePercent, paymentStatus })`. mock은 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"으로만 계산하며, 진짜 모델 점수가 아니다.
+- 프론트: `diagnosisApi.js`의 `getExpectedScore({ incomeVariationPct, incomeChangePercent, fixedExpenseAmount, expenseChangePercent, paymentStatus })`. mock은 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"(🆕 11/20 밀림이면 −15점 더)으로만 계산하며, 진짜 모델 점수가 아니다.
+
+---
+
+## N-15 동년배·같은 직군 비교 (DIAG-01, FP-160, 담당 동주) 🆕 11/20
+
+자산·부채 건전성 화면의 "같은 직군 평균과 비교" 카드(N-15-3)에 쓰는 회원 평균이다. 11/19 팀 결정으로 공공통계(`FACT_HFS_*`) 대신 **서비스 회원 표**에서 요청 때마다 계산한다(적재 없음). 공공통계에는 프리랜서 구분이 없기 때문이다.
+
+### GET `/api/members/me/peer-benchmark` (DIAG-01)
+
+- 로그인한 일반 회원만(보안 설정: 토큰 없음 401, 관리자 403). 회원은 토큰에서 꺼내고 쿼리·본문은 없다.
+- 응답 200 — 금액은 원, 평균은 반올림한 정수. 필드 이름은 건전성 화면 `peer`와 같다.
+
+```json
+{
+  "workerTypeCode": "EMPLOYEE",
+  "ageBandCode": "30S",
+  "sameWorkerType": { "memberCount": 132, "annualIncomeAmount": 42000000, "totalAssetAmount": 85000000, "totalDebtAmount": 31000000,
+                      "incomeMemberCount": 130, "assetMemberCount": 128, "debtMemberCount": 125 },
+  "sameAgeBand":    { "memberCount": 3,   "annualIncomeAmount": null,     "totalAssetAmount": null,     "totalDebtAmount": null,
+                      "incomeMemberCount": 3, "assetMemberCount": 3, "debtMemberCount": 2 }
+}
+```
+
+| 필드 | 뜻 |
+|---|---|
+| `workerTypeCode` | 내 직군 (`EMPLOYEE`·`SELF_EMPLOYED`·`FREELANCER`) |
+| `ageBandCode` | 내 연령대 (`20S`·`30S`·`40S`·`50_PLUS`) — 연 나이(올해 − 출생연도), 평가 저장과 같은 구간 |
+| `sameWorkerType` | 같은 직군 회원 평균 (본인 포함) |
+| `sameAgeBand` | 같은 연령대 회원 평균 (직군과 상관없이, 본인 포함) |
+| `*.memberCount` | 그룹 회원 수 |
+| `*.annualIncomeAmount`·`totalAssetAmount`·`totalDebtAmount` | 평균 연소득·총자산·총부채. 그 금액을 입력한 회원만 평균에 넣고, **그 인원이 5명 미만이면 그 금액만 null**(몇 명뿐인 평균은 그 사람들의 값이 드러난다) — 화면은 "비교할 회원이 부족합니다"로 처리 |
+| `*.incomeMemberCount`·`assetMemberCount`·`debtMemberCount` 🆕 11/20 | 각 금액 평균에 들어간 회원 수 (PR 리뷰 반영) |
+
+- 평균에 넣는 회원: 일반 회원, 탈퇴 아님, 직군·출생연도 있음, 소득 행이 1개 이상(더미 회원 포함).
+- 회원 값(기준월 = 그 회원의 가장 늦은 소득월, DIAG-07-1과 같은 규칙). 미입력은 0원으로 넣지 않고 **그 금액 평균에서만 뺀다**(O-15 A안).
+
+  | 금액 | 평균에 넣는 경우 | 빼는 경우 |
+  |---|---|---|
+  | 연소득 | 기준월 포함 **최근 12개월(달력)** 안에 직군별 필요 개월 수(`DIM_WORKER_TYPE`: 급여소득자 1, 자영업자·프리랜서 12)만큼 소득이 있음 → N-20-3 공유 함수 `FinancialHealthCalculator.calculateAnnualIncome`(급여소득자 = 기준월 월급 × 12, 자영업자·프리랜서 = 12개월 합). 1년 넘은 소득은 섞지 않는다 | 빠진 달이 있어 개월 수가 모자람 |
+  | 총자산 | 기준월 `USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT`가 있음 | NULL(미입력)·자산 행 없음 |
+  | 총부채 | 기준월 대출 행이 있으면 `BALANCE_AMT` 합, 행이 없고 `NO_LOAN_YN='Y'`(해당 없음)면 0 | 둘 다 아님(미입력) |
+- 오류
+
+  | 상태 | code | 언제 |
+  |---|---|---|
+  | 401 | `UNAUTHORIZED` | 토큰 없음·만료, 탈퇴·없는 계정 |
+  | 403 | `FORBIDDEN` | 관리자 계정 |
+  | 409 | `JOB_TYPE_REQUIRED` | 직군을 고르지 않음 |
+
+- 참고: 지금 더미 회원은 20대가 60%이고 30대 이상의 부채가 거의 0이라 평균이 어색하게 보일 수 있다.
+- 정의서의 DIAG-02(`/all`)·DIAG-05(기준금리 `/api/finance/policy-rates`)는 만들지 않는다. 기준금리는 N-17 `GET /api/members/me/scenario-base`의 `policyRate`(원천 `FACT_POLICY_RATE`, FP-153)를 쓴다. 🆕 11/20
+
+---
+
+## N-17 시나리오 테스트 (FP-167, 담당 광희) 🆕 11/20
+
+로그인 회원의 저장 데이터에 금리·소득·지출 변화를 넣어 **상환 여력**(월 잉여, 상환 부담률, 월 이자 변화, 버틸 수 있는 개월 수)을 다시 계산한다. **점수는 구하지 않고**(점수 예측은 N-21 DIAG-09) **저장하지 않는다**.
+
+- 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(DIAG-04, 프론트 mock만 있음)를 아래 두 경로로 대신한다. 기준값을 서버가 저장 데이터에서 읽으므로 요청에 기준값을 보내지 않는다.
+- 로그인 확인은 보안 설정이 한다: 토큰 없음 `401 UNAUTHORIZED`, 관리자 계정 `403 FORBIDDEN`(`/api/members/me/**`는 `ROLE_USER` 전용).
+
+### 계산에 쓰는 저장 데이터 (기준월 = 소득 기준월, 현금흐름 전망과 같음)
+
+| 값 | 출처 | 없을 때 |
+|---|---|---|
+| 월 소득 | `USER_INCOME_MONTH` 최근 12개월 평균(급여소득자는 월급 그대로). DIAG-08-1과 같은 함수 | 소득이 하나도 없으면 404 |
+| 월 지출 | `USER_EXPENSE_ITEM` 기준월 합계 | 0 |
+| 월 상환액 | `USER_LOAN` 기준월 월 원리금 합계 | 0 |
+| 변동금리 대출 | `USER_LOAN` 기준월 `RATE_TYPE_CODE = 'VARIABLE'` 행의 잔액·연 금리·월 원리금(고정·`UNKNOWN` 제외). 기준값 응답에는 잔액 합계만 준다 | 잔액 0(행 없음) |
+| 총자산 | `USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT` 기준월 | `null`(미입력, 0으로 바꾸지 않음) |
+| 현재 정책금리 | `FACT_POLICY_RATE`의 '한국은행 기준금리' 중 기준일이 가장 늦은 행(FP-153 적재 SQL) | `null` |
+
+### GET `/api/members/me/scenario-base` (N-17-1)
+
+- 응답 `200`:
+
+  | 필드 | 형식 | 설명 |
+  |---|---|---|
+  | `monthlyIncomeAmount`, `monthlyExpenseAmount`, `monthlyPaymentAmount` | 정수(원) | 월 소득(12개월 평균)·지출·상환액 |
+  | `variableLoanBalanceAmount` | 정수(원) | 금리 변화를 반영할 변동금리 대출 잔액 |
+  | `totalAssetAmount` | 정수(원) 또는 `null` | 총자산. 미입력이면 `null`(버틸 개월 수를 구하지 않음) |
+  | `policyRate` | 객체 또는 `null` | `{ baseDate: "2026-10-31", ratePct: 3.000 }` 출발 금리(연 %) |
+  | `assumptions` | 문자열 배열 | 화면에 그대로 보여 줄 계산 가정 4개 |
+
+- 오류: `404 NOT_FOUND` "저장된 소득 데이터가 없습니다."(현금흐름 전망과 같음)
+
+### POST `/api/members/me/scenario-recalculate` (N-17-2~5)
+
+- 요청 본문(JSON). 모두 생략할 수 있고, 생략하면 0(변화 없음)이다. 본문이 없어도 된다.
+
+  | 필드 | 형식 | 범위 | 뜻 |
+  |---|---|---|---|
+  | `ratePctPoint` | 소수 | −5 ~ +10 (%p) | 금리 변화. **변동금리 대출 잔액에만** 반영한다 |
+  | `incomePct` | 소수 | −100 ~ +100 (%) | 월 소득 변화 |
+  | `expensePct` | 소수 | −50 ~ +100 (%) | 월 지출 변화 |
+
+- 계산(N-17-3 공통 재계산 틀, 원 단위 반올림):
+  - 바뀐 소득·지출 = 기준값 × (1 + % ÷ 100)
+  - 월 이자 변화 = Σ 변동금리 잔액 × (max(금리 + 변화, 0) − 금리) ÷ 100 ÷ 12. **대출마다 금리는 0% 아래로 내려가지 않는다.** 합계를 낸 뒤 한 번만 반올림한다(HALF_UP, −0.5원 → −1원. 프론트 mock도 같음)
+  - 바뀐 상환액 = 고정 상환액 + max(0, 변동 상환액 + 월 이자 변화). 변동 상환액은 변동금리 대출 월 원리금 합계, 고정 상환액은 전체 월 상환액에서 그것을 뺀 값(고정·`UNKNOWN`)이다. **금리가 내려가도 고정 상환액은 줄지 않는다**
+  - 월 잉여 = 소득 − 지출 − 상환액. 상환 부담률 = 연 원리금 ÷ 연소득 × 100(소수 둘째 자리, N-16-1·N-20-4와 같은 함수). 소득이 0 이하면 `null`
+  - 버틸 수 있는 개월 수 = ⌊총자산 × **15%** ÷ 월 부족액⌋. 조건 반영 후 **적자일 때만** 값이 있고, 흑자이거나 총자산 미입력이면 `null`
+    - 15%는 D-33 11/20 합의다(`ScenarioService.SURVIVABLE_ASSET_RATIO_PCT`).
+- 응답 `200`:
+
+  | 필드 | 형식 | 설명 |
+  |---|---|---|
+  | `current`, `changed` | 객체 | 지금·조건 반영 후. 각각 `monthlyIncomeAmount`, `monthlyExpenseAmount`, `monthlyPaymentAmount`, `monthlySurplusAmount`(원), `dsrPct`(%, 또는 `null`) |
+  | `monthlyInterestChangeAmount` | 정수(원) | 월 이자 변화(±, 대출마다 금리 하한 0% 적용) |
+  | `surplusDiffAmount` | 정수(원) | 조건 반영 후 월 잉여 − 지금 월 잉여 |
+  | `survivableMonths` | 정수 또는 `null` | 버틸 수 있는 개월 수(위 규칙) |
+  | `verdict` | 문자열 | `SHORTFALL`(조건 반영 후 적자), `IMPROVED`(지금보다 잉여 증가), `STILL_POSITIVE`(그 밖, 흑자 유지) |
+  | `assumptions` | 문자열 배열 | 기준값 응답과 같은 계산 가정 |
+
+  ```json
+  { "current": { "monthlyIncomeAmount": 2099498, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 350000, "monthlySurplusAmount": 433984, "dsrPct": 16.67 },
+    "changed": { "monthlyIncomeAmount": 1259699, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 370000, "monthlySurplusAmount": -425815, "dsrPct": 29.37 },
+    "monthlyInterestChangeAmount": 20000, "surplusDiffAmount": -859799, "survivableMonths": 10, "verdict": "SHORTFALL",
+    "assumptions": ["금리 변화는 변동금리 대출 잔액에만 반영하고, …"] }
+  ```
+  (예: 변동금리 대출 1,200만 원·연 5%·월 원리금 20만 원(전체 상환액 35만 원 중), 총자산 3,000만 원, `{ "ratePctPoint": 2, "incomePct": -40 }`. 같은 기준값에 `-5`%p면 금리가 0%까지만 내려가 월 이자 −50,000원, 상환액은 고정 15만 원이 남아 30만 원)
+- 오류:
+
+  | 상태 | code | 언제 |
+  |---|---|---|
+  | 400 | `INVALID_INPUT` | 범위 밖(필드 = 이름). 문구 예: "금리 변화는 -5~+10%p 사이로 입력해 주세요." 조건은 DB를 읽기 전에 검사한다. 숫자로 읽을 수 없는 값(예: `"abc"`)은 공통 처리로 "요청 형식이 올바르지 않습니다."(`fieldErrors` 없음) |
+  | 404 | `NOT_FOUND` | 저장된 소득 데이터가 없음 |
+- 프론트: `diagnosisApi.js`의 `getScenarioBase()`, `recalculateMemberScenario({ ratePctPoint, incomePct, expensePct })`. mock은 위 계산 규칙과 같고, 기준값은 예시값(소득·지출은 시드 회원 2번, 대출·자산은 예시)이다. 옛 `recalculateScenario`(옛 경로 mock)는 지우지 않고 두었다.
 
 ---
 
@@ -273,8 +409,9 @@
 |---|---|---|---|
 | POST | `/api/diagnosis/dsr/calculate` | N-20-4 DSR·위험 단계 | 요청 본문 |
 | POST | `/api/diagnosis/financial-health/calculate` | N-16-1·2 건전성 지표, N-16-3 값 바꿔 보기 | 요청 본문 |
+| GET | `/api/members/me/financial-health` 🆕 11/20 | N-16-1·2·4 내 저장값(DIAG-03-1, FP-239) | 저장 데이터 (아래 「DIAG-03-1」) |
 
-- 두 API 모두 **DB를 읽지 않고 받은 값으로 계산만** 한다. 저장 데이터 조회 연결(N-16·N-20 "저장 데이터 조회")은 후속 작업이다.
+- 위 두 POST API는 **DB를 읽지 않고 받은 값으로 계산만** 한다. 저장값은 DIAG-03-1이 돌려주고, 화면은 그 값으로 POST를 불러 비율·위험 단계를 구한다.
 - 상환 부담률(N-16-1)과 DSR(N-20-4)은 백엔드 `FinancialHealthCalculator.calculateRepaymentBurdenRatio()` **함수 하나를 함께 쓴다**.
 - 비율은 `금액 ÷ 기준 × 100`이다. BigDecimal로 계산해 소수 둘째 자리에서 반올림(HALF_UP)한다.
 - 오류: 금액이 음수이면 `400 INVALID_INPUT`이고 `fieldErrors[0].field`에 그 필드 이름(예: `totalAsset`)이 담긴다. DSR API는 연소득이 0이어도 `400`이다(`field`: `annualIncome`).
@@ -349,6 +486,31 @@
 ```
 
 프론트: `features/diagnosis/api/diagnosisApi.js`의 `calculateDsr(payload)`, `calculateFinancialHealth(payload)`. mock도 백엔드와 같은 규칙으로 계산한다.
+
+### GET `/api/members/me/financial-health` — DIAG-03-1 자산·부채 저장값 (FP-239) 🆕 11/20
+
+로그인 회원의 **저장된 값**을 돌려준다. 비율·위험 단계는 계산하지 않는다(화면이 이 값으로 위 POST를 부른다). 같은 직군 평균(`peer`)은 넣지 않는다. 화면이 DIAG-01(`/peer-benchmark`)의 `sameWorkerType`을 붙인다(경환 님 11/20).
+
+- 로그인한 일반 회원만(보안 설정: 토큰 없음 401, 관리자 403). 회원은 토큰에서 꺼내고 쿼리·본문은 없다.
+- 기준월 = 그 회원의 가장 늦은 소득월(DIAG-07-1·08-1·N-17과 같음). 미입력은 0원으로 바꾸지 않고 `null`이다(O-15 A안, DIAG-01과 같은 규칙).
+
+  | 필드 | 값 | 미입력이면 |
+  |---|---|---|
+  | `baseMonth` | 기준월 `"YYYY-MM"` | — |
+  | `totalAssetAmount` | 기준월 `USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT` | `null`(자산 행 없음·NULL) |
+  | `annualIncomeAmount` | N-20-3 공유 함수 `calculateAnnualIncome`로 기준월 포함 최근 12개월(달력)의 합. 급여소득자는 월급을 12개월로 펼치므로 월급 × 12 | `null`(자영업자·프리랜서가 12개 달을 다 채우지 않음. 일부 합으로 연소득을 낮게 보이지 않게 한다) |
+  | `totalDebtAmount` | 기준월 대출이 있으면 `BALANCE_AMT` 합, 대출 행이 없고 `NO_LOAN_YN='Y'`(해당 없음)면 0 | `null`(둘 다 아님) |
+  | `annualPaymentAmount` | 같은 규칙으로 `MONTHLY_PAYMENT_AMT` 합 × 12, 해당 없음은 0 | `null` |
+  | `loans[]` | N-16-4 보유 대출(기준월, `LOAN_ID` 순): `loanId`, `loanTypeCode`, `loanTypeName`(`DIM_LOAN_TYPE`), `balanceAmount`, `annualRatePct`(연 %), `rateTypeCode`(`FIXED`·`VARIABLE`·`UNKNOWN`), `remainingMonths`, `monthlyPaymentAmount` | 빈 배열 |
+
+  ```json
+  { "baseMonth": "2026-08", "totalAssetAmount": 30000000, "annualIncomeAmount": 25193976,
+    "totalDebtAmount": 15000000, "annualPaymentAmount": 4200000,
+    "loans": [ { "loanId": 101, "loanTypeCode": "CREDIT", "loanTypeName": "신용대출", "balanceAmount": 12000000,
+                 "annualRatePct": 5.0, "rateTypeCode": "VARIABLE", "remainingMonths": 36, "monthlyPaymentAmount": 200000 } ] }
+  ```
+- 오류: `404 NOT_FOUND` "저장된 소득 데이터가 없습니다."(다른 저장값 API와 같음). 401·403은 위와 같다.
+- 프론트: `diagnosisApi.js`의 `getMemberFinancialHealth()`. mock은 예시값이다(총자산·대출은 N-17 시나리오 기준값 예시와 같다).
 
 ---
 
@@ -521,3 +683,180 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 프론트: `features/simulation/api/simulationApi.js`의 `recalculateCreditCare({ changes })`. mock은 588점 예시에서 간단한 규칙으로 계산한다(진짜 모델 아님).
 
 - Spring 검사(11/18 구현): JSON 정수만 받는다. `12.0`처럼 소수점이 있는 값과 문자열(`"2"`)은 "0 이상의 정수를 입력해 주세요."로 막는다.
+
+## N-26-1~4 관리자 직군·연령별 통계 (ADM-03, FP-161, 담당 광희) 🆕 11/20
+
+관리자 "직군·연령별 통계" 화면(FP-162)에 쓴다. **D-26·D-28 담당자 결정(11/20, 광희)**:
+- 항목은 11/06 확정 UI대로 만든다: 요약, 대안 등급 분포, 직군별·연령대별 통계 표. 기능 명세 v3의 상자 그림·직군×연령 히트맵·통신비 연체 경험은 UI에 없어 만들지 않는다.
+- 데이터는 **서비스 회원의 최근 SCORED 평가 1건**이다(`ASSESSMENT`, `DATASET_CODE='SERVICE'`). 명세의 합성 고객 12,000명은 `ASSESSMENT`에 적재되지 않았고, 평가 표본(`MODEL_EVAL_SAMPLE`)에는 연령대가 없어 쓰지 않는다.
+- **탈퇴 회원(`WITHDRAWN`)의 평가는 뺀다.** 잠긴 회원(`LOCKED`)은 넣는다. DIAG-01 회원 평균·관리자 계정 목록과 같은 기준이다.
+
+### GET `/api/admin/stats?groupBy=WORKER_TYPE|AGE_BAND`
+
+- 관리자만(보안 설정: `/api/admin/**` = `ROLE_ADMIN`). 일반 회원 `403 FORBIDDEN`, 토큰 없음 `401`, 비밀번호 변경이 필요한 관리자 `403 PASSWORD_CHANGE_REQUIRED`.
+- `groupBy`: `WORKER_TYPE`(직군별, 생략하면 이것)·`AGE_BAND`(연령대별). 그 밖의 값은 `400 INVALID_INPUT`(`fieldErrors[0].field` = `groupBy`).
+- 대상 = 회원마다 **지금 ACTIVE 모델로 낸** 가장 최근 SCORED 서비스 평가 1건(`ASSESSED_AT`이 같으면 `ASSESSMENT_ID`가 큰 것). 직군·연령대는 **평가 시점 값**이다.
+  - 🆕 11/23 **ACTIVE가 아닌 모델로 낸 평가는 세지 않는다**(리뷰 반영). 지금 ACTIVE가 `LGBM-BASE-0.2`이면 옛 모델(0.1)·Mock(`DEV-DUMMY`) 평가가 빠진다. 모델이 섞이면 기존 → 대안 비교가 모델 차이인지 알 수 없기 때문이다. Mock을 늘 빼는 것은 아니다: ACTIVE가 `DEV-DUMMY`이면(DDL 기본값, `rollback_model_to_dev_dummy.sql`로 되돌린 경우) Mock 평가만 집계되고 `modelVersion`이 `DEV-DUMMY`다. 조건은 회원별 최근 평가를 고르기 **전에** 건다. 그래서 옛 모델 평가만 있는 회원은 빠지고, 모델을 바꾼 직후에는 새 모델로 다시 점수를 낸 회원만 잡힌다.
+  - ACTIVE 모델이 없으면 평가 인원 0명, `modelVersion` `null`이다.
+- 점수 평균·비율은 소수 첫째 자리(HALF_UP). **값마다 실제로 계산에 들어간 인원이 5명(`minGroupSize`)보다 적으면 그 값은 `null`**이다(몇 명뿐이면 개인 점수가 드러난다, DIAG-01과 같은 기준). 🆕 11/23 그룹이 5명 이상이어도 기존 모델 산출자가 5명 미만이면 기존 평균·상승폭·기존 등급 값만 숨기고 대안 값은 보인다(리뷰 반영). 인원 수는 보인다.
+  - 대안 평균·대안 등급 값 → `memberCount`명(SCORED면 대안 점수가 늘 있다)
+  - 기존 평균·기존 등급 값·상승폭 → `tradScoredMemberCount`명(기존 모델로 산출된 회원, 상승폭은 두 점수가 다 있어야 해서 같은 인원)
+- 응답 `200`:
+
+  | 필드 | 형식 | 설명 |
+  |---|---|---|
+  | `groupBy`, `minGroupSize` | 문자열, 정수 | 요청한 구분, 숨김 기준(5) |
+  | `summary.assessedMemberCount` | 정수 | 평가 고객 수(최근 SCORED 평가가 있는 회원, 탈퇴 제외) |
+  | `summary.avgTradScore`·`avgAltScore` | 소수 또는 `null` | 평균 기존·대안 점수. 기존은 기존 모델로 산출된 회원만 |
+  | `summary.avgScoreUplift` | 소수 또는 `null` | 상승폭 = 두 점수가 다 있는 회원의 (대안 − 기존) 평균 |
+  | `summary.standardOrAboveRatePct` | 소수 또는 `null` | Standard 이상 비율(%) = 대안 등급 STANDARD·GOOD ÷ 대상 |
+  | `summary.registeredMemberCount` | 정수 | 가입 회원 수(일반 회원, 탈퇴 제외, 관리자 계정은 세지 않음) |
+  | `summary.todayScoredCount` | 정수 | 오늘 산출: 오늘 0시(서버 시간 Asia/Seoul) 이후 ACTIVE 모델로 저장된 서비스 SCORED 평가 수(탈퇴 제외). 관리자 전용 수치 |
+  | `modelVersion` 🆕 11/23 | 문자열 또는 `null` | 통계 기준 모델(ACTIVE, 예: `LGBM-BASE-0.2`). 화면이 "모델 0.2 기준"처럼 안내하는 데 쓴다 |
+  | `gradeDistribution` | 배열 또는 `null` | 전체 대안 등급 분포 `[{ gradeBandCode, count, ratePct }]`, CAUTION·STANDARD·GOOD 순서(0명도 있음) |
+  | `summary.tradStandardOrAboveRatePct` 🆕 11/23 | 소수 또는 `null` | **기존 모델** Standard 이상 비율(%) = 기존 등급 STANDARD·GOOD ÷ **기존 등급이 있는 회원**(기존 모델로 산출된 회원만. 산출 못 한 회원은 기존 쪽 분모에서만 빠진다) |
+  | `tradGradeDistribution` 🆕 11/23 | 배열 또는 `null` | 전체 **기존** 등급 분포. 모양은 `gradeDistribution`과 같고 비율의 분모는 기존 등급이 있는 회원 수 |
+  | `groups[]` | 배열 | 직군 3개(`EMPLOYEE`·`SELF_EMPLOYED`·`FREELANCER`) 또는 연령대 4개(`20S`·`30S`·`40S`·`50_PLUS`)를 고정 순서로(0명도 있음). 각각 `groupCode`, `memberCount`, `avgTradScore`, `avgAltScore`, `avgScoreUplift`, `standardOrAboveRatePct`, `gradeDistribution`, 🆕 11/23 `tradStandardOrAboveRatePct`, `tradGradeDistribution`, `tradScoredMemberCount` |
+  | `summary.tradScoredMemberCount`·`groups[].tradScoredMemberCount` 🆕 11/23 | 정수 | 기존 모델로 산출된 회원 수. 기존 값이 `null`일 때 "기존 모델 산출자가 부족함"을 화면이 안내하는 데 쓴다 |
+
+- 🆕 11/23 등급 값은 11/06 UI처럼 **기존 → 대안**을 나란히 보여 주도록 두 벌이다: `standardOrAboveRatePct`·`gradeDistribution` = 대안 모델(처음부터 있던 필드, 이름·뜻 그대로), `trad*` = 기존 모델. 모든 값은 DB에 저장된 평가의 점수·등급(`ASSESSMENT.TRAD_*`·`ALT_*`)으로 계산한다.
+
+  ```json
+  { "groupBy": "WORKER_TYPE", "minGroupSize": 5, "modelVersion": "LGBM-BASE-0.2",
+    "summary": { "assessedMemberCount": 14, "avgTradScore": 636.9, "avgAltScore": 705.4, "avgScoreUplift": 68.8,
+                 "standardOrAboveRatePct": 71.4, "registeredMemberCount": 40, "todayScoredCount": 3, "tradStandardOrAboveRatePct": 30.8, "tradScoredMemberCount": 13 },
+    "gradeDistribution": [ { "gradeBandCode": "CAUTION", "count": 4, "ratePct": 28.6 }, { "gradeBandCode": "STANDARD", "count": 8, "ratePct": 57.1 },
+                           { "gradeBandCode": "GOOD", "count": 2, "ratePct": 14.3 } ],
+    "tradGradeDistribution": [ { "gradeBandCode": "CAUTION", "count": 9, "ratePct": 69.2 }, { "gradeBandCode": "STANDARD", "count": 4, "ratePct": 30.8 },
+                               { "gradeBandCode": "GOOD", "count": 0, "ratePct": 0.0 } ],
+    "groups": [ { "groupCode": "EMPLOYEE", "memberCount": 6, "avgTradScore": 663.3, "avgAltScore": 720.0, "avgScoreUplift": 56.7,
+                  "standardOrAboveRatePct": 83.3, "gradeDistribution": [ … ], "tradStandardOrAboveRatePct": 50.0, "tradGradeDistribution": [ … ], "tradScoredMemberCount": 6 },
+                { "groupCode": "FREELANCER", "memberCount": 3, "avgTradScore": null, "avgAltScore": null, "avgScoreUplift": null,
+                  "standardOrAboveRatePct": null, "gradeDistribution": null, "tradStandardOrAboveRatePct": null, "tradGradeDistribution": null, "tradScoredMemberCount": 2 } ] }
+  ```
+  (예시 14명 중 1명은 기존 모델로 산출되지 않아 기존 쪽 분모는 13명이다)
+  (mock 예시값. `SELF_EMPLOYED` 행은 줄였다)
+- 알려진 한계: 등급은 평가 때 저장된 값을 그대로 쓰고 다시 매기지 않는다. 🆕 11/23 등급 구간 버전(`ASSESSMENT.CUTOFF_VERSION`)은 모델 버전과 따로 저장되므로, **같은 ACTIVE 모델 평가라도 등급 구간 버전이 다를 수 있다**(예: 등급 구간을 CUT-0.2로 바꾼 앞뒤의 평가). 통계는 등급 구간 버전을 거르지 않으므로 이때 등급 분포에 두 기준이 섞인다(리뷰 반영). 시연 DB에서 ACTIVE 모델로 점수를 낸 회원이 적으면 대부분의 값이 5명 미만으로 비어 보인다.
+- 프론트: `features/admin/api/adminStatsApi.js`의 `getAdminStats({ groupBy })`. mock은 예시 회원 14명으로 같은 규칙대로 계산한다.
+
+---
+
+## N-25 모형 성능 비교 (ADM-01·02, FP-184, 담당 동주) 🆕 11/20
+
+> 관리자 「모형 성능 비교」 화면(FP-185)이 쓴다. **합성 학습 데이터로 낸 평가 결과**라 실제 신용평가·심사 결과가 아니며, 대안 모형이 나쁜 지표도 걸러 내지 않고 그대로 돌려준다.
+> 평가 표본은 서비스 회원이 아니라 합성 학습 고객(`CUSTOMER_REF` SYN…·THF…)이라 회원 신용정보 열람 감사 로그(N-35) 대상이 아니다.
+
+| 메서드 | 경로 | 설명 | 원천 |
+|---|---|---|---|
+| GET | `/api/admin/model-performance?group=&label=&cutoff=` | ADM-01 · N-25-1·2·4 컷오프 기준 지표 6개, 직군별 우량 고객 오거절률 | DB `MODEL_EVAL_SAMPLE`, `MODEL_ARTIFACT.METRICS_JSON` |
+| GET | `/api/admin/model-performance/roc?group=&label=` | ADM-02 · N-25-3 ROC 곡선 점 | DB `MODEL_EVAL_SAMPLE` |
+
+- 권한: `/api/admin/**`라 관리자(`ROLE_ADMIN`)만 부른다. 토큰 없음 401, 일반 회원 403(공통 보안 설정).
+- **비교할 모델 = `MODEL_REGISTRY`의 ACTIVE 모델**(B팀 명세서 ML-03 "DB의 ACTIVE가 스위치"). 그 버전의 `MODEL_EVAL_SAMPLE` 행 중 TRAIN·VALID만 쓴다(TEST는 최종 평가 FP-144용이라 섞지 않는다).
+- 프론트: `features/admin/api/modelPerformanceApi.js`의 `fetchModelPerformance({ group, label, cutoff })`, `fetchModelRoc({ group, label })`. mock은 같은 모양의 시연용 예시다.
+
+### 쿼리 값
+
+| 이름 | 값 | 생략하면 | 설명 |
+|---|---|---|---|
+| `group` | `LEGACY` \| `THINFILE` | `LEGACY` | 고객 집단(`MODEL_EVAL_SAMPLE.GROUP_CODE` 그대로). 두 집단은 정답 라벨 생성 방식이 달라 합치지 않는다('전체' 없음, 11/19 결정) |
+| `label` | `DELINQ` \| `NONFIN` | `DELINQ` | 비교 라벨. 기존·대안 모두 **같은 라벨로 학습한 점수**끼리 비교한다(피처 정의서 C20). DELINQ = `SCORE_LEGACY_DELINQ`·`SCORE_ALT_DELINQ` + `LABEL_ANY_DELINQUENCY_12M`, NONFIN = `SCORE_LEGACY_NONFIN`·`SCORE_ALT_NONFIN` + `LABEL_NONFIN_EFFECT_12M` |
+| `cutoff` | 정수 600~800 | 700 | 승인 기준 점수(ADM-01만). 화면 슬라이더는 10점 간격 |
+
+### GET `/api/admin/model-performance` (ADM-01)
+
+계산 규칙: 점수 ≥ `cutoff`면 승인, 미만이면 거절(부도로 예측). 라벨 1이 불량, 0이 우량이다.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `group`·`label`·`cutoff` | 문자열·문자열·정수 | 요청 값(생략했으면 기본값) |
+| `sampleBasis` | 문자열 | `VALID`(검증 표본만) \| `TRAIN_VALID`(TRAIN이 섞임. 씬파일은 이 모델이 학습하지 않은 집단이라 TRAIN도 평가에 쓴다) |
+| `sampleCount`·`badCount` | 정수 | 표본 인원, 그중 불량 인원 |
+| `aucBasis` | 문자열 | `SEED_MEAN_5`(METRICS_JSON 같은 라벨 비교 5개 시드 평균) \| `SINGLE_SEED`(이 표본으로 계산, 시드 1개). LEGACY는 평균 값이 있으면 `SEED_MEAN_5`, THINFILE은 항상 `SINGLE_SEED` |
+| `legacy`·`alternative` | 객체 | 기존·대안 모형 지표(아래) |
+| `byJob[]` | 배열 | 직군별(`DIM_WORKER_TYPE` 표시 순서) `{ jobType, sampleCount, badCount, legacyGoodRejectRate, alternativeGoodRejectRate }`. 직군별은 불량 수가 적어 값이 흔들리므로 화면에 인원을 함께 보여 준다 |
+
+`legacy`·`alternative` 객체
+
+| 필드 | 단위 | 계산 |
+|---|---|---|
+| `modelVersion` | 문자열 | ACTIVE 모델 버전(두 객체 같음) |
+| `auc` | 0~1, 소수 넷째 자리 | ROC-AUC(확률). 위 `aucBasis` 참고. 직접 계산할 때는 불량·우량 한 명씩 골랐을 때 불량 쪽 점수가 더 낮을 확률(같으면 0.5) |
+| `accuracy` | %, 소수 둘째 자리 | (우량 승인 + 불량 거절) / 전체 |
+| `misclassCost` | 1인당 상대값, 소수 넷째 자리 | (우량 거절 + 불량 승인 × 5) / 전체 (부도 오승인 5배, decisions.md N-25) |
+| `goodRejectRate` | % | 우량 거절 / 우량 |
+| `badApproveRate` | % | 불량 승인 / 불량 |
+| `approvalRate` | % | 승인 / 전체 |
+
+분모가 0이면 0을 준다.
+
+```json
+{
+  "group": "LEGACY", "label": "DELINQ", "cutoff": 700,
+  "sampleBasis": "VALID", "sampleCount": 1800, "badCount": 174, "aucBasis": "SEED_MEAN_5",
+  "legacy": { "modelVersion": "LGBM-BASE-0.2", "auc": 0.6047, "accuracy": 61.5, "misclassCost": 0.4321,
+              "goodRejectRate": 30.25, "badApproveRate": 40.0, "approvalRate": 65.12 },
+  "alternative": { "modelVersion": "LGBM-BASE-0.2", "auc": 0.6078, "...": "같은 필드" },
+  "byJob": [ { "jobType": "EMPLOYEE", "sampleCount": 1411, "badCount": 130, "legacyGoodRejectRate": 31.5, "alternativeGoodRejectRate": 29.25 } ]
+}
+```
+(건수·AUC 말고 지표 숫자는 모양 예시다. AUC는 ACTIVE 모델 `LGBM-BASE-0.2`의 연체 라벨 5개 시드 평균 🆕 11/20)
+
+### GET `/api/admin/model-performance/roc` (ADM-02)
+
+- 컷오프와 무관하고 `group`·`label`만 받는다.
+- 기준 점수 t를 0, 10, …, 1010으로 올리며 "점수 < t면 거절"로 볼 때의 점을 준다(102개, (0,0)에서 (100,100)까지 순서대로).
+  - `fpr` = 우량 거절률(%), `tpr` = 불량 거절률(%), 소수 둘째 자리.
+- 곡선은 이 표본(시드 1개)으로 그린다. AUC 숫자는 주지 않는다. 화면 비교 표의 AUC(5개 시드 평균)와 섞이지 않게 하려는 것이다.
+
+```json
+{ "group": "THINFILE", "label": "NONFIN",
+  "legacy": { "points": [ { "fpr": 0.0, "tpr": 0.0 }, "…", { "fpr": 100.0, "tpr": 100.0 } ] },
+  "alternative": { "points": [ "…" ] } }
+```
+
+### 오류 (두 API 같음)
+
+| 상태 | code | 언제 | 문구 |
+|---|---|---|---|
+| 400 | `INVALID_INPUT` | `group`·`label`이 허용값이 아님, `cutoff`가 600~800 밖. 틀린 칸마다 `fieldErrors[].field` = 쿼리 이름 | "고객 집단 값이 올바르지 않습니다." / "비교 라벨 값이 올바르지 않습니다." / "컷오프는 600~800점 사이로 넣어 주세요." |
+| 400 | `INVALID_INPUT` | `cutoff`가 정수가 아님(공통 처리기) | field `cutoff` "형식이 올바르지 않습니다." |
+| 401 / 403 | `UNAUTHORIZED` / `FORBIDDEN` | 토큰 없음 / 관리자가 아님 | 공통 |
+| 409 | `MODEL_EVAL_NOT_READY` 🆕 | ACTIVE 모델이 없거나, ACTIVE 모델 버전의 평가 표본이 아직 없음(예: 공용 DB가 아직 `DEV-DUMMY`, 적재 SQL 미실행). 409 = 지금 상태로는 처리할 수 없음(B팀 명세서 용어집) | "지금 사용 중인 모델(LGBM-BASE-0.2)의 평가 표본이 아직 준비되지 않았습니다." (괄호 안은 ACTIVE 버전) |
+
+409가 나오면 ACTIVE 모델 버전에 맞는 평가 표본 SQL이 실행됐는지, `MODEL_REGISTRY`에서 그 버전이 ACTIVE인지 본다. 공용 DB는 그 SQL이 든 PR의 작성자가 병합 후 실행한다(sql README 「공용 DB 적용 규칙」, PR #124). 0.2 기준(🆕 11/20): `create_model_eval_sample.sql`(표가 없을 때) → `load_model_eval_sample_lgbm_base_0_2.sql` → `update_model_metrics_same_label_lgbm_base_0_2.sql`(LEGACY의 5개 시드 평균 AUC, 없으면 `aucBasis`가 `SINGLE_SEED`로 바뀜). 모델을 다시 학습하면 새 `MODEL_VERSION`으로 평가 표본도 다시 적재해야 화면이 나온다.
+
+---
+
+## N-30-1 금융 용어 사전 (HELP-01, FP-180, 담당 광희) 🆕 11/19
+
+| 메서드 | 경로 | 설명 | 데이터 출처 |
+|---|---|---|---|
+| GET | `/api/glossary` | 용어 사전 전체(용어·쉬운 말·뜻 풀이). 툴팁(N-30-2, FP-157)과 챗봇(N-32)이 쓴다 | DB `GLOSSARY_TERM` |
+
+- 인증: 로그인 필요(보안 설정 "그 밖의 `/api/**`"). 토큰이 없으면 `401 UNAUTHORIZED`다. 회원 데이터를 읽지 않으므로 관리자 계정도 부를 수 있다.
+- 요청 값은 없다. 사전 전체를 **용어 이름 순서**(`ORDER BY TERM`)로 한 번에 돌려준다(수십 행).
+- 사전이 비어 있어도 오류가 아니라 `{ "terms": [] }`다. 화면은 사전에 없는 말을 원래 말 그대로 보여 준다.
+- 기준 데이터: [`docs/spec/sql/add_glossary_term.sql`](../sql/add_glossary_term.sql)(합성 교육용 문구 20개, 다시 실행해도 됨). dummy_db 생성기에는 들어 있지 않아 DDL·시드 다음에 따로 실행한다. 공용 DB는 PR 작성자가 병합 후 실행한다(sql README 「공용 DB 적용 규칙」).
+
+응답 `200`:
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `terms[]` | 배열 | 용어 목록 |
+| `terms[].term` | 문자열 | 화면에 나오는 금융 용어(최대 50자) |
+| `terms[].easyText` | 문자열 | 바꿔 보여 줄 쉬운 말(최대 200자) |
+| `terms[].explanation` | 문자열 또는 `null` | 툴팁에 보일 뜻 풀이(최대 1000자) |
+
+```json
+{
+  "terms": [
+    { "term": "DSR", "easyText": "1년 소득 중 빚 갚는 데 쓰는 돈의 비율", "explanation": "총부채원리금상환비율의 줄임말입니다. …" },
+    { "term": "원리금", "easyText": "갚아야 하는 원금과 이자를 합친 돈", "explanation": "빌린 돈(원금)과 그 돈을 빌린 대가(이자)를 합친 금액입니다. …" }
+  ]
+}
+```
+
+- `GLOSSARY_TERM.TERM_ID`는 화면이 쓰지 않아 보내지 않는다.
+- SHAP 용어 풀이는 "점수에 어떻게 반영됐는지"만 설명하고 원인처럼 쓰지 않는다(AGENTS.md 5장).
+- 프론트: `features/ai/api/glossaryApi.js`의 `getGlossary()`. mock은 시드 문구 5개를 같은 모양으로 돌려준다(로그인하지 않았으면 401).

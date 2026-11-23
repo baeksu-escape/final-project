@@ -29,3 +29,12 @@ def load_train_valid(table_path: Path) -> pd.DataFrame:
     if missing:
         sys.exit(f"학습 표에 없는 열이 있다(데이터 버전이 맞는지 확인): {missing}")
     return df[df[config.SPLIT_COLUMN].isin([config.TRAIN_SPLIT, config.VALID_SPLIT])].copy()
+
+
+def load_thinfile_train_valid(table_path: Path) -> pd.DataFrame:
+    """씬파일 표를 읽고 TRAIN·VALID 중 eval_future_credit_exposure = 1인 행만 남긴다(TEST는 바로 버린다, 정의서 5장).
+    씬파일을 학습에 쓰는 모델(--with-thinfile)이 쓴다. 노출 열이 없으면 이름을 알리고 멈춘다."""
+    df = load_train_valid(table_path)
+    if config.EXPOSURE_COLUMN not in df.columns:
+        sys.exit(f"씬파일 표에 {config.EXPOSURE_COLUMN} 열이 없다(데이터 버전이 맞는지 확인)")
+    return df[df[config.EXPOSURE_COLUMN] == 1].copy()

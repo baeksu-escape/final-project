@@ -13,6 +13,8 @@ FASTAPI_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA_DIR = FASTAPI_ROOT / "data" / "training"
 DEFAULT_OUT_DIR = FASTAPI_ROOT / "artifacts"
 TABLE_RELATIVE_PATH = Path("1_model") / "legacy_model_table.csv"
+THINFILE_TABLE_RELATIVE_PATH = Path("1_model") / "thinfile_model_table.csv"
+EXPOSURE_COLUMN = "eval_future_credit_exposure"   # 씬파일 표에서 1인 고객만 학습·평가에 쓴다(정의서 5장). 0인 고객은 라벨이 항상 0이라 가짜 패턴을 만든다.
 
 # 기존 모델 18개 = 대안 데이터가 아닌 피처. LRZ021201은 C9(11/16 임시 결정)로 뺐다.
 LEGACY_FEATURES = [
@@ -76,4 +78,18 @@ LGBM_PARAMS = {                # 튜닝하지 않은 고정 설정
     "num_leaves": 31,
     "colsample_bytree": 0.8,
     "verbose": -1,
+}
+
+# 단조 제약(후보 B = 모델 0.2, 11/20 범영 점검 사례 반영, --monotone 옵션으로만 켠다). 불량(양성) 확률의 방향이다: +1이면 값이 클수록 불량 확률이 높아지고(점수는 낮아짐), -1이면 낮아진다.
+# 방향이 분명한 피처에만 건다(위 6개). 소득·지출 금액(아래 2개)은 학습 데이터가 소득↑ 연체↑ 방향이고 둘의 상관이 0.88이라 처음에는 뺐지만,
+# 시험(11/20)에서 걸어도 AUC가 0.1 수준 이상이고 범영 님 사례의 반대 방향이 모두 사라져서 넣었다. 부채 금액까지 거는 것은 반응이 과해져 뺐다.
+MONOTONE_CONSTRAINTS = {
+    "expense_ratio_svc_12m": 1,
+    "dsr_svc_12m": 1,
+    "deficit_months_svc_12m": 1,
+    "worst_month_net_cash_svc_12m_krw": -1,
+    "DQ1200001": 1,
+    "CL0631905": 1,
+    "income_svc_12m_krw": -1,
+    "expense_avg_month_krw": 1,
 }

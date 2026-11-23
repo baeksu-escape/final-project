@@ -138,7 +138,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 `00_drop_all.sql`은 첫 DROP 전에 USER_TABLES에서 옛 DB 표식(APP_MEMBER·MEMBER_MONTHLY_INPUT·MEMBER_LOAN·EXTERNAL_API_RESPONSE)을 확인하고 하나라도 있으면 오류로 종료한다. 단독 실행에도 WHENEVER SQLERROR EXIT가 적용된다. 표식이 없는 스키마의 공유 테이블까지 자동 식별하는 가드는 아니므로 별도 스키마 원칙은 유지한다.
 
-`99_check.sql`은 현재 개정 DDL 기준 테이블 48개·테이블별 기대 행 수(DIM_FEATURE 77개 = FS-DRAFT 39 + FS-V1 38, 등급 구간 버전 2개 CUT-0.1 ACTIVE·CUT-0.2 DRAFT와 구간 6개 포함)·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·CRLF를 LF로 정규화한 DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
+`99_check.sql`은 현재 개정 DDL 기준 테이블 48개·테이블별 기대 행 수(DIM_FEATURE 77개 = FS-DRAFT 39 + FS-V1 38, 등급 구간 버전 3개 CUT-0.3 ACTIVE·CUT-0.1 RETIRED·CUT-0.2 DRAFT와 구간 9개 포함)·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·CRLF를 LF로 정규화한 DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
 
 테스트(저장소 루트, cryptography가 설치된 Python):
 

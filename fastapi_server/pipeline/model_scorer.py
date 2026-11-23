@@ -9,7 +9,7 @@ from pathlib import Path
 
 import joblib
 
-from pipeline.feature_catalog import REAL_FEATURE_SET_VERSION, REAL_MODEL_VERSION, grade_band
+from pipeline.feature_catalog import REAL_FEATURE_SET_VERSION, REAL_MODEL_VERSION, grade_band, is_real_model_version
 from training.explain import AlternativeExplainer, score_one
 
 log = logging.getLogger("avenue.prediction")
@@ -20,9 +20,11 @@ ARTIFACT_DIR = Path(__file__).resolve().parents[1] / "artifacts"
 class ModelScorer:
     """기존(legacy)·대안(alternative) 모델 한 묶음. 서버가 시작할 때 한 번 만들어 재사용한다(SHAP 설명기 만드는 데 시간이 걸린다)."""
 
-    def __init__(self, legacy_model=None, alternative_model=None):
+    def __init__(self, legacy_model=None, alternative_model=None, version: str = REAL_MODEL_VERSION):
         self.legacy_model = legacy_model
         self.explainer = AlternativeExplainer(alternative_model) if alternative_model is not None else None
+        # FP-237 이 묶음의 모델 버전(meta.json의 model_version). 준비 안 됐으면 None.
+        self.version = version if self.ready else None
 
     @property
     def ready(self) -> bool:
@@ -40,21 +42,35 @@ class ModelScorer:
 
 
 def _model_score(result: dict) -> dict:
-    """explain/score_one 결과 → 응답의 모델 한쪽 모양. 등급은 서비스 등급 구간(CUT-0.1)으로 매긴다."""
+    """explain/score_one 결과 → 응답의 모델 한쪽 모양. 등급은 서비스 등급 구간(CUT-0.3)으로 매긴다."""
     return {"scorableYn": "Y", "score": result["score"], "gradeBandCode": grade_band(result["score"]),
             "defaultProb": result["defaultProb"]}
 
 
-def _meta_matches(path: Path) -> bool:
-    """설명 파일에 모델 버전·피처 세트가 적혀 있으면 서비스 값과 같은지 본다(재욱 님 새 묶음부터 들어감). 없으면 통과."""
-    if not path.exists():
-        return True
-    meta = json.loads(path.read_text(encoding="utf-8"))
-    expected = {"model_version": REAL_MODEL_VERSION, "feature_set_version": REAL_FEATURE_SET_VERSION}
-    wrong = {key: meta[key] for key, value in expected.items() if key in meta and meta[key] != value}
-    if wrong:
-        log.warning("model meta mismatch file=%s values=%s", path.name, wrong)
-    return not wrong
+def _bundle_version(directory: Path) -> str | None:
+    """FP-237 두 설명 파일(legacy·alternative.meta.json)에서 이 묶음의 모델 버전을 정한다. 쓸 수 없는 묶음이면 None.
+    - 피처 세트가 적혀 있으면 서비스 피처 세트(FS-V1)와 같아야 한다(피처 목록·순서가 코드에 있어서).
+    - 모델 버전은 LGBM-BASE-숫자.숫자 모양이어야 하고 두 파일이 같아야 한다(다른 학습의 파일이 섞이면 안 됨).
+    - 어느 파일에도 버전이 없으면(옛 묶음) 기본값 REAL_MODEL_VERSION으로 본다."""
+    versions = set()
+    for name in ("legacy", "alternative"):
+        path = directory / f"{name}.meta.json"
+        if not path.exists():
+            continue
+        meta = json.loads(path.read_text(encoding="utf-8"))
+        feature_set = meta.get("feature_set_version")
+        if feature_set is not None and feature_set != REAL_FEATURE_SET_VERSION:
+            log.warning("model meta feature set mismatch file=%s value=%s", path.name, feature_set)
+            return None
+        if "model_version" in meta:
+            if not is_real_model_version(meta["model_version"]):
+                log.warning("model meta version not allowed file=%s value=%s", path.name, meta["model_version"])
+                return None
+            versions.add(meta["model_version"])
+    if len(versions) > 1:
+        log.warning("model meta versions differ between files values=%s", sorted(versions))
+        return None
+    return versions.pop() if versions else REAL_MODEL_VERSION
 
 
 HASH_LIST_FILE = "SHA256SUMS.txt"
@@ -76,7 +92,7 @@ def _hashes_match(directory: Path) -> bool:
         if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
             wrong.append(name)
     if wrong:
-        log.warning("model hash mismatch files=%s — %s 요청은 503", wrong, REAL_MODEL_VERSION)
+        log.warning("model hash mismatch files=%s — 실제 모델 요청은 503", wrong)
     return not wrong
 
 
@@ -86,18 +102,19 @@ def load_from_artifacts(directory: Path = ARTIFACT_DIR) -> ModelScorer:
     files = {name: directory / f"{name}.joblib" for name in ("legacy", "alternative")}
     missing = [path.name for path in files.values() if not path.exists()]
     if missing:
-        log.warning("model files not found dir=%s missing=%s — %s 요청은 503", directory, missing, REAL_MODEL_VERSION)
+        log.warning("model files not found dir=%s missing=%s — 실제 모델 요청은 503", directory, missing)
         return ModelScorer()
     if not _hashes_match(directory):
         return ModelScorer()
-    if not all(_meta_matches(directory / f"{name}.meta.json") for name in files):
+    version = _bundle_version(directory)
+    if version is None:
         return ModelScorer()
     try:
-        scorer = ModelScorer(joblib.load(files["legacy"]), joblib.load(files["alternative"]))
+        scorer = ModelScorer(joblib.load(files["legacy"]), joblib.load(files["alternative"]), version)
     except Exception as error:   # 버전이 다른 라이브러리로 만든 파일 등 — 서버는 켜 두고 503으로 알린다
         log.error("model load failed type=%s", type(error).__name__)
         return ModelScorer()
-    log.info("model loaded version=%s featureSet=%s", REAL_MODEL_VERSION, REAL_FEATURE_SET_VERSION)
+    log.info("model loaded version=%s featureSet=%s", version, REAL_FEATURE_SET_VERSION)
     return scorer
 
 

@@ -32,6 +32,10 @@ public class ExpectedScoreService {
     static final String FIXED_CATEGORY = "고정지출";
     /** 소득 변동 폭을 보내지 않으면 과거 달 소득을 그대로 쓴다(100%) */
     static final int DEFAULT_VARIATION_PCT = 100;
+    /** N-21-2 카드값·대출 납부 '밀림' */
+    static final String DELAYED = "DELAYED";
+    /** FP-239 밀림이면 최근 1년 30일 이상 연체(DQ1200001)를 이만큼 더한다(경환 제안, 범영 11/20 동의) */
+    static final int ASSUMED_DELINQUENCY_INCREMENT = 1;
 
     private final AssessmentMapper assessmentMapper;
     private final ScoreInputAssembler assembler;
@@ -78,6 +82,7 @@ public class ExpectedScoreService {
         checkIncomeMonths(request);   // 소득 개월 수가 모자라면 ML-03이 422로 거절하므로 부르기 전에 409로 알린다
         applyIncomeCondition(request, cond);
         applyExpenseCondition(request, cond);
+        Integer assumedDelinquencyCount = applyPaymentStatus(request, cond);
 
         Map<String, Object> result;
         try {
@@ -85,7 +90,29 @@ public class ExpectedScoreService {
         } catch (PredictionFailedException e) {
             throw toApiException(e);
         }
-        return toResponse(current, result);
+        return toResponse(current, result, assumedDelinquencyCount);
+    }
+
+    /**
+     * FP-239 납부 상태 반영(N-21-2) — 밀림(DELAYED)이면 ML-03 요청의 최근 1년 30일 이상 연체 건수(creditProfile.delinqCount12m,
+     * 피처 DQ1200001)에 1을 더하고 그 값을 돌려준다. 저장값이 없으면(신용 이력 없음) 0으로 보고 더한다(모델 0.2가 null을 0으로 읽는 것과 같음, D-31).
+     * 제때(ON_TIME)·생략이면 바꾸지 않고 null이다. 화면 문구: "최근 1년 30일 이상 연체 1회 추가로 가정"(범영 11/20 동의).
+     */
+    @SuppressWarnings("unchecked")
+    static Integer applyPaymentStatus(Map<String, Object> request, CashFlowConditionRequest cond) {
+        if (!DELAYED.equals(cond.getPaymentStatus())) {
+            return null;
+        }
+        Map<String, Object> credit = request.get("creditProfile") instanceof Map
+                ? (Map<String, Object>) request.get("creditProfile") : null;
+        if (credit == null) {
+            credit = new LinkedHashMap<>();
+            request.put("creditProfile", credit);
+        }
+        int stored = credit.get("delinqCount12m") instanceof Number n ? n.intValue() : 0;
+        int assumed = stored + ASSUMED_DELINQUENCY_INCREMENT;
+        credit.put("delinqCount12m", assumed);
+        return assumed;
     }
 
     /**
@@ -177,15 +204,15 @@ public class ExpectedScoreService {
     }
 
     @SuppressWarnings("unchecked")
-    private static ExpectedScoreResponse toResponse(AssessmentRow current, Map<String, Object> result) {
+    private static ExpectedScoreResponse toResponse(AssessmentRow current, Map<String, Object> result, Integer assumedDelinquencyCount) {
         Map<String, Object> alt = result.get("alternative") instanceof Map ? (Map<String, Object>) result.get("alternative") : Map.of();
         Integer expected = alt.get("score") instanceof Number n ? (int) Math.round(n.doubleValue()) : null;
         Integer diff = expected == null || current.getAltScore() == null ? null : expected - current.getAltScore();
         // 현재 점수를 낸 모델(baseModelVersion)을 함께 보내, 예상 점수 모델과 다르면 화면이 "모델이 바뀌어 차이가 클 수 있음"을 안내한다(경환 11/19).
-        // 납부 상태(DELAYED)를 어느 피처에 반영할지 정해지기 전이라 점수에 쓰지 않았다는 것을 화면에 알린다
+        // FP-239 밀림이면 연체 +1을 점수에 반영했다는 것(paymentStatusApplied)과 넣은 연체 건수를 화면에 알린다
         return new ExpectedScoreResponse(current.getAltScore(), current.getAltGradeBandCode(), expected,
                 (String) alt.get("gradeBandCode"), diff, (String) result.get("modelVersion"), current.getModelVersion(),
-                current.getRequestId(), false);
+                current.getRequestId(), assumedDelinquencyCount != null, assumedDelinquencyCount);
     }
 
     private static double amount(Object value) {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { requestLogin, requestLogout, requestMe } from '../api/authApi.js'
 import { UNAUTHORIZED_EVENT } from '../api/client.js'
+import { clearSessionDrafts } from './sessionDrafts.js'
 import { AuthContext } from './AuthContext.js'
 import { tokenStorage } from './tokenStorage.js'
 
@@ -31,6 +32,7 @@ export default function AuthProvider({ children }) {
   }, [])
 
   // API 모듈이 401을 받으면 로그아웃 상태로 바꾼다. 화면 이동은 라우트 가드가 한다.
+  // FP-227 세션 만료는 같은 사람이 다시 로그인해 이어 쓸 수 있게 임시저장본을 남긴다(키에 회원 번호가 있어 다른 계정에는 보이지 않는다).
   useEffect(() => {
     const handleUnauthorized = () => setAuth(ANONYMOUS)
     window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized)
@@ -60,6 +62,8 @@ export default function AuthProvider({ children }) {
       // 서버 로그아웃이 실패해도 화면에서는 토큰을 지운다.
     }
     tokenStorage.clear()
+    // FP-227 직접 로그아웃·탈퇴는 여러 사람이 쓰는 PC를 생각해 임시저장본(sessionDrafts.js 접두어 키)을 지운다. 회원 탈퇴도 이 logout을 거친다.
+    clearSessionDrafts()
     setAuth(ANONYMOUS)
     setNotice(nextNotice ?? '')
   }, [])
