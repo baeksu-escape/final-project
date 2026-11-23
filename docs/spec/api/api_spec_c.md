@@ -739,6 +739,45 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 - 프론트: `features/admin/api/adminStatsApi.js`의 `getAdminStats({ groupBy })`. mock은 예시 회원 14명으로 같은 규칙대로 계산한다.
 - 화면: 🆕 11/23 `features/admin/pages/AdminStatsPage.jsx`(FP-162, `/admin/stats`). 숨긴 값(`null`)은 '—'로, 기존 분포만 숨겨지면 대안 분포만 글자로 보여 준다.
 
+## N-26-5~7 사용자 비교 분석 (ADM-04, FP-164, 담당 광희) 🆕 11/23
+
+주 메뉴 '비교 분석'(`/comparison`)에서 일반 회원이 직군 × 연령 격자(N-26-6)와 직군별·연령별 비교(N-26-7)를 본다. 11/23 동주·광희 합의로 나눠 만든다: 동주가 N-13 내 위치 API·`/comparison` 화면 틀·카드 3개, 광희가 이 API와 그 아래 격자·비교 화면(동주 PR 병합 뒤).
+- **집계 기준은 ADM-03과 같다**(같은 매퍼·같은 계산 코드 `AdminStatsService.groupStats`): 회원마다 ACTIVE 모델로 낸 최근 SCORED 서비스 평가 1건, 탈퇴 회원 제외(D-28), 값마다 계산 인원이 5명 미만이면 `null`, 등급은 평가 때 저장된 값.
+- 관리자 전용 수치(가입 회원 수·오늘 산출)는 넣지 않는다(N-26-5).
+
+### GET `/api/members/me/group-comparison`
+
+- 일반 회원만(보안 설정: `/api/members/me/**` = `ROLE_USER`). 관리자 `403`, 토큰 없음 `401`. 내 위치가 들어 있어 Q-8 규칙대로 `/api/members/me/` 아래에 둔다(DIAG-01 `peer-benchmark`와 같음). 쿼리 값은 없다.
+- 한 번 호출로 화면의 보기 전환(직군 × 연령, 직군별, 연령별)에 필요한 값을 모두 준다(집단 20개라 응답이 작다).
+- 응답 `200`:
+
+  | 필드 | 형식 | 설명 |
+  |---|---|---|
+  | `modelVersion`, `minGroupSize` | 문자열 또는 `null`, 정수 | 통계 기준 모델(ACTIVE, 없으면 `null`), 숨김 기준(5) |
+  | `me` | 객체 또는 `null` | 통계에 들어간 **내 평가**: `workerTypeCode`, `ageBandCode`(평가 시점 값이라 격자의 내 칸과 같다), `tradScore`, `altScore`, `tradGradeBandCode`, `altGradeBandCode`. 본인 값이라 숨기지 않는다. 기존 모델로 산출할 수 없었으면 `trad*`가 `null`. ACTIVE 모델로 점수가 나온 평가가 없으면 `me` 자체가 `null` |
+  | `overall` | 집단 | 전체(`groupCode` = `ALL`). N-26-7 요약표의 전체 행, N-26-6 "전체 평균 대비" |
+  | `byWorkerType[]` | 집단 3개 | `EMPLOYEE`·`SELF_EMPLOYED`·`FREELANCER` 고정 순서. 격자의 행 평균, N-26-7 직군별 |
+  | `byAgeBand[]` | 집단 4개 | `20S`·`30S`·`40S`·`50_PLUS` 고정 순서. 격자의 열 평균, N-26-7 연령별 |
+  | `grid[]` | 12칸 | `{ workerTypeCode, ageBandCode, stats: 집단 }`, 직군 순서 → 연령대 순서(0명 칸도 있음). `stats.groupCode`는 `직군:연령대`(예: `EMPLOYEE:30S`) |
+
+  **집단** = ADM-03 `groups[]` 한 줄과 같은 모양: `groupCode`, `memberCount`, `avgTradScore`, `avgAltScore`, `avgScoreUplift`, `standardOrAboveRatePct`, `gradeDistribution`, `tradStandardOrAboveRatePct`, `tradGradeDistribution`, `tradScoredMemberCount`(뜻·숨김 규칙은 위 ADM-03 절).
+
+  ```json
+  { "modelVersion": "LGBM-BASE-0.2", "minGroupSize": 5,
+    "me": { "workerTypeCode": "EMPLOYEE", "ageBandCode": "30S", "tradScore": 640, "altScore": 700,
+            "tradGradeBandCode": "CAUTION", "altGradeBandCode": "STANDARD" },
+    "overall": { "groupCode": "ALL", "memberCount": 14, "avgTradScore": 636.9, "avgAltScore": 705.4, "avgScoreUplift": 68.8, … },
+    "byWorkerType": [ { "groupCode": "EMPLOYEE", "memberCount": 6, "avgAltScore": 720.0, … }, … ],
+    "byAgeBand": [ { "groupCode": "20S", "memberCount": 3, "avgAltScore": null, … }, … ],
+    "grid": [ { "workerTypeCode": "EMPLOYEE", "ageBandCode": "20S", "stats": { "groupCode": "EMPLOYEE:20S", "memberCount": 1, "avgAltScore": null, … } }, … ] }
+  ```
+  (mock 예시값, 줄였다)
+- 화면이 계산할 것: 칸을 고른 뒤 "전체·직군·연령 평균 대비"는 `overall`·`byWorkerType`·`byAgeBand`의 같은 필드와 빼서 보여 준다. 내 칸은 `me.workerTypeCode`·`me.ageBandCode`로 찾는다.
+- 알려진 한계
+  - ADM-03과 같다: 등급 구간 버전을 거르지 않아 CUT-0.3 전환(#137) 전후 평가의 등급이 섞일 수 있다. 시연 DB는 평가 회원이 적어 격자 칸 대부분이 5명 미만('—')으로 보인다.
+  - **빼기로 숨긴 값을 알아낼 수 있다.** 5명 기준은 값마다 따로 걸기 때문에, 행(직군) 평균은 보이고 그 행의 칸 하나만 숨겨졌으면 `행 합계 − 보이는 칸 합계`로 숨긴 칸(예: 1명)의 점수를 계산할 수 있다(인원 수는 보인다). 관리자 통계보다 보는 사람이 많아 문제가 커진다. 막으려면 2차 숨김(숨긴 칸이 하나뿐인 행·열은 다른 칸이나 평균도 숨김)이 필요하다. 지금은 기준을 ADM-03과 같게 두고 팀 결정을 기다린다.
+- 프론트: `features/comparison/api/groupComparisonApi.js`의 `getGroupComparison()`. mock은 관리자 통계 mock의 예시 회원 14명·계산을 그대로 쓴다(데모 계정 `employee`만 `me`가 있다, 관리자 403).
+
 ---
 
 ## N-25 모형 성능 비교 (ADM-01·02, FP-184, 담당 동주) 🆕 11/20
