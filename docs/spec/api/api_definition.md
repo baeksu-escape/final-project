@@ -284,7 +284,7 @@
 |---|---|---|---|---|---|
 | ADM-01 | `GET /api/admin/model-performance?group=LEGACY\|THINFILE&label=DELINQ\|NONFIN&cutoff=600~800` 🆕 11/20 | N-25-1 비교 조건 선택, N-25-2 성능 지표 재계산·비교 표, N-25-4 직군별 우량 고객 오거절률 | `MODEL_EVAL_SAMPLE`(평가 표본 3,085건, PR #99 🆕 11/20), `MODEL_ARTIFACT`(같은 라벨 AUC `METRICS_JSON.same_label_comparison`, PR #98 🆕 11/20) | 동주 (FP-184) 🆕 11/20 | ✅ ACTIVE 모델(지금 `LGBM-BASE-0.2`) 기준 🆕 11/20 |
 | ADM-02 | `GET /api/admin/model-performance/roc?group=…&label=…` 🆕 11/20 | N-25-3 ROC 곡선 | 위와 같음 | 동주 (FP-184) 🆕 11/20 | ✅ 🆕 11/20 |
-| ADM-03 | `GET /api/admin/stats` | N-26-1 구분·지표 선택, N-26-2 요약 수치, N-26-3 분포 차트, N-26-4 통계 표·직군별 점수 표 | `ASSESSMENT` | 확인 필요 (Q-10) | 🟡 |
+| ADM-03 | `GET /api/admin/stats?groupBy=WORKER_TYPE\|AGE_BAND` 🆕 11/20 | N-26-1 구분 선택(직군별·연령대별), N-26-2 요약 수치(평가 고객 수·평균 기존·대안 점수·상승폭·Standard 이상 비율 기존·대안·가입 회원 수·오늘 산출), N-26-3 기존·대안 등급 분포, N-26-4 그룹별 통계 표(🆕 11/23 기존 모델 등급 값 추가). 서비스 회원이 ACTIVE 모델로 낸 최근 SCORED 평가(🆕 11/23 ACTIVE가 아닌 모델의 평가 제외), 탈퇴 회원 제외, 값마다 계산 인원 5명 미만이면 숨김(D-26·D-28 담당자 결정) | `ASSESSMENT`, `APP_USER` | 광희 (FP-161) 🆕 11/20 | ✅ 🆕 11/20 |
 | ADM-04 | `GET /api/stats/compare` | N-26-5 비교 분석 화면 (사용자), N-26-6 직군 × 연령 격자·선택한 집단, N-26-7 직군별·연령별 비교 | `ASSESSMENT` | 광희 (FP-159) | ⛔ (사용자 쪽은 미정) |
 | ADM-05 | `GET /api/admin/users?q&role&status&page&size` | N-27-1 계정 목록 조회·검색 (size 최대 100) | `APP_USER` | 경환·우찬 (FP-80) | ✅ |
 | ADM-06 | `PATCH /api/admin/users/{userId}/lock` | N-27-3 회원 계정 잠금 `{ locked, reason }` (잠글 때 reason 필수, 본인·탈퇴 409) | `APP_USER` | 경환·우찬 | ✅ |
@@ -351,4 +351,4 @@
 | ~~Q-7~~ | ✅ 해결(🆕 11/20): 오류 응답 형식은 D-20 확정(1장 공통 형식), FastAPI 타임아웃은 설정값으로 분리(D-18, Gemini만 남음) | 팀 전체 |
 | ~~Q-8~~ | ~~DIAG-07-1·08-1 경로~~ ✅ **해결:** `/api/members/me/…`로 이동(광희 PR #103, 우찬 합의, SIM-01·02·DIAG-09 포함) 🆕 11/20 | — |
 | ~~Q-9~~ | ~~SIM-03·대출 상품 담당~~ ✅ **해결:** 대출 상품 LOAN-01~05 경환(FP-90, PR #101), SIM-03은 만들지 않고 SIM-04 + LOAN-01로 대신 🆕 11/20 | — |
-| Q-10 | ADM-03(N-26 관리자 통계) 담당과 Jira 번호. 정의서에 있던 FP-191은 커뮤니티 카드였다. 비교 통계는 FP-159(광희) | 광희·동주 |
+| ~~Q-10~~ | ~~ADM-03(N-26 관리자 통계) 담당과 Jira 번호. 정의서에 있던 FP-191은 커뮤니티 카드였다. 비교 통계는 FP-159(광희)~~ ✅ **해결 🆕 11/20:** 광희, API FP-161·화면 FP-162 | — |
