@@ -101,7 +101,7 @@ class AdminStatsMapperIT {
         failed.setAltScorableYn("N");
         assessmentMapper.insertAssessment(failed);
 
-        List<MemberScore> mine = mapper.selectLatestScoredMembers().stream().filter(m -> m.getUserId() == userId).toList();
+        List<MemberScore> mine = mapper.selectLatestScoredMembers(modelVersion).stream().filter(m -> m.getUserId() == userId).toList();
 
         assertEquals(1, mine.size());
         MemberScore m = mine.get(0);
@@ -114,9 +114,37 @@ class AdminStatsMapperIT {
     }
 
     @Test
+    @DisplayName("ACTIVE 모델이 아닌 평가(옛 모델·Mock)는 더 늦어도 세지 않고, 회원별 최근 평가는 ACTIVE 모델 평가 중에서 고른다(11/23 리뷰 반영)")
+    void onlyActiveModel() {
+        assertEquals(modelVersion, mapper.selectActiveModelVersion());
+        List<Map<String, Object>> others = jdbc.queryForList(
+                "SELECT MODEL_VERSION, FEATURE_SET_VERSION FROM MODEL_REGISTRY WHERE STATUS_CODE <> 'ACTIVE' AND FEATURE_SET_VERSION IS NOT NULL FETCH FIRST 1 ROWS ONLY");
+        Assumptions.assumeFalse(others.isEmpty(), "로컬 DB에 ACTIVE가 아닌 모델이 없음");
+        long userId = activeMember();
+        scored(userId, FUTURE.plusDays(1), 650, 720, "STANDARD");   // ACTIVE 모델
+        AssessmentRow old = base(userId, FUTURE.plusDays(2));        // 더 늦은 옛 모델 평가
+        old.setModelVersion((String) others.get(0).get("MODEL_VERSION"));
+        old.setFeatureSetVersion((String) others.get(0).get("FEATURE_SET_VERSION"));
+        old.setCutoffVersion("CUT-0.1");
+        old.setGradeStatusCode("SCORED");
+        old.setAltScorableYn("Y");
+        old.setAltScore(500);
+        old.setAltGradeBandCode("CAUTION");
+        old.setAltDefaultProb(new BigDecimal("0.40"));
+        old.setFeatureSnapshot("{\"telecom_on_time_streak\": 1}");
+        assessmentMapper.insertAssessment(old);
+
+        List<MemberScore> mine = mapper.selectLatestScoredMembers(modelVersion).stream().filter(m -> m.getUserId() == userId).toList();
+        assertEquals(1, mine.size());
+        assertEquals(720, mine.get(0).getAltScore(), "옛 모델 평가(500점)는 더 늦어도 고르지 않는다");
+        assertEquals(1, mapper.selectScoredCountSince(FUTURE, modelVersion) - mapper.selectScoredCountSince(FUTURE.plusDays(1).plusSeconds(1), modelVersion),
+                "옛 모델 평가는 오늘 산출 건수에도 들어가지 않는다");
+    }
+
+    @Test
     @DisplayName("오늘 산출(from 이후 SCORED 수)은 NOT_SCORABLE을 세지 않고, 가입 회원 수는 일반 회원 중 탈퇴 제외")
     void counts() {
-        long before = mapper.selectScoredCountSince(FUTURE);
+        long before = mapper.selectScoredCountSince(FUTURE, modelVersion);
         long userId = activeMember();
         scored(userId, FUTURE.plusHours(1), null, 600, "CAUTION");
         scored(userId, FUTURE.plusHours(2), null, 610, "CAUTION");
@@ -126,7 +154,7 @@ class AdminStatsMapperIT {
         failed.setAltScorableYn("N");
         assessmentMapper.insertAssessment(failed);
 
-        assertEquals(before + 2, mapper.selectScoredCountSince(FUTURE));
+        assertEquals(before + 2, mapper.selectScoredCountSince(FUTURE, modelVersion));
         assertEquals(jdbc.queryForObject(
                         "SELECT COUNT(*) FROM APP_USER WHERE ROLE_CODE = 'ROLE_USER' AND ACCOUNT_STATUS_CODE <> 'WITHDRAWN'", Long.class),
                 mapper.selectRegisteredMemberCount());
@@ -139,7 +167,7 @@ class AdminStatsMapperIT {
         Assumptions.assumeTrue(withdrawn != null, "로컬 DB에 탈퇴 회원이 없음");
         scored(withdrawn, FUTURE.plusDays(5), 600, 700, "STANDARD");
 
-        assertTrue(mapper.selectLatestScoredMembers().stream().noneMatch(m -> m.getUserId().equals(withdrawn)));
-        assertEquals(0, mapper.selectScoredCountSince(FUTURE.plusDays(5)));
+        assertTrue(mapper.selectLatestScoredMembers(modelVersion).stream().noneMatch(m -> m.getUserId().equals(withdrawn)));
+        assertEquals(0, mapper.selectScoredCountSince(FUTURE.plusDays(5), modelVersion));
     }
 }

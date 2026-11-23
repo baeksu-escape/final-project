@@ -24,6 +24,8 @@ const SAMPLE_MEMBERS = Object.freeze([
   Object.freeze({ workerTypeCode, ageBandCode, tradScore, altScore, altGradeBandCode, tradGradeBandCode: gradeOfScore(tradScore) })))
 const SAMPLE_REGISTERED_MEMBER_COUNT = 40
 const SAMPLE_TODAY_SCORED_COUNT = 3
+// 통계 기준 모델(실제 API는 MODEL_REGISTRY의 ACTIVE 모델로 낸 평가만 센다, 11/23 리뷰 반영)
+const SAMPLE_MODEL_VERSION = 'LGBM-BASE-0.2'
 
 // 서버 BigDecimal HALF_UP(소수 첫째 자리)과 같은 반올림 — 값이 모두 0 이상이라 Math.round로 같다
 const round1 = (value) => Math.round(value * 10) / 10
@@ -85,6 +87,7 @@ function handleAdminStats({ token, query }) {
     },
     gradeDistribution: overall.gradeDistribution,
     tradGradeDistribution: overall.tradGradeDistribution,
+    modelVersion: SAMPLE_MODEL_VERSION,
     groups: GROUP_CODES[groupBy].map((groupCode) => {
       const group = members.filter((m) => keyOf(m) === groupCode)
       return { groupCode, memberCount: group.length, ...aggregate(group) }

@@ -3,6 +3,7 @@ package com.baeksuescape.admin.controller;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -83,13 +84,15 @@ class AdminStatsApiTest {
             members.add(member("EMPLOYEE", "30S", 640, 700, "STANDARD"));
         }
         members.add(member("FREELANCER", "20S", 580, 640, "CAUTION"));
-        given(statsMapper.selectLatestScoredMembers()).willReturn(members);
+        given(statsMapper.selectActiveModelVersion()).willReturn("LGBM-BASE-0.2");
+        given(statsMapper.selectLatestScoredMembers("LGBM-BASE-0.2")).willReturn(members);
         given(statsMapper.selectRegisteredMemberCount()).willReturn(120L);
-        given(statsMapper.selectScoredCountSince(any())).willReturn(3L);
+        given(statsMapper.selectScoredCountSince(any(), eq("LGBM-BASE-0.2"))).willReturn(3L);
 
         mvc.perform(as(get(STATS), "ROLE_ADMIN"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.groupBy").value("WORKER_TYPE"))
+                .andExpect(jsonPath("$.modelVersion").value("LGBM-BASE-0.2"))
                 .andExpect(jsonPath("$.minGroupSize").value(5))
                 .andExpect(jsonPath("$.summary.assessedMemberCount").value(6))
                 .andExpect(jsonPath("$.summary.avgTradScore").value(630.0))
@@ -124,7 +127,8 @@ class AdminStatsApiTest {
     @Test
     @DisplayName("groupBy=AGE_BAND면 연령대 4개, 그 밖의 값은 400 INVALID_INPUT(field groupBy)")
     void groupBy() throws Exception {
-        given(statsMapper.selectLatestScoredMembers()).willReturn(List.of());
+        given(statsMapper.selectActiveModelVersion()).willReturn("LGBM-BASE-0.2");
+        given(statsMapper.selectLatestScoredMembers("LGBM-BASE-0.2")).willReturn(List.of());
 
         mvc.perform(as(get(STATS).param("groupBy", "AGE_BAND"), "ROLE_ADMIN"))
                 .andExpect(status().isOk())

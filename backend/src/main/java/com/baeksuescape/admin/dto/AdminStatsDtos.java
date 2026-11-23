@@ -8,6 +8,7 @@ import java.util.List;
 // 대안 값은 그룹 전원(memberCount), 기존 평균·기존 등급 값·상승폭은 기존 모델로 산출된 회원(tradScoredMemberCount)으로 계산한다.
 // 등급 값은 11/06 UI처럼 기존 → 대안을 나란히 보여 주도록 두 벌이다: standardOrAboveRatePct·gradeDistribution = 대안 모델,
 // trad* = 기존 모델(기존 모델로 산출된 회원만 분모, 11/23 추가).
+// modelVersion = 통계 기준 모델(ACTIVE). 이 모델로 낸 평가만 센다(옛 모델·Mock 평가 제외, 11/23 리뷰 반영). ACTIVE가 없으면 null.
 public final class AdminStatsDtos {
 
     private AdminStatsDtos() {
@@ -20,7 +21,8 @@ public final class AdminStatsDtos {
             Summary summary,
             List<GradeCount> gradeDistribution,
             List<GroupStats> groups,
-            List<GradeCount> tradGradeDistribution) {
+            List<GradeCount> tradGradeDistribution,
+            String modelVersion) {
     }
 
     // N-26-2 요약 수치. assessedMemberCount = 최근 SCORED 평가가 있는 회원 수(탈퇴 제외), registeredMemberCount = 가입 회원 수(탈퇴 제외),

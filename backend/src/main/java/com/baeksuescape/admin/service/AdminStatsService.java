@@ -25,7 +25,7 @@ import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
  * FP-161 N-26-1~4 관리자 직군·연령별 통계(ADM-03).
  * D-26 담당자 결정(11/20, 광희): 11/06 확정 UI대로 요약(평가 고객 수·평균 점수 기존→대안·Standard 이상 비율 기존→대안·가입 회원 수·오늘 산출),
  * 기존·대안 등급 분포, 직군별·연령대별 통계 표를 만든다(v3의 상자 그림·히트맵·통신비 연체 경험은 UI에 없어 만들지 않는다).
- * 데이터는 서비스 회원의 최근 SCORED 평가 1건이고, D-28 결정대로 탈퇴 회원은 뺀다(매퍼).
+ * 데이터는 서비스 회원이 ACTIVE 모델로 낸 최근 SCORED 평가 1건이고(옛 모델·Mock 평가 제외, 11/23 리뷰 반영), D-28 결정대로 탈퇴 회원은 뺀다(매퍼).
  */
 @Service
 public class AdminStatsService {
@@ -61,14 +61,17 @@ public class AdminStatsService {
             String message = "구분은 WORKER_TYPE(직군별) 또는 AGE_BAND(연령대별)여야 합니다.";
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", message, List.of(new FieldErrorItem("groupBy", message)));
         }
-        List<MemberScore> members = mapper.selectLatestScoredMembers();
+        // ACTIVE 모델로 낸 평가만 센다(옛 모델 0.1·Mock 점수가 섞이면 기존 → 대안 비교의 뜻이 흐려진다, 11/23 리뷰 반영)
+        String modelVersion = mapper.selectActiveModelVersion();
+        List<MemberScore> members = modelVersion == null ? List.of() : mapper.selectLatestScoredMembers(modelVersion);
         long registered = mapper.selectRegisteredMemberCount();
-        long today = mapper.selectScoredCountSince(LocalDate.now(clock).atStartOfDay());
-        return build(by, members, registered, today);
+        long today = modelVersion == null ? 0L : mapper.selectScoredCountSince(LocalDate.now(clock).atStartOfDay(), modelVersion);
+        return build(by, members, registered, today, modelVersion);
     }
 
     /** 계산 본체(DB 없이 테스트). */
-    static StatsResponse build(String groupBy, List<MemberScore> members, long registeredMemberCount, long todayScoredCount) {
+    static StatsResponse build(String groupBy, List<MemberScore> members, long registeredMemberCount, long todayScoredCount,
+            String modelVersion) {
         Function<MemberScore, String> key = WORKER_TYPE.equals(groupBy) ? MemberScore::getWorkerTypeCode : MemberScore::getAgeBandCode;
         // 5명 기준은 그룹 인원이 아니라 값마다 실제로 계산에 들어간 인원에 적용한다(아래 average·grades 함수, 리뷰 반영 11/23).
         // 그룹이 5명 이상이어도 기존 모델 산출자가 5명 미만이면 기존 평균·상승폭·기존 등급 값으로 소수 회원의 값이 드러나기 때문이다.
@@ -95,7 +98,7 @@ public class AdminStatsService {
                     tradScoredCount(group)));
         }
         return new StatsResponse(groupBy, MIN_GROUP_SIZE, summary, gradeDistribution(members, ALT_GRADE), groups,
-                gradeDistribution(members, TRAD_GRADE));
+                gradeDistribution(members, TRAD_GRADE), modelVersion);
     }
 
     /** 기존 모델로 산출된 회원 수(기존 점수가 있는 회원). 기존 평균·기존 등급 값·상승폭이 이 인원으로 계산된다 */

@@ -12,12 +12,15 @@ import com.baeksuescape.admin.dto.AdminStatsRows;
 @Mapper
 public interface AdminStatsMapper {
 
-    // 회원마다 가장 최근 SCORED 서비스 평가 1건(탈퇴 회원 제외)
-    List<AdminStatsRows.MemberScore> selectLatestScoredMembers();
+    // 지금 쓰는 모델 버전(MODEL_REGISTRY ACTIVE, AssessmentMapper·ModelPerformanceMapper와 같은 조건). 없으면 null
+    String selectActiveModelVersion();
+
+    // 회원마다 그 모델로 낸 가장 최근 SCORED 서비스 평가 1건(탈퇴 회원 제외). 옛 모델(0.1·Mock) 평가는 세지 않는다(리뷰 반영 11/23)
+    List<AdminStatsRows.MemberScore> selectLatestScoredMembers(@Param("modelVersion") String modelVersion);
 
     // 가입 회원 수: 일반 회원(ROLE_USER) 중 탈퇴 제외
     long selectRegisteredMemberCount();
 
-    // from 이후 저장된 서비스 SCORED 평가 수(탈퇴 회원 제외)
-    long selectScoredCountSince(@Param("from") LocalDateTime from);
+    // from 이후 그 모델로 저장된 서비스 SCORED 평가 수(탈퇴 회원 제외)
+    long selectScoredCountSince(@Param("from") LocalDateTime from, @Param("modelVersion") String modelVersion);
 }
