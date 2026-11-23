@@ -21,7 +21,7 @@ function getShapNote(factor) {
     return '대출 이력이 적어 모델이 판단할 근거가 부족한 경우예요. 대출이 없다는 것 자체로 감점된다는 뜻은 아니에요.'
   }
   if (factor.featureCode === 'dp_active_months' || factor.featureCode === 'dp_payment_amount_12m_krw') {
-    return "간편결제를 쓴 달 수가 적으면 감점으로 나타날 수 있어요. 합성 데이터에 '꾸준히 쓰는지'를 반영해 만든 방향이에요."
+    return "간편결제를 꾸준히 쓴 기간이나 금액이 적으면 감점으로 나타날 수 있어요. 합성 데이터에 '꾸준히 쓰는지'를 반영해 만든 방향이에요."
   }
   return null
 }
@@ -50,7 +50,7 @@ export default function ShapFactorsCard({ shap, alternativeScore }) {
       {factors.length === 0 ? <p>표시할 항목이 없습니다.</p> : (
         <div className="l-stack">
           <div className="shap-summary-row">
-            <p className="shap-summary">전체 회원 평균 <span className="num">{shap.baseScore}</span>점 → 항목 영향 합 <span className="num">{scoreDifference == null ? '' : scoreDifference > 0 ? '+' : ''}{scoreDifference}</span>점 → 내 점수 <span className="num">{alternativeScore}</span>점</p>
+            <p className="shap-summary">모델 기준점(학습 데이터 평균) <span className="num">{shap.baseScore}</span>점 → 항목 영향 합 <span className="num">{scoreDifference == null ? '' : scoreDifference > 0 ? '+' : ''}{scoreDifference}</span>점 → 내 점수 <span className="num">{alternativeScore}</span>점</p>
             {factors.length > topFactors.length && (
               <Button size="sm" onClick={() => setShowAll((current) => !current)}>
                 {showAll ? '간단히 보기' : '자세히 보기'}
