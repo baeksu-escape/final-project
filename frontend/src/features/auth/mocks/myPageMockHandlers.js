@@ -1,6 +1,6 @@
 import { ApiError } from '../../../common/api/ApiError.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
-import { AUTH_ERROR_CODES, EMAIL_PURPOSES } from '../authConstants.js'
+import { AUTH_ERROR_CODES, EMAIL_PURPOSES, SAME_PASSWORD_MESSAGE } from '../authConstants.js'
 import { isValidEmail, isValidPassword } from '../validation.js'
 import { withdrawAllAltDataOfUser } from '../../dataInput/mocks/altDataMockStore.js'
 import { consumeVerification, isMockEmailInUse, requireAccountByToken, withdrawMockAccount } from './authMockHandlers.js'
@@ -82,11 +82,14 @@ registerMockHandlers({
     return {}
   },
 
-  // N-04-3 비밀번호 변경 — 현재 비밀번호를 확인하고 새 비밀번호 규칙을 검사한 뒤 바꾼다.
+  // N-04-3 비밀번호 변경 — 현재 비밀번호를 확인하고 새 비밀번호 규칙을 검사한 뒤 바꾼다. 지금 비밀번호와 같으면 400 SAME_PASSWORD(FP-222, 서버와 같은 순서).
   'PUT /api/members/me/password': ({ body, token }) => {
     const account = requireAccountByToken(token)
     if (!matchesPassword(account, body?.currentPassword)) throw new ApiError(400, '현재 비밀번호가 올바르지 않습니다.')
     if (!isValidPassword(body.newPassword)) throw new ApiError(400, '비밀번호 규칙을 지켜 주세요.')
+    if (matchesPassword(account, body.newPassword)) {
+      throw new ApiError(400, SAME_PASSWORD_MESSAGE, { code: AUTH_ERROR_CODES.SAME_PASSWORD })
+    }
     account.password = body.newPassword
     return {}
   },

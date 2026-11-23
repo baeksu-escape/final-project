@@ -27,6 +27,8 @@ public class MyPageService {
 
     // DIM_WORKER_TYPE 코드(프론트 common/config/jobTypes.js와 같은 값).
     static final Set<String> JOB_TYPES = Set.of("EMPLOYEE", "SELF_EMPLOYED", "FREELANCER");
+    // FP-222 MEM-04 새 비밀번호가 지금 비밀번호와 같을 때 문구(프론트 authConstants.js SAME_PASSWORD_MESSAGE와 같음).
+    static final String SAME_PASSWORD_MESSAGE = "지금 쓰는 비밀번호와 같습니다. 다른 비밀번호를 입력해 주세요.";
 
     private final UserAccountMapper userMapper;
     private final FinancialInputMapper financialInputMapper;
@@ -92,6 +94,7 @@ public class MyPageService {
     }
 
     // MEM-04 비밀번호 변경 — 현재 비밀번호를 확인하고 새 비밀번호 규칙을 검사한다.
+    // FP-222 새 비밀번호가 지금 비밀번호와 같으면(BCrypt matches) 400 SAME_PASSWORD로 막는다. 화면 검사를 거치지 않은 요청도 막기 위해서다.
     public void changePassword(long userId, MyPageDtos.PasswordChange request) {
         UserAccount account = require(userId);
         if (!passwordMatches(account, request.currentPassword())) {
@@ -100,6 +103,10 @@ public class MyPageService {
         if (!AccountRules.isValidPassword(request.newPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "비밀번호 규칙을 지켜 주세요.",
                     List.of(new FieldErrorItem("newPassword", "비밀번호 규칙을 지켜 주세요.")));
+        }
+        if (passwordMatches(account, request.newPassword())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "SAME_PASSWORD", SAME_PASSWORD_MESSAGE,
+                    List.of(new FieldErrorItem("newPassword", SAME_PASSWORD_MESSAGE)));
         }
         userMapper.updatePassword(userId, passwordEncoder.encode(request.newPassword()), LocalDateTime.now(clock));
     }

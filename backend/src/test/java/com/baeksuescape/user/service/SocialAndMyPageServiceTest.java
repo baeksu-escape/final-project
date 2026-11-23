@@ -188,6 +188,17 @@ class SocialAndMyPageServiceTest {
         verify(userMapper).updatePassword(eq(7L), anyString(), any());
     }
 
+    // FP-222 새 비밀번호가 지금 비밀번호와 같으면 400 SAME_PASSWORD로 막고 저장하지 않는다. 다르면 저장한다.
+    @Test
+    void 비밀번호_변경은_지금_비밀번호와_같은_새_비밀번호를_막는다() {
+        given(userMapper.selectById(7L)).willReturn(UserFixtures.user(7L, "employee"));
+        assertThat(codeOf(() -> myPage.changePassword(7L, new MyPageDtos.PasswordChange(PASSWORD, PASSWORD)))).isEqualTo("400 SAME_PASSWORD");
+        verify(userMapper, never()).updatePassword(any(Long.class), anyString(), any());
+
+        myPage.changePassword(7L, new MyPageDtos.PasswordChange(PASSWORD, "different99"));
+        verify(userMapper).updatePassword(eq(7L), anyString(), any());
+    }
+
     // FP-227 MEM-05 — 직군을 selectById가 돌려줄 계정에 넣어 둔다(null이면 아직 고르지 않음).
     private UserAccount givenJobType(String jobType) {
         UserAccount account = UserFixtures.user(7L, "newbie");

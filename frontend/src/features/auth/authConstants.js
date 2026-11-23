@@ -37,7 +37,12 @@ export const AUTH_ERROR_CODES = Object.freeze({
   DUPLICATE_NICKNAME: 'DUPLICATE_NICKNAME',
   // 실제 서버: 관리자 2단계 인증(AUTH-11) 준비 전에는 관리자 로그인을 409로 막는다(FP-87 작업 2, 작업 7에서 연다).
   ADMIN_2FA_NOT_READY: 'ADMIN_2FA_NOT_READY',
+  // FP-222 MEM-04 새 비밀번호가 지금 비밀번호와 같음(400).
+  SAME_PASSWORD: 'SAME_PASSWORD',
 })
+
+// FP-222 N-04-3 새 비밀번호가 지금 비밀번호와 같을 때 문구. 서버 MyPageService.SAME_PASSWORD_MESSAGE와 같다.
+export const SAME_PASSWORD_MESSAGE = '지금 쓰는 비밀번호와 같습니다. 다른 비밀번호를 입력해 주세요.'
 
 // N-01 로그인 실패 문구. 아이디와 비밀번호 중 무엇이 틀렸는지 알려 주지 않는다. 탈퇴한 옛 아이디로 로그인할 때도 이 문구를 쓴다(FP-93 작업 지시서 문구).
 export const LOGIN_FAILED_MESSAGE = '아이디 또는 비밀번호가 맞지 않습니다.'

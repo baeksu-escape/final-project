@@ -11,13 +11,16 @@ const NO_JOB_TYPE = '직군 미선택'
 
 // N-04-1 내 정보 카드 — 7개 항목을 보여 준다. 이름·휴대폰·이메일은 서버가 가려서 보낸 값을 그대로 쓴다.
 // N-04-2 [가림 해제]를 누르면 비밀번호 칸을 열고, 확인은 onUnmask(password)가 맡는다(틀리면 오류를 던진다). 해제 뒤에는 unmasked 값을 보여 준다.
+// FP-222 확인한 뒤에는 이 카드에서 [숨기기]·[표시]로 가린 값과 원래 값을 오간다. 원래 값은 MyPage 상태에만 있어 다시 표시할 때 비밀번호를 묻지 않고,
+// 화면을 벗어나면 함께 사라진다(서버 MEM-02는 유효시간 없이 요청마다 비밀번호를 확인한다).
 export default function MyProfileCard({ profile, unmasked, onUnmask }) {
   const [asking, setAsking] = useState(false)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
+  const [revealed, setRevealed] = useState(false)
 
-  const shown = unmasked ?? profile
+  const shown = unmasked && revealed ? unmasked : profile
   const items = [
     ['아이디', profile.loginId],
     ['닉네임', profile.nickname],
@@ -47,6 +50,7 @@ export default function MyProfileCard({ profile, unmasked, onUnmask }) {
     try {
       await onUnmask(password)
       setAsking(false)
+      setRevealed(true)
     } catch (unmaskError) {
       setError(unmaskError.message)
     } finally {
@@ -65,10 +69,15 @@ export default function MyProfileCard({ profile, unmasked, onUnmask }) {
           </div>
         ))}
       </dl>
-      {unmasked && (
+      {unmasked && revealed && (
         <p className="my-profile-card__unmasked" role="status">
           가림을 해제했습니다. 이 화면을 벗어나면 다시 가려집니다.
         </p>
+      )}
+      {unmasked && (
+        <button type="button" className="my-profile-card__unmask" onClick={() => setRevealed((value) => !value)}>
+          {revealed ? '숨기기' : '표시'}
+        </button>
       )}
       {!unmasked && asking && (
         <form className="my-profile-card__unmask-form" onSubmit={handleUnmask} noValidate>

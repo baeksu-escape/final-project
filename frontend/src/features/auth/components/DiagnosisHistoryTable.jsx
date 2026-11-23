@@ -3,6 +3,8 @@ import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { GRADE_STATUS, getNotScorableMessage } from '../../../common/config/scoreStatus.js'
 import { fetchDiagnosisHistory } from '../api/diagnosisHistoryApi.js'
 import { EMPTY_HISTORY_MESSAGE, GRADE_LABELS, NOT_SCORABLE_LABEL } from '../diagnosisHistoryConfig.js'
+// FP-222 등급 태그 모양(credit-grade)은 신용 리포트 [점수 비교]와 같은 규칙을 가져다 쓴다(메인 화면 LandingPage와 같은 방식, 파일은 고치지 않음).
+import '../../credit/credit.css'
 
 // 가장 오래된 진단처럼 변화 값이 없을 때 보일 문자.
 const NO_CHANGE = '—'
@@ -17,6 +19,12 @@ function formatScore(score, notScorable) {
 // 서버 시각 문자열(2026-11-09T14:30:00)을 "2026-11-09 14:30"으로 보여 준다.
 function formatCalculatedAt(value) {
   return value.slice(0, 16).replace('T', ' ')
+}
+
+// FP-222 등급 칸 — 신용 리포트와 같은 등급 태그(credit-grade credit-grade--{코드 소문자})로 보여 준다. 등급이 없으면 예전처럼 비운다.
+function GradeTag({ grade }) {
+  if (!grade) return null
+  return <span className={`credit-grade credit-grade--${grade.toLowerCase()}`}>{GRADE_LABELS[grade] ?? grade}</span>
 }
 
 // 변화 값을 부호와 함께 보여 준다. 예) 12 → +12, -5 → -5, null → —
@@ -82,7 +90,7 @@ export default function DiagnosisHistoryTable() {
               <td>
                 {notScorable
                   ? `${NOT_SCORABLE_LABEL} (${getNotScorableMessage(item.notScorableReasonCode)})`
-                  : (GRADE_LABELS[item.grade] ?? item.grade)}
+                  : <GradeTag grade={item.grade} />}
               </td>
               <td>{notScorable ? '' : formatChange(item.alternativeScoreChange)}</td>
             </tr>
