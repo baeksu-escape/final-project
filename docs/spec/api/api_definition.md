@@ -57,7 +57,7 @@
 | 평가 식별자 | 화면과 URL에는 `ASSESSMENT_ID` 대신 **`REQUEST_ID`(소문자 UUID)**만 쓴다. 번호를 추측해 남의 결과를 보는 것을 막기 위해서다 | DDL `ASSESSMENT.REQUEST_ID` 주석 |
 | 형식 | JSON, UTF-8. 필드는 camelCase, 경로는 kebab-case. 코드값은 DB 코드 그대로 쓴다(`SELF_EMPLOYED`, `SCORED` 등) | 기존 코드 |
 | 금액·비율 | 금액은 원 단위 정수, 금리는 연 %(8.9 = 8.9%), 확률은 0~1 | DDL 머리말 |
-| 점수 | **0~1000** 정수. 등급은 `GOOD` / `STANDARD` / `CAUTION`(ACTIVE CUT-0.1: 0~664 / 665~779 / 780~1000, 🟡 임시값. 11/19 `CUT-0.2` 0~659 / 660~730 / 731~1000이 DRAFT로 추가됐고 전환 시점은 팀이 정함, PR #106 🆕 11/20) | DDL v0.3.1 A-1 |
+| 점수 | **0~1000** 정수. 등급은 `GOOD` / `STANDARD` / `CAUTION`(ACTIVE CUT-0.3: 0~653 / 654~726 / 727~1000, 🟡 임시값. 11/23 `CUT-0.1`(0~664 / 665~779 / 780~1000)에서 전환, FP-248 🆕 11/23. `CUT-0.2` 0~659 / 660~730 / 731~1000은 DRAFT) | DDL v0.3.1 A-1 |
 | 날짜 | 월 `"YYYY-MM"`, 날짜 `"YYYY-MM-DD"`, 시각은 ISO-8601 | DDL CHECK |
 | 오류 응답 | HTTP 상태 + `{ "code", "message", "fieldErrors": [{ "field", "message" }] }`. ✅ 전 API 공통(FP-87 `GlobalExceptionHandler`, D-20 확정 🆕 11/20) | 프론트 `serverErrors.js` |
 | 개인정보 | 이름·휴대폰·이메일은 마스킹해서 응답한다. 원문은 로그에 남기지 않는다. 관리자가 회원 신용정보를 열람하면 `ACCESS_AUDIT_LOG`에 남긴다 | AGENTS.md 5장, DDL N-35 |

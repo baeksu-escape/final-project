@@ -411,7 +411,7 @@ C팀 SIM-02 `POST /api/members/me/credit-care-recalculate`가 부른다(11/19 �
 
 | 항목 | Mock 동작 |
 |---|---|
-| 버전 | `DEV-DUMMY` / `FS-DRAFT` / `CUT-0.1` (DDL 기준 데이터와 같음) |
+| 버전 | `DEV-DUMMY` / `FS-DRAFT` / `CUT-0.3` (DDL 기준 데이터와 같음, 11/23 CUT-0.1에서 전환 FP-248) |
 | 점수 | 입력에서 정해지는 값이다. 같은 입력이면 같은 점수가 나와서 화면 테스트가 흔들리지 않는다. 범위 0~1000 |
 | SHAP | 점수 합 규칙을 실제와 똑같이 지킨다 |
 | 피처 코드 | ✅ 피처 정의서 v1.0 11장의 39개를 `FS-DRAFT`로 쓴다(정의서가 확정되면 `FS-V1`). 시드 파일 `docs/spec/sql/seed/avenue_seed_dim_feature_fs_draft.sql`(11/13, `avenue_ddl.sql` 다음 실행). 금융 8: `income_cv`, `zero_income_months_12m`, `expense_to_income_pct`, `debt_service_ratio_pct`, `delinq_count_12m`, `max_delinq_days_3m`, `card_util_pct`, `cash_advance_months` / 대안 6: `telecom_on_time_streak`, `telecom_late_months`, `utility_late_months`, `dp_payment_amount_12m_krw`, `np_arrears_months`, `hi_arrears_months`. 시뮬 가능 여부는 임시값 |
