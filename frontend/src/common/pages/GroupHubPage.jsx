@@ -5,10 +5,12 @@ import { NAV_GROUPS, PATHS } from '../config/navigation.js'
 import { useAuth } from '../auth/useAuth.js'
 import Button from '../components/Button.jsx'
 import ScoreGauge from '../../features/credit/components/ScoreGauge.jsx'
-import { fetchCreditReport, fetchScorePercentile } from '../../features/credit/api/creditApi.js'
+import { fetchCreditReport } from '../../features/credit/api/creditApi.js'
+import { getScorePercentile } from '../../features/comparison/api/scorePercentileApi.js'
 import { getCreditCareBase } from '../../features/simulation/api/simulationApi.js'
 import { calculateAssetDebtPreview, getAssetDebtData, getCashFlowData } from '../../features/diagnosis/api/financeApi.js'
 import { getScenarioBase, recalculateMemberScenario } from '../../features/diagnosis/api/diagnosisApi.js'
+import { ASSET_DEBT_RISK_THRESHOLDS } from '../../features/diagnosis/utils/financeCalculations.js'
 import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import '../../features/credit/credit.css'
 import './hub.css'
@@ -60,7 +62,7 @@ const COPY = {
       <>
         <div className="hub-preview__rings">
           {['dsr', 'debtToAsset', 'debtToNetAsset'].map((key, index) => Number.isFinite(ratios[key])
-            ? <ScoreRing key={key} value={ratios[key]} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub={formatPct(ratios[key])} tone={['var(--mint)', 'var(--warn)', 'var(--bad)'][index]} size={160} />
+            ? <ScoreRing key={key} value={ratios[key]} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub={formatPct(ratios[key])} tone={riskTone(ratios[key], ['dsr', 'debtToAsset', 'debtToNetAsset'][index])} size={160} />
             : <p key={key} className="hint" role="status">미입력</p>)}
         </div>
         {['dsr', 'debtToAsset', 'debtToNetAsset'].some((key) => !Number.isFinite(ratios[key])) && <p className="hint">입력하지 않은 항목이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면으로 이동</Link></p>}
@@ -79,9 +81,7 @@ const COPY = {
     body: '금리 상승·소득 감소 같은 상황을 골라 보면 매달 갚을 돈과 상환 여력(소득 대비 상환 부담)이 어떻게 바뀌는지 계산합니다. 나빠질 때와 좋아질 때를 모두 볼 수 있어요.',
     preview: ({ ratios }) => (
       <div className="hub-preview__rings">
-        <ScoreRing value={ratios[0]} max={100} label="지금" sub={`상환 부담 ${formatPct(ratios[0])}`} tone="var(--mint)" size={160} />
-        <ScoreRing value={ratios[1]} max={100} label="금리 +2%p" sub={`상환 부담 ${formatPct(ratios[1])}`} tone="var(--warn)" size={160} />
-        <ScoreRing value={ratios[2]} max={100} label="소득 -15%" sub={`상환 부담 ${formatPct(ratios[2])}`} tone="var(--bad)" size={160} />
+        {ratios.map((ratio, index) => <ScoreRing key={index} value={ratio} max={100} label={['지금', '금리 +2%p', '소득 -15%'][index]} sub={`상환 부담 ${formatPct(ratio)}`} tone={riskTone(ratio, 'dsr')} size={160} />)}
       </div>
     ),
   },
@@ -99,6 +99,13 @@ const COPY = {
 // N-16·N-17·N-21 소개 수치의 표시는 각 기능 카드와 같은 소수 첫째 자리 기준으로 맞춘다.
 function formatPct(value) {
   return Number.isFinite(value) ? `${value.toFixed(1)}%` : '—'
+}
+
+// N-16 위험 단계 기준을 재사용해 점수 링의 의미 색을 정한다.
+function riskTone(value, key) {
+  const thresholds = ASSET_DEBT_RISK_THRESHOLDS[key]
+  const risk = value >= thresholds.danger ? 'danger' : value >= thresholds.caution ? 'caution' : 'safe'
+  return ({ safe: 'var(--mint)', caution: 'var(--warn)', danger: 'var(--bad)' })[risk]
 }
 
 // N-12·N-13·N-16·N-17·N-18·N-21 조회 실패는 이 목록에만 적용한다.
@@ -165,7 +172,7 @@ export default function GroupHubPage({ groupKey }) {
   useEffect(() => {
     if (groupKey !== 'credit') return undefined
     let active = true
-    fetchScorePercentile().then((response) => {
+    getScorePercentile().then((response) => {
       if (!active) return
       const workerGroup = response.groups?.find((item) => item.groupType === 'WORKER_TYPE')
       if (!workerGroup) {
