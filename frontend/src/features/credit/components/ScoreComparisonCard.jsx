@@ -57,11 +57,9 @@ function ModelScore({ title, model, bands, features, alternative, diff }) {
           </span>
         )}
       </div>
-      {alternative && diff != null && (
-        <p className={diff < 0 ? 'credit-diff credit-diff--negative num' : 'credit-diff num'}>
-          기존보다 {signedScore(diff)}점
-        </p>
-      )}
+      <p aria-hidden={!alternative || diff == null} className={`${alternative && diff != null ? 'credit-diff' : 'credit-diff credit-diff--placeholder'}${alternative && diff < 0 ? ' credit-diff--negative' : ''} num`}>
+        {alternative && diff != null ? `기존보다 ${signedScore(diff)}점` : '\u00a0'}
+      </p>
       {available ? (
         <ScoreGauge score={model.score} bands={bands} label={title} alternative={alternative} />
       ) : <p className="credit-unavailable">산정 불가</p>}

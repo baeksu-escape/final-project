@@ -30,18 +30,21 @@
 .credit-gauge__tick text { fill: var(--mut2); font-size: 10.5px; font-weight: 700; }
 .credit-gauge__band-label.is-mine { fill: var(--gauge); font-weight: 800; }
 .credit-gauge__score { fill: var(--gauge); font-size: 60px; font-weight: 800; letter-spacing: -0.04em; }
+.credit-gauge:not(.credit-gauge--alternative) .credit-gauge__value { stroke: var(--mut); }
+.credit-gauge:not(.credit-gauge--alternative) .credit-gauge__score { fill: var(--fg2); }
 .credit-gauge__unit { fill: var(--mut2); font-size: 13px; font-weight: 600; }
 .credit-unavailable { min-height: 150px; display: grid; place-items: center; color: var(--mut); font-weight: 600; }
 
 /* 영역 칩 */
 .credit-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.credit-chips .chip { background: var(--panel); border: 1px solid var(--line); }
 .credit-chip--alternative .chip { color: var(--acc); background: var(--sel); }
 
 /* 대안 모델 쪽 상자는 파란 테두리로 강조 */
 .panel-sunk:has(.credit-gauge--alternative) { background: var(--panel); box-shadow: inset 0 0 0 2px var(--acc); }
 .panel-sunk:has(.credit-gauge) { display: flex; flex-direction: column; gap: var(--sp-3); }
-.panel-sunk:has(.credit-gauge) > .credit-gauge { margin-top: auto; }
 .credit-diff { margin: 0; }
+.credit-diff--placeholder { visibility: hidden; }
 
 /* 요약 카드 */
 .credit-summary-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
