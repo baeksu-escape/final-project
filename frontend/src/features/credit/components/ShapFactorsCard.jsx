@@ -6,6 +6,7 @@ import '../credit.css'
 
 // N-12 SHAP 값 표시 — 단위에 맞춰 보여 준다. 0/1은 없음·있음, 비율은 ×100 %, 원은 콤마, 그 밖은 값 뒤에 단위를 붙인다.
 function formatShapValue(value, unitName) {
+  if (unitName === '코드') return ''
   const number = Number(value)
   if (unitName === '0/1' && (number === 0 || number === 1)) return number === 1 ? '있음' : '없음'
   if (unitName === '비율' && value !== '' && Number.isFinite(number)) return `${(number * 100).toFixed(1)}%`
@@ -37,18 +38,19 @@ export default function ShapFactorsCard({ shap, alternativeScore }) {
   const topFactors = [
     ...factors.filter((factor) => factor.shapScore > 0).slice(0, 5),
     ...factors.filter((factor) => factor.shapScore < 0).slice(0, 5),
-    // 영향이 0인 항목도 값(예: 없음)이 보이도록 맨 뒤에 모두 둔다.
-    ...factors.filter((factor) => factor.shapScore === 0),
   ]
   const visibleFactors = showAll ? factors : topFactors
   const maxScore = Math.max(30, ...factors.map((factor) => Math.abs(factor.shapScore)))
+  const scoreDifference = shap?.baseScore == null || alternativeScore == null
+    ? null
+    : alternativeScore - shap.baseScore
 
   return (
     <Card title="영역별 영향도 (SHAP)">
       {factors.length === 0 ? <p>표시할 항목이 없습니다.</p> : (
         <div className="l-stack">
           <div className="shap-summary-row">
-            <p className="shap-summary">기준점 <span className="num">{shap.baseScore}</span> → 모델 점수 <span className="num">{alternativeScore}</span></p>
+            <p className="shap-summary">전체 회원 평균 <span className="num">{shap.baseScore}</span>점 → 항목 영향 합 <span className="num">{scoreDifference == null ? '' : scoreDifference > 0 ? '+' : ''}{scoreDifference}</span>점 → 내 점수 <span className="num">{alternativeScore}</span>점</p>
             {factors.length > topFactors.length && (
               <Button size="sm" onClick={() => setShowAll((current) => !current)}>
                 {showAll ? '간단히 보기' : '자세히 보기'}
@@ -71,7 +73,7 @@ export default function ShapFactorsCard({ shap, alternativeScore }) {
                 <div className="shap-row">
                   <span className="shap-label">
                     {factor.alternativeYn === 'Y' && <b className="shap-tag">대안</b>}
-                    {factor.featureName}{factor.featureValue != null && <> ({formatShapValue(factor.featureValue, factor.unitName)})</>}
+                    {factor.featureName}{factor.featureValue != null && factor.unitName !== '코드' && <> ({formatShapValue(factor.featureValue, factor.unitName)})</>}
                   </span>
                   <span className="shap-bar" aria-hidden="true">
                     <span className="shap-midpoint" />
