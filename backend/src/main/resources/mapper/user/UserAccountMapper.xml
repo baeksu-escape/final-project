@@ -111,6 +111,13 @@
          WHERE USER_ID = #{userId}
     </update>
 
+    <!-- MEM-08 N-04-3 닉네임 변경(FP-222) -->
+    <update id="updateNickname">
+        UPDATE APP_USER
+           SET NICKNAME = #{nickname}, UPDATED_AT = #{now}
+         WHERE USER_ID = #{userId}
+    </update>
+
     <update id="updateEmail">
         UPDATE APP_USER
            SET EMAIL_ENC = #{emailEnc}, EMAIL_HMAC = #{emailHmac}, UPDATED_AT = #{now}
