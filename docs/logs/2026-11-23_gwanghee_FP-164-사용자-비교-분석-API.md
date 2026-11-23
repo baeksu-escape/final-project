@@ -58,7 +58,7 @@
   - `groupComparisonCodes.js`: 보기 이름, 행·열 순서, 차이 표시
   - `features/admin/adminStatsCodes.js`의 `groupLabel`이 `ALL`을 "전체"로 보여 준다(관리자 통계 응답에는 ALL이 없어 영향 없음).
 - CSS·className은 새로 만들지 않았다. 공통 컴포넌트(`Card`·`Button`·`Notice`·`SegmentedControl`·`CompareBar`)와 기존 클래스(`l-stack`·`l-cols`·`data-table`·`hint`·`num`)만 썼다.
-- **아직 메뉴에 연결되지 않았다.** 동주 님 FP-253(`ComparisonPage.jsx`)이 develop에 병합되면 develop을 합치고, 동주 님이 비워 둔 주석 자리에 `<GroupCompareSection />` 한 줄을 넣는다.
+- **연결:** 동주 님 FP-253(`ComparisonPage.jsx`, PR #147)이 develop에 병합된 뒤, 동주 님이 비워 둔 주석 자리에 `<GroupCompareSection />` 한 줄을 넣었다. `/comparison`에서 내 위치 카드 아래에 보인다. 페이지 전체를 서버 렌더링해 두 구역이 함께 조립되는 것을 확인했다.
 - **확인**
   - `npm run lint` 오류 0, `npm run build` 성공
   - mock 응답으로 서버 렌더링해 글자를 확인했다.
