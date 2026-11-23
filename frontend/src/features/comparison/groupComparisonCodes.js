@@ -37,8 +37,9 @@ export function diffOf(value, base) {
   return Math.round((value - base) * 10) / 10
 }
 
-// 차이를 부호와 함께 — 예) +12.3점, -4.0점. 숨김이면 '—'
+// 차이를 화살표와 함께 — 예) ▲ 12.3점, ▼ 4.0점, 같음(11/06 UI). 숨김이면 '—'
 export function formatDiff(diff) {
   if (diff === null) return EMPTY_TEXT
-  return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}점`
+  if (diff === 0) return '같음'
+  return `${diff > 0 ? '▲' : '▼'} ${Math.abs(diff).toFixed(1)}점`
 }

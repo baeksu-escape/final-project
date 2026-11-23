@@ -71,7 +71,11 @@ export default function GroupCompareSection() {
       {view === 'GRID' ? (
         <div className="l-cols">
           <Card title="직군 × 연령 한눈에 보기" className="l-cols__main">
-            <SegmentedControl label="칸에 표시할 값" options={CELL_METRICS} value={metric.value} onChange={setMetricKey} />
+            <p className="hint">칸이 진할수록 값이 높습니다. 칸을 누르면 오른쪽에 자세한 내용이 나옵니다.</p>
+            <div className="l-row">
+              <span className="hint">칸에 표시할 값</span>
+              <SegmentedControl label="칸에 표시할 값" options={CELL_METRICS} value={metric.value} onChange={setMetricKey} />
+            </div>
             <HeatmapGrid
               rows={WORKER_TYPE_ORDER.map(jobName)}
               columns={AGE_BAND_ORDER.map(ageName)}
@@ -89,10 +93,7 @@ export default function GroupCompareSection() {
               totalSummary={pick(data.overall)}
               formatValue={metric.formatValue}
             />
-            <p className="hint">
-              칸이 진할수록 값이 높습니다. 칸을 누르면 오른쪽에 자세한 내용이 나옵니다. 점선 칸은 직군 평균·연령 평균·전체 평균이고, '—'는 인원이
-              적어 숨긴 값입니다.
-            </p>
+            <p className="hint">낮음 → 높음(진할수록) · [나] 내 집단 · 점선 칸 = 평균 · — = 인원이 적어 숨긴 값</p>
           </Card>
           <SelectedGroupPanel data={data} selected={selected} />
         </div>
