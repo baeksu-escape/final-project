@@ -3,6 +3,7 @@ import { Card } from '../../../common/components/index.js'
 import { fetchMyProfile, requestUnmaskProfile } from '../api/myPageApi.js'
 import AccountManageCard from '../components/AccountManageCard.jsx'
 import DiagnosisHistoryTable from '../components/DiagnosisHistoryTable.jsx'
+import MyCreditSummary from '../components/MyCreditSummary.jsx'
 import MyProfileCard from '../components/MyProfileCard.jsx'
 import WithdrawalCard from '../components/WithdrawalCard.jsx'
 import '../auth.css'
@@ -51,7 +52,8 @@ export default function MyPage() {
 
   return (
     <section className="my-page">
-      <h1 className="my-page__title">마이 페이지</h1>
+      {/* UI 리뉴얼 — 맨 위 시각화 요약(점수 링·추이·숫자 타일) */}
+      <MyCreditSummary profile={profile} />
       {loadError && (
         <p className="my-page__error" role="alert">
           {loadError}

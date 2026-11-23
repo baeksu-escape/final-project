@@ -396,3 +396,204 @@
   padding-top: 14px;
   border-top: 1px solid var(--line);
 }
+
+/* ===== UI 리뉴얼 — 커뮤니티형 목록 ===== */
+.lounge-list {
+  padding: 32px;
+}
+
+.lounge-hot {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.lounge-hot:empty {
+  display: none;
+}
+
+.lounge-hot__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 140px;
+  padding: 20px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--panel2);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.lounge-hot__card:hover {
+  transform: translateY(-3px);
+  background: var(--sel);
+}
+
+.lounge-hot__badge {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--panel);
+  color: #7c5cff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.lounge-hot__card b {
+  font-size: 16.5px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.lounge-hot__meta {
+  margin-top: auto;
+  color: var(--mut2);
+  font-size: 13px;
+}
+
+.lounge-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.lounge-tabs__btn {
+  padding: 9px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--fg2);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lounge-tabs__btn[aria-selected='true'] {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--panel);
+}
+
+.lounge-feed {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+.lounge-feed__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px 90px;
+  gap: 16px;
+  align-items: center;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.15s;
+}
+
+.lounge-feed__row:hover {
+  background: var(--panel2);
+}
+
+.lounge-feed__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 15.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lounge-feed__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lounge-feed__comments {
+  flex: none;
+  color: #7c5cff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.lounge-feed__mine {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--sel);
+  color: var(--acc);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.lounge-feed__row--hidden .lounge-feed__title {
+  color: var(--mut2);
+  cursor: default;
+}
+
+.lounge-feed__author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg2);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.lounge-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tone) 18%, var(--panel));
+  color: var(--tone);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.lounge-feed__date {
+  color: var(--mut2);
+  font-size: 13.5px;
+  text-align: right;
+}
+
+.lounge-empty {
+  padding: 48px 0;
+  color: var(--mut2);
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .lounge-list {
+    padding: 22px 16px;
+  }
+
+  .lounge-hot {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lounge-feed__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .lounge-feed__author {
+    display: none;
+  }
+}

@@ -1,45 +1,83 @@
-/* N-12-6 신용 리포트 전용 스타일 — 배치와 기본 표기는 공통 클래스를 사용한다. */
+/* N-12-6 신용 리포트(+ 메인 페이지 게이지) 전용 스타일 */
+
+/* 모델 한쪽 점수 상자 */
 .credit-model__header { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
-.credit-model__header h3 { margin: 0; font-size: 15px; }
-.credit-model__header p { margin: 4px 0; color: var(--mut); font-size: 14px; }
-.credit-grade { border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+.credit-model__header h3 { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
+.credit-model__header p { margin: 2px 0 0; color: var(--mut); font-size: 13.5px; }
+
+/* 등급 배지 */
+.credit-grade { display: inline-flex; align-items: center; padding: 7px 16px; border-radius: 999px; font-size: 15px; font-weight: 800; white-space: nowrap; }
 .credit-grade--good { color: var(--ok-fg); background: var(--ok-bg); }
 .credit-grade--standard { color: var(--note-fg); background: var(--note-bg); }
 .credit-grade--caution { color: var(--warn-fg); background: var(--warn-bg); }
-.credit-diff { color: var(--mint); font-weight: 700; font-size: 14px; }
-.credit-diff--negative { color: var(--bad); }
-.credit-gauge { display: block; width: 100%; max-width: 300px; margin: 0 auto; color: var(--mut); }
-.credit-gauge--alternative { color: var(--mint); }
-.credit-gauge__track, .credit-gauge__value { fill: none; stroke-width: 22; stroke-linecap: round; }
-.credit-gauge__track { stroke: var(--line); }
-.credit-gauge__value { stroke: currentColor; }
-.credit-gauge__tick { fill: var(--fg); }
-.credit-gauge__label { fill: var(--mut); font-size: 12px; }
-.credit-gauge__score { fill: currentColor; font-size: 50px; font-weight: 700; }
-.credit-unavailable { min-height: 150px; display: grid; place-items: center; color: var(--mut); }
-.credit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.credit-chip--alternative .chip { color: var(--vio); border-color: var(--vio); background: var(--note-bg); }
+
+/* 점수 차이 */
+.credit-diff { align-self: flex-start; padding: 4px 12px; border-radius: 999px; background: var(--ok-bg); color: var(--mint); font-weight: 800; font-size: 14px; }
+.credit-diff--negative { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+
+/* 반원 게이지 — 하나의 띠: 등급 구간은 옅은 색, 내 점수까지는 진한 같은 등급 색 */
+.credit-gauge { display: block; width: 100%; max-width: 380px; margin: 4px auto 0; overflow: visible; }
+.credit-gauge--tone-caution { --gauge: var(--warn); }
+.credit-gauge--tone-standard { --gauge: var(--acc); }
+.credit-gauge--tone-good { --gauge: var(--mint); }
+.credit-gauge__seg { fill: none; stroke-width: 20; stroke-linecap: butt; }
+.credit-gauge__seg--caution { stroke: color-mix(in srgb, var(--warn) 18%, var(--panel2)); }
+.credit-gauge__seg--standard { stroke: color-mix(in srgb, var(--acc) 18%, var(--panel2)); }
+.credit-gauge__seg--good { stroke: color-mix(in srgb, var(--mint) 18%, var(--panel2)); }
+.credit-gauge__value { fill: none; stroke: var(--gauge); stroke-width: 20; stroke-linecap: butt; transition: stroke-dashoffset 1.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.credit-gauge__band-label { fill: var(--mut2); font-size: 12px; font-weight: 600; }
+.credit-gauge__band-label.is-mine { fill: var(--gauge); font-weight: 800; }
+.credit-gauge__score { fill: var(--gauge); font-size: 60px; font-weight: 800; letter-spacing: -0.04em; }
+.credit-gauge__unit { fill: var(--mut2); font-size: 13px; font-weight: 600; }
+.credit-unavailable { min-height: 150px; display: grid; place-items: center; color: var(--mut); font-weight: 600; }
+
+/* 영역 칩 */
+.credit-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.credit-chip--alternative .chip { color: var(--acc); background: var(--sel); }
+
+/* 대안 모델 쪽 상자는 파란 테두리로 강조 */
+.panel-sunk:has(.credit-gauge--alternative) { background: var(--panel); box-shadow: inset 0 0 0 2px var(--acc); }
+.panel-sunk:has(.credit-gauge) { display: flex; flex-direction: column; gap: var(--sp-3); }
+.panel-sunk:has(.credit-gauge) > .credit-gauge { margin-top: auto; }
+.credit-diff { margin: 0; }
+
+/* 요약 카드 */
 .credit-summary-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.credit-summary-card__header h2 { margin: 4px 0 0; font-size: 15px; }
-.credit-summary-card__legend { display: grid; gap: 6px; color: var(--mut); font-size: 12px; }
-.credit-summary-card__action p { margin: 0 0 10px; }
-.shap-summary-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.shap-summary { margin: 0; color: var(--fg); }
+.credit-summary-card__header h2 { margin: 2px 0 0; font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+.credit-summary-card__legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--mut); font-size: 12.5px; }
+.credit-summary-card__action { display: flex; flex-direction: column; gap: var(--sp-3); }
+.credit-summary-card__action p { margin: 0; }
+.credit-summary-card__action .button { align-self: flex-start; text-decoration: none; }
+
+/* SHAP 막대 */
+.shap-summary-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.shap-summary { margin: 0; padding: 10px 14px; border-radius: var(--r); background: var(--panel2); color: var(--fg2); font-size: 14px; }
+.shap-summary .num { color: var(--fg); font-weight: 800; }
 .shap-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--mut); font-size: 12.5px; }
-.shap-swatch { display: inline-block; width: 14px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: middle; }
+.shap-swatch { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 50%; vertical-align: middle; }
 .shap-swatch.shap-positive, .shap-fill.shap-positive { background: var(--mint); }
 .shap-swatch.shap-negative, .shap-fill.shap-negative { background: var(--bad); }
-.shap-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.6fr) 64px; gap: 12px; align-items: center; font-size: 14px; }
-.shap-label { min-width: 0; }
-.shap-tag { display: inline-block; margin-right: 6px; padding: 1px 6px; border: 1px solid var(--vio); border-radius: 5px; color: var(--vio); font-size: 11px; }
-.shap-bar { position: relative; display: block; height: 20px; border-radius: 4px; background: var(--panel2); }
-.shap-bar > span { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
-.shap-bar > .shap-midpoint { left: 50%; top: -4px; bottom: -4px; width: 1px; border-radius: 0; background: var(--line2); }
-.shap-score { text-align: right; }
+.shap-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.5fr) 56px; gap: 14px; align-items: center; padding: 6px 0; font-size: 14px; }
+.shap-row + .shap-row { border-top: 1px solid var(--line); padding-top: 10px; }
+.shap-label { min-width: 0; color: var(--fg2); }
+.shap-tag { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 6px; background: var(--sel); color: var(--acc); font-size: 11px; font-weight: 800; vertical-align: 1px; }
+.shap-bar { position: relative; display: block; height: 10px; border-radius: 999px; background: var(--panel2); }
+.shap-bar > span { position: absolute; top: 0; bottom: 0; border-radius: 999px; }
+.shap-bar > .shap-midpoint { left: 50%; top: -5px; bottom: -5px; width: 2px; border-radius: 0; background: var(--line2); }
+.shap-score { text-align: right; font-weight: 800; }
 .shap-score.shap-positive { color: var(--mint); }
 .shap-score.shap-negative { color: var(--bad); }
-.shap-score.shap-neutral { color: var(--fg); }
+.shap-score.shap-neutral { color: var(--mut2); }
 @media (max-width: 640px) {
   .shap-row { grid-template-columns: minmax(0, 1fr) 56px; }
   .shap-bar { grid-column: 1 / -1; grid-row: 2; }
 }
+/* UI 리뉴얼 — SHAP 막대가 가운데 선에서 양쪽으로 자라난다 */
+.shap-bar > .shap-fill { animation: shap-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.shap-bar > .shap-fill.shap-positive { transform-origin: left center; }
+.shap-bar > .shap-fill.shap-negative { transform-origin: right center; }
+.shap-row:nth-child(2) .shap-fill { animation-delay: .06s; }
+.shap-row:nth-child(3) .shap-fill { animation-delay: .12s; }
+.shap-row:nth-child(4) .shap-fill { animation-delay: .18s; }
+.shap-row:nth-child(n+5) .shap-fill { animation-delay: .24s; }
+@keyframes shap-grow { from { transform: scaleX(0); } }

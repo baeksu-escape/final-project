@@ -1,85 +1,109 @@
-/* 공통 디자인 토큰 — 색·글꼴 변수. 기본은 화이트 테마이고, html에 data-theme="dark"를 달면 블랙 테마가 된다.
-   값은 'Avenue 기능 데모 v2' UI 기준이다. 테마를 바꾸는 코드는 여기에 없다. */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+/* 공통 디자인 토큰 — 색·글꼴·간격 변수. 기본은 화이트 테마이고, html에 data-theme="dark"를 달면 블랙 테마가 된다.
+   UI 리뉴얼(신뢰감 있는 금융 앱): 강조색은 파랑 하나, 의미색(좋음·주의·나쁨)만 따로 둔다. 테마를 바꾸는 코드는 여기에 없다.
+   변수 이름은 예전 그대로 쓴다(기능 CSS가 이 이름을 쓴다). 이름과 실제 쓰임:
+   --mint = 좋음·가점(초록), --vio = 강조·차트 계열(파랑), --pri = 주 버튼, --acc = 선택·강조 테두리 */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 
 :root {
   color-scheme: light;
-  --bg: #f0eee9;
-  --panel: #ebe8de;
-  --panel2: #e4e1d8;
-  --inp: #faf9f6;
-  --line: #c1bdb3;
-  --line2: #aaa69c;
-  --sel: #dbeee6;
-  --fg: #24221e;
-  --fg2: #38352f;
-  --mut: #5c5951;
-  --mut2: #726f67;
-  --mint: #277b68;
-  --vio: #7954d4;
-  --vio2: #6a46c4;
-  --pri: #bde9dc;
-  --pri2: #a9dfcf;
-  --pri-fg: #1b4e43;
-  --warn: #8a6828;
-  --bad: #974646;
-  --info: #2a6a9a;
-  --link: #2a5a8f;
-  --acc: #277b68;
+  --bg: #f2f4f6;
+  --panel: #ffffff;
+  --panel2: #f7f8fa;
+  --inp: #ffffff;
+  --line: #e5e8eb;
+  --line2: #d1d6db;
+  --sel: #e8f1fe;
+  --fg: #191f28;
+  --fg2: #333d4b;
+  --mut: #4e5968;
+  --mut2: #6b7684;
+  --mint: #0e9f6e;
+  --vio: #3478f6;
+  --vio2: #2563d9;
+  --pri: #3478f6;
+  --pri2: #2563d9;
+  --pri-fg: #ffffff;
+  --warn: #e07b00;
+  --bad: #f04452;
+  --info: #3478f6;
+  --link: #2563d9;
+  --acc: #3478f6;
 
   /* 안내 박스·오버레이 */
-  --note-bg: #f0ecfb;
-  --note-line: #cfc4ef;
-  --note-fg: #4a36a0;
-  --warn-bg: #fbf3dc;
-  --warn-line: #e6cf93;
-  --warn-fg: #6b4b00;
-  --ok-bg: #e1f3ea;
-  --ok-line: #a9d9c3;
-  --ok-fg: #145a43;
-  --overlay: #2b28204d;
-  --float-bg: #fbfaf6;
-  --shadow: 0 12px 32px rgba(60, 50, 30, 0.2);
+  --note-bg: #edf4ff;
+  --note-line: #d3e0fa;
+  --note-fg: #1f3f8a;
+  --warn-bg: #fff6e5;
+  --warn-line: #f4dcae;
+  --warn-fg: #7a4800;
+  --ok-bg: #e9f6f0;
+  --ok-line: #bfe3d2;
+  --ok-fg: #0b5a3f;
+  --overlay: #0f172a66;
+  --float-bg: #ffffff;
+  --shadow: 0 8px 28px rgba(17, 24, 39, 0.12);
+  --shadow-sm: none;
 
-  --f-d: 'DM Sans', 'Noto Sans KR', sans-serif;
-  --f-b: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  /* 글꼴 — Pretendard 하나(한글·숫자 모두). --f-d는 숫자·제목용으로 예전 이름을 유지 */
+  --f-d: 'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif;
+  --f-b: 'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif;
+
+  /* 간격(4px 단위)·모서리·글자 크기 — 새 화면은 이 값만 쓴다 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 48px;
+  --r-sm: 8px;
+  --r: 12px;
+  --r-lg: 24px;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 24px;
+  --fs-num: 40px;
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #0f172a;
-  --panel: #131f37;
-  --panel2: #0f1a30;
-  --inp: #0c1527;
-  --line: #22314b;
-  --line2: #2d3e5c;
-  --sel: #1b2944;
-  --fg: #eaf1fa;
-  --fg2: #cfd8e6;
-  --mut: #a7b4c6;
-  --mut2: #8a9bb4;
-  --mint: #00e6a5;
-  --vio: #a78bfa;
-  --vio2: #c4b5fd;
-  --pri: #6d3ee8;
-  --pri2: #7b50f0;
+  --bg: #101113;
+  --panel: #1c1d21;
+  --panel2: #25262b;
+  --inp: #1c1d21;
+  --line: #2c2e34;
+  --line2: #3d4047;
+  --sel: #1d2d4d;
+  --fg: #f2f4f6;
+  --fg2: #d6d9de;
+  --mut: #a5aab3;
+  --mut2: #8a909a;
+  --mint: #2fcf8e;
+  --vio: #5b93ff;
+  --vio2: #86afff;
+  --pri: #3f80ff;
+  --pri2: #5b93ff;
   --pri-fg: #ffffff;
-  --warn: #fbbf24;
-  --bad: #ff8d7d;
-  --info: #38bdf8;
-  --link: #9db8ff;
-  --acc: #00e6a5;
+  --warn: #f5a524;
+  --bad: #ff6370;
+  --info: #5b93ff;
+  --link: #86afff;
+  --acc: #5b93ff;
 
-  --note-bg: #17123a;
-  --note-line: #3b2f7a;
-  --note-fg: #c4b5fd;
-  --warn-bg: #2a2210;
-  --warn-line: #6b5420;
-  --warn-fg: #fde6a8;
-  --ok-bg: #0d2a26;
-  --ok-line: #145a48;
-  --ok-fg: #a7f3d8;
-  --overlay: #050a16b3;
-  --float-bg: #1f2d4d;
-  --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --note-bg: #16213a;
+  --note-line: #26375e;
+  --note-fg: #b9ceff;
+  --warn-bg: #2a2111;
+  --warn-line: #5a4419;
+  --warn-fg: #fbd99a;
+  --ok-bg: #0f2a20;
+  --ok-line: #1c5540;
+  --ok-fg: #a5ecd0;
+  --overlay: #000000a6;
+  --float-bg: #1e2228;
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
 }

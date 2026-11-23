@@ -1,0 +1,207 @@
+/* 움직이는 시각화 부품(viz.jsx) */
+
+.viz-ring {
+  position: relative;
+  flex: none;
+}
+
+.viz-ring svg {
+  display: block;
+}
+
+.viz-ring__track {
+  fill: none;
+  stroke: var(--panel2);
+  stroke-width: 14;
+}
+
+.viz-ring__value {
+  fill: none;
+  stroke-width: 14;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.viz-ring__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.viz-ring__label {
+  color: var(--mut2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.viz-ring__center b {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+
+.viz-ring__sub {
+  color: var(--mut);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* 추이 곡선 */
+.viz-trend {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.viz-trend__grid {
+  stroke: var(--line);
+  stroke-dasharray: 4 6;
+}
+
+.viz-trend__line {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.viz-trend__area {
+  opacity: 0;
+  transition: opacity 0.8s 0.6s;
+}
+
+.viz-trend__pt {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.4s, transform 0.4s;
+  transition-delay: calc(0.25s + var(--i) * 0.15s);
+}
+
+.viz-trend__pt circle {
+  fill: var(--panel);
+  stroke: var(--tone);
+  stroke-width: 3;
+}
+
+.viz-trend__pt text {
+  fill: var(--mut);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.viz-trend__pt text.is-last {
+  fill: var(--tone);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.viz-trend__pt .viz-trend__x {
+  fill: var(--mut2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.viz-trend.is-in .viz-trend__line {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.viz-trend.is-in .viz-trend__area {
+  opacity: 1;
+}
+
+.viz-trend.is-in .viz-trend__pt {
+  opacity: 1;
+  transform: none;
+}
+
+/* 가점·감점 막대 */
+.viz-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.viz-bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 64px;
+  gap: 14px;
+  align-items: center;
+}
+
+.viz-bars__label {
+  overflow: hidden;
+  color: var(--fg2);
+  font-size: 14.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-bars__label em {
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--sel);
+  color: var(--acc);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.viz-bars__track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--panel2);
+}
+
+.viz-bars__track i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--mint);
+  transition: width 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-delay: calc(var(--i) * 0.08s);
+}
+
+.viz-bars__track i.is-down {
+  background: var(--bad);
+}
+
+.viz-bars.is-in .viz-bars__track i {
+  width: var(--w);
+}
+
+.viz-bars b {
+  text-align: right;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.viz-bars b.is-up { color: var(--mint); }
+.viz-bars b.is-down { color: var(--bad); }
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-trend__line { stroke-dashoffset: 0; }
+  .viz-trend__area, .viz-trend__pt { opacity: 1; transform: none; }
+}
+
+/* 좁은 화면: 막대를 이름 아래 줄로 내려 이름이 잘리지 않게 */
+@media (max-width: 600px) {
+  .viz-bars li { grid-template-columns: minmax(0, 1fr) 64px; row-gap: 6px; }
+  .viz-bars__label { white-space: normal; }
+  .viz-bars__track { grid-column: 1 / -1; grid-row: 2; }
+}

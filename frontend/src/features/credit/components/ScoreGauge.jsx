@@ -1,25 +1,56 @@
+import { useCountUp, useInView } from '../../../common/components/vizHooks.js'
+
+const R = 112
+const CX = 150
+const CY = 150
+const BAND_TONE = { CAUTION: 'caution', STANDARD: 'standard', GOOD: 'good' }
+const BAND_TEXT = { CAUTION: '주의', STANDARD: '보통', GOOD: '좋음' }
+
 // 점수 위치를 반원 위의 좌표로 바꾼다.
 function point(score, radius) {
   const angle = Math.PI * (1 - Math.max(0, Math.min(1000, score)) / 1000)
-  return [150 + radius * Math.cos(angle), 140 - radius * Math.sin(angle)]
+  return [CX + radius * Math.cos(angle), CY - radius * Math.sin(angle)]
 }
 
-// N-12-6 서버가 준 등급 경계를 눈금으로 표시한다.
+// 반원 위 from~to 점수 구간의 호
+function arc(from, to, radius) {
+  const [x1, y1] = point(from, radius)
+  const [x2, y2] = point(to, radius)
+  return `M ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${x2} ${y2}`
+}
+
+// N-12-6 반원 게이지 — 하나의 굵은 띠를 서버가 준 등급 구간(주의·보통·좋음)별 옅은 색으로 나누고,
+// 그 위에 내 점수까지 같은 등급 색이 0점부터 차오른다. 가운데 숫자도 0부터 올라간다.
 export default function ScoreGauge({ score, bands, label, alternative }) {
-  const [x, y] = point(score, 110)
-  const arc = `M 40 140 A 110 110 0 0 1 ${x} ${y}`
+  const [ref, seen] = useInView()
+  // SVG text 안에는 span을 못 넣어 숫자만 받아 쓴다
+  const shown = useCountUp(seen ? score : 0)
+  const clamped = Math.max(0, Math.min(1000, score))
+  const sorted = [...(bands ?? [])].sort((a, b) => a.minScore - b.minScore)
+  const myBand = sorted.find((band) => score >= band.minScore && score <= band.maxScore)
+  const tone = BAND_TONE[myBand?.gradeBandCode] ?? 'standard'
+  // 차오르는 호의 길이(점수 비율)만큼만 보이게 한다
+  const fullLen = Math.PI * R
   return (
-    <svg className={`credit-gauge${alternative ? ' credit-gauge--alternative' : ''}`} viewBox="0 0 300 175" role="img" aria-label={`${label} ${score}점, 0점부터 1000점`}>
-      <path className="credit-gauge__track" d="M 40 140 A 110 110 0 0 1 260 140" />
-      {score > 0 && <path className="credit-gauge__value" d={arc} />}
-      {bands.filter((band) => band.minScore > 0 && band.minScore < 1000).map((band) => {
-        const [tx, ty] = point(band.minScore, 110)
-        const [lx, ly] = point(band.minScore, 133)
-        return <g key={band.gradeBandCode}><circle className="credit-gauge__tick" cx={tx} cy={ty} r="4" /><text className="credit-gauge__label" x={lx} y={ly + 4} textAnchor="middle">{band.minScore}</text></g>
+    <svg ref={ref} className={`credit-gauge credit-gauge--tone-${tone}${alternative ? ' credit-gauge--alternative' : ''}`} viewBox="0 0 300 190" role="img" aria-label={`${label} ${score}점, 0점부터 1000점, ${BAND_TEXT[myBand?.gradeBandCode] ?? ''} 구간`}>
+      {sorted.map((band) => {
+        const from = Math.max(0, band.minScore)
+        const to = Math.min(1000, band.maxScore)
+        const [lx, ly] = point((from + to) / 2, R + 28)
+        return (
+          <g key={band.gradeBandCode}>
+            <path className={`credit-gauge__seg credit-gauge__seg--${BAND_TONE[band.gradeBandCode] ?? 'standard'}`} d={arc(from, to, R)} />
+            <text className={`credit-gauge__band-label${band === myBand ? ' is-mine' : ''}`} x={lx} y={ly + 4} textAnchor="middle">{BAND_TEXT[band.gradeBandCode] ?? band.gradeBandCode}</text>
+          </g>
+        )
       })}
-      <text className="credit-gauge__score num" x="150" y="138" textAnchor="middle">{score}</text>
-      <text className="credit-gauge__label" x="40" y="164" textAnchor="middle">0</text>
-      <text className="credit-gauge__label" x="260" y="164" textAnchor="middle">1000</text>
+      <path
+        className="credit-gauge__value"
+        d={arc(0, 1000, R)}
+        style={{ strokeDasharray: fullLen, strokeDashoffset: seen ? fullLen * (1 - clamped / 1000) : fullLen }}
+      />
+      <text className="credit-gauge__score num" x={CX} y={CY - 10} textAnchor="middle">{shown}</text>
+      <text className="credit-gauge__unit" x={CX} y={CY + 16} textAnchor="middle">/ 1000점</text>
     </svg>
   )
 }
