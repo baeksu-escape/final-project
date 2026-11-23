@@ -3,7 +3,8 @@
 > A팀(우찬·경환) API의 요청·응답 상세다. 관리: A팀. 작성 규칙은 [README](README.md) 3장, 전체 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > - **원본:** 우찬 님 「A팀 API 명세 — 반영 요청(11/16)」. develop `bfe6b94`(PR #50·#52·#53 병합 후)의 실제 Spring Controller·DTO에서 뽑은 내용이다. 🆕 11/18 이 파일로 옮겼다(그 전에는 정의서에 요약만 있었다). 그 뒤 코드가 바뀌면 A팀이 이 파일을 고친다.
-> - 🆕 최근 변경 (11/19, FP-227): 자산 4종 저장(DDL C13). INP-02 요청 본문 모양은 바뀌지 않고, INP-01이 저장된 4종을 그대로 돌려준다
+> - 🆕 최근 변경 (11/23, FP-222): MEM-08 닉네임 변경 추가(`SAME_NICKNAME` 추가), MEM-04가 400 `SAME_PASSWORD`를 실제로 돌려줌
+> - 최근 변경 (11/19, FP-227): 자산 4종 저장(DDL C13). INP-02 요청 본문 모양은 바뀌지 않고, INP-01이 저장된 4종을 그대로 돌려준다
 > - 최근 변경 (11/19, FP-227): MEM-05 저장 전 직군 변경 허용(`JOB_TYPE_LOCKED` 추가)
 > - 🆕 최근 변경 (11/19, FP-90): 7장 대출 상품 LOAN-01~05 추가(경환), 5장 오류 code에 `PRODUCT_NOT_FOUND`
 > - 이전 변경 (11/18, FP-219): AUTH-06 가입 요청에 휴대폰 인증 토큰 추가·이름·닉네임 규칙, 닉네임 중복 확인·휴대폰 인증번호 발송·확인 API(AUTH-13~15) 추가
@@ -75,6 +76,7 @@
 | MEM-05 | `PATCH /api/members/me/job-type` | `{ jobType }` | `{ user }` | ✅ 🆕 11/19 FP-227 입력 저장 전에는 다시 고를 수 있다. 비어 있으면 저장 · 같은 직군이면 바꾸지 않고 200 · 다른 직군이면 저장한 데이터 입력(`USER_ASSET_SNAPSHOT`, 기준월 무관)도 평가(`ASSESSMENT`)도 없을 때만 바꾼다. 하나라도 있으면 409 `JOB_TYPE_LOCKED`. 동시에 바뀌어 반영하지 못하면 409 `JOB_TYPE_ALREADY_SELECTED` |
 | MEM-06 | `GET /api/members/me/diagnoses` | — | [B팀 명세서](api_spec_b.md) 3-4 | ↗ B팀(범영) 구현 완료(FP-142), A팀 화면 연결됨 🆕 11/18 |
 | MEM-07 | `DELETE /api/members/me` | `{ password }` | `{}` | ✅ |
+| MEM-08 | `PATCH /api/members/me/nickname` | `{ nickname }` | `{}` | ✅ 🆕 11/23 FP-222 규칙은 AUTH-06과 같다(한글·영문·숫자 2~7자, '탈퇴'로 시작 불가, 틀리면 400 `INVALID_INPUT` `nickname` 칸). 지금 닉네임과 같으면 400 `SAME_NICKNAME`(`nickname` 칸), 다른 회원이 쓰면 409 `DUPLICATE_NICKNAME`(저장 직전 겹침도 같음). 화면은 AUTH-13으로 먼저 확인한다 |
 
 - MEM-07: 비밀번호가 없는 간편 로그인 전용 계정은 비밀번호 대신 "토큰 발급 10분 이내"로 확인한다. 지나면 403 `RECENT_LOGIN_REQUIRED`(`password` 칸 오류).
 - MEM-07 처리: 상태 `WITHDRAWN` + 개인정보 표시값 덮어쓰기, 소셜 연결·인증 기록·동의로 불러온 데이터 삭제, 직접 입력·평가는 보관. 시스템 로그 INFO 1건.
@@ -150,7 +152,7 @@
 | 400 | `INVALID_INPUT` | 입력 형식 오류(`fieldErrors` 포함) |
 | 400 | `INVALID_PASSWORD` | 비밀번호 확인 실패(MEM-02·MEM-07 등) |
 | 400 | `INVALID_VERIFICATION_CODE`, `VERIFICATION_CODE_EXPIRED`, `VERIFICATION_ATTEMPTS_EXCEEDED` | 인증번호 틀림·만료·5회 초과 (🆕 11/18 휴대폰 인증 포함 — 휴대폰·이메일은 세 경우 모두 `INVALID_VERIFICATION_CODE`) |
-| 400 | `EMAIL_VERIFICATION_REQUIRED`, `SAME_EMAIL`, `SAME_PASSWORD` | 이메일 인증 누락, 같은 값으로 변경 |
+| 400 | `EMAIL_VERIFICATION_REQUIRED`, `SAME_EMAIL`, `SAME_PASSWORD`, `SAME_NICKNAME` 🆕 11/23 | 이메일 인증 누락, 같은 값으로 변경(`SAME_NICKNAME`은 MEM-08) |
 | 400 | `ADMIN_CHALLENGE_INVALID`, `PASSWORD_SETUP_INVALID` | 관리자 1회용 토큰 만료·재사용 |
 | 400 | `ACCESS_REASON_REQUIRED` | ADM-08 사유 없음 |
 | 400 | `INVALID_SOCIAL_CODE`, `SOCIAL_LINK_EXPIRED` | 간편 로그인 코드·연결 키 문제 |
