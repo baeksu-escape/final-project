@@ -27,11 +27,13 @@ const SAMPLE_TODAY_SCORED_COUNT = 3
 
 // 서버 BigDecimal HALF_UP(소수 첫째 자리)과 같은 반올림 — 값이 모두 0 이상이라 Math.round로 같다
 const round1 = (value) => Math.round(value * 10) / 10
-const average = (values) => (values.length ? round1(values.reduce((sum, v) => sum + v, 0) / values.length) : null)
+// 5명 기준은 값마다 실제로 계산에 들어간 인원에 적용한다(서버와 같음, 11/23 리뷰 반영)
+const average = (values) => (values.length >= MIN_GROUP_SIZE ? round1(values.reduce((sum, v) => sum + v, 0) / values.length) : null)
 const rate = (count, total) => (total ? round1((count * 100) / total) : null)
 
 // 등급 하나(대안 또는 기존)의 Standard 이상 비율·분포. 분모는 그 등급이 있는 회원(기존은 기존 모델로 산출된 회원만, 서버와 같음)
 function gradeStats(grades) {
+  if (grades.length < MIN_GROUP_SIZE) return { standardOrAboveRatePct: null, gradeDistribution: null }
   return {
     standardOrAboveRatePct: rate(grades.filter((g) => g !== 'CAUTION').length, grades.length),
     gradeDistribution: GRADE_CODES.map((gradeBandCode) => {
@@ -53,13 +55,8 @@ function aggregate(members) {
     gradeDistribution: alt.gradeDistribution,
     tradStandardOrAboveRatePct: trad.standardOrAboveRatePct,
     tradGradeDistribution: trad.gradeDistribution,
+    tradScoredMemberCount: withTrad.length,
   }
-}
-
-// 5명 미만이면 평균·비율·등급 분포를 숨긴다(인원 수는 보인다)
-function hidden() {
-  return { avgTradScore: null, avgAltScore: null, avgScoreUplift: null, standardOrAboveRatePct: null, gradeDistribution: null,
-    tradStandardOrAboveRatePct: null, tradGradeDistribution: null }
 }
 
 function handleAdminStats({ token, query }) {
@@ -71,7 +68,7 @@ function handleAdminStats({ token, query }) {
   }
   const members = SAMPLE_MEMBERS
   const keyOf = (m) => (groupBy === 'WORKER_TYPE' ? m.workerTypeCode : m.ageBandCode)
-  const overall = members.length >= MIN_GROUP_SIZE ? aggregate(members) : hidden()
+  const overall = aggregate(members)
   return {
     groupBy,
     minGroupSize: MIN_GROUP_SIZE,
@@ -84,12 +81,13 @@ function handleAdminStats({ token, query }) {
       registeredMemberCount: SAMPLE_REGISTERED_MEMBER_COUNT,
       todayScoredCount: SAMPLE_TODAY_SCORED_COUNT,
       tradStandardOrAboveRatePct: overall.tradStandardOrAboveRatePct,
+      tradScoredMemberCount: overall.tradScoredMemberCount,
     },
     gradeDistribution: overall.gradeDistribution,
     tradGradeDistribution: overall.tradGradeDistribution,
     groups: GROUP_CODES[groupBy].map((groupCode) => {
       const group = members.filter((m) => keyOf(m) === groupCode)
-      return { groupCode, memberCount: group.length, ...(group.length >= MIN_GROUP_SIZE ? aggregate(group) : hidden()) }
+      return { groupCode, memberCount: group.length, ...aggregate(group) }
     }),
   }
 }

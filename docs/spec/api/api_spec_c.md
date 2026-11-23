@@ -696,7 +696,9 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 - 관리자만(보안 설정: `/api/admin/**` = `ROLE_ADMIN`). 일반 회원 `403 FORBIDDEN`, 토큰 없음 `401`, 비밀번호 변경이 필요한 관리자 `403 PASSWORD_CHANGE_REQUIRED`.
 - `groupBy`: `WORKER_TYPE`(직군별, 생략하면 이것)·`AGE_BAND`(연령대별). 그 밖의 값은 `400 INVALID_INPUT`(`fieldErrors[0].field` = `groupBy`).
 - 대상 = 회원마다 가장 최근 SCORED 서비스 평가 1건(`ASSESSED_AT`이 같으면 `ASSESSMENT_ID`가 큰 것). 직군·연령대는 **평가 시점 값**이다.
-- 점수 평균·비율은 소수 첫째 자리(HALF_UP). **대상이 5명(`minGroupSize`)보다 적은 그룹(또는 전체)은 평균·비율·등급 분포가 `null`**이다(몇 명뿐이면 개인 점수가 드러난다, DIAG-01과 같은 기준). 인원 수는 보인다.
+- 점수 평균·비율은 소수 첫째 자리(HALF_UP). **값마다 실제로 계산에 들어간 인원이 5명(`minGroupSize`)보다 적으면 그 값은 `null`**이다(몇 명뿐이면 개인 점수가 드러난다, DIAG-01과 같은 기준). 🆕 11/23 그룹이 5명 이상이어도 기존 모델 산출자가 5명 미만이면 기존 평균·상승폭·기존 등급 값만 숨기고 대안 값은 보인다(리뷰 반영). 인원 수는 보인다.
+  - 대안 평균·대안 등급 값 → `memberCount`명(SCORED면 대안 점수가 늘 있다)
+  - 기존 평균·기존 등급 값·상승폭 → `tradScoredMemberCount`명(기존 모델로 산출된 회원, 상승폭은 두 점수가 다 있어야 해서 같은 인원)
 - 응답 `200`:
 
   | 필드 | 형식 | 설명 |
@@ -711,22 +713,23 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
   | `gradeDistribution` | 배열 또는 `null` | 전체 대안 등급 분포 `[{ gradeBandCode, count, ratePct }]`, CAUTION·STANDARD·GOOD 순서(0명도 있음) |
   | `summary.tradStandardOrAboveRatePct` 🆕 11/23 | 소수 또는 `null` | **기존 모델** Standard 이상 비율(%) = 기존 등급 STANDARD·GOOD ÷ **기존 등급이 있는 회원**(기존 모델로 산출된 회원만. 산출 못 한 회원은 기존 쪽 분모에서만 빠진다) |
   | `tradGradeDistribution` 🆕 11/23 | 배열 또는 `null` | 전체 **기존** 등급 분포. 모양은 `gradeDistribution`과 같고 비율의 분모는 기존 등급이 있는 회원 수 |
-  | `groups[]` | 배열 | 직군 3개(`EMPLOYEE`·`SELF_EMPLOYED`·`FREELANCER`) 또는 연령대 4개(`20S`·`30S`·`40S`·`50_PLUS`)를 고정 순서로(0명도 있음). 각각 `groupCode`, `memberCount`, `avgTradScore`, `avgAltScore`, `avgScoreUplift`, `standardOrAboveRatePct`, `gradeDistribution`, 🆕 11/23 `tradStandardOrAboveRatePct`, `tradGradeDistribution` |
+  | `groups[]` | 배열 | 직군 3개(`EMPLOYEE`·`SELF_EMPLOYED`·`FREELANCER`) 또는 연령대 4개(`20S`·`30S`·`40S`·`50_PLUS`)를 고정 순서로(0명도 있음). 각각 `groupCode`, `memberCount`, `avgTradScore`, `avgAltScore`, `avgScoreUplift`, `standardOrAboveRatePct`, `gradeDistribution`, 🆕 11/23 `tradStandardOrAboveRatePct`, `tradGradeDistribution`, `tradScoredMemberCount` |
+  | `summary.tradScoredMemberCount`·`groups[].tradScoredMemberCount` 🆕 11/23 | 정수 | 기존 모델로 산출된 회원 수. 기존 값이 `null`일 때 "기존 모델 산출자가 부족함"을 화면이 안내하는 데 쓴다 |
 
 - 🆕 11/23 등급 값은 11/06 UI처럼 **기존 → 대안**을 나란히 보여 주도록 두 벌이다: `standardOrAboveRatePct`·`gradeDistribution` = 대안 모델(처음부터 있던 필드, 이름·뜻 그대로), `trad*` = 기존 모델. 모든 값은 DB에 저장된 평가의 점수·등급(`ASSESSMENT.TRAD_*`·`ALT_*`)으로 계산한다.
 
   ```json
   { "groupBy": "WORKER_TYPE", "minGroupSize": 5,
     "summary": { "assessedMemberCount": 14, "avgTradScore": 636.9, "avgAltScore": 705.4, "avgScoreUplift": 68.8,
-                 "standardOrAboveRatePct": 71.4, "registeredMemberCount": 40, "todayScoredCount": 3, "tradStandardOrAboveRatePct": 30.8 },
+                 "standardOrAboveRatePct": 71.4, "registeredMemberCount": 40, "todayScoredCount": 3, "tradStandardOrAboveRatePct": 30.8, "tradScoredMemberCount": 13 },
     "gradeDistribution": [ { "gradeBandCode": "CAUTION", "count": 4, "ratePct": 28.6 }, { "gradeBandCode": "STANDARD", "count": 8, "ratePct": 57.1 },
                            { "gradeBandCode": "GOOD", "count": 2, "ratePct": 14.3 } ],
     "tradGradeDistribution": [ { "gradeBandCode": "CAUTION", "count": 9, "ratePct": 69.2 }, { "gradeBandCode": "STANDARD", "count": 4, "ratePct": 30.8 },
                                { "gradeBandCode": "GOOD", "count": 0, "ratePct": 0.0 } ],
     "groups": [ { "groupCode": "EMPLOYEE", "memberCount": 6, "avgTradScore": 663.3, "avgAltScore": 720.0, "avgScoreUplift": 56.7,
-                  "standardOrAboveRatePct": 83.3, "gradeDistribution": [ … ], "tradStandardOrAboveRatePct": 50.0, "tradGradeDistribution": [ … ] },
+                  "standardOrAboveRatePct": 83.3, "gradeDistribution": [ … ], "tradStandardOrAboveRatePct": 50.0, "tradGradeDistribution": [ … ], "tradScoredMemberCount": 6 },
                 { "groupCode": "FREELANCER", "memberCount": 3, "avgTradScore": null, "avgAltScore": null, "avgScoreUplift": null,
-                  "standardOrAboveRatePct": null, "gradeDistribution": null, "tradStandardOrAboveRatePct": null, "tradGradeDistribution": null } ] }
+                  "standardOrAboveRatePct": null, "gradeDistribution": null, "tradStandardOrAboveRatePct": null, "tradGradeDistribution": null, "tradScoredMemberCount": 2 } ] }
   ```
   (예시 14명 중 1명은 기존 모델로 산출되지 않아 기존 쪽 분모는 13명이다)
   (mock 예시값. `SELF_EMPLOYED` 행은 줄였다)

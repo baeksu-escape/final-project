@@ -90,6 +90,7 @@ class AdminStatsServiceTest {
         assertEquals(0, d("28.6").compareTo(grades.get(0).ratePct()));
 
         // 기존 모델(11/23 추가): 기존 등급이 있는 6명만 분모 — CAUTION 4(600·640·580·600)·STANDARD 2(700·750)
+        assertEquals(6, r.summary().tradScoredMemberCount());
         assertEquals(0, d("33.3").compareTo(r.summary().tradStandardOrAboveRatePct()), "2/6");
         List<GradeCount> trad = r.tradGradeDistribution();
         assertEquals(List.of(4, 2, 0), trad.stream().map(GradeCount::count).toList());
@@ -105,13 +106,16 @@ class AdminStatsServiceTest {
         assertEquals(List.of("EMPLOYEE", "SELF_EMPLOYED", "FREELANCER"), r.groups().stream().map(GroupStats::groupCode).toList());
         GroupStats employee = r.groups().get(0);
         assertEquals(5, employee.memberCount());
-        assertEquals(0, d("672.5").compareTo(employee.avgTradScore()), "(600+640+700+750)/4");
+        // 대안 값은 5명 전원으로 계산해 보인다
         assertEquals(0, d("720.0").compareTo(employee.avgAltScore()), "3600/5");
-        assertEquals(0, d("55.0").compareTo(employee.avgScoreUplift()), "(50+60+60+50)/4");
         assertEquals(0, d("80.0").compareTo(employee.standardOrAboveRatePct()));
         assertEquals(List.of(1, 3, 1), employee.gradeDistribution().stream().map(GradeCount::count).toList());
-        assertEquals(0, d("50.0").compareTo(employee.tradStandardOrAboveRatePct()), "기존 등급 있는 4명 중 2명");
-        assertEquals(List.of(2, 2, 0), employee.tradGradeDistribution().stream().map(GradeCount::count).toList());
+        // 기존 모델 산출자는 4명이라(5명 미만) 기존 평균·상승폭·기존 등급 값은 숨긴다(리뷰 반영 11/23)
+        assertEquals(4, employee.tradScoredMemberCount());
+        assertNull(employee.avgTradScore());
+        assertNull(employee.avgScoreUplift());
+        assertNull(employee.tradStandardOrAboveRatePct());
+        assertNull(employee.tradGradeDistribution());
 
         GroupStats selfEmployed = r.groups().get(1);
         assertEquals(0, selfEmployed.memberCount());
@@ -126,6 +130,36 @@ class AdminStatsServiceTest {
         assertNull(freelancer.gradeDistribution());
         assertNull(freelancer.tradStandardOrAboveRatePct());
         assertNull(freelancer.tradGradeDistribution());
+    }
+
+    @Test
+    @DisplayName("5명 기준은 값마다 계산 인원에 적용한다: 그룹 6명 중 기존 모델 산출자가 4명이면 기존 값만 숨기고, 5명이 되면 보인다")
+    void minimumPerValue() {
+        List<MemberScore> group = new ArrayList<>();
+        group.add(member("SELF_EMPLOYED", "40S", 600, 650, "CAUTION"));
+        group.add(member("SELF_EMPLOYED", "40S", 700, 720, "STANDARD"));
+        group.add(member("SELF_EMPLOYED", "40S", 620, 690, "STANDARD"));
+        group.add(member("SELF_EMPLOYED", "40S", 680, 760, "STANDARD"));
+        group.add(member("SELF_EMPLOYED", "40S", null, 700, "STANDARD"));   // 기존 모델로 산출 못 함
+        group.add(member("SELF_EMPLOYED", "40S", null, 640, "CAUTION"));    // 기존 모델로 산출 못 함
+
+        GroupStats g = AdminStatsService.build("WORKER_TYPE", group, 0L, 0L).groups().get(1);
+        assertEquals(6, g.memberCount());
+        assertEquals(4, g.tradScoredMemberCount());
+        assertEquals(0, d("693.3").compareTo(g.avgAltScore()), "대안은 6명이라 보인다");
+        assertEquals(0, d("66.7").compareTo(g.standardOrAboveRatePct()));
+        assertNull(g.avgTradScore(), "기존 산출 4명 — 1명의 값도 역산될 수 있어 숨긴다");
+        assertNull(g.avgScoreUplift());
+        assertNull(g.tradStandardOrAboveRatePct());
+        assertNull(g.tradGradeDistribution());
+
+        group.add(member("SELF_EMPLOYED", "40S", 640, 700, "STANDARD"));    // 기존 산출자 5명이 된다
+        GroupStats five = AdminStatsService.build("WORKER_TYPE", group, 0L, 0L).groups().get(1);
+        assertEquals(5, five.tradScoredMemberCount());
+        assertEquals(0, d("648.0").compareTo(five.avgTradScore()), "(600+700+620+680+640)/5");
+        assertEquals(0, d("56.0").compareTo(five.avgScoreUplift()), "(50+20+70+80+60)/5 = 280/5");
+        assertEquals(0, d("40.0").compareTo(five.tradStandardOrAboveRatePct()), "700·680 두 명이 STANDARD");
+        assertEquals(List.of(3, 2, 0), five.tradGradeDistribution().stream().map(GradeCount::count).toList());
     }
 
     @Test

@@ -4,7 +4,8 @@ import java.math.BigDecimal;
 import java.util.List;
 
 // FP-161 N-26-1~4 관리자 직군·연령별 통계(ADM-03) 응답. 점수 평균·비율은 소수 첫째 자리(HALF_UP).
-// 대상 회원이 minGroupSize(5)명보다 적은 그룹(또는 전체)은 평균·비율·등급 분포가 null이다(몇 명뿐이면 개인 점수가 드러난다).
+// 값마다 실제로 계산에 들어간 인원이 minGroupSize(5)명보다 적으면 그 값은 null이다(몇 명뿐이면 개인 점수가 드러난다, 11/23 리뷰 반영).
+// 대안 값은 그룹 전원(memberCount), 기존 평균·기존 등급 값·상승폭은 기존 모델로 산출된 회원(tradScoredMemberCount)으로 계산한다.
 // 등급 값은 11/06 UI처럼 기존 → 대안을 나란히 보여 주도록 두 벌이다: standardOrAboveRatePct·gradeDistribution = 대안 모델,
 // trad* = 기존 모델(기존 모델로 산출된 회원만 분모, 11/23 추가).
 public final class AdminStatsDtos {
@@ -32,7 +33,8 @@ public final class AdminStatsDtos {
             BigDecimal standardOrAboveRatePct,
             long registeredMemberCount,
             long todayScoredCount,
-            BigDecimal tradStandardOrAboveRatePct) {
+            BigDecimal tradStandardOrAboveRatePct,
+            int tradScoredMemberCount) {
     }
 
     // N-26-3 등급 분포 한 칸
@@ -49,6 +51,7 @@ public final class AdminStatsDtos {
             BigDecimal standardOrAboveRatePct,
             List<GradeCount> gradeDistribution,
             BigDecimal tradStandardOrAboveRatePct,
-            List<GradeCount> tradGradeDistribution) {
+            List<GradeCount> tradGradeDistribution,
+            int tradScoredMemberCount) {
     }
 }

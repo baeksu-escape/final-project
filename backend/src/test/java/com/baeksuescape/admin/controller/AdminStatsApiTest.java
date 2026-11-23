@@ -111,6 +111,8 @@ class AdminStatsApiTest {
                 .andExpect(jsonPath("$.groups[2].gradeDistribution").value(nullValue()))
                 // 기존 모델(11/23 추가): 기존 점수 640·580은 모두 CAUTION
                 .andExpect(jsonPath("$.summary.tradStandardOrAboveRatePct").value(0.0))
+                .andExpect(jsonPath("$.summary.tradScoredMemberCount").value(6))
+                .andExpect(jsonPath("$.groups[0].tradScoredMemberCount").value(5))
                 .andExpect(jsonPath("$.tradGradeDistribution[0].gradeBandCode").value("CAUTION"))
                 .andExpect(jsonPath("$.tradGradeDistribution[0].count").value(6))
                 .andExpect(jsonPath("$.tradGradeDistribution[0].ratePct").value(100.0))

@@ -70,30 +70,37 @@ public class AdminStatsService {
     /** 계산 본체(DB 없이 테스트). */
     static StatsResponse build(String groupBy, List<MemberScore> members, long registeredMemberCount, long todayScoredCount) {
         Function<MemberScore, String> key = WORKER_TYPE.equals(groupBy) ? MemberScore::getWorkerTypeCode : MemberScore::getAgeBandCode;
-        boolean enough = members.size() >= MIN_GROUP_SIZE;
+        // 5명 기준은 그룹 인원이 아니라 값마다 실제로 계산에 들어간 인원에 적용한다(아래 average·grades 함수, 리뷰 반영 11/23).
+        // 그룹이 5명 이상이어도 기존 모델 산출자가 5명 미만이면 기존 평균·상승폭·기존 등급 값으로 소수 회원의 값이 드러나기 때문이다.
         Summary summary = new Summary(members.size(),
-                enough ? avgTrad(members) : null,
-                enough ? avgAlt(members) : null,
-                enough ? avgUplift(members) : null,
-                enough ? standardOrAboveRate(members, ALT_GRADE) : null,
+                avgTrad(members),
+                avgAlt(members),
+                avgUplift(members),
+                standardOrAboveRate(members, ALT_GRADE),
                 registeredMemberCount, todayScoredCount,
-                enough ? standardOrAboveRate(members, TRAD_GRADE) : null);
+                standardOrAboveRate(members, TRAD_GRADE),
+                tradScoredCount(members));
 
         List<GroupStats> groups = new ArrayList<>();
         for (String code : GROUP_CODES.get(groupBy)) {
             List<MemberScore> group = members.stream().filter(m -> code.equals(key.apply(m))).toList();
-            boolean groupEnough = group.size() >= MIN_GROUP_SIZE;
             groups.add(new GroupStats(code, group.size(),
-                    groupEnough ? avgTrad(group) : null,
-                    groupEnough ? avgAlt(group) : null,
-                    groupEnough ? avgUplift(group) : null,
-                    groupEnough ? standardOrAboveRate(group, ALT_GRADE) : null,
-                    groupEnough ? gradeDistribution(group, ALT_GRADE) : null,
-                    groupEnough ? standardOrAboveRate(group, TRAD_GRADE) : null,
-                    groupEnough ? gradeDistribution(group, TRAD_GRADE) : null));
+                    avgTrad(group),
+                    avgAlt(group),
+                    avgUplift(group),
+                    standardOrAboveRate(group, ALT_GRADE),
+                    gradeDistribution(group, ALT_GRADE),
+                    standardOrAboveRate(group, TRAD_GRADE),
+                    gradeDistribution(group, TRAD_GRADE),
+                    tradScoredCount(group)));
         }
-        return new StatsResponse(groupBy, MIN_GROUP_SIZE, summary, enough ? gradeDistribution(members, ALT_GRADE) : null, groups,
-                enough ? gradeDistribution(members, TRAD_GRADE) : null);
+        return new StatsResponse(groupBy, MIN_GROUP_SIZE, summary, gradeDistribution(members, ALT_GRADE), groups,
+                gradeDistribution(members, TRAD_GRADE));
+    }
+
+    /** 기존 모델로 산출된 회원 수(기존 점수가 있는 회원). 기존 평균·기존 등급 값·상승폭이 이 인원으로 계산된다 */
+    static int tradScoredCount(List<MemberScore> members) {
+        return (int) members.stream().filter(m -> m.getTradScore() != null).count();
     }
 
     /** 기존 점수 평균: 기존 모델로 산출된 회원만 */
@@ -115,17 +122,23 @@ public class AdminStatsService {
     /**
      * Standard 이상 비율(%): 등급이 STANDARD·GOOD인 회원 ÷ 그 등급이 있는 회원.
      * 대안 등급은 SCORED면 늘 있고, 기존 등급은 기존 모델로 산출된 회원만 있다(없는 회원은 분모에서 빠진다, 평균 기존 점수와 같은 처리).
-     * 등급이 있는 회원이 없으면 null.
+     * 등급이 있는 회원이 5명 미만이면 null(소수 회원의 등급이 드러나지 않게).
      */
     static BigDecimal standardOrAboveRate(List<MemberScore> members, Function<MemberScore, String> grade) {
         List<String> grades = gradesOf(members, grade);
+        if (grades.size() < MIN_GROUP_SIZE) {
+            return null;
+        }
         long count = grades.stream().filter(STANDARD_OR_ABOVE::contains).count();
         return rate(count, grades.size());
     }
 
-    /** 등급 분포(CAUTION·STANDARD·GOOD 순서, 0명인 등급도 행이 있다). 비율의 분모는 그 등급이 있는 회원 수 */
+    /** 등급 분포(CAUTION·STANDARD·GOOD 순서, 0명인 등급도 행이 있다). 비율의 분모는 그 등급이 있는 회원 수. 그 인원이 5명 미만이면 null */
     static List<GradeCount> gradeDistribution(List<MemberScore> members, Function<MemberScore, String> grade) {
         List<String> grades = gradesOf(members, grade);
+        if (grades.size() < MIN_GROUP_SIZE) {
+            return null;
+        }
         List<GradeCount> out = new ArrayList<>();
         for (String code : GRADE_CODES) {
             int count = (int) grades.stream().filter(code::equals).count();
@@ -138,8 +151,9 @@ public class AdminStatsService {
         return members.stream().map(grade).filter(g -> g != null).toList();
     }
 
+    // 평균에 들어간 인원이 5명 미만이면 null(몇 명뿐이면 그 사람들의 점수가 드러난다). 값마다 따로 적용한다.
     private static BigDecimal average(List<Integer> values) {
-        if (values.isEmpty()) {
+        if (values.size() < MIN_GROUP_SIZE) {
             return null;
         }
         long sum = values.stream().mapToLong(Integer::longValue).sum();
