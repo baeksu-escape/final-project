@@ -10,8 +10,8 @@ const GROUP_CODES = Object.freeze({
   AGE_BAND: ['20S', '30S', '40S', '50_PLUS'],
 })
 const GRADE_CODES = ['CAUTION', 'STANDARD', 'GOOD']
-// 예시 회원의 기존 등급은 기존 점수로 정한다(평가 때 저장되는 CUT-0.1 경계 665·780, 예시의 대안 등급도 같은 경계). 기존 점수가 없으면 null
-const gradeOfScore = (score) => (score === null ? null : score >= 780 ? 'GOOD' : score >= 665 ? 'STANDARD' : 'CAUTION')
+// 예시 회원의 기존 등급은 기존 점수로 정한다(평가 때 저장되는 CUT-0.3 경계 654·727, 예시의 대안 등급도 같은 경계). 기존 점수가 없으면 null
+const gradeOfScore = (score) => (score === null ? null : score >= 727 ? 'GOOD' : score >= 654 ? 'STANDARD' : 'CAUTION')
 
 // [직군, 연령대, 기존 점수(null = 기존 모델로 산출 못 함), 대안 점수, 대안 등급] — 회원별 최근 평가 예시
 const SAMPLE_MEMBERS = Object.freeze([
