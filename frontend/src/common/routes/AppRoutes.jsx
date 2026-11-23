@@ -33,6 +33,7 @@ import CashFlowPage from '../../features/diagnosis/pages/CashFlowPage.jsx'
 import ScenarioPage from '../../features/scenario/pages/ScenarioPage.jsx'
 import AdminReportsPage from '../../features/admin/pages/AdminReportsPage.jsx'
 import ModelPerformancePage from '../../features/admin/pages/ModelPerformancePage.jsx'
+import AdminStatsPage from '../../features/admin/pages/AdminStatsPage.jsx'
 import LoungePage from '../../features/community/pages/LoungePage.jsx'
 import LoanProductsPage from '../../features/loans/pages/LoanProductsPage.jsx'
 import LoanProductDetailPage from '../../features/loans/pages/LoanProductDetailPage.jsx'
@@ -91,7 +92,7 @@ export default function AppRoutes() {
           {/* 관리자 전용 — N-08-1 관리자 탭 5개 */}
           <Route element={<RouteGuard requiredRole={ROLES.ADMIN} />}>
             <Route path={PATHS.ADMIN_MODEL} element={<ModelPerformancePage />} />
-            <Route path={PATHS.ADMIN_STATS} element={<PlaceholderPage title="직군·연령별 통계" nId="N-26" />} />
+            <Route path={PATHS.ADMIN_STATS} element={<AdminStatsPage />} />
             <Route path={PATHS.ADMIN_ACCOUNTS} element={<AdminAccountsPage />} />
             <Route path={PATHS.ADMIN_REPORTS} element={<AdminReportsPage />} />
             <Route path={PATHS.ADMIN_AUDIT} element={<AdminAuditLogsPage />} />

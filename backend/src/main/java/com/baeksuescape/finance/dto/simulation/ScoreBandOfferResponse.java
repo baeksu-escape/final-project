@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * N-18-7 같은 점수대 참고 금리·한도 응답 DTO (FP-170).
- * 필드 이름은 A조 LoanRecommendResponse와 맞췄다. 금리·한도는 더미 데이터이며 "같은 점수대의 참고 정보"로만 보여 준다.
+ * SIM-04 응답이다(SIM-03 추천 API는 만들지 않는다, 정의서 Q-9). 금리·한도는 더미 데이터이며 "같은 점수대의 참고 정보"로만 보여 준다.
  */
 @Getter
 @Builder
