@@ -702,6 +702,13 @@ p {
   }
 }
 
+/* 숫자 타일 안의 큰 숫자 */
+.l-kpis .num:not(.hint) {
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
 .l-g2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--min, 200px)), 1fr));

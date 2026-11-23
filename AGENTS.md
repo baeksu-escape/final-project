@@ -41,6 +41,8 @@
   - 배치 클래스(`common/styles/layout.css`): 제목 띠 `page-head`(`__tag`·`__title`·`__lead`, 움직이는 빛 장식이 자동으로 붙음), 2:1 `l-cols`(+`l-cols__main`), 3열 `l-grid3`, 숫자 타일 `l-kpis`, 자동 칸 `l-g2`, 표 `data-table`(+`data-table-wrap`), 안쪽 상자 `panel-sunk`, 글자 `hint`·`num`
   - 색·간격은 `tokens.css` 변수만 쓰고 색 코드를 직접 쓰지 않는다. 강조는 `--acc`(파랑) 하나, 좋음·가점 `--mint`, 주의 `--warn`, 나쁨·감점 `--bad`. 간격 `--sp-1`~`--sp-8`, 모서리 `--r-sm`·`--r`·`--r-lg` 🆕 11/23
   - 이모지·아이콘 타일 대신 글자와 그래프로 보여 준다(앱이 아닌 웹사이트 느낌) 🆕 11/23
+  - 버튼 단계 🆕 11/23: 진한 파랑 `Button variant="primary"`는 한 영역에서 가장 중요한 동작 하나만, 반복·보조 동작은 옅은 파랑(`size="sm"`인 primary는 자동, 링크는 `className="button button--weak"`), 다른 화면으로 가는 것은 버튼 대신 글자 링크(`className="text-link"` 또는 클래스 없는 `<a>`·`<Link>`)
+  - 등급 이름은 `GRADE_LABELS`(좋음·보통·주의)를 쓰고 영문을 직접 적지 않는다 🆕 11/23
 - 위 재료로 안 되는 모양이 필요하면 기능 폴더에 `<기능>.css`를 만들기 전에 프론트 담당에게 먼저 알린다. 공통 CSS(`tokens.css`·`forms.css`·`components.css`·`layout.css`)는 프론트 담당만 고친다.
 
 ### 3-3. 주석
