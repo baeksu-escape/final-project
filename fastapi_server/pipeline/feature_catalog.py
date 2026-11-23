@@ -7,7 +7,7 @@ from dataclasses import dataclass
 # DB 기준 데이터와 글자까지 같아야 Spring 저장이 FK 오류 없이 된다 (DDL MODEL_REGISTRY·FEATURE_SET_VERSION·SCORE_CUTOFF_VERSION).
 MODEL_VERSION = "DEV-DUMMY"
 FEATURE_SET_VERSION = "FS-DRAFT"
-CUTOFF_VERSION = "CUT-0.1"
+CUTOFF_VERSION = "CUT-0.3"   # 11/23 CUT-0.1(665/780)에서 전환(FP-248). DB의 ACTIVE 구간 버전과 같아야 한다
 
 # FP-141 실제 모델(LightGBM 임시 베이스라인, 11/17 범영·재욱 합의). DB의 ACTIVE 모델이 이 값이면 실제 모델로 계산한다.
 # 값은 학습 코드(training/config.py)를 그대로 가져온다. 그쪽 시험(test_fs_v1_seed)이 DDL 기준 데이터와 같은지 검사하므로 세 곳이 어긋나지 않는다.
@@ -26,11 +26,11 @@ def is_real_model_version(version: str | None) -> bool:
     """실제 모델 버전 이름 모양(LGBM-BASE-숫자.숫자)인지. Mock(DEV-DUMMY)·알 수 없는 이름과 구분할 때 쓴다."""
     return version is not None and REAL_MODEL_VERSION_PATTERN.fullmatch(version) is not None
 
-# 등급 구간 CUT-0.1 (decisions.md D-01 임시값: 0~664 / 665~779 / 780~1000).
+# 등급 구간 CUT-0.3 (decisions.md D-01, 모델 0.2 점수 분포 25/50/25: 0~653 / 654~726 / 727~1000). 이전 CUT-0.1은 665·780.
 GRADE_BANDS = [
-    {"gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 664},
-    {"gradeBandCode": "STANDARD", "minScore": 665, "maxScore": 779},
-    {"gradeBandCode": "GOOD", "minScore": 780, "maxScore": 1000},
+    {"gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 653},
+    {"gradeBandCode": "STANDARD", "minScore": 654, "maxScore": 726},
+    {"gradeBandCode": "GOOD", "minScore": 727, "maxScore": 1000},
 ]
 
 
@@ -95,7 +95,7 @@ ALTERNATIVE_CODES = [f.code for f in FEATURES]
 
 
 def grade_band(score: int) -> str:
-    """점수를 CUT-0.1 등급 코드로 바꾼다."""
+    """점수를 CUT-0.3 등급 코드로 바꾼다."""
     for band in GRADE_BANDS:
         if band["minScore"] <= score <= band["maxScore"]:
             return band["gradeBandCode"]

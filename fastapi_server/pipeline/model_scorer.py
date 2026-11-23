@@ -42,7 +42,7 @@ class ModelScorer:
 
 
 def _model_score(result: dict) -> dict:
-    """explain/score_one 결과 → 응답의 모델 한쪽 모양. 등급은 서비스 등급 구간(CUT-0.1)으로 매긴다."""
+    """explain/score_one 결과 → 응답의 모델 한쪽 모양. 등급은 서비스 등급 구간(CUT-0.3)으로 매긴다."""
     return {"scorableYn": "Y", "score": result["score"], "gradeBandCode": grade_band(result["score"]),
             "defaultProb": result["defaultProb"]}
 
