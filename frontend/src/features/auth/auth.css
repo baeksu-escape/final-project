@@ -490,6 +490,7 @@
 .my-profile-card__unmask,
 .my-profile-card__unmask-submit,
 .my-profile-card__unmask-cancel,
+.account-manage-card__nickname,
 .account-manage-card__email,
 .account-manage-card__password,
 .account-manage-card__data-input,
@@ -514,6 +515,7 @@
 
 .my-profile-card__unmask:hover,
 .my-profile-card__unmask-cancel:hover,
+.account-manage-card__nickname:hover,
 .account-manage-card__email:hover,
 .account-manage-card__password:hover,
 .account-manage-card__data-input:hover,
@@ -578,8 +580,10 @@
   font-size: 12.5px;
 }
 
-/* 회원 탈퇴 — 데모 .warnbox, 탈퇴 버튼은 위험 색 */
+/* 회원 탈퇴 — 데모 .warnbox, 탈퇴 버튼은 위험 색.
+   FP-222 카드가 화면 전체 폭이라 열린 확인 상자도 전체 폭으로 늘어났다. 가입·찾기 화면과 같은 600px까지만 넓어지게 한다. */
 .withdrawal-form {
+  max-width: 600px;
   border-color: var(--warn-line);
   background: var(--warn-bg);
 }
