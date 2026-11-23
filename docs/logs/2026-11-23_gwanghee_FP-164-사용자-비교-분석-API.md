@@ -45,6 +45,28 @@
 - mock을 node로 직접 불러 확인: `employee` 계정은 `me`가 급여소득자·30대 640 → 700, `self` 계정은 `me` null, 관리자 403
 - 확인 못 함: 실제 DB(로컬 Oracle)에서 호출. 매퍼는 ADM-03과 같아 `AdminStatsMapperIT`가 이미 확인한다
 
+## 11/23 화면: 같은 집단과 나란히 보기 (N-26-5~7)
+- **결정(광희, 11/23)**
+  - 격자는 표(`data-table`)로 그린다. 공통 `HeatmapGrid`(동주 님)는 숨긴 값(null)을 0점으로 그리고 색 기준도 0부터 잡는데, 격자 칸은 대부분 5명 미만이라 그대로 쓰면 '0점' 칸이 잔뜩 보인다.
+  - N-26-7 점 그래프는 공통 부품이 없어 `CompareBar` 막대로 대신한다. 내 점수 세로선 대신 "내 대안 점수 ○점"과 "(내 집단)" 표시로 보여 준다.
+  - 화면도 FP-164 PR에 같이 올린다.
+- **만든 것** (`frontend/src/features/comparison/`)
+  - `components/GroupCompareSection.jsx`: 구역 진입점. ADM-04를 한 번 불러 보기 전환(직군 × 연령 / 직군별 / 연령대별)마다 다시 부르지 않는다. 동주 님 `MyPositionSection`처럼 자기 데이터를 스스로 불러온다.
+  - `components/GroupGridTable.jsx`: 직군 3 × 연령대 4 표, 오른쪽 끝 직군 평균, 맨 아래 연령 평균, 오른쪽 아래 전체. 칸은 공통 `Button`으로 고르고 '나'·'선택'을 글자로 표시한다.
+  - `components/SelectedGroupPanel.jsx`: 고른 칸의 기존 → 대안 평균, 전체·같은 직군·같은 연령대 평균 대비, 내 점수 대비, 보통 이상 비율, 등급 분포(관리자 `GradeDistributionBars` 재사용)
+  - `components/GroupBarsCompare.jsx`: 직군별·연령대별 막대, 요약표(관리자 `AdminStatsTable` 재사용, 전체 행 포함), 전체 등급 분포
+  - `groupComparisonCodes.js`: 보기 이름, 행·열 순서, 차이 표시
+  - `features/admin/adminStatsCodes.js`의 `groupLabel`이 `ALL`을 "전체"로 보여 준다(관리자 통계 응답에는 ALL이 없어 영향 없음).
+- CSS·className은 새로 만들지 않았다. 공통 컴포넌트(`Card`·`Button`·`Notice`·`SegmentedControl`·`CompareBar`)와 기존 클래스(`l-stack`·`l-cols`·`data-table`·`hint`·`num`)만 썼다.
+- **아직 메뉴에 연결되지 않았다.** 동주 님 FP-253(`ComparisonPage.jsx`)이 develop에 병합되면 develop을 합치고, 동주 님이 비워 둔 주석 자리에 `<GroupCompareSection />` 한 줄을 넣는다.
+- **확인**
+  - `npm run lint` 오류 0, `npm run build` 성공
+  - mock 응답으로 서버 렌더링해 글자를 확인했다.
+    - 격자: 칸은 모두 5명 미만이라 '—'(예시 회원 14명), 직군 평균 720.0·701.0, 연령 평균 30대 703.0, 전체 705.4, 내 칸 "나"
+    - 직군별·연령대별: 막대, 요약표 전체 행, 숨김 안내, `me` 없을 때
+    - 값이 있는 칸(가정 712.4): 전체 대비 +7.0, 같은 직군 −7.6, 같은 연령대 +9.4, 내 점수 대비 −12.4
+  - 확인 못 함: 브라우저 화면(FP-253 병합 뒤 `/comparison`에서)
+
 ## 다음 사람이 알아야 할 것
 - **빼기로 숨긴 값을 알아낼 수 있다.** 5명 기준을 값마다 따로 걸어서, 행 평균이 보이고 그 행의 칸 하나만 숨겨졌으면 빼기로 그 칸의 점수가 나온다. 사용자가 보는 화면이라 관리자 통계보다 영향이 크다. 2차 숨김을 넣을지 팀 결정이 필요하다(명세 알려진 한계에 적음).
 - mock 예시 회원 14명은 격자 칸마다 5명이 안 돼서, mock 화면에서는 격자 값이 모두 '—'다. 화면을 만들 때 예시 회원을 늘릴지 정한다.
