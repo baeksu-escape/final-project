@@ -24,8 +24,8 @@ export default function CreditReportSummaryCard({ factors = [] }) {
       <div className="l-stack">
         <div className="credit-summary-card__header">
           <div>
-            <span className="tag">SUMMARY</span>
-            <h2>한눈에 보는 요약</h2>
+            <span className="tag">요약</span>
+            <h2>점수를 움직인 항목</h2>
           </div>
         </div>
         <div className="credit-summary-card__legend">
@@ -35,7 +35,7 @@ export default function CreditReportSummaryCard({ factors = [] }) {
         <BarChart data={chartData} height={280} wrapLabels barGap labelGap={12} ariaLabel="점수에 영향을 준 상승·하락 요인 상위 3개" />
         <div className="credit-summary-card__action panel-sunk">
           <p className="hint">조건을 바꾸면 점수가 어떻게 달라지는지 시뮬레이터에서 미리 확인해 보세요.</p>
-          <Link className="button button--primary" to={PATHS.SIMULATOR}>신용케어 시뮬레이터로 가기</Link>
+          <Link className="button button--weak" to={PATHS.SIMULATOR}>신용케어 시뮬레이터로 가기</Link>
         </div>
       </div>
     </Card>

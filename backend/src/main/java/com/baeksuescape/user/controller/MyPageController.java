@@ -61,6 +61,13 @@ public class MyPageController {
         return Map.of();
     }
 
+    // MEM-08 N-04-3 닉네임 변경(FP-222) — { nickname } → {}. 같은 값이면 400 SAME_NICKNAME, 다른 회원이 쓰면 409 DUPLICATE_NICKNAME.
+    @PatchMapping("/nickname")
+    public Map<String, Object> changeNickname(@AuthenticationPrincipal AuthUser user, @RequestBody MyPageDtos.NicknameChange request) {
+        myPageService.changeNickname(user.userId(), request);
+        return Map.of();
+    }
+
     // MEM-04 N-04-3 비밀번호 변경
     @PutMapping("/password")
     public Map<String, Object> changePassword(@AuthenticationPrincipal AuthUser user, @Valid @RequestBody MyPageDtos.PasswordChange request) {

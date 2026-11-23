@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { GRADE_STATUS, getNotScorableMessage } from '../../../common/config/scoreStatus.js'
-import { fetchDiagnosisHistory } from '../api/diagnosisHistoryApi.js'
 import { EMPTY_HISTORY_MESSAGE, GRADE_LABELS, NOT_SCORABLE_LABEL } from '../diagnosisHistoryConfig.js'
+// FP-222 등급 태그 모양(credit-grade)은 신용 리포트 [점수 비교]와 같은 규칙을 가져다 쓴다(메인 화면 LandingPage와 같은 방식, 파일은 고치지 않음).
+import '../../credit/credit.css'
 
 // 가장 오래된 진단처럼 변화 값이 없을 때 보일 문자.
 const NO_CHANGE = '—'
@@ -19,6 +19,12 @@ function formatCalculatedAt(value) {
   return value.slice(0, 16).replace('T', ' ')
 }
 
+// FP-222 등급 칸 — 신용 리포트와 같은 등급 태그(credit-grade credit-grade--{코드 소문자})로 보여 준다. 등급이 없으면 예전처럼 비운다.
+function GradeTag({ grade }) {
+  if (!grade) return null
+  return <span className={`credit-grade credit-grade--${grade.toLowerCase()}`}>{GRADE_LABELS[grade] ?? grade}</span>
+}
+
 // 변화 값을 부호와 함께 보여 준다. 예) 12 → +12, -5 → -5, null → —
 function formatChange(change) {
   if (change === null || change === undefined) return NO_CHANGE
@@ -28,33 +34,8 @@ function formatChange(change) {
 // N-04-6 진단 내역 조회 — 지난 평가를 최신순 표로 보여 준다. 순서·변화·등급은 서버가 보낸 값을 그대로 쓰고, 모델 버전은 보여 주지 않는다.
 // 산출 불가(NOT_SCORABLE) 평가는 등급 칸에 '산출 불가'와 사유를, 점수 칸에 '—'를 보여 주고 변화 칸은 비운다. 화면에서 점수로 등급을 계산하지 않는다.
 // 산출은 됐지만(SCORED) 기존 점수나 대안 점수가 null인 평가도 그 칸에 '—'를 보여 준다.
-export default function DiagnosisHistoryTable() {
-  const [items, setItems] = useState(null)
-  const [loadError, setLoadError] = useState('')
-
-  // 화면에 들어올 때 진단 내역을 한 번 불러온다.
-  useEffect(() => {
-    let cancelled = false
-    fetchDiagnosisHistory()
-      .then((result) => {
-        if (!cancelled) setItems(result.items)
-      })
-      .catch((error) => {
-        if (!cancelled) setLoadError(error.message)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  if (loadError) {
-    return (
-      <p className="diagnosis-history__error" role="alert">
-        {loadError}
-      </p>
-    )
-  }
-  if (items === null) return <p className="diagnosis-history__loading">진단 내역을 불러오는 중입니다.</p>
+// FP-222 v2 불러오기·불러오는 중·오류는 DiagnosisHistoryPanel이 맡고(그래프와 같은 데이터를 한 번만 받는다), 이 표는 받은 items만 그린다.
+export default function DiagnosisHistoryTable({ items }) {
   if (items.length === 0) return <p className="diagnosis-history__empty">{EMPTY_HISTORY_MESSAGE}</p>
 
   return (
@@ -82,7 +63,7 @@ export default function DiagnosisHistoryTable() {
               <td>
                 {notScorable
                   ? `${NOT_SCORABLE_LABEL} (${getNotScorableMessage(item.notScorableReasonCode)})`
-                  : (GRADE_LABELS[item.grade] ?? item.grade)}
+                  : <GradeTag grade={item.grade} />}
               </td>
               <td>{notScorable ? '' : formatChange(item.alternativeScoreChange)}</td>
             </tr>

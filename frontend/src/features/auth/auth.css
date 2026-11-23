@@ -490,6 +490,7 @@
 .my-profile-card__unmask,
 .my-profile-card__unmask-submit,
 .my-profile-card__unmask-cancel,
+.account-manage-card__nickname,
 .account-manage-card__email,
 .account-manage-card__password,
 .account-manage-card__data-input,
@@ -514,6 +515,7 @@
 
 .my-profile-card__unmask:hover,
 .my-profile-card__unmask-cancel:hover,
+.account-manage-card__nickname:hover,
 .account-manage-card__email:hover,
 .account-manage-card__password:hover,
 .account-manage-card__data-input:hover,
@@ -578,8 +580,10 @@
   font-size: 12.5px;
 }
 
-/* 회원 탈퇴 — 데모 .warnbox, 탈퇴 버튼은 위험 색 */
+/* 회원 탈퇴 — 데모 .warnbox, 탈퇴 버튼은 위험 색.
+   FP-222 카드가 화면 전체 폭이라 열린 확인 상자도 전체 폭으로 늘어났다. 가입·찾기 화면과 같은 600px까지만 넓어지게 한다. */
 .withdrawal-form {
+  max-width: 600px;
   border-color: var(--warn-line);
   background: var(--warn-bg);
 }
@@ -648,4 +652,151 @@
 .diagnosis-history__error {
   color: var(--bad);
   font-size: 13px;
+}
+
+/* ===== UI 리뉴얼 — 마이페이지 맨 위 "내 신용 한눈에" ===== */
+.my-page {
+  gap: 24px;
+}
+
+.my-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.my-summary__hello {
+  padding: 16px 0 8px;
+}
+
+.my-summary__eyebrow {
+  color: var(--acc);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.my-summary__title {
+  margin-top: 8px;
+  font-size: clamp(28px, 3.4vw, 42px);
+  font-weight: 800;
+  line-height: 1.22;
+  letter-spacing: -0.045em;
+}
+
+.my-summary__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  gap: 24px;
+}
+
+.my-summary__card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding: 28px;
+  border-radius: 28px;
+  background: var(--panel);
+}
+
+.my-summary__card h2 {
+  color: var(--fg2);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.my-summary__ring {
+  align-items: center;
+}
+
+.my-summary__ring h2 {
+  align-self: flex-start;
+}
+
+.my-summary__link {
+  color: var(--mut2);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.my-summary__tiles {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+.my-summary__tiles b {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.my-summary__tiles small {
+  margin-left: 4px;
+  color: var(--mut);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.my-summary__tiles .is-up { color: var(--mint); }
+.my-summary__tiles .is-down { color: var(--bad); }
+
+@media (max-width: 960px) {
+  .my-summary__grid,
+  .my-summary__tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.my-summary__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin: 4px 0 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+}
+
+.my-summary__facts dt {
+  color: var(--mut2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.my-summary__facts dd {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.my-summary__facts small {
+  margin-left: 2px;
+  color: var(--mut);
+  font-size: 13px;
+}
+
+.my-summary__facts .is-up { color: var(--mint); }
+.my-summary__facts .is-down { color: var(--bad); }
+
+.my-summary__tip {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--sel);
+  color: var(--note-fg);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.my-summary__links {
+  display: flex;
+  gap: 20px;
 }

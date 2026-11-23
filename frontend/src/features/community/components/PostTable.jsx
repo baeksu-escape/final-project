@@ -1,55 +1,37 @@
-import { Chip } from '../../../common/components/index.js'
 import { formatDate } from '../config/communityCodes.js'
 
-// N-06-1 글 목록 표 — No·제목·작성자·댓글·등록일. 숨김 글은 제목 대신 안내 문구, 내 글에는 '내 글' 칩을 붙인다.
-// No는 최신 글이 가장 큰 번호다(전체 글 수에서 거꾸로 센다).
+// 닉네임 첫 글자로 만든 동그란 얼굴 — 닉네임마다 색이 고정된다(실제 사진·개인정보 아님)
+const AVATAR_TONES = ['var(--c-blue)', 'var(--c-green)', 'var(--c-violet)', 'var(--c-orange)', 'var(--c-sky)', 'var(--c-pink)']
+function Avatar({ name = '?' }) {
+  const code = [...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0)
+  return <span className="lounge-avatar" style={{ '--tone': AVATAR_TONES[code % AVATAR_TONES.length] }} aria-hidden="true">{name.slice(0, 1)}</span>
+}
+
+// N-06-1 글 목록 — 커뮤니티형 줄 목록: 제목(+댓글 수) · 작성자(얼굴·닉네임) · 등록일. 숨김 글은 안내 문구, 내 글에는 '내 글' 표시.
+// startNo는 예전 표의 번호(최신 글이 가장 큰 번호)로, 화면 낭독기용 이름에만 쓴다.
 export default function PostTable({ items, startNo, onOpen }) {
+  if (items.length === 0) return <p className="lounge-empty">찾는 글이 없습니다.</p>
   return (
-    <div className="data-table-wrap">
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th className="lounge-table__no">No</th>
-            <th>제목</th>
-            <th>작성자</th>
-            <th className="lounge-table__num">댓글</th>
-            <th className="lounge-table__num">등록일</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.length === 0 && (
-            <tr>
-              <td colSpan={5} className="lounge-table__empty">
-                찾는 글이 없습니다.
-              </td>
-            </tr>
-          )}
-          {items.map((post, index) =>
-            post.hidden ? (
-              <tr key={post.postId} className="lounge-table__row--hidden">
-                <td className="lounge-table__no">{startNo - index}</td>
-                <td>신고로 숨김 처리된 글입니다.</td>
-                <td>—</td>
-                <td className="lounge-table__num">—</td>
-                <td className="lounge-table__num">{formatDate(post.createdAt)}</td>
-              </tr>
-            ) : (
-              <tr key={post.postId}>
-                <td className="lounge-table__no">{startNo - index}</td>
-                <td>
-                  <button type="button" className="lounge-table__title" onClick={() => onOpen(post.postId)}>
-                    {post.title}
-                  </button>
-                  {post.mine && <Chip accent>내 글</Chip>}
-                </td>
-                <td className="lounge-table__muted">{post.nickname}</td>
-                <td className="lounge-table__num">{post.commentCount || ''}</td>
-                <td className="lounge-table__num lounge-table__muted">{formatDate(post.createdAt)}</td>
-              </tr>
-            ),
-          )}
-        </tbody>
-      </table>
-    </div>
+    <ul className="lounge-feed">
+      {items.map((post, index) =>
+        post.hidden ? (
+          <li key={post.postId} className="lounge-feed__row lounge-feed__row--hidden">
+            <span className="lounge-feed__title">신고로 숨김 처리된 글입니다.</span>
+            <span className="lounge-feed__author" />
+            <span className="lounge-feed__date num">{formatDate(post.createdAt)}</span>
+          </li>
+        ) : (
+          <li key={post.postId} className="lounge-feed__row">
+            <button type="button" className="lounge-feed__title" onClick={() => onOpen(post.postId)} aria-label={`${startNo - index}번 글 ${post.title}${post.commentCount ? `, 댓글 ${post.commentCount}개` : ''}`}>
+              <span className="lounge-feed__text">{post.title}</span>
+              {post.commentCount > 0 && <span className="lounge-feed__comments num">{post.commentCount}</span>}
+              {post.mine && <span className="lounge-feed__mine">내 글</span>}
+            </button>
+            <span className="lounge-feed__author"><Avatar name={post.nickname} />{post.nickname}</span>
+            <span className="lounge-feed__date num">{formatDate(post.createdAt)}</span>
+          </li>
+        ),
+      )}
+    </ul>
   )
 }

@@ -2,7 +2,7 @@ import Card from '../../../common/components/Card.jsx'
 import Chip from '../../../common/components/Chip.jsx'
 import ScoreGauge from './ScoreGauge.jsx'
 
-const GRADE_LABELS = { GOOD: 'Good', STANDARD: 'Standard', CAUTION: 'Caution' }
+const GRADE_LABELS = { GOOD: '좋음', STANDARD: '보통', CAUTION: '주의' }
 
 const FEATURE_GROUPS = [
   { label: '소득·현금흐름', featureCodes: ['income_svc_12m_krw', 'income_cv_svc_12m', 'zero_income_months_svc_12m', 'expense_avg_month_krw', 'debt_service_current_krw', 'expense_ratio_svc_12m', 'dsr_svc_12m', 'deficit_months_svc_12m', 'worst_month_net_cash_svc_12m_krw'] },
@@ -80,7 +80,7 @@ function ModelScore({ title, model, bands, features, alternative, diff }) {
               </span>
             ))}
           </div>
-          {hasAlternativeFeatures && <p className="hint">보라색 태그는 대안 모델에서 새로 더한 비금융 피처입니다.</p>}
+          {hasAlternativeFeatures && <p className="hint">파란 태그는 대안 모델에서 새로 더한 비금융 영역입니다.</p>}
         </div>
       )}
     </div>
