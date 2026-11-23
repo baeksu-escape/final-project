@@ -87,16 +87,16 @@ frontend/
    ├─ common/              여러 기능이 함께 쓰는 것
    │  ├─ api/              API 호출(client.js: 토큰·mock 전환·401 처리), 오류 형식
    │  ├─ auth/             로그인 상태, 라우트 가드(역할·직군·점수 여부)
-   │  ├─ components/       공통 컴포넌트(버튼·입력·카드·모달) + 차트 4종(CompareBar·TrendLineChart·BarChart·HeatmapGrid)
-   │  ├─ config/           환경 변수, 메뉴 경로, 역할·직군·등급 코드
-   │  ├─ layout/           화면 틀 — AppLayout(로그인 후)·PublicLayout(로그인 전)·AppHeader·TabMenu·AppFooter
+   │  ├─ components/       공통 컴포넌트(버튼·입력·카드·모달) + 차트 4종(CompareBar·TrendLineChart·BarChart·HeatmapGrid) + 움직이는 시각화 viz.jsx(ScoreRing·TrendArea·FactorBars·CountUp, 훅은 vizHooks.js) 🆕 11/23
+   │  ├─ config/           환경 변수, 메뉴 경로·큰 분류 묶음(NAV_GROUPS), 역할·직군·등급 코드(화면 이름 좋음·보통·주의)
+   │  ├─ layout/           화면 틀 — AppLayout(로그인 후)·PublicLayout(로그인 전)·AppHeader·MegaNav(큰 분류 + 펼침 세부 메뉴)·NavIcon·AppFooter 🆕 11/23 (TabMenu 삭제)
    │  ├─ mocks/            mock 응답 등록·처리, mock 계정
-   │  ├─ pages/            메인(홍보) 페이지·403·404·준비 중 화면
+   │  ├─ pages/            메인(홍보) 페이지(스크롤 무대)·한눈에(HomePage, /home)·분류 화면(GroupHubPage, /my-credit·/finance)·403·404·준비 중 화면 🆕 11/23
    │  ├─ routes/           AppRoutes.jsx — 전체 라우트
-   │  ├─ styles/           tokens.css(색·간격) / forms.css / components.css / layout.css(화면 틀·배치 클래스)
+   │  ├─ styles/           tokens.css(색·간격·장식 색 --c-*) / forms.css / components.css(버튼 단계·text-link) / layout.css(화면 틀·배치 클래스, 내용 폭 1440) / viz.css
    │  └─ utils/            theme.js(화이트·블랙 테마 저장·적용) 등
    └─ features/<기능>/     기능별 폴더: api · components · pages · mocks · config
-      admin · auth · community · dataInput · market (만들어진 기능)
+      admin · auth · community · credit · dataInput · diagnosis · loans · market · scenario · simulation (만들어진 기능)
 ```
 
 ### 새 기능을 붙일 때
