@@ -18,7 +18,7 @@ function parseJson(text) {
   }
 }
 
-// 실제 서버로 요청을 보낸다. TODO(D-20) 공통 응답 형식이 정해지면 본문 꺼내는 방식을 여기서 맞춘다.
+// 실제 서버로 요청을 보낸다. 성공 응답은 감싸지 않은 본문 그대로다(D-20 확정, 11/20).
 async function sendToServer(method, path, body, token, extraHeaders = {}) {
   const headers = { ...extraHeaders, Accept: 'application/json' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'

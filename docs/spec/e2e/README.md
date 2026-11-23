@@ -4,7 +4,7 @@
 
 ## 1. 준비
 - DB: **평소에는 로컬 DB.** 점수 산출(E2E-03)이 평가 1행을 실제로 저장하므로, 공용 DB는 통합 테스트 때만 쓴다.
-- 실제 모델로 보려면 그 DB의 ACTIVE가 `LGBM-BASE-0.1`이어야 한다(`docs/spec/sql/register_model_lgbm_base_0_1.sql` → `activate_model_lgbm_base_0_1.sql`). 공용 DB는 11/18 전환 완료.
+- 실제 모델로 보려면 그 DB의 ACTIVE가 실제 모델(`LGBM-BASE-0.x`)이고, FastAPI가 같은 버전의 모델 묶음을 불러와 있어야 한다(`/v1/health`의 `modelVersion`). 기대 버전은 스크립트가 health에서 읽는다. 공용 DB는 11/20부터 `LGBM-BASE-0.2`다(🆕 11/20). 로컬 DB를 맞추는 SQL 순서는 `docs/spec/sql/README.md` 표를 따른다.
 - 켜 둘 것: 백엔드(STS), FastAPI(`uvicorn main:app --port 8000`, 모델 파일 5개는 `fastapi_server/artifacts/`). 화면은 자동 점검에는 필요 없다.
 - 시연 계정 비밀번호는 저장소 밖 env 파일의 `AVENUE_DEMO_PASSWORD`(팀 개발 env 파일)에서 읽는다.
 
