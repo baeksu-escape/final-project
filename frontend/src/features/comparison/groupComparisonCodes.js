@@ -12,6 +12,15 @@ export const VIEW_OPTIONS = Object.freeze([
 ])
 export const DEFAULT_VIEW = 'GRID'
 
+// N-26-6 격자 칸에 표시할 값 — 대안 평균 점수·상승폭·보통 이상 비율(11/06 UI의 '칸에 표시할 값'). field는 ADM-04 집단의 필드 이름.
+// 등급 이름은 UI 리뉴얼 규칙대로 한글('보통 이상')로 쓴다.
+export const CELL_METRICS = Object.freeze([
+  { value: 'ALT_SCORE', label: '대안 점수', field: 'avgAltScore', formatValue: (v) => `${v.toFixed(1)}점` },
+  { value: 'UPLIFT', label: '상승폭', field: 'avgScoreUplift', formatValue: (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}점` },
+  { value: 'STANDARD_OR_ABOVE', label: '보통 이상', field: 'standardOrAboveRatePct', formatValue: (v) => `${v.toFixed(1)}%` },
+])
+export const DEFAULT_CELL_METRIC = 'ALT_SCORE'
+
 // 격자의 행(직군)·열(연령대) 순서 — 서버 응답의 고정 순서와 같다.
 export const WORKER_TYPE_ORDER = Object.freeze(['EMPLOYEE', 'SELF_EMPLOYED', 'FREELANCER'])
 export const AGE_BAND_ORDER = Object.freeze(['20S', '30S', '40S', '50_PLUS'])
