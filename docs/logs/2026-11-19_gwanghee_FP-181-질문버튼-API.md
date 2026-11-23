@@ -34,10 +34,10 @@
   - 적용하면 `dummy_db/99_check.sql`의 `CHATBOT_PRESET_QUESTION` 기대값(0)과 실제 값이 달라지는 것이 정상이다.
 - API: `GET /api/chatbot/presets` 추가(HELP-02, 로그인 필요, 응답 `{ presets: [{ presetId, question, answer }] }`)
 - 영향을 받는 기능·팀원
-  - 범영 님(DB 담당): 병합 후 공용 DB에 `add_chatbot_preset_question.sql` 실행(체크리스트 9). 로컬 DB는 각자 실행
+  - 광희(PR 작성자): 병합 후 공용 DB에 `add_chatbot_preset_question.sql`을 실행하고 DB 변경 채널에 남긴다(🆕 11/23 sql README 「공용 DB 적용 규칙」, 범영 님은 검수). 로컬 DB는 각자 실행
   - 경환 님(더미 DB 생성기): 나중에 생성기·`99_check.sql`에 넣을지는 선택(지금은 별도 파일로 충분)
   - 용어 도우미 화면(FP-207): `getChatbotPresets()`를 쓸 수 있다
-  - 범영 님: 이 PR은 `api_definition.md`를 고치지 않는다. 병합 후 정의서 HELP-02 상태를 🟡 → ✅로 바꾸는 것은 후속 작업이다(PR 본문으로 요청)
+  - 범영 님: 🆕 11/23 새 규칙(정의서 2장 행은 만든 사람이 PR에서 고침)에 따라 이 PR에서 정의서 HELP-02 상태를 🟡 → ✅로 직접 바꿨다. 범영 님은 리뷰에서 검수한다
 
 ## 확인
 - 확인함
@@ -46,7 +46,23 @@
   - 시드 SQL: 4행, 길이가 DDL 제한 안(질문 최대 35자/200, 답 최대 267자/2000)임을 스크립트로 확인
   - 🆕 11/20 최신 develop(FP-180 #108 병합 포함) 반영 후 다시 확인: `./mvnw clean test` 398개 통과, `npm run lint` 오류 0, DB 통합 테스트(`-Ddb.it=true`, 로컬 DB, 키는 일회용 값으로 덮어씀) `ChatbotMapperIT`·`GlossaryMapperIT` 포함 6종 통과
 - 확인 못 함
-  - 시드 SQL의 Oracle 실행 확인은 병합 후 DB 담당이 실행하면서, SQL 끝 확인 쿼리에 표시 순서 1~4가 하나씩(4행) 나오는지로 확인한다.
+  - 시드 SQL의 공용 DB 실행은 병합 후 PR 작성자(광희)가 하면서, SQL 끝 확인 쿼리에 표시 순서 1~4가 하나씩(4행) 나오는지로 확인한다.
+
+## 11/23 최신 develop 반영·새 규칙 정리 (PR 전)
+- 11/20 이후 develop이 크게 앞서가(#109~#132) 다시 반영했다. 충돌은 2곳이다.
+  - `api_spec_c.md` 맨 위 「최근 변경」: #132 새 규칙("기능 PR은 맨 위 「최근 변경」을 고치지 않는다")에 따라 FP-181 줄을 빼고 develop 쪽만 남겼다. 문서 끝 N-32-1 절은 그대로다.
+  - `sql/README.md` 경로 표: develop의 최신 "모델 전환(0.1)" 행과 FP-181의 "질문 버튼 4개" 행을 모두 남겼다.
+  - develop 대비 지운 줄은 0줄이다.
+- 새 규칙 반영
+  - SQL 머리말: 공용 DB 실행을 "DB 담당(범영)"에서 "PR 작성자가 병합 후 실행하고 DB 변경 채널에 남긴다"로 고쳤다(#124 문구와 같음).
+  - 정의서 HELP-02 행: 상태를 `✅ FP-181 🆕 11/23`으로 직접 고쳤다.
+- 2부(N-31 요약, N-32-2 자유 질문)는 이번 PR 범위가 아니다. Jira FP-181은 열어 둔다.
+- 확인
+  - `./mvnw clean test` 460개 통과
+  - DB 통합 테스트(로컬 Oracle, 키는 일회용 값) 8종 통과(`ChatbotMapperIT` 포함)
+  - `npm run lint` 오류 0, `npm run build` 성공
+  - mock 직접 호출: 질문 버튼 4개(`presetId`·`question`·`answer`), 비로그인 401
+  - 충돌 표시 검사 0건
 
 ## 다음 사람이 알아야 할 것
 - FP-180(용어 사전, `feature-C/FP-180-glossary`)과 같은 `help` 패키지에 다른 파일을 추가했다. 코드 충돌은 없지만 `api_spec_c.md`의 「최근 변경」 줄과 문서 끝 절이 같은 자리라, 나중에 병합하는 쪽에서 두 쪽 내용을 모두 남긴다.

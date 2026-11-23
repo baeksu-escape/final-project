@@ -273,7 +273,7 @@
 | ID | 메서드 · 경로 | 기능 | 주요 표 | 인증 | 상태 |
 |---|---|---|---|---|---|
 | HELP-01 | `GET /api/glossary` | N-30-1 용어 사전 데이터, N-30-2 쉬운 말로 바꾸기 | `GLOSSARY_TERM` | USER | ✅ FP-180 PR #108 🆕 11/20 |
-| HELP-02 | `GET /api/chatbot/presets` | N-32-1 질문 버튼 방식 설명 | `CHATBOT_PRESET_QUESTION` | USER | 🟡 |
+| HELP-02 | `GET /api/chatbot/presets` | N-32-1 질문 버튼 방식 설명 | `CHATBOT_PRESET_QUESTION` | USER | ✅ FP-181 🆕 11/23 |
 | HELP-03 | `POST /api/chatbot/questions` | N-32-2 자유 질문 AI 설명 (하루 10회, 질문 글은 저장 안 함) | `CHATBOT_QUESTION_LOG`, `APP_SETTING` | USER | 🟡 |
 
 - Gemini에는 계산된 숫자·라벨만 넘긴다(RPT-04). 자유 질문(HELP-03)에는 사용자가 쓴 질문 글만 넘긴다(AGENTS.md 5장, D-21).

@@ -9,7 +9,7 @@
 --  - 문구는 PR에서 팀이 검토한다.
 --
 -- 실행 순서: avenue_ddl.sql → (시드가 필요하면) dummy_db/run_seed_only.sql → 이 파일. 새 DB·기존 DB 모두 이 파일로 넣는다.
--- 공용 DB 실행은 PR 병합 후 DB 담당(범영)이 한다. 로컬 DB는 각자 실행한다(docs/spec/sql/README.md 체크리스트 9).
+-- 공용 DB는 PR 작성자가 병합 후 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」). 로컬 DB는 각자 실행한다.
 --
 -- 다시 실행해도 된다: 표에 중복 불가 열이 없어 표시 순서(DISPLAY_ORDER 1~4)를 기준으로, 같은 순서가 있으면 질문·답을 이 파일 값으로 덮어쓴다.
 -- 적용한 DB에서는 dummy_db/99_check.sql의 CHATBOT_PRESET_QUESTION 기대값(0)과 실제(4)가 다르게 나오는 것이 정상이다.
