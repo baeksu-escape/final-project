@@ -64,6 +64,10 @@ export default function AdminStatsPage() {
         지금 서비스에 쓰는 모델(ACTIVE)로 낸 평가만 셉니다. 값마다 계산에 들어간 인원이 {data?.minGroupSize ?? 5}명보다 적으면 개인 점수가
         드러나지 않도록 그 값을 숨깁니다(—).
       </Notice>
+      {/* 리뷰 반영(11/23): 등급은 평가 당시 등급 구간으로 저장되고 ADM-03은 등급 구간 버전을 거르지 않는다(api_spec_c.md N-26 알려진 한계) */}
+      <p className="hint">
+        등급은 평가 당시의 등급 구간 기준으로 저장되므로, 기준이 바뀌기 전의 평가가 남아 있으면 등급 분포·Standard 이상 비율에 이전 기준이 섞여 있을 수 있습니다.
+      </p>
       {error && <Notice type="warn">{error}</Notice>}
       {!data && !error && <p className="hint">통계를 불러오는 중입니다…</p>}
       {data && !data.modelVersion && <Notice type="warn">서비스에 쓰는 모델(ACTIVE)이 없어 통계를 낼 수 없습니다.</Notice>}
