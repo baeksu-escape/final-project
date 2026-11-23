@@ -535,8 +535,7 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 |---|---|---|---|
 | GET | `/api/simulation/score-band-offer?score=` | 점수대의 참고 금리·한도와 등급 | DB `SCORE_BAND_OFFER`, `SCORE_GRADE_BAND`(ACTIVE 버전) |
 
-- **상품 추천(N-18-7 상품 3종)은 A조 담당이라 이 API에 없다.** A조 추천 API는 백엔드 `ScoreBandOfferService.findOffer(score)`를 재사용할 수 있다.
-- 기존 프론트 mock `GET /api/simulation/loans/recommend`(금리·한도 + 상품)는 A조 몫으로 그대로 둔다.
+- **상품 추천(N-18-7 상품 3종)은 이 API에 없다.** 🆕 11/23 금리·한도와 상품을 함께 주려던 SIM-03(`/api/simulation/loans/recommend`)은 만들지 않기로 했다(정의서 Q-9). 화면은 이 API(SIM-04)와 대출 상품 목록 LOAN-01(경환 FP-90)을 합쳐 보여 준다.
 - 금리·한도는 **더미 데이터**다. 화면에는 "같은 점수대의 참고 정보"로만 보여 준다(`dummyNotice`가 항상 `true`).
 - 오류:
   - `score`가 없거나 숫자가 아니거나 0~1000 밖이면 `400 INVALID_INPUT`(범위 밖이면 `fieldErrors`에 `score`)
@@ -738,6 +737,7 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
   (mock 예시값. `SELF_EMPLOYED` 행은 줄였다)
 - 알려진 한계: 등급은 평가 때 저장된 값을 그대로 쓰고 다시 매기지 않는다. 🆕 11/23 등급 구간 버전(`ASSESSMENT.CUTOFF_VERSION`)은 모델 버전과 따로 저장되므로, **같은 ACTIVE 모델 평가라도 등급 구간 버전이 다를 수 있다**(예: 등급 구간을 CUT-0.2로 바꾼 앞뒤의 평가). 통계는 등급 구간 버전을 거르지 않으므로 이때 등급 분포에 두 기준이 섞인다(리뷰 반영). 시연 DB에서 ACTIVE 모델로 점수를 낸 회원이 적으면 대부분의 값이 5명 미만으로 비어 보인다.
 - 프론트: `features/admin/api/adminStatsApi.js`의 `getAdminStats({ groupBy })`. mock은 예시 회원 14명으로 같은 규칙대로 계산한다.
+- 화면: 🆕 11/23 `features/admin/pages/AdminStatsPage.jsx`(FP-162, `/admin/stats`). 숨긴 값(`null`)은 '—'로, 기존 분포만 숨겨지면 대안 분포만 글자로 보여 준다.
 
 ---
 
