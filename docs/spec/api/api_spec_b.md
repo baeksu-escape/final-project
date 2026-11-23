@@ -234,7 +234,7 @@
 - **모델 선택 (FP-141, PR #74)**
   - ML-03: Spring은 DB `MODEL_REGISTRY`의 **ACTIVE** 모델 버전을 `expectedModelVersion`으로 보낸다. **DB의 ACTIVE가 스위치**다.
   - ML-04: Spring SIM-02는 ACTIVE가 아니라 **출발 평가(최근 SCORED)에 저장된** `MODEL_VERSION`을 `baseAssessment.modelVersion`으로 보낸다. 저장된 피처값과 같은 모델로 다시 계산해야 하기 때문이다(4-4, FP-170 PR #93). 정정
-  - `DEV-DUMMY`(또는 버전 없음) → Mock(`FS-DRAFT` 39개), **불러온 실제 모델 묶음의 버전**(🆕 11/23 지금 `LGBM-BASE-0.2`, `meta.json`) → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`
+  - `DEV-DUMMY`(또는 버전 없음) → Mock(`FS-DRAFT` 39개), **불러온 실제 모델 묶음의 버전**(🆕 11/23 지금 `LGBM-BASE-0.2`, `fastapi_server/artifacts/*.meta.json`의 `model_version`. 모델 파일은 Git에 넣지 않고 팀 파일 공유로 받으며, 공용 DB의 ACTIVE 모델도 같은 버전이다 — FP-237) → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`
   - 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503 `MODEL_NOT_READY`(11/17 범영·재욱 합의)
   - 공용 DB는 11/18 `LGBM-BASE-0.1`(FP-216)에 이어 **11/20 `LGBM-BASE-0.2`로 전환 완료**(FP-237, 🆕 11/20). 학습 데이터·모델 파일 기록은 `docs/spec/sql/register_model_lgbm_base_0_1.sql`(PR #88). 전환은 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`, 되돌리기는 `rollback_model_to_dev_dummy.sql`(PR #77, 절차: `fastapi_server/README.md`). 0.2는 `register_model_lgbm_base_0_2.sql` → `activate_model_lgbm_base_0_2.sql`, 되돌리기 `rollback_model_lgbm_base_0_2_to_0_1.sql`(PR #110·#113)
 

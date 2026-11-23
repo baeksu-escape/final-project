@@ -96,7 +96,7 @@ frontend/
    │  ├─ styles/           tokens.css(색·간격·장식 색 --c-*) / forms.css / components.css(버튼 단계·text-link) / layout.css(화면 틀·배치 클래스, 내용 폭 1440) / viz.css
    │  └─ utils/            theme.js(화이트·블랙 테마 저장·적용) 등
    └─ features/<기능>/     기능별 폴더: api · components · pages · mocks · config
-      admin · auth · community · credit · dataInput · diagnosis · loans · market · scenario · simulation (만들어진 기능)
+      admin · ai · auth · community · credit · dataInput · diagnosis · loans · market · scenario · simulation (만들어진 기능)
 ```
 
 ### 새 기능을 붙일 때
