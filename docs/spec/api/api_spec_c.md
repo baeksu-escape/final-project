@@ -6,7 +6,6 @@
 > - 전체 API 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > **최근 변경**
-> - 🆕 11/20 (광희, FP-161) N-26-1~4 관리자 직군·연령별 통계 `GET /api/admin/stats`(ADM-03) 추가. D-26(11/06 UI대로)·D-28(탈퇴 회원 제외) 담당자 결정, 데이터는 서비스 회원별 최근 SCORED 평가, 5명 미만 그룹은 평균 숨김.
 > - 🆕 11/20 (동주, FP-184) N-25 모형 성능 비교 ADM-01 `GET /api/admin/model-performance`·ADM-02 `/roc` 구현. ACTIVE 모델의 평가 표본(`MODEL_EVAL_SAMPLE`)으로 계산하고, 표본이 없으면 409 `MODEL_EVAL_NOT_READY`(새 오류 code). 맨 아래 「N-25 모형 성능 비교」 절.
 > - 🆕 11/20 N-17 버틸 수 있는 개월 수의 총자산 사용 비율을 25%에서 15%로 변경했다(D-33 합의).
 > - 🆕 11/20 (광희, FP-239) N-16 자산·부채 저장값 `GET /api/members/me/financial-health`(DIAG-03-1) 추가: 총자산·연소득·총부채·연 원리금·보유 대출 목록, 미입력은 null. 정의서의 옛 경로 `GET /api/diagnosis/health`를 대신한다. 비율은 화면이 이 값으로 DIAG-03 POST를 불러 구한다. 같은 PR에서 DIAG-09 '밀림' 반영: `paymentStatus=DELAYED`면 최근 1년 30일 이상 연체 +1로 예상 점수를 구하고 응답에 `assumedDelinquencyCount`를 추가, `paymentStatusApplied`는 밀림일 때 `true`(범영 11/20 동의).

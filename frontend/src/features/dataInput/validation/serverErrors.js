@@ -2,7 +2,7 @@ import { BASE_MONTH_FIELD } from '../config/inputSections.js'
 import { errorKeyOf } from './inputValidation.js'
 
 // FP-86 N-05 서버 입력 오류 변환 — 서버(또는 mock)가 400으로 돌려준 칸별 오류를 화면 오류 key로, 또는 그 반대로 바꾼다.
-// TODO(D-20) 응답 형식 임시안: { code: 'INVALID_INPUT', message, fieldErrors: [{ field, message }] }
+// 오류 응답 형식(D-20 확정, FP-87 공통): { code: 'INVALID_INPUT', message, fieldErrors: [{ field, message }] }
 //   field 모양(Spring 검증 오류의 필드 경로와 같은 꼴):
 //     'baseMonth'                       기준월
 //     'income.monthlySalary'            칸 섹션의 칸
@@ -43,7 +43,7 @@ function toErrorKey(path, values) {
 }
 
 // 서버 fieldErrors를 화면 오류로 바꾼다 → { errors: { 화면 오류 key: 문구 }, unmatched: [화면에서 칸을 찾지 못한 문구] }
-// TODO(D-20) fieldErrors는 팀 공통 형식이 정해지지 않은 임시 형식이다.
+// fieldErrors는 팀 공통 오류 형식(D-20 확정)이다.
 export function fromServerFieldErrors(fieldErrors, values) {
   const errors = {}
   const unmatched = []
