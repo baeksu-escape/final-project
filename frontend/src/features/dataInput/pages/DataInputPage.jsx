@@ -262,7 +262,7 @@ export default function DataInputPage() {
   // 1~4단계 [다음]·5단계 [저장하기] — 지금 단계의 오류가 없으면 다음 단계로 넘긴다. 임시저장은 값이 바뀔 때마다 이미 되어 있다.
   // 5단계에서는 1~5단계를 모두 검사해 오류가 있는 가장 앞 단계로 돌아가고, 통과하면 요청 본문(모든 섹션에 기준월)을 서버에 저장한 뒤 6단계(대안 데이터)로 간다.
   // 서버가 400과 칸별 오류(fieldErrors)를 주면 해당 칸이 있는 단계로 돌아가 칸 옆에 보여 주고, 칸을 찾지 못한 오류는 폼 아래 문구에 붙인다.
-  // TODO(D-20) { code, message, fieldErrors }는 팀 공통 형식이 정해지지 않은 임시 형식이다.
+  // { code, message, fieldErrors }는 팀 공통 오류 형식이다(D-20 확정, FP-87).
   const handleNext = async (event) => {
     event.preventDefault()
     setFormError('')
