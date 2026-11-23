@@ -7,6 +7,7 @@
 #   최종(TEST, 한 번):    python -m training.final_test_eval --split TEST --confirm-test-once
 import argparse
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -29,6 +30,13 @@ from training.train import fit_model, load_training_sets
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RESULT_DIR = REPO_ROOT / "docs" / "spec"
 RESULT_STEM = "final_test_eval_result"
+# TEST 실행 기록은 --out-dir과 상관없이 이 고정 경로에만 남긴다(옵션으로 바꿀 수 없다). TEST를 읽기 전에 먼저 쓰고, 이 파일이 있으면 재실행에 사유가 필요하다.
+RUN_RECORD_PATH = REPO_ROOT / "docs" / "spec" / "final_test_eval_run.json"
+# 공용 DB에 등록한 모델 0.2의 파일 해시(MODEL_ARTIFACT.FILE_SHA256, METRICS_JSON.meta_sha256)가 적힌 SQL. 로컬 모델 파일이 공용 0.2 묶음과 같은지 비교하는 기준이다.
+REGISTER_SQL_PATH = REPO_ROOT / "docs" / "spec" / "sql" / "register_model_lgbm_base_0_2.sql"
+# 작업 트리 검사에서 뺄 파일: TEST 실행이 만드는 기록·결과 파일(첫 실행 뒤 재실행을 막지 않게)
+RUN_OUTPUT_PATHS = ["docs/spec/final_test_eval_run.json", "docs/spec/final_test_eval_result.json", "docs/spec/final_test_eval_result.md"]
+REGISTER_ARTIFACT = re.compile(r"add_artifact\('[^']*',\s*'[^']*/ (?P<file>\w+)\.joblib',\s*'(?P<file_sha>[0-9a-f]{64})'.*?\"meta_sha256\":\"(?P<meta_sha>[0-9a-f]{64})\"", re.S)
 EXPECTED_MODEL_VERSION = "LGBM-BASE-0.2"
 TEST_SPLIT = "TEST"
 SHIPPED_SEED = config.SEEDS[0]          # 서버 모델 파일은 첫 시드(11)로 학습한 것이다
@@ -106,8 +114,21 @@ def read_sums(path: Path) -> dict:
     return sums
 
 
-def verify_shipped(model_dir: Path) -> dict:
-    """서버 모델 파일 4개의 해시가 SHA256SUMS.txt와 같고 meta.json이 모델 0.2인지 확인한다. 다르면 TEST를 열기 전에 멈춘다."""
+def registered_hashes(registry_path: Path) -> dict:
+    """공용 DB 등록 SQL(모델 0.2)에서 {파일명: 해시} 4개를 읽는다: legacy.joblib·alternative.joblib는 FILE_SHA256, 각 .meta.json은 meta_sha256."""
+    if not registry_path.exists():
+        sys.exit(f"공용 0.2 등록 SQL이 없어 모델 파일 해시를 비교할 수 없다: {registry_path}")
+    hashes = {}
+    for match in REGISTER_ARTIFACT.finditer(registry_path.read_text(encoding="utf-8")):
+        hashes[f"{match['file']}.joblib"] = match["file_sha"]
+        hashes[f"{match['file']}.meta.json"] = match["meta_sha"]
+    if set(hashes) != set(SHIPPED_FILES):
+        sys.exit(f"등록 SQL에서 모델 파일 해시 4개를 읽지 못했다(읽은 것: {sorted(hashes)}): {registry_path}")
+    return hashes
+
+
+def verify_shipped(model_dir: Path, registry_path: Path = REGISTER_SQL_PATH) -> dict:
+    """서버 모델 파일 4개의 해시가 SHA256SUMS.txt와 같고, 공용 DB에 등록한 모델 0.2의 해시(등록 SQL)와도 같으며, meta.json이 모델 0.2인지 확인한다. 다르면 TEST를 열기 전에 멈춘다."""
     sums_path = model_dir / "SHA256SUMS.txt"
     if not sums_path.exists():
         sys.exit(f"SHA256SUMS.txt가 없다: {sums_path}")
@@ -120,6 +141,10 @@ def verify_shipped(model_dir: Path) -> dict:
         hashes[name] = sha256_of(path)
         if hashes[name] != sums[name]:
             sys.exit(f"{name}의 해시가 SHA256SUMS.txt와 다르다. 서버 모델 파일을 확인하기 전에는 평가하지 않는다")
+    registered = registered_hashes(registry_path)
+    for name in SHIPPED_FILES:
+        if hashes[name] != registered[name]:
+            sys.exit(f"{name}의 해시가 공용 DB에 등록한 모델 0.2({registry_path.name})와 다르다. 공용 0.2 묶음과 같은 파일인지 확인하기 전에는 평가하지 않는다")
     for name in ("legacy.meta.json", "alternative.meta.json"):
         version = json.loads((model_dir / name).read_text(encoding="utf-8")).get("model_version")
         if version != EXPECTED_MODEL_VERSION:
@@ -127,23 +152,49 @@ def verify_shipped(model_dir: Path) -> dict:
     return hashes
 
 
-def check_not_done(result_json: Path, rerun_reason: str | None) -> str | None:
-    """TEST는 한 번만 본다. 결과 파일이 이미 있으면 --rerun-reason(평가 코드 오류를 고친 재실행 이유)이 있어야 하고, 이전 파일의 해시를 돌려준다."""
-    if not result_json.exists():
+def check_not_done(run_record: Path, result_json: Path, rerun_reason: str | None) -> str | None:
+    """TEST는 한 번만 본다. 고정 실행 기록(--out-dir과 무관)이나 결과 파일이 이미 있으면 --rerun-reason(평가 코드 오류를 고친 재실행 이유)이 있어야 한다.
+    실행 기록은 TEST를 읽기 전에 쓰므로 읽는 도중 중단됐어도 남아 있다. 이전 결과 파일이 있으면 그 해시를 돌려준다."""
+    found = [path for path in (run_record, result_json) if path.exists()]
+    if not found:
         return None
     if not rerun_reason:
-        sys.exit(f"TEST 결과 파일이 이미 있다: {result_json}\nTEST는 한 번만 본다(C26). 평가 코드 오류를 고친 재실행이면 같은 모델·코드로 --rerun-reason \"<이유>\"를 준다")
-    return sha256_of(result_json)
+        names = ", ".join(str(path) for path in found)
+        sys.exit(f"TEST를 이미 시작했거나 끝낸 기록이 있다: {names}\nTEST는 한 번만 본다(C26). 평가 코드 오류를 고친 재실행이면 같은 모델·코드로 --rerun-reason \"<이유>\"를 준다")
+    return sha256_of(result_json) if result_json.exists() else None
+
+
+def start_run_record(path: Path, entry: dict) -> None:
+    """TEST 행을 읽기 전에 실행 기록에 '시작' 한 건을 먼저 쌓는다(재실행 사유도 이어서 쌓고 덮어쓰지 않는다). 임시 파일에 쓴 뒤 바꿔서 쓰다 끊겨도 깨지지 않게 한다."""
+    record = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"runs": []}
+    record["runs"].append({"status": "started", **entry})
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_suffix(".json.tmp")
+    temp.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n")
+    temp.replace(path)
+
+
+def finish_run_record(path: Path, status: str, **extra) -> None:
+    """가장 최근 실행 건을 끝(finished) 또는 실패(failed)로 바꾼다. 강제 종료되면 이 호출이 없어 started로 남고, 그래도 재실행에는 사유가 필요하다."""
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["runs"][-1].update({"status": status, "finished_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), **extra})
+    temp = path.with_suffix(".json.tmp")
+    temp.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n")
+    temp.replace(path)
 
 
 def git_state() -> dict:
-    """평가에 쓴 코드의 커밋 해시와 작업 트리가 깨끗한지. 결과보다 코드가 먼저 커밋됐다는 기록이 된다."""
+    """평가에 쓴 코드의 커밋 해시와, 추적 중인 파일에 커밋하지 않은 변경이 없는지. 결과보다 코드가 먼저 커밋됐다는 기록이 된다.
+    추적하지 않는 파일(artifacts/README.txt 등)은 막지 않고 개수·이름만 남긴다. TEST 기록·결과 파일 경로는 검사에서 뺀다(첫 실행 뒤 재실행을 막지 않게)."""
     def run(*args):
         return subprocess.run(["git", *args], cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout.strip()
     try:
-        return {"commit": run("rev-parse", "HEAD"), "working_tree_clean": run("status", "--porcelain") == ""}
+        excluded = [f":(exclude){path}" for path in RUN_OUTPUT_PATHS]
+        dirty = run("status", "--porcelain", "--untracked-files=no", "--", ".", *excluded)
+        untracked = [name for name in run("ls-files", "--others", "--exclude-standard").splitlines() if name not in RUN_OUTPUT_PATHS]
+        return {"commit": run("rev-parse", "HEAD"), "working_tree_clean": dirty == "", "untracked_files_count": len(untracked), "untracked_files": untracked[:20]}
     except (OSError, subprocess.CalledProcessError):
-        return {"commit": None, "working_tree_clean": None}
+        return {"commit": None, "working_tree_clean": None, "untracked_files_count": None, "untracked_files": []}
 
 
 def load_eval_split(table_path: Path, split: str, group: str = "legacy", confirmed_test: bool = False) -> pd.DataFrame:
@@ -305,7 +356,8 @@ def main() -> None:
         return
     out_dir = args.out_dir if args.out_dir else (DEFAULT_RESULT_DIR if is_test else None)
     stem = RESULT_STEM if is_test else f"{RESULT_STEM}_valid_rehearsal"
-    previous_hash = check_not_done(out_dir / f"{stem}.json", args.rerun_reason) if (is_test and out_dir) else None
+    # 실행 기록(고정 경로)과 기본 결과 파일은 --out-dir과 상관없이 검사한다. --out-dir을 바꿔도 이전 실행을 피해 갈 수 없다
+    previous_hash = check_not_done(RUN_RECORD_PATH, DEFAULT_RESULT_DIR / f"{RESULT_STEM}.json", args.rerun_reason) if is_test else None
     provenance = git_state()
     if is_test and provenance["working_tree_clean"] is not True:
         sys.exit("작업 트리가 깨끗하지 않거나 git 상태를 읽지 못했다. TEST는 평가 코드를 먼저 커밋한 뒤에 본다")
@@ -325,6 +377,31 @@ def main() -> None:
     if "다름" in reproduction.values() and is_test:
         sys.exit("서버 모델 파일이 같은 설정으로 재현되지 않는다. TEST를 열기 전에 중단한다")
 
+    if is_test:
+        # TEST 행을 읽기 전에 실행 기록을 먼저 남긴다. 읽는 도중 오류·중단이 나도 기록이 남아 재실행에는 사유가 필요하다
+        start_run_record(RUN_RECORD_PATH, {
+            "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "provenance": provenance, "model_files_sha256": model_hashes,
+            "tables_sha256_8": {"legacy": sha256_of(legacy_path)[:8], "thinfile": sha256_of(thinfile_path)[:8]},
+            "out_dir": str(out_dir), "rerun_reason": args.rerun_reason})
+    try:
+        result, markdown = evaluate_and_render(args, models, shipped, reproduction, model_hashes, provenance, legacy_path, thinfile_path, previous_hash)
+        if out_dir:
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / f"{stem}.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n")
+            (out_dir / f"{stem}.md").write_text(markdown, encoding="utf-8", newline="\n")
+            print(f"저장: {out_dir / (stem + '.json')}, {out_dir / (stem + '.md')}")
+    except BaseException as error:
+        if is_test:
+            finish_run_record(RUN_RECORD_PATH, "failed", error=repr(error)[:500])
+        raise
+    if is_test:
+        finish_run_record(RUN_RECORD_PATH, "finished", result_json_sha256=sha256_of(out_dir / f"{stem}.json") if out_dir else None)
+
+
+def evaluate_and_render(args, models: dict, shipped: dict, reproduction: dict, model_hashes: dict, provenance: dict,
+                        legacy_path: Path, thinfile_path: Path, previous_hash: str | None) -> tuple:
+    """평가할 분할(VALID 리허설 또는 TEST)을 읽어 결과 dict와 요약 md를 만든다. TEST 행은 여기서 처음 읽는다(실행 기록을 먼저 남긴 뒤)."""
+    is_test = args.split == TEST_SPLIT
     print(f"{args.split} 행을 읽어 평가한다")
     legacy_frame = load_eval_split(legacy_path, args.split, "legacy", args.confirm_test_once)
     thin_frame = load_eval_split(thinfile_path, args.split, "thinfile", args.confirm_test_once)
@@ -345,11 +422,7 @@ def main() -> None:
 
     markdown = render_markdown(result)
     print(markdown)
-    if out_dir:
-        out_dir.mkdir(parents=True, exist_ok=True)
-        (out_dir / f"{stem}.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n")
-        (out_dir / f"{stem}.md").write_text(markdown, encoding="utf-8", newline="\n")
-        print(f"저장: {out_dir / (stem + '.json')}, {out_dir / (stem + '.md')}")
+    return result, markdown
 
 
 if __name__ == "__main__":

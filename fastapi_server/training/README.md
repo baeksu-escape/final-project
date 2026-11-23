@@ -171,7 +171,7 @@ python -m training.final_test_eval                                   # 리허설
 python -m training.final_test_eval --split TEST --confirm-test-once  # 최종(TEST). 한 번만 실행한다
 ```
 
-- 시작할 때 서버 모델 파일 4개의 해시를 `SHA256SUMS.txt`와 대조하고 `meta.json`이 `LGBM-BASE-0.2`인지 확인한다. 다르거나, 같은 설정으로 다시 학습한 모델과 VALID 점수가 다르면 TEST를 열기 전에 멈춘다.
-- `--confirm-test-once` 없이는 TEST 행을 읽지 않는다. TEST는 작업 트리가 깨끗할 때(코드를 먼저 커밋한 뒤)만 실행된다. 결과는 `docs/spec/final_test_eval_result.json`·`.md`에 남고, 이 파일이 있으면 다시 실행되지 않는다(평가 코드 오류를 고친 재실행만 `--rerun-reason "<이유>"`로 같은 모델·코드로).
+- 시작할 때 서버 모델 파일 4개의 해시를 `SHA256SUMS.txt`와 대조하고, 공용 DB에 등록한 모델 0.2의 해시(`docs/spec/sql/register_model_lgbm_base_0_2.sql`)와도 대조하며, `meta.json`이 `LGBM-BASE-0.2`인지 확인한다. 다르거나, 같은 설정으로 다시 학습한 모델과 VALID 점수가 다르면 TEST를 열기 전에 멈춘다.
+- `--confirm-test-once` 없이는 TEST 행을 읽지 않는다. TEST는 추적 중인 파일에 커밋하지 않은 변경이 없을 때(코드를 먼저 커밋한 뒤)만 실행된다. 추적하지 않는 파일은 막지 않고 기록에 이름만 남긴다. TEST 행을 읽기 **전에** 고정 경로 `docs/spec/final_test_eval_run.json`에 실행 기록을 먼저 남기고(`--out-dir`과 무관, 옵션으로 바꿀 수 없음), 끝나면 `finished`, 오류면 `failed`로 바꾼다. 읽는 도중 중단돼 결과 파일이 없어도 이 기록이 있으면 다시 실행되지 않는다. 결과는 `docs/spec/final_test_eval_result.json`·`.md`에 남는다. 기록이나 결과 파일이 있으면 평가 코드 오류를 고친 재실행만 `--rerun-reason "<이유>"`로 같은 모델·코드로 실행할 수 있고, 사유는 실행 기록에 쌓인다. TEST를 실행한 직후 실행 기록과 결과 파일을 바로 커밋한다.
 - 기존 집단은 C26 정상 범위로 판정한다. 씬파일은 평가 표본에 이력이 긴 비교군(`young_established`)이 섞여 있어 참고 값으로만 보여 준다. 직군별·cohort별 AUC는 양성 건수와 함께 나온다.
 - 결과를 본 뒤에 모델·지표·정상 범위·등급 경계를 바꾸지 않는다. 범위를 벗어나도 그대로 보고한다.

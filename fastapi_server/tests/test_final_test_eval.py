@@ -4,6 +4,7 @@ import contextlib
 import hashlib
 import io
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -158,41 +159,189 @@ class TestGuardTests(unittest.TestCase):
 
     def test_check_not_done(self):
         with tempfile.TemporaryDirectory() as folder:
-            result = Path(folder) / "result.json"
-            self.assertIsNone(fte.check_not_done(result, None))
+            record, result = Path(folder) / "run.json", Path(folder) / "result.json"
+            self.assertIsNone(fte.check_not_done(record, result, None))
             result.write_text("{}", encoding="utf-8")
             with self.assertRaises(SystemExit):
-                fte.check_not_done(result, None)
-            self.assertEqual(fte.check_not_done(result, "평가 코드 오류 수정"), hashlib.sha256(b"{}").hexdigest())
+                fte.check_not_done(record, result, None)
+            self.assertEqual(fte.check_not_done(record, result, "평가 코드 오류 수정"), hashlib.sha256(b"{}").hexdigest())
+
+    def test_run_record_alone_blocks_rerun_without_reason(self):
+        # 결과 파일이 없어도(읽는 도중 중단) 실행 기록만 있으면 사유 없이는 다시 실행되지 않는다
+        with tempfile.TemporaryDirectory() as folder:
+            record, result = Path(folder) / "run.json", Path(folder) / "result.json"
+            record.write_text('{"runs": []}', encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                fte.check_not_done(record, result, None)
+            self.assertIsNone(fte.check_not_done(record, result, "읽는 도중 중단돼 같은 코드로 재실행"))
+
+    def test_changing_out_dir_cannot_bypass_run_record(self):
+        # --out-dir을 다른 폴더로 줘도 고정 경로의 실행 기록을 검사한다(TEST 행을 읽기 전에 멈춘다)
+        with tempfile.TemporaryDirectory() as folder:
+            record = Path(folder) / "run.json"
+            record.write_text('{"runs": []}', encoding="utf-8")
+            argv = ["final_test_eval", "--split", "TEST", "--confirm-test-once", "--out-dir", str(Path(folder) / "다른폴더"),
+                    "--data-dir", "없는폴더", "--model-dir", "없는폴더"]
+            with mock.patch.object(fte, "RUN_RECORD_PATH", record), mock.patch.object(fte, "DEFAULT_RESULT_DIR", Path(folder)), \
+                    mock.patch.object(sys, "argv", argv), self.assertRaises(SystemExit) as caught:
+                fte.main()
+            self.assertIn("이미 시작했거나", str(caught.exception))
 
 
 class VerifyShippedTests(unittest.TestCase):
-    def build_dir(self, folder: Path, version: str = "LGBM-BASE-0.2", wrong_hash: bool = False) -> None:
-        lines = []
+    def build_dir(self, folder: Path, version: str = "LGBM-BASE-0.2", wrong_hash: bool = False, wrong_registry: bool = False) -> Path:
+        """가짜 모델 폴더(SHA256SUMS.txt 포함)와 같은 해시를 적은 가짜 공용 0.2 등록 SQL을 만들고 등록 SQL 경로를 돌려준다."""
+        lines, digests = [], {}
         for name in fte.SHIPPED_FILES:
             body = json.dumps({"model_version": version}).encode() if name.endswith(".meta.json") else name.encode()
             (folder / name).write_bytes(body)
-            digest = hashlib.sha256(body).hexdigest()
-            lines.append(f"{'0' * 64 if wrong_hash and name == 'legacy.joblib' else digest} *{name}")
+            digests[name] = hashlib.sha256(body).hexdigest()
+            lines.append(f"{'0' * 64 if wrong_hash and name == 'legacy.joblib' else digests[name]} *{name}")
         (folder / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        registered = dict(digests)
+        if wrong_registry:
+            registered["alternative.joblib"] = "f" * 64
+        sql = "".join(
+            f"add_artifact('{key}',\n 'avenue_model_files.zip / {model}.joblib',\n '{registered[model + '.joblib']}',\n 0.6,\n"
+            f" q'[{{\"model\":\"{model}\",\"meta_sha256\":\"{registered[model + '.meta.json']}\",\"label\":\"x\"}}]');\n"
+            for key, model in (("trad_legacy", "legacy"), ("alt_legacy", "alternative")))
+        registry = folder / "register.sql"
+        registry.write_text(sql, encoding="utf-8")
+        return registry
 
     def test_matching_files_pass(self):
         with tempfile.TemporaryDirectory() as folder:
-            self.build_dir(Path(folder))
-            hashes = fte.verify_shipped(Path(folder))
+            registry = self.build_dir(Path(folder))
+            hashes = fte.verify_shipped(Path(folder), registry)
         self.assertEqual(set(hashes), set(fte.SHIPPED_FILES))
 
     def test_hash_mismatch_stops(self):
         with tempfile.TemporaryDirectory() as folder:
-            self.build_dir(Path(folder), wrong_hash=True)
+            registry = self.build_dir(Path(folder), wrong_hash=True)
             with self.assertRaises(SystemExit):
-                fte.verify_shipped(Path(folder))
+                fte.verify_shipped(Path(folder), registry)
 
     def test_wrong_model_version_stops(self):
         with tempfile.TemporaryDirectory() as folder:
-            self.build_dir(Path(folder), version="LGBM-BASE-0.1")
+            registry = self.build_dir(Path(folder), version="LGBM-BASE-0.1")
             with self.assertRaises(SystemExit):
-                fte.verify_shipped(Path(folder))
+                fte.verify_shipped(Path(folder), registry)
+
+    def test_hash_different_from_registered_0_2_stops(self):
+        # 로컬 SHA256SUMS.txt와는 맞아도 공용 DB에 등록한 0.2 해시와 다르면 TEST를 열기 전에 멈춘다
+        with tempfile.TemporaryDirectory() as folder:
+            registry = self.build_dir(Path(folder), wrong_registry=True)
+            with self.assertRaises(SystemExit) as caught:
+                fte.verify_shipped(Path(folder), registry)
+        self.assertIn("공용 DB에 등록한 모델 0.2", str(caught.exception))
+
+    def test_missing_registry_stops(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.build_dir(Path(folder))
+            with self.assertRaises(SystemExit):
+                fte.verify_shipped(Path(folder), Path(folder) / "없는파일.sql")
+
+    def test_real_register_sql_has_four_hashes(self):
+        hashes = fte.registered_hashes(fte.REGISTER_SQL_PATH)
+        self.assertEqual(set(hashes), set(fte.SHIPPED_FILES))
+        for digest in hashes.values():
+            self.assertRegex(digest, r"^[0-9a-f]{64}$")
+
+
+class RunRecordTests(unittest.TestCase):
+    def test_start_and_finish_accumulate_without_overwriting(self):
+        with tempfile.TemporaryDirectory() as folder:
+            record = Path(folder) / "run.json"
+            fte.start_run_record(record, {"started_at": "t1", "rerun_reason": None})
+            fte.finish_run_record(record, "failed", error="중단")
+            fte.start_run_record(record, {"started_at": "t2", "rerun_reason": "읽는 도중 중단"})
+            fte.finish_run_record(record, "finished", result_json_sha256="abc")
+            runs = json.loads(record.read_text(encoding="utf-8"))["runs"]
+            self.assertEqual([run["status"] for run in runs], ["failed", "finished"])
+            self.assertEqual(runs[1]["rerun_reason"], "읽는 도중 중단")
+            self.assertEqual(list(Path(folder).glob("*.tmp")), [])
+
+    def fake_run(self, folder: Path, evaluate) -> Path:
+        """main()을 TEST로 돌리되 표·모델·평가를 가짜로 바꿔 실행 기록 흐름만 본다(실제 TEST는 읽지 않는다)."""
+        data_dir = folder / "data"
+        for relative in (fte.config.TABLE_RELATIVE_PATH, fte.config.THINFILE_TABLE_RELATIVE_PATH):
+            (data_dir / relative).parent.mkdir(parents=True, exist_ok=True)
+            (data_dir / relative).write_text("x\n", encoding="utf-8")
+        record = folder / "run.json"
+        argv = ["final_test_eval", "--split", "TEST", "--confirm-test-once", "--data-dir", str(data_dir), "--model-dir", str(folder), "--out-dir", str(folder / "out")]
+        clean = {"commit": "abc", "working_tree_clean": True, "untracked_files_count": 0, "untracked_files": []}
+        patches = [mock.patch.object(fte, "RUN_RECORD_PATH", record), mock.patch.object(fte, "DEFAULT_RESULT_DIR", folder),
+                   mock.patch.object(sys, "argv", argv), mock.patch.object(fte, "git_state", return_value=clean),
+                   mock.patch.object(fte, "verify_shipped", return_value={name: "0" * 64 for name in fte.SHIPPED_FILES}),
+                   mock.patch.object(fte.joblib, "load", return_value=object()), mock.patch.object(fte, "load_training_sets", return_value=(pd.DataFrame(), pd.DataFrame(), None, {})),
+                   mock.patch.object(fte, "train_models", return_value={}),
+                   mock.patch.object(fte, "reproduction_check", return_value={"legacy_delinq": "같음", "alt_nonfin": "같음"}),
+                   mock.patch.object(fte, "evaluate_and_render", side_effect=evaluate)]
+        with contextlib.ExitStack() as stack:
+            for patch in patches:
+                stack.enter_context(patch)
+            fte.main()
+        return record
+
+    def test_record_is_written_before_test_rows_are_evaluated_and_marked_failed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            record = Path(folder) / "run.json"
+            seen = {}
+
+            def evaluate(*args, **kwargs):
+                # TEST 행을 읽는 단계(evaluate_and_render)에 들어간 시점에 실행 기록이 이미 started로 있어야 한다
+                seen["status"] = json.loads(record.read_text(encoding="utf-8"))["runs"][-1]["status"]
+                raise RuntimeError("읽는 도중 중단")
+
+            with self.assertRaises(RuntimeError), contextlib.redirect_stdout(io.StringIO()):
+                self.fake_run(Path(folder), evaluate)
+            self.assertEqual(seen["status"], "started")
+            self.assertEqual(json.loads(record.read_text(encoding="utf-8"))["runs"][-1]["status"], "failed")
+            self.assertFalse((Path(folder) / "out" / "final_test_eval_result.json").exists())     # 결과 파일은 없어도 기록은 남는다
+
+    def test_rerun_after_failure_needs_reason(self):
+        with tempfile.TemporaryDirectory() as folder:
+            def boom(*args, **kwargs):
+                raise RuntimeError("중단")
+
+            with self.assertRaises(RuntimeError), contextlib.redirect_stdout(io.StringIO()):
+                self.fake_run(Path(folder), boom)
+            with self.assertRaises(SystemExit), contextlib.redirect_stdout(io.StringIO()):
+                self.fake_run(Path(folder), boom)                                      # 사유 없이 다시 실행하면 TEST를 읽기 전에 거부
+
+
+class GitStateTests(unittest.TestCase):
+    def git(self, folder: Path, *args) -> None:
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args], cwd=folder, check=True, capture_output=True)
+
+    def make_repo(self, folder: Path) -> None:
+        self.git(folder, "init", "-q")
+        (folder / "docs/spec").mkdir(parents=True)
+        (folder / "tracked.txt").write_text("a", encoding="utf-8")
+        (folder / "docs/spec/final_test_eval_run.json").write_text("{}", encoding="utf-8")
+        self.git(folder, "add", ".")
+        self.git(folder, "commit", "-q", "-m", "init")
+
+    def test_untracked_files_do_not_block_but_are_recorded(self):
+        with tempfile.TemporaryDirectory() as folder, mock.patch.object(fte, "REPO_ROOT", Path(folder)):
+            self.make_repo(Path(folder))
+            (Path(folder) / "artifacts_README.txt").write_text("메모", encoding="utf-8")
+            state = fte.git_state()
+        self.assertTrue(state["working_tree_clean"])
+        self.assertEqual(state["untracked_files"], ["artifacts_README.txt"])
+
+    def test_modified_tracked_file_blocks(self):
+        with tempfile.TemporaryDirectory() as folder, mock.patch.object(fte, "REPO_ROOT", Path(folder)):
+            self.make_repo(Path(folder))
+            (Path(folder) / "tracked.txt").write_text("바뀜", encoding="utf-8")
+            self.assertFalse(fte.git_state()["working_tree_clean"])
+
+    def test_run_record_change_does_not_block(self):
+        # 첫 실행이 실행 기록을 고쳐 놓아도 재실행 검사가 막히지 않는다
+        with tempfile.TemporaryDirectory() as folder, mock.patch.object(fte, "REPO_ROOT", Path(folder)):
+            self.make_repo(Path(folder))
+            (Path(folder) / "docs/spec/final_test_eval_run.json").write_text('{"runs": []}', encoding="utf-8")
+            self.assertTrue(fte.git_state()["working_tree_clean"])
 
 
 class EvaluationSmokeTests(unittest.TestCase):
