@@ -112,6 +112,7 @@
 | 404 | `ASSESSMENT_NOT_FOUND` | SIM-01·02, DIAG-09: 점수가 나온(SCORED) 평가가 하나도 없음 — 리포트(RPT-02)와 같은 코드 |
 | 409 | `VERSION_MISMATCH` | SIM-02: ML-04가 출발 평가의 모델 버전을 계산할 수 없음 → "점수를 다시 산출한 뒤 이용" 안내 |
 | 409 | `INPUT_INCOMPLETE` | DIAG-09: 입력 기준월·출생연도 없음, 소득이 직군에 필요한 개월 수보다 적거나 같은 달이 겹침(점수 산출과 같은 문구) 🆕 11/20 |
+| 409 | `ALT_DATA_EMPTY` | DIAG-09: 통신비 또는 공과금 기관 기록이 0건이라 ML-03을 부르지 않음 → "통신비·공과금 기록이 없어 예상 점수를 계산할 수 없어요." (점수 산출 RPT-01의 `NOT_SCORABLE` `ALT_DATA_EMPTY`와 같은 기준, FP-239 리뷰 후속) 🆕 11/23 |
 | 503 | `MODEL_NOT_READY` | SIM-02·DIAG-09: 실제 모델 파일 없음, 연결 실패, 타임아웃, 그 밖의 5xx. 저장하지 않으므로 `MODEL_ERROR` 기록 없음 |
 
 - 커뮤니티(동주, PR #80) 오류 code: 403 `NOT_OWNER`(남의 글 수정·삭제), 404 `POST_NOT_FOUND`·`TARGET_NOT_FOUND`·`REPORT_NOT_FOUND`, 409 `OWN_CONTENT`(본인 글 신고)·`DUPLICATE_REPORT`·`POST_HIDDEN`·`STATUS_CHANGED`·`ALREADY_HANDLED`, 429 `DAILY_LIMIT_EXCEEDED`(하루 3번 초과).
@@ -208,7 +209,7 @@
 | DIAG-07-1 | `GET /api/members/me/income-volatility` 🆕 11/20 | N-22-1 저장 데이터 조회 + N-22-3·4·5 (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM` | USER | 광희 (FP-203) | ✅ |
 | DIAG-08 | `POST /api/diagnosis/cash-flow/forecast` | N-21-5 현금흐름 전망 계산, N-21-6 최근 12개월 적자 개월 수 계산, N-21-7 성수기·비수기 소득 격차 계산, N-21-9 과거 월 실적 `months[]`(요청의 `past12MonthsHistory`를 같은 모양으로 돌려줌) (요청 본문으로 계산, DB 안 읽음) | — | USER | 광희 (FP-203) | ✅ |
 | DIAG-08-1 | `GET /api/members/me/cash-flow-forecast` 🆕 11/20 | N-21-1 저장 데이터 조회 + N-21-2 전망 조건(쿼리, `incomeVariationPct`·`fixedExpenseAmount`·`paymentStatus` 추가) + N-21-5·6·7 + N-21-9 과거 월 실적 `months[]`(최대 12개) (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM`, `USER_LOAN` | USER | 광희 (FP-203) | ✅ |
-| DIAG-09 | `POST /api/members/me/cash-flow-expected-score` 🆕 11/20 | N-21-8 예상 대안 점수 재계산 (FastAPI ML-03을 ACTIVE 모델로 1번 호출, 저장 안 함 — O-6 확정). 응답 `expectedScore`·`scoreDiff`·`modelVersion`·`baseModelVersion`. 🆕 11/20 밀림 반영: `paymentStatus=DELAYED`면 최근 1년 30일 이상 연체(`DQ1200001`)를 +1로 가정, 응답 `assumedDelinquencyCount`(넣은 건수) 추가, `paymentStatusApplied`는 DELAYED일 때 `true` | 읽기만 (`ASSESSMENT` 최근 SCORED, 입력 표) | USER | 광희 (FP-170, 밀림 FP-239) | ✅ (PR #93) |
+| DIAG-09 | `POST /api/members/me/cash-flow-expected-score` 🆕 11/20 | N-21-8 예상 대안 점수 재계산 (FastAPI ML-03을 ACTIVE 모델로 1번 호출, 저장 안 함 — O-6 확정). 응답 `expectedScore`·`scoreDiff`·`modelVersion`·`baseModelVersion`. 🆕 11/20 밀림 반영: `paymentStatus=DELAYED`면 최근 1년 30일 이상 연체(`DQ1200001`)를 +1로 가정, 응답 `assumedDelinquencyCount`(넣은 건수) 추가, `paymentStatusApplied`는 DELAYED일 때 `true`. 🆕 11/23 통신비·공과금 기관 기록이 없으면 409 `ALT_DATA_EMPTY` | 읽기만 (`ASSESSMENT` 최근 SCORED, 입력 표) | USER | 광희 (FP-170, 밀림 FP-239) | ✅ (PR #93) |
 | ~~DIAG-10~~ | ~~`GET /api/commercial/dongs/{admDongCode}`~~ | N-24-2 소상공인 상권 분석, N-24-3 상권 분석 차트, N-24-5 행정동 상세 창 | — (상권 표 5개는 DDL에서 제거, 11/14) | USER | C조 | ⛔ **API 만들지 않음** — 화면이 정적 JSON(`frontend/public/data/market/`)을 읽는다(N-24 결정) |
 | ~~DIAG-11~~ | ~~`GET /api/commercial/heatmap`~~ | N-24-4 상권 공간 시각화 (지도 히트맵) | 위와 같음 | USER | C조 | ⛔ 위와 같음 |
 

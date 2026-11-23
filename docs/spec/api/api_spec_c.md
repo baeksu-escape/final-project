@@ -270,6 +270,7 @@
   | 403 | `FORBIDDEN` | 🆕 11/19 관리자 계정(`/api/members/me/**`는 `ROLE_USER` 전용) |
   | 404 | `ASSESSMENT_NOT_FOUND` | 점수가 나온 평가가 하나도 없음(리포트와 같은 코드) |
   | 409 | `INPUT_INCOMPLETE` | 저장된 입력 기준월이 없거나 출생연도가 없음(점수 산출과 같은 문구). 🆕 11/19 소득이 직군에 필요한 개월 수(자영업자·프리랜서 12, 급여소득자 1)보다 적거나 같은 달이 겹치면 ML-03을 부르지 않고 "소득을 필요한 개월 수만큼 입력해 주세요."(점수 산출과 같음, 0원으로 채워 계산하지 않음) |
+  | 409 | `ALT_DATA_EMPTY` | 🆕 11/23 통신비 또는 공과금 기관 기록이 0건이면 ML-03을 부르지 않고 "통신비·공과금 기록이 없어 예상 점수를 계산할 수 없어요." ML-03이 이런 요청을 422로 거절해 예전에는 400 "입력값을 확인해 주세요"로만 보였다(FP-239 리뷰 후속, 범영 님 제안). 기준은 점수 산출(RPT-01)의 `ALT_DATA_EMPTY`와 같다(간편결제·보험 0건은 막지 않음) |
   | 503 | `MODEL_NOT_READY` | ML-03 연결 실패·시간 초과·5xx. 저장하지 않으므로 MODEL_ERROR 기록을 남기지 않는다 |
 - 프론트: `diagnosisApi.js`의 `getExpectedScore({ incomeVariationPct, incomeChangePercent, fixedExpenseAmount, expenseChangePercent, paymentStatus })`. mock은 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"(🆕 11/20 밀림이면 −15점 더)으로만 계산하며, 진짜 모델 점수가 아니다.
 
