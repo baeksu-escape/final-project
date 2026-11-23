@@ -46,10 +46,10 @@ const COPY = {
   comparison: {
     headline: '나와 비슷한 사람들은\n어느 정도일까요',
     body: '같은 직군·연령대의 평균과 내 점수를 나란히 놓고 봅니다. 어디가 앞서고 어디가 부족한지 한눈에 알 수 있어요. (준비 중)',
-    preview: ({ myScore, topPct }) => (
+    preview: ({ myScore, topPct, avgScore }) => (
       <div className="hub-preview__rings">
         <ScoreRing value={myScore} label="나" sub="대안 점수" />
-        <ScoreRing value={topPct} max={100} label="같은 직군 안" sub={`상위 ${topPct.toFixed(1)}%`} tone="var(--line2)" />
+        <ScoreRing value={avgScore} label="같은 직군 평균" sub={`나는 상위 ${topPct.toFixed(1)}%`} tone="var(--line2)" />
       </div>
     ),
   },
@@ -57,11 +57,14 @@ const COPY = {
     headline: '가진 것과 갚을 것,\n건강한 균형인가요',
     body: '총자산·연소득·총부채로 상환 부담률(DSR), 자산 대비 부채, 순자산 대비 부채를 계산하고 안전·주의·위험으로 알려 줍니다.',
     preview: ({ ratios }) => (
-      <div className="hub-preview__rings">
-        <ScoreRing value={ratios.dsr} max={100} label="상환 부담률" sub={formatPct(ratios.dsr)} tone="var(--mint)" size={160} />
-        <ScoreRing value={ratios.debtToAsset} max={100} label="자산 대비 부채" sub={formatPct(ratios.debtToAsset)} tone="var(--warn)" size={160} />
-        <ScoreRing value={ratios.debtToNetAsset} max={100} label="순자산 대비" sub={formatPct(ratios.debtToNetAsset)} tone="var(--bad)" size={160} />
-      </div>
+      <>
+        <div className="hub-preview__rings">
+          {['dsr', 'debtToAsset', 'debtToNetAsset'].map((key, index) => Number.isFinite(ratios[key])
+            ? <ScoreRing key={key} value={ratios[key]} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub={formatPct(ratios[key])} tone={['var(--mint)', 'var(--warn)', 'var(--bad)'][index]} size={160} />
+            : <p key={key} className="hint" role="status">미입력</p>)}
+        </div>
+        {['dsr', 'debtToAsset', 'debtToNetAsset'].some((key) => !Number.isFinite(ratios[key])) && <p className="hint">입력하지 않은 항목이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면으로 이동</Link></p>}
+      </>
     ),
   },
   'cash-flow': {
@@ -167,12 +170,12 @@ export default function GroupHubPage({ groupKey }) {
       const workerGroup = response.groups?.find((item) => item.groupType === 'WORKER_TYPE')
       if (!workerGroup) {
         setPercentileState({ scope, status: 'error' })
-      } else if (workerGroup.topPct == null || workerGroup.memberCount < response.minGroupSize) {
+      } else if (workerGroup.topPct == null || workerGroup.avgScore == null || workerGroup.memberCount < response.minGroupSize) {
         setPercentileState({ scope, status: 'smallGroup' })
-      } else if (!Number.isInteger(response.myScore) || !Number.isFinite(workerGroup.topPct)) {
+      } else if (!Number.isInteger(response.myScore) || !Number.isFinite(workerGroup.topPct) || !Number.isFinite(workerGroup.avgScore)) {
         setPercentileState({ scope, status: 'error' })
       } else {
-        setPercentileState({ scope, status: 'ready', data: { myScore: response.myScore, topPct: workerGroup.topPct } })
+        setPercentileState({ scope, status: 'ready', data: { myScore: response.myScore, topPct: workerGroup.topPct, avgScore: workerGroup.avgScore } })
       }
     }).catch((error) => {
       if (active) setPercentileState({ scope, status: isMissingData(error) ? 'empty' : 'error' })
@@ -203,11 +206,11 @@ export default function GroupHubPage({ groupKey }) {
     })).then((result) => {
       if (!active) return
       const ratios = result?.ratios
-      if (!['dsr', 'debtToAsset', 'debtToNetAsset'].every((key) => Number.isFinite(ratios?.[key]?.value))) {
+      if (!['dsr', 'debtToAsset', 'debtToNetAsset'].some((key) => Number.isFinite(ratios?.[key]?.value))) {
         setAssetState({ scope, status: 'empty' })
       } else {
         setAssetState({ scope, status: 'ready', data: { ratios: {
-          dsr: ratios.dsr.value, debtToAsset: ratios.debtToAsset.value, debtToNetAsset: ratios.debtToNetAsset.value,
+          dsr: ratios.dsr?.value ?? null, debtToAsset: ratios.debtToAsset?.value ?? null, debtToNetAsset: ratios.debtToNetAsset?.value ?? null,
         } } })
       }
     }).catch((error) => {
