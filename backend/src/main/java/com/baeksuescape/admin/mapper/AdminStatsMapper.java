@@ -15,7 +15,7 @@ public interface AdminStatsMapper {
     // 지금 쓰는 모델 버전(MODEL_REGISTRY ACTIVE, AssessmentMapper·ModelPerformanceMapper와 같은 조건). 없으면 null
     String selectActiveModelVersion();
 
-    // 회원마다 그 모델로 낸 가장 최근 SCORED 서비스 평가 1건(탈퇴 회원 제외). 옛 모델(0.1·Mock) 평가는 세지 않는다(리뷰 반영 11/23)
+    // 회원마다 그 모델로 낸 가장 최근 SCORED 서비스 평가 1건(탈퇴 회원 제외). 그 밖의 모델로 낸 평가는 세지 않는다(리뷰 반영 11/23)
     List<AdminStatsRows.MemberScore> selectLatestScoredMembers(@Param("modelVersion") String modelVersion);
 
     // 가입 회원 수: 일반 회원(ROLE_USER) 중 탈퇴 제외

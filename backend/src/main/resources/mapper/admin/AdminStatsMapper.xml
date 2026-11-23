@@ -14,7 +14,7 @@
          FETCH FIRST 1 ROWS ONLY
     </select>
 
-    <!-- 11/23 리뷰 반영: 회원별 최근 평가를 고르기 전에 ACTIVE 모델로 낸 평가만 남긴다. 옛 모델(0.1)·Mock(DEV-DUMMY) 점수가 섞이지 않게 한다.
+    <!-- 11/23 리뷰 반영: 회원별 최근 평가를 고르기 전에 ACTIVE 모델로 낸 평가만 남긴다. 여러 모델 점수가 섞이지 않게 한다(ACTIVE가 0.2면 0.1·DEV-DUMMY가 빠지고, ACTIVE가 DEV-DUMMY면 Mock 평가만 남는다).
          그래서 옛 모델 평가만 있는 회원은 빠지고, 모델을 바꾼 뒤에는 새 모델로 다시 점수를 낸 회원만 잡힌다 -->
     <!-- 회원마다 가장 최근 SCORED 평가 1건(selectLatestScored와 같은 정렬). 직군·연령대는 평가 시점 값. 잠긴 회원(LOCKED)은 넣는다 -->
     <select id="selectLatestScoredMembers" resultType="com.baeksuescape.admin.dto.AdminStatsRows$MemberScore">

@@ -25,7 +25,7 @@ import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
  * FP-161 N-26-1~4 관리자 직군·연령별 통계(ADM-03).
  * D-26 담당자 결정(11/20, 광희): 11/06 확정 UI대로 요약(평가 고객 수·평균 점수 기존→대안·Standard 이상 비율 기존→대안·가입 회원 수·오늘 산출),
  * 기존·대안 등급 분포, 직군별·연령대별 통계 표를 만든다(v3의 상자 그림·히트맵·통신비 연체 경험은 UI에 없어 만들지 않는다).
- * 데이터는 서비스 회원이 ACTIVE 모델로 낸 최근 SCORED 평가 1건이고(옛 모델·Mock 평가 제외, 11/23 리뷰 반영), D-28 결정대로 탈퇴 회원은 뺀다(매퍼).
+ * 데이터는 서비스 회원이 ACTIVE 모델로 낸 최근 SCORED 평가 1건이고(ACTIVE가 아닌 모델의 평가 제외. ACTIVE가 DEV-DUMMY면 Mock 평가가 대상이다, 11/23 리뷰 반영), D-28 결정대로 탈퇴 회원은 뺀다(매퍼).
  */
 @Service
 public class AdminStatsService {
@@ -61,7 +61,7 @@ public class AdminStatsService {
             String message = "구분은 WORKER_TYPE(직군별) 또는 AGE_BAND(연령대별)여야 합니다.";
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", message, List.of(new FieldErrorItem("groupBy", message)));
         }
-        // ACTIVE 모델로 낸 평가만 센다(옛 모델 0.1·Mock 점수가 섞이면 기존 → 대안 비교의 뜻이 흐려진다, 11/23 리뷰 반영)
+        // ACTIVE 모델로 낸 평가만 센다(여러 모델 점수가 섞이면 기존 → 대안 비교의 뜻이 흐려진다, 11/23 리뷰 반영)
         String modelVersion = mapper.selectActiveModelVersion();
         List<MemberScore> members = modelVersion == null ? List.of() : mapper.selectLatestScoredMembers(modelVersion);
         long registered = mapper.selectRegisteredMemberCount();

@@ -107,9 +107,19 @@
 - **확인:** `./mvnw clean test` 466개 통과, DB 통합 테스트 8종 통과(탈퇴 확인 1개는 로컬에 탈퇴 회원이 없어 건너뜀), `npm run lint` 오류 0
 - **영향:** 모델을 바꾸면 새 모델로 다시 점수를 낸 회원만 통계에 잡힌다. 시연 전에 ACTIVE 모델로 회원 점수를 미리 내 둔다.
 
+## 11/23 리뷰 반영: 명세 문구 2곳 바로잡기
+- **지적 1 (api_spec_c.md 알려진 한계):** 등급 구간 버전(`ASSESSMENT.CUTOFF_VERSION`)은 모델 버전과 따로 저장된다. 그래서 같은 모델 평가라도 등급 구간 버전이 다를 수 있다. "ACTIVE 모델 평가끼리라 등급 구간 버전도 같다"는 틀린 문구였다.
+  - 확인: DDL에서 두 열이 따로 있고, `CUTOFF_VERSION`은 FastAPI 응답값을 그대로 저장한다. 등급 구간 추가 SQL(CUT-0.2·0.3)도 있다.
+  - 고친 것: "같은 ACTIVE 모델 평가라도 등급 구간 버전이 다를 수 있고, 통계는 이를 거르지 않아 등급 분포에 두 기준이 섞일 수 있다"로 바꿨다. 계산은 그대로다.
+- **지적 2 (api_spec_c.md 대상 설명):** ACTIVE가 `DEV-DUMMY`면 Mock 평가가 집계된다. 그러니 "Mock 제외"는 실제 동작과 다르다.
+  - 확인: DDL 기본 ACTIVE가 `DEV-DUMMY`이고, `rollback_model_to_dev_dummy.sql`로 되돌릴 수도 있다. 쿼리는 `MODEL_VERSION = ACTIVE`만 건다.
+  - 고친 것: "ACTIVE가 아닌 모델의 평가는 세지 않는다. ACTIVE가 0.2면 0.1·Mock이 빠지고, ACTIVE가 `DEV-DUMMY`면 Mock 평가만 집계된다"로 바꿨다.
+  - 같은 뜻의 문구도 함께 고쳤다: 정의서 ADM-03 행, `AdminStatsService`·`AdminStatsMapper`(.java/.xml) 주석, `adminStatsApi.js` 주석. 동작은 바뀌지 않는다.
+- **확인:** 주석·문서만 바뀌어 `./mvnw clean test`, `npm run lint`로 확인했다.
+
 ## 다음 사람이 알아야 할 것
 - 시연 DB는 점수를 낸 회원이 적어 대부분의 그룹이 5명 미만으로 비어 보일 수 있다. 발표 전에 시연 회원 점수를 E2E 스크립트로 미리 내 두는 것을 검토한다.
-- 평가마다 모델(0.1·0.2)과 등급 구간 버전이 다를 수 있다. 등급은 평가 때 저장된 값을 그대로 쓴다.
+- 통계는 ACTIVE 모델 평가만 세지만, 등급 구간 버전은 평가마다 다를 수 있다(모델과 따로 저장). 등급은 평가 때 저장된 값을 그대로 쓴다.
 - 5명 기준은 `AdminStatsService.MIN_GROUP_SIZE` 상수다.
 - 사용자 비교 분석(ADM-04, N-26-5~7)은 D-27(우선순위 미정)이라 만들지 않았다.
 
