@@ -50,6 +50,9 @@ public interface UserAccountMapper {
     // N-04-3 비밀번호 변경(로그인한 상태).
     int updatePassword(@Param("userId") long userId, @Param("passwordHash") String passwordHash, @Param("now") LocalDateTime now);
 
+    // MEM-08 N-04-3 닉네임 변경(FP-222). 겹침은 서비스가 먼저 확인하고, 동시에 바꾸면 UK_APU_NICKNAME이 막는다.
+    int updateNickname(@Param("userId") long userId, @Param("nickname") String nickname, @Param("now") LocalDateTime now);
+
     // N-04-3 이메일 변경: 암호문과 검색 HMAC을 함께 바꾼다.
     int updateEmail(@Param("userId") long userId, @Param("emailEnc") String emailEnc, @Param("emailHmac") String emailHmac,
             @Param("now") LocalDateTime now);
