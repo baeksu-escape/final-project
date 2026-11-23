@@ -18,7 +18,7 @@ const SIMULATION_CHANGE_KEYS = new Set([
   SIMULATION_CARD.spendKey,
 ])
 
-// 점수가 속한 등급(CUT-0.1)과 부도 확률 예시를 ML-04 before·after 모양으로 만든다.
+// 점수가 속한 등급(CUT-0.3)과 부도 확률 예시를 ML-04 before·after 모양으로 만든다.
 function summarizeScore(score) {
   const gradeBandCode = SCORE_BAND_OFFER_ROWS.find((row) => score >= row.minScore && score <= row.maxScore).gradeBand
   return { score, gradeBandCode, defaultProb: SIMULATION_DEFAULT_PROB[gradeBandCode] }
@@ -203,7 +203,7 @@ function handleScoreBandOffer({ query }) {
   return {
     score,
     gradeBand: band.gradeBand,
-    cutoffVersion: 'CUT-0.1',
+    cutoffVersion: 'CUT-0.3',
     bandMinScore: band.minScore,
     bandMaxScore: band.maxScore,
     expectedMinRate: band.rateMin,

@@ -63,12 +63,12 @@ export const SAMPLE_CASH_FLOW_BASE = Object.freeze({
 })
 
 // N-21-8 DIAG-09 예상 점수 mock의 현재 점수(점수가 나온 최근 평가 예시, 시뮬레이터 mock과 같은 588점).
-// 등급 경계는 CUT-0.1(665·780). 예상 점수는 mock 규칙으로만 계산하며 진짜 모델 점수가 아니다.
+// 등급 경계는 CUT-0.3(654·727). 예상 점수는 mock 규칙으로만 계산하며 진짜 모델 점수가 아니다.
 export const SAMPLE_EXPECTED_SCORE_BASE = Object.freeze({
   baseRequestId: '00000000-0000-4000-8000-000000000588',
   modelVersion: 'DEV-DUMMY',
   score: 588,
-  gradeCutoffs: Object.freeze({ standard: 665, good: 780 }),
+  gradeCutoffs: Object.freeze({ standard: 654, good: 727 }),
   incomePointPerPercent: 1, // 평균 소득이 1% 늘 때 +1점
   expensePointPerPercent: 0.5, // 월 지출이 1% 늘 때 −0.5점
   storedDelinquencyCount: 0, // 저장된 최근 1년 30일 이상 연체 건수 예시(밀림이면 +1)
