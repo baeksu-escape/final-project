@@ -5,8 +5,8 @@
 ```
 [프로젝트 규칙]
 - 프로젝트: 연령·직군별 대안 신용평가 웹 서비스(교육용, 합성 데이터). React → Spring Boot(JWT, Oracle) → FastAPI(LightGBM·SHAP). 서비스의 Gemini API는 백엔드에서 호출한다. 개발용 AI 도구는 자유롭게 사용한다.
-- 직군은 급여소득자·자영업자·프리랜서 3개, 등급은 Good·Standard·Caution 3개(점수 0~1000), 역할은 ROLE_USER·ROLE_ADMIN.
-- CSS·className·인라인 style·레이아웃은 요청하지 않으면 바꾸지 말 것. 필요하면 제안만.
+- 직군은 급여소득자·자영업자·프리랜서 3개, 등급은 Good·Standard·Caution 3개(점수 0~1000, 화면 표시는 좋음·보통·주의), 역할은 ROLE_USER·ROLE_ADMIN.
+- CSS·className·인라인 style·레이아웃은 요청하지 않으면 바꾸지 말 것. 필요하면 제안만. 새 화면은 AGENTS.md 3-2의 공통 재료(11/23 UI 리뉴얼: 공통 클래스·NAV_GROUPS·버튼 단계)로 맞출 것.
 - 내가 요청한 부분만 고칠 것. 이름 바꾸기·삭제·포맷 정리·명세에 없는 기능 추가 금지.
 - 모르거나 정해지지 않은 것(테이블명, API 형식, 폴더 구조 등)은 추측하지 말고 선택지를 주고 물어볼 것.
 - 새 함수·컴포넌트·API에는 한국어 1~2문장 주석과 기능 번호(N-xx, 세부 기능은 N-xx-n)를 달 것.
