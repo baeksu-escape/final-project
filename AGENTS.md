@@ -34,10 +34,15 @@
 - 요청 없이 `*.css`, `*.scss`, `styles/`, 색상·폰트·간격 값, `className`, 인라인 `style`, 레이아웃 구조, 테마 전환(화이트·블랙)과 카드 접기 로직을 만들거나 고치거나 지우지 않는다.
 - 로직 작업 중에도 기존 마크업과 클래스명을 그대로 둔다. 새 스타일이 필요하면 코드 대신 "이런 스타일이 필요하다"고 제안만 한다.
 - 프론트 담당자가 직접 요청한 경우에만, 요청한 범위 안에서 고친다.
-- 새 화면은 아래 공통 재료로 모양을 맞춘다. 이미 있는 클래스·컴포넌트를 쓰는 것이므로 요청 없이 해도 된다(기준 UI: 데모 v2).
-  - 컴포넌트: `common/components`(Card·Button·Chip·Notice·Modal·Toast·입력류·차트 4종)
-  - 배치 클래스(`common/styles/layout.css`): 제목 줄 `page-head`(`__tag`·`__title`·`__lead`), 2:1 `l-cols`(+`l-cols__main`), 3열 `l-grid3`, 숫자 타일 `l-kpis`, 자동 칸 `l-g2`, 표 `data-table`(+`data-table-wrap`), 안쪽 상자 `panel-sunk`, 글자 `hint`·`num`
-  - 색·간격은 `tokens.css` 변수만 쓰고 색 코드를 직접 쓰지 않는다.
+- 새 화면은 아래 공통 재료로 모양을 맞춘다. 이미 있는 클래스·컴포넌트를 쓰는 것이므로 요청 없이 해도 된다(기준 UI: **11/23 UI 리뉴얼** — 흰 바탕·파랑 강조 하나·큰 숫자의 금융 앱형, 데모 v2 대신) 🆕 11/23.
+  - 틀(`common/layout`): 위쪽 바 + 마우스를 올리면 메뉴 바로 아래로 세부 메뉴가 내려오는 `MegaNav`, 분류 안 세부 메뉴 줄, 본문은 화면 가운데 최대 1440px(`--page-max`·`--page-pad`). 경로가 바뀌면 본문이 흐릿 → 선명하게 들어온다(`page-enter`, 따로 할 일 없음) 🆕 11/23
+  - 메뉴: 사용자 메뉴는 큰 분류 5개(한눈에·내 신용·재무 진단·대출·라운지, '한눈에'는 로그인 후 첫 화면인 요약 대시보드)로 묶는다. 새 기능 화면은 `common/config/navigation.js`의 `NAV_GROUPS` 알맞은 분류 `items`에 넣고, 분류 화면 설명·예시 그래프는 `common/pages/GroupHubPage.jsx`의 `COPY`에 넣는다 🆕 11/23
+  - 컴포넌트: `common/components`(Card·Button·Chip·Notice·Modal·Toast·입력류·차트 4종) + 움직이는 시각화 `viz.jsx`(`ScoreRing` 점수 링·`TrendArea` 추이 곡선·`FactorBars` 가점/감점 막대·`CountUp` 숫자 올라가기, 훅은 `vizHooks.js`) 🆕 11/23
+  - 배치 클래스(`common/styles/layout.css`): 제목 띠 `page-head`(`__tag`·`__title`·`__lead`, 움직이는 빛 장식이 자동으로 붙음), 2:1 `l-cols`(+`l-cols__main`), 3열 `l-grid3`, 숫자 타일 `l-kpis`, 자동 칸 `l-g2`, 표 `data-table`(+`data-table-wrap`), 안쪽 상자 `panel-sunk`, 글자 `hint`·`num`
+  - 색·간격은 `tokens.css` 변수만 쓰고 색 코드를 직접 쓰지 않는다. 강조는 `--acc`(파랑) 하나, 좋음·가점 `--mint`, 주의 `--warn`, 나쁨·감점 `--bad`. 간격 `--sp-1`~`--sp-8`, 모서리 `--r-sm`·`--r`·`--r-lg` 🆕 11/23
+  - 이모지·아이콘 타일 대신 글자와 그래프로 보여 준다(앱이 아닌 웹사이트 느낌) 🆕 11/23
+  - 버튼 단계 🆕 11/23: 진한 파랑 `Button variant="primary"`는 한 영역에서 가장 중요한 동작 하나만, 반복·보조 동작은 옅은 파랑(`size="sm"`인 primary는 자동, 링크는 `className="button button--weak"`), 다른 화면으로 가는 것은 버튼 대신 글자 링크(`className="text-link"` 또는 클래스 없는 `<a>`·`<Link>`)
+  - 등급 이름은 `GRADE_LABELS`(좋음·보통·주의)를 쓰고 영문을 직접 적지 않는다 🆕 11/23
 - 위 재료로 안 되는 모양이 필요하면 기능 폴더에 `<기능>.css`를 만들기 전에 프론트 담당에게 먼저 알린다. 공통 CSS(`tokens.css`·`forms.css`·`components.css`·`layout.css`)는 프론트 담당만 고친다.
 
 ### 3-3. 주석

@@ -7,11 +7,11 @@ export const GRADES = Object.freeze({
   CAUTION: 'CAUTION',
 })
 
-// 등급 코드 → 화면에 보일 이름.
+// 등급 코드 → 화면에 보일 이름. UI 리뉴얼(11/23)부터 한글로 보인다(코드값 GOOD·STANDARD·CAUTION은 그대로).
 export const GRADE_LABELS = Object.freeze({
-  [GRADES.GOOD]: 'Good',
-  [GRADES.STANDARD]: 'Standard',
-  [GRADES.CAUTION]: 'Caution',
+  [GRADES.GOOD]: '좋음',
+  [GRADES.STANDARD]: '보통',
+  [GRADES.CAUTION]: '주의',
 })
 
 // 기존·대안 모델 점수 범위 — DDL v0.3.2 CHECK와 같은 0~1000. TODO(D-01) 모형 학습 후 환산식이 정해지면 다시 맞춘다.

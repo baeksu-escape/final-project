@@ -10,6 +10,13 @@ import ReportModal from '../components/ReportModal.jsx'
 import { PAGE_SIZE } from '../config/communityCodes.js'
 import '../community.css'
 
+// UI 리뉴얼 — 목록 위 보기 탭(지금 쪽의 글에서 거른다. 서버 검색·쪽 넘기기는 그대로)
+const FEED_TABS = [
+  { key: 'all', label: '전체보기', pick: () => true },
+  { key: 'talk', label: '댓글 많은 글', pick: (post) => !post.hidden && post.commentCount > 0 },
+  { key: 'mine', label: '내 글', pick: (post) => post.mine },
+]
+
 // FP-223 주소(?post=3, ?post=3&mode=edit, ?mode=write)에서 지금 볼 화면을 읽는다. 번호가 이상하면 목록으로 본다.
 function readView(params) {
   const postId = Number(params.get('post'))
@@ -46,6 +53,7 @@ export default function LoungePage() {
   // 이번에 신고한 대상('POST:12') — 버튼 대신 '신고함'을 보여 준다
   const [reportedKeys, setReportedKeys] = useState([])
   const [toast, setToast] = useState('')
+  const [feedTab, setFeedTab] = useState('all')
 
   // 목록 — 쪽·검색어가 바뀌거나 저장·삭제 뒤에 다시 읽는다
   useEffect(() => {
@@ -193,7 +201,26 @@ export default function LoungePage() {
         {!data && !list.error && <p className="hint">불러오는 중…</p>}
         {data && (
           <>
-            <PostTable items={data.items} startNo={data.totalCount - (data.page - 1) * PAGE_SIZE} onOpen={openPost} />
+            {/* 이야기가 많은 글 3개 — 지금 쪽에서 댓글 수가 많은 순 */}
+            {feedTab === 'all' && (
+              <div className="lounge-hot">
+                {[...data.items].filter((post) => !post.hidden && post.commentCount > 0).sort((a, b) => b.commentCount - a.commentCount).slice(0, 3).map((post) => (
+                  <button key={post.postId} type="button" className="lounge-hot__card" onClick={() => openPost(post.postId)}>
+                    <span className="lounge-hot__badge">이야기 중</span>
+                    <b>{post.title}</b>
+                    <span className="lounge-hot__meta">{post.nickname} · 댓글 <span className="num">{post.commentCount}</span></span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="lounge-tabs" role="tablist" aria-label="글 보기">
+              {FEED_TABS.map((tab) => (
+                <button key={tab.key} type="button" role="tab" aria-selected={feedTab === tab.key} className="lounge-tabs__btn" onClick={() => setFeedTab(tab.key)}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <PostTable items={data.items.filter(FEED_TABS.find((tab) => tab.key === feedTab).pick)} startNo={data.totalCount - (data.page - 1) * PAGE_SIZE} onOpen={openPost} />
             <Pager page={data.page} totalPages={totalPages} onChange={setPage} />
           </>
         )}
