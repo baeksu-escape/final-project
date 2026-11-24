@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth.js'
+import Button from '../components/Button.jsx'
 import { FactorBars, ScoreRing, TrendArea } from '../components/viz.jsx'
 import { NAV_GROUPS, PATHS } from '../config/navigation.js'
 import { fetchDiagnosisHistory } from '../../features/auth/api/diagnosisHistoryApi.js'
@@ -22,19 +23,29 @@ export default function HomePage() {
   const [report, setReport] = useState(null)
   const [reportError, setReportError] = useState(false)
   const [history, setHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [historyError, setHistoryError] = useState(false)
   // [다시 시도]를 누르면 1씩 올려 다시 불러온다
   const [reloadKey, setReloadKey] = useState(0)
+  const [historyReloadKey, setHistoryReloadKey] = useState(0)
 
-  // 점수(RPT-02)와 진단 내역(MEM-06)을 불러온다. 점수 조회가 실패하면 로딩에 머물지 않고 안내와 [다시 시도]를 보여 준다(FP-252 검수 반영).
-  // 진단 내역 실패는 추이 카드만 비고 나머지는 그대로 보이게 둔다.
+  // 점수(RPT-02)를 불러온다. 조회가 실패하면 로딩에 머물지 않고 안내와 [다시 시도]를 보여 준다(FP-252 검수 반영).
   useEffect(() => {
     let active = true
     fetchCreditReport()
       .then((data) => { if (active) { setReport(data); setReportError(false) } })
       .catch(() => { if (active) setReportError(true) })
-    fetchDiagnosisHistory().then(({ items }) => { if (active) setHistory(items ?? []) }).catch(() => {})
     return () => { active = false }
   }, [reloadKey])
+
+  // N-12-4 점수 추이 내역을 불러온다. 실패 안내와 재시도는 추이 카드 안에서만 처리한다.
+  useEffect(() => {
+    let active = true
+    fetchDiagnosisHistory()
+      .then(({ items }) => { if (active) { setHistory(items ?? []); setHistoryLoading(false) } })
+      .catch(() => { if (active) { setHistoryError(true); setHistoryLoading(false) } })
+    return () => { active = false }
+  }, [historyReloadKey])
 
   const retry = () => {
     setReportError(false)
@@ -45,10 +56,14 @@ export default function HomePage() {
   const alt = report?.alternative
   const scored = report?.gradeStatusCode === 'SCORED' && alt?.score != null
   const diff = report?.comparison?.scoreDiff
-  const trend = [...history].reverse()
-    .filter((item) => item.alternativeScore != null)
-    .slice(-6)
+  const scoredHistory = [...history]
+    .filter((item) => item.gradeStatusCode === 'SCORED' && item.alternativeScore != null && item.calculatedAt && !Number.isNaN(new Date(item.calculatedAt).getTime()))
+    .sort((a, b) => new Date(a.calculatedAt) - new Date(b.calculatedAt))
+  const visibleHistory = scoredHistory.slice(-6)
+  const trend = visibleHistory
     .map((item) => ({ label: `${new Date(item.calculatedAt).getMonth() + 1}월`, value: item.alternativeScore }))
+  const modelChanges = visibleHistory.slice(1).filter((item, index) => item.modelVersion !== visibleHistory[index].modelVersion)
+  const latestModelChange = modelChanges.at(-1)
   const factors = [...(report?.shap?.factors ?? [])]
     .filter((factor) => factor.shapScore !== 0)
     .sort((a, b) => Math.abs(b.shapScore) - Math.abs(a.shapScore))
@@ -88,7 +103,21 @@ export default function HomePage() {
 
         <article className="dash-card dash-trend">
           <div className="dash-card__head"><h2>대안 점수 추이</h2><Link to={PATHS.MY_PAGE} className="dash-more">진단 내역 →</Link></div>
-          <TrendArea points={trend} height={250} ariaLabel="최근 대안 점수 추이" />
+          {historyError ? (
+            <div role="alert">
+              <p className="hint">점수 추이를 불러오지 못했습니다.</p>
+              <Button size="sm" onClick={() => { setHistoryError(false); setHistoryLoading(true); setHistoryReloadKey((key) => key + 1) }}>다시 시도</Button>
+            </div>
+          ) : historyLoading ? (
+            <p className="hint">불러오는 중…</p>
+          ) : trend.length <= 1 ? (
+            <p className="hint">평가가 2번 이상 쌓이면 추이가 보여요.</p>
+          ) : (
+            <>
+              <TrendArea points={trend} height={250} ariaLabel="최근 대안 점수 추이" />
+              {latestModelChange && <p className="hint">{new Date(latestModelChange.calculatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })}부터 모델이 바뀌어, 점수 차이에 모델 변경 효과가 섞여 있을 수 있어요.</p>}
+            </>
+          )}
         </article>
       </section>
 
