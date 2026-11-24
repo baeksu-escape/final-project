@@ -8,9 +8,10 @@ import Notice from '../components/Notice.jsx'
 import ScoreGauge from '../../features/credit/components/ScoreGauge.jsx'
 import { fetchCreditReport } from '../../features/credit/api/creditApi.js'
 import { getScorePercentile } from '../../features/comparison/api/scorePercentileApi.js'
-import { calculateAssetDebtPreview, getAssetDebtData, getCashFlowData } from '../../features/diagnosis/api/financeApi.js'
-import { getScenarioBase, recalculateMemberScenario } from '../../features/diagnosis/api/diagnosisApi.js'
-import { ASSET_DEBT_RISK_THRESHOLDS } from '../../features/diagnosis/utils/financeCalculations.js'
+import { getCashFlowData } from '../../features/diagnosis/api/financeApi.js'
+import { getMemberFinancialHealth, getScenarioBase, recalculateMemberScenario } from '../../features/diagnosis/api/diagnosisApi.js'
+import { adaptAssetDebtData } from '../../features/diagnosis/adapters/financeAdapter.js'
+import { ASSET_DEBT_RISK_THRESHOLDS, calculateAssetDebt } from '../../features/diagnosis/utils/financeCalculations.js'
 import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import '../../features/credit/credit.css'
 import './hub.css'
@@ -224,15 +225,17 @@ export default function GroupHubPage({ groupKey }) {
     })
     return () => { active = false }
   }, [groupKey, scope, retries.percentile])
-  // N-16-1·2 DIAG-03-1 저장값과 공통 재계산 결과가 모두 있을 때 세 비율을 표시한다.
+  // N-16-1·2 저장된 자산·부채를 공유 계산 함수로 계산해 세 비율을 표시한다.
   useEffect(() => {
     if (groupKey !== 'finance') return undefined
     let active = true
-    getAssetDebtData(user?.userId).then((baseline) => calculateAssetDebtPreview(baseline, {
-      totalAssetAmount: baseline.totalAssetAmount,
-      annualIncomeAmount: baseline.annualIncomeAmount,
-      totalDebtAmount: baseline.totalDebtAmount,
-    })).then((result) => {
+    Promise.resolve().then(() => {
+      if (!(typeof user?.userId === 'string' && user.userId.trim() || Number.isSafeInteger(user?.userId) && user.userId > 0)) throw new Error('로그인 회원을 확인해 주세요.')
+      return getMemberFinancialHealth()
+    }).then((health) => {
+      const baseline = adaptAssetDebtData({ ...health, peer: null, assumptions: [] })
+      return calculateAssetDebt(baseline)
+    }).then((result) => {
       if (!active) return
       const ratios = result?.ratios
       const hasUnavailableReason = Object.values(ratios ?? {}).some((ratio) => ratio?.unavailableReason != null)
