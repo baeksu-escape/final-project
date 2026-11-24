@@ -96,7 +96,7 @@ const COPY = {
                 : <ScoreRing key={key} value={null} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub={reason.sub} tone={reason.tone ?? 'var(--line2)'} size={160} />
             })}
           </div>
-          {hasNetAssetRisk && <Notice type="warn">부채가 자산보다 많아 순자산 대비 비율을 계산할 수 없어요. 위험 단계로 보세요.</Notice>}
+          {hasNetAssetRisk && <Notice type="warn">순자산이 0원 이하라 순자산 대비 비율을 계산할 수 없어요. 위험 단계로 보세요.</Notice>}
           {hasMissing && <p className="hint">입력하지 않은 항목이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면으로 이동</Link></p>}
           {hasZero && <p className="hint">값이 0이라 계산할 수 없는 비율이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면에서 확인해 보세요.</Link></p>}
         </>
