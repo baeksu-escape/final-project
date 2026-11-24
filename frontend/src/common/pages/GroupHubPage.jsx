@@ -57,8 +57,8 @@ const COPY = {
     body: '금융 이력만 보는 기존 모델과, 통신비·연금 같은 납부 기록까지 보는 대안 모델. 두 점수와, 모델이 점수를 계산할 때 크게 작용한 항목을 함께 보여 줍니다.',
     preview: ({ traditionalScore, alternativeScore, bands }) => (
       <div className="hub-preview__pair">
-        <div><p>기존 모델</p><ScoreGauge score={traditionalScore} bands={bands} label="기존 모델" /></div>
-        <div><p>대안 모델</p><ScoreGauge score={alternativeScore} bands={bands} label="대안 모델" alternative /></div>
+        <div><p>기존 모델</p>{traditionalScore != null ? <ScoreGauge score={traditionalScore} bands={bands} label="기존 모델" /> : <p className="credit-unavailable">산정 불가</p>}</div>
+        <div><p>대안 모델</p>{alternativeScore != null ? <ScoreGauge score={alternativeScore} bands={bands} label="대안 모델" alternative /> : <p className="credit-unavailable">산정 불가</p>}</div>
       </div>
     ),
   },
@@ -188,12 +188,11 @@ export default function GroupHubPage({ groupKey }) {
     if (groupKey !== 'credit') return undefined
     let active = true
     fetchCreditReport().then((report) => {
-      const traditionalScore = report.traditional?.score
-      const alternativeScore = report.alternative?.score
+      const traditionalScore = report.traditional?.scorableYn === 'Y' ? report.traditional.score : null
+      const alternativeScore = report.alternative?.scorableYn === 'Y' ? report.alternative.score : null
       const bands = report.gradeBands?.bands
       if (!active) return
-      if (report.gradeStatusCode !== 'SCORED' || !Number.isInteger(traditionalScore)
-        || !Number.isInteger(alternativeScore) || !Array.isArray(bands) || bands.length === 0) {
+      if (report.gradeStatusCode !== 'SCORED' || !Array.isArray(bands) || bands.length === 0) {
         setReportState({ scope, status: 'empty' })
         return
       }
