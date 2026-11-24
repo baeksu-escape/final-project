@@ -63,7 +63,7 @@ const COPY = {
         <div className="hub-preview__rings">
           {['dsr', 'debtToAsset', 'debtToNetAsset'].map((key, index) => Number.isFinite(ratios[key])
             ? <ScoreRing key={key} value={ratios[key]} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub={formatPct(ratios[key])} tone={riskTone(ratios[key], ['dsr', 'debtToAsset', 'debtToNetAsset'][index])} size={160} />
-            : <p key={key} className="hint" role="status">미입력</p>)}
+            : <ScoreRing key={key} value={null} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub="미입력" tone="var(--line2)" size={160} />)}
         </div>
         {['dsr', 'debtToAsset', 'debtToNetAsset'].some((key) => !Number.isFinite(ratios[key])) && <p className="hint">입력하지 않은 항목이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면으로 이동</Link></p>}
       </>

@@ -20,9 +20,9 @@
 .credit-gauge--tone-caution { --gauge: var(--warn); }
 .credit-gauge--tone-standard { --gauge: var(--acc); }
 .credit-gauge--tone-good { --gauge: var(--mint); }
-.credit-gauge--tone-caution:not(.credit-gauge--alternative) { --gauge: var(--mut2); }
-.credit-gauge--tone-standard:not(.credit-gauge--alternative) { --gauge: var(--mut); }
-.credit-gauge--tone-good:not(.credit-gauge--alternative) { --gauge: var(--fg2); }
+.credit-gauge--tone-caution:not(.credit-gauge--alternative) { --gauge: color-mix(in srgb, var(--mut2) 55%, var(--line2)); }
+.credit-gauge--tone-standard:not(.credit-gauge--alternative) { --gauge: var(--mut2); }
+.credit-gauge--tone-good:not(.credit-gauge--alternative) { --gauge: var(--fg); }
 .credit-gauge__seg { fill: none; stroke-width: 20; stroke-linecap: butt; }
 .credit-gauge__seg--caution { stroke: color-mix(in srgb, var(--warn) 18%, var(--panel2)); }
 .credit-gauge__seg--standard { stroke: color-mix(in srgb, var(--acc) 18%, var(--panel2)); }
@@ -35,8 +35,8 @@
 .credit-gauge__score { fill: var(--gauge); font-size: 60px; font-weight: 800; letter-spacing: -0.04em; }
 .credit-gauge:not(.credit-gauge--alternative) .credit-gauge__score { fill: var(--fg2); }
 .credit-gauge:not(.credit-gauge--alternative) .credit-gauge__seg--caution { stroke: var(--line); }
-.credit-gauge:not(.credit-gauge--alternative) .credit-gauge__seg--standard { stroke: color-mix(in srgb, var(--line) 50%, var(--line2)); }
-.credit-gauge:not(.credit-gauge--alternative) .credit-gauge__seg--good { stroke: var(--line2); }
+.credit-gauge:not(.credit-gauge--alternative) .credit-gauge__seg--standard { stroke: var(--line2); }
+.credit-gauge:not(.credit-gauge--alternative) .credit-gauge__seg--good { stroke: color-mix(in srgb, var(--line2) 55%, var(--mut2)); }
 .credit-gauge:not(.credit-gauge--alternative) .credit-gauge__band-label { fill: var(--mut); }
 .credit-gauge:not(.credit-gauge--alternative) .credit-gauge__band-label.is-mine { fill: var(--fg2); }
 .credit-gauge__unit { fill: var(--mut2); font-size: 13px; font-weight: 600; }
