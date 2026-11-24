@@ -80,7 +80,7 @@ const COPY = {
     headline: '가진 것과 갚을 것,\n건강한 균형인가요',
     body: '총자산·연소득·총부채로 상환 부담률(DSR), 자산 대비 부채, 순자산 대비 부채를 계산하고 안전·주의·위험으로 알려 줍니다.',
     preview: ({ ratios, unavailableReasons }) => {
-      const reasons = Object.values(unavailableReasons ?? {}).map((code) => ASSET_DEBT_UNAVAILABLE_COPY[code] ?? ASSET_DEBT_UNAVAILABLE_COPY.unknown)
+      const reasons = Object.values(unavailableReasons ?? {}).filter((code) => code != null).map((code) => ASSET_DEBT_UNAVAILABLE_COPY[code] ?? ASSET_DEBT_UNAVAILABLE_COPY.unknown)
       const hasMissing = reasons.some((reason) => reason.notice === 'missing')
       const hasZero = reasons.some((reason) => reason.notice === 'zero')
       const hasNetAssetRisk = reasons.some((reason) => reason.notice === 'netAsset')
