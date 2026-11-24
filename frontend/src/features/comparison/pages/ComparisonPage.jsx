@@ -1,3 +1,4 @@
+import GroupCompareSection from '../components/GroupCompareSection.jsx'
 import MyPositionSection from '../components/MyPositionSection.jsx'
 import '../comparison.css'
 
@@ -14,7 +15,8 @@ export default function ComparisonPage() {
 
       <MyPositionSection />
 
-      {/* FP-164 N-26-5~7 직군 × 연령 격자·집단 비교 구역은 여기 아래에 둔다(광희). */}
+      {/* FP-164 N-26-5~7 직군 × 연령 격자·집단 비교 구역(광희) */}
+      <GroupCompareSection />
     </>
   )
 }
