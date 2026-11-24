@@ -11,7 +11,7 @@
 
 .viz-ring__track {
   fill: none;
-  stroke: var(--panel2);
+  stroke: var(--line);
   stroke-width: 14;
 }
 
