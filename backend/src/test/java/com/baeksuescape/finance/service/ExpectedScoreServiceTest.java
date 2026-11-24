@@ -83,6 +83,11 @@ class ExpectedScoreServiceTest {
         request.put("applicant", new LinkedHashMap<>(Map.of("workerTypeCode", "FREELANCER", "requiredIncomeMonths", 3)));
         request.put("incomeMonths", incomes);
         request.put("expenses", expenses);
+        // 통신비·공과금 기관 기록 각 1건(없으면 DIAG-09가 409 ALT_DATA_EMPTY로 막는다)
+        Map<String, Object> alternativeData = new LinkedHashMap<>();
+        alternativeData.put("telecom", new ArrayList<>(List.of(Map.of("baseMonth", "2026-08"))));
+        alternativeData.put("utility", new ArrayList<>(List.of(Map.of("baseMonth", "2026-08"))));
+        request.put("alternativeData", alternativeData);
         return request;
     }
 
@@ -293,6 +298,33 @@ class ExpectedScoreServiceTest {
         when(financialInput.load(USER_ID)).thenReturn(new FinancialInputResponse(null, null, null, List.of()));
         assertEquals("INPUT_INCOMPLETE", assertThrows(ApiException.class, () -> service.expectedScore(USER_ID, null)).getCode());
         verify(predictionClient, never()).score(any());
+    }
+
+    @Test
+    @DisplayName("통신비·공과금 기관 기록이 비어 있으면 ML-03을 부르지 않고 409 ALT_DATA_EMPTY (FP-239 리뷰 후속, RPT-01과 같은 기준)")
+    @SuppressWarnings("unchecked")
+    void billDataEmpty() {
+        readyToScore(current());
+        when(assembler.build(anyString(), eq("REAL-V1"), any(), eq("2026-08"), eq(31))).thenAnswer(invocation -> {
+            Map<String, Object> request = request();
+            ((Map<String, Object>) request.get("alternativeData")).put("telecom", new ArrayList<>());
+            return request;
+        });
+
+        ApiException e = assertThrows(ApiException.class, () -> service.expectedScore(USER_ID, null));
+
+        assertEquals(HttpStatus.CONFLICT, e.getStatus());
+        assertEquals("ALT_DATA_EMPTY", e.getCode());
+        assertEquals("통신비·공과금 기록이 없어 예상 점수를 계산할 수 없어요.", e.getMessage());
+        verify(predictionClient, never()).score(any());
+
+        Map<String, Object> noUtility = request();
+        ((Map<String, Object>) noUtility.get("alternativeData")).remove("utility");
+        assertThrows(ApiException.class, () -> ExpectedScoreService.checkBillData(noUtility));
+        Map<String, Object> noAltData = request();
+        noAltData.remove("alternativeData");
+        assertThrows(ApiException.class, () -> ExpectedScoreService.checkBillData(noAltData));
+        ExpectedScoreService.checkBillData(request());   // 둘 다 1건 이상이면 통과
     }
 
     @Test

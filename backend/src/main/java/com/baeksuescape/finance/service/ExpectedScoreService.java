@@ -80,6 +80,7 @@ public class ExpectedScoreService {
 
         Map<String, Object> request = assembler.build(UUID.randomUUID().toString(), activeModel, user, baseMonth, age);
         checkIncomeMonths(request);   // 소득 개월 수가 모자라면 ML-03이 422로 거절하므로 부르기 전에 409로 알린다
+        checkBillData(request);       // 통신비·공과금 기관 기록이 없어도 ML-03이 422로 거절하므로 이유를 알려 준다(FP-239 리뷰, 범영 제안)
         applyIncomeCondition(request, cond);
         applyExpenseCondition(request, cond);
         Integer assumedDelinquencyCount = applyPaymentStatus(request, cond);
@@ -113,6 +114,22 @@ public class ExpectedScoreService {
         int assumed = stored + ASSUMED_DELINQUENCY_INCREMENT;
         credit.put("delinqCount12m", assumed);
         return assumed;
+    }
+
+    /**
+     * N-21-8 통신비 또는 공과금 기관 기록이 0건이면 예상 점수를 계산하지 않고 409 ALT_DATA_EMPTY로 이유를 알린다(11/23 FP-239 리뷰 후속).
+     * 기준은 점수 산출(RPT-01)의 ScoreCalculationService.isBillDataEmpty와 같다(피처 정의서 8-5·D-30 (다)). 그 메서드는 다른 패키지라 같은 조건을 여기에 둔다.
+     * 간편결제·보험은 0건도 학습에 있어 막지 않는다.
+     */
+    @SuppressWarnings("unchecked")
+    static void checkBillData(Map<String, Object> request) {
+        Map<String, Object> alt = request.get("alternativeData") instanceof Map
+                ? (Map<String, Object>) request.get("alternativeData") : null;
+        List<Object> telecom = alt == null ? null : (List<Object>) alt.get("telecom");
+        List<Object> utility = alt == null ? null : (List<Object>) alt.get("utility");
+        if (telecom == null || telecom.isEmpty() || utility == null || utility.isEmpty()) {
+            throw new ApiException(HttpStatus.CONFLICT, "ALT_DATA_EMPTY", "통신비·공과금 기록이 없어 예상 점수를 계산할 수 없어요.");
+        }
     }
 
     /**

@@ -33,12 +33,14 @@ public class AdminStatsService {
     static final String WORKER_TYPE = "WORKER_TYPE";
     static final String AGE_BAND = "AGE_BAND";
     /** 그룹 회원이 이보다 적으면 평균·비율·등급 분포를 내지 않는다(동주 님 DIAG-01과 같은 기준) */
-    static final int MIN_GROUP_SIZE = 5;
+    public static final int MIN_GROUP_SIZE = 5;
 
     /** 그룹 코드 고정 순서 (DIM_WORKER_TYPE 3분류 D-03, ASSESSMENT 연령대 4구간) */
+    public static final List<String> WORKER_TYPE_CODES = List.of("EMPLOYEE", "SELF_EMPLOYED", "FREELANCER");
+    public static final List<String> AGE_BAND_CODES = List.of("20S", "30S", "40S", "50_PLUS");
     static final Map<String, List<String>> GROUP_CODES = Map.of(
-            WORKER_TYPE, List.of("EMPLOYEE", "SELF_EMPLOYED", "FREELANCER"),
-            AGE_BAND, List.of("20S", "30S", "40S", "50_PLUS"));
+            WORKER_TYPE, WORKER_TYPE_CODES,
+            AGE_BAND, AGE_BAND_CODES);
     static final List<String> GRADE_CODES = List.of("CAUTION", "STANDARD", "GOOD");
     private static final List<String> STANDARD_OR_ABOVE = List.of("STANDARD", "GOOD");
     /** 등급 꺼내기: 대안 모델(기존 응답 필드) · 기존 모델(trad* 필드, 11/23 추가 — 11/06 UI의 기존 → 대안 비교) */
@@ -86,19 +88,26 @@ public class AdminStatsService {
 
         List<GroupStats> groups = new ArrayList<>();
         for (String code : GROUP_CODES.get(groupBy)) {
-            List<MemberScore> group = members.stream().filter(m -> code.equals(key.apply(m))).toList();
-            groups.add(new GroupStats(code, group.size(),
-                    avgTrad(group),
-                    avgAlt(group),
-                    avgUplift(group),
-                    standardOrAboveRate(group, ALT_GRADE),
-                    gradeDistribution(group, ALT_GRADE),
-                    standardOrAboveRate(group, TRAD_GRADE),
-                    gradeDistribution(group, TRAD_GRADE),
-                    tradScoredCount(group)));
+            groups.add(groupStats(code, members.stream().filter(m -> code.equals(key.apply(m))).toList()));
         }
         return new StatsResponse(groupBy, MIN_GROUP_SIZE, summary, gradeDistribution(members, ALT_GRADE), groups,
                 gradeDistribution(members, TRAD_GRADE), modelVersion);
+    }
+
+    /**
+     * 그룹 한 줄(N-26-4). FP-164 사용자 비교 분석(ADM-04, GroupComparisonService)도 같은 계산을 쓴다(집계 기준을 관리자 통계와 같게, 11/23 동주 합의).
+     * 값마다 계산 인원이 5명 미만이면 null이다.
+     */
+    public static GroupStats groupStats(String code, List<MemberScore> group) {
+        return new GroupStats(code, group.size(),
+                avgTrad(group),
+                avgAlt(group),
+                avgUplift(group),
+                standardOrAboveRate(group, ALT_GRADE),
+                gradeDistribution(group, ALT_GRADE),
+                standardOrAboveRate(group, TRAD_GRADE),
+                gradeDistribution(group, TRAD_GRADE),
+                tradScoredCount(group));
     }
 
     /** 기존 모델로 산출된 회원 수(기존 점수가 있는 회원). 기존 평균·기존 등급 값·상승폭이 이 인원으로 계산된다 */

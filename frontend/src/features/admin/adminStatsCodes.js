@@ -22,8 +22,9 @@ export const AGE_BAND_LABELS = Object.freeze({
 // N-26-3 등급 분포 순서 — 서버 응답과 같은 Caution·Standard·Good 순서
 export const GRADE_ORDER = Object.freeze([GRADES.CAUTION, GRADES.STANDARD, GRADES.GOOD])
 
-// 그룹 코드 → 화면 이름. 모르는 코드는 그대로 보여 준다.
+// 그룹 코드 → 화면 이름. 모르는 코드는 그대로 보여 준다. 'ALL'은 전체 행(FP-164 비교 분석 요약표, ADM-04 overall)이다.
 export function groupLabel(groupBy, code) {
+  if (code === 'ALL') return '전체'
   const labels = groupBy === 'AGE_BAND' ? AGE_BAND_LABELS : JOB_TYPE_LABELS
   return labels[code] ?? code
 }

@@ -270,6 +270,7 @@
   | 403 | `FORBIDDEN` | 🆕 11/19 관리자 계정(`/api/members/me/**`는 `ROLE_USER` 전용) |
   | 404 | `ASSESSMENT_NOT_FOUND` | 점수가 나온 평가가 하나도 없음(리포트와 같은 코드) |
   | 409 | `INPUT_INCOMPLETE` | 저장된 입력 기준월이 없거나 출생연도가 없음(점수 산출과 같은 문구). 🆕 11/19 소득이 직군에 필요한 개월 수(자영업자·프리랜서 12, 급여소득자 1)보다 적거나 같은 달이 겹치면 ML-03을 부르지 않고 "소득을 필요한 개월 수만큼 입력해 주세요."(점수 산출과 같음, 0원으로 채워 계산하지 않음) |
+  | 409 | `ALT_DATA_EMPTY` | 🆕 11/23 통신비 또는 공과금 기관 기록이 0건이면 ML-03을 부르지 않고 "통신비·공과금 기록이 없어 예상 점수를 계산할 수 없어요." ML-03이 이런 요청을 422로 거절해 예전에는 400 "입력값을 확인해 주세요"로만 보였다(FP-239 리뷰 후속, 범영 님 제안). 기준은 점수 산출(RPT-01)의 `ALT_DATA_EMPTY`와 같다(간편결제·보험 0건은 막지 않음) |
   | 503 | `MODEL_NOT_READY` | ML-03 연결 실패·시간 초과·5xx. 저장하지 않으므로 MODEL_ERROR 기록을 남기지 않는다 |
 - 프론트: `diagnosisApi.js`의 `getExpectedScore({ incomeVariationPct, incomeChangePercent, fixedExpenseAmount, expenseChangePercent, paymentStatus })`. mock은 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"(🆕 11/20 밀림이면 −15점 더)으로만 계산하며, 진짜 모델 점수가 아니다.
 
@@ -787,6 +788,46 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 - 알려진 한계: 등급은 평가 때 저장된 값을 그대로 쓰고 다시 매기지 않는다. 🆕 11/23 등급 구간 버전(`ASSESSMENT.CUTOFF_VERSION`)은 모델 버전과 따로 저장되므로, **같은 ACTIVE 모델 평가라도 등급 구간 버전이 다를 수 있다**(예: 등급 구간을 CUT-0.2로 바꾼 앞뒤의 평가). 통계는 등급 구간 버전을 거르지 않으므로 이때 등급 분포에 두 기준이 섞인다(리뷰 반영). 시연 DB에서 ACTIVE 모델로 점수를 낸 회원이 적으면 대부분의 값이 5명 미만으로 비어 보인다.
 - 프론트: `features/admin/api/adminStatsApi.js`의 `getAdminStats({ groupBy })`. mock은 예시 회원 14명으로 같은 규칙대로 계산한다.
 - 화면: 🆕 11/23 `features/admin/pages/AdminStatsPage.jsx`(FP-162, `/admin/stats`). 숨긴 값(`null`)은 '—'로, 기존 분포만 숨겨지면 대안 분포만 글자로 보여 준다.
+
+## N-26-5~7 사용자 비교 분석 (ADM-04, FP-164, 담당 광희) 🆕 11/23
+
+주 메뉴 '비교 분석'(`/comparison`)에서 일반 회원이 직군 × 연령 격자(N-26-6)와 직군별·연령별 비교(N-26-7)를 본다. 11/23 동주·광희 합의로 나눠 만든다: 동주가 N-13 내 위치 API·`/comparison` 화면 틀·카드 3개, 광희가 이 API와 그 아래 격자·비교 화면(동주 PR 병합 뒤).
+- **집계 기준은 ADM-03과 같다**(같은 매퍼·같은 계산 코드 `AdminStatsService.groupStats`): 회원마다 ACTIVE 모델로 낸 최근 SCORED 서비스 평가 1건, 탈퇴 회원 제외(D-28), 값마다 계산 인원이 5명 미만이면 `null`, 등급은 평가 때 저장된 값.
+- 관리자 전용 수치(가입 회원 수·오늘 산출)는 넣지 않는다(N-26-5).
+
+### GET `/api/members/me/group-comparison`
+
+- 일반 회원만(보안 설정: `/api/members/me/**` = `ROLE_USER`). 관리자 `403`, 토큰 없음 `401`. 내 위치가 들어 있어 Q-8 규칙대로 `/api/members/me/` 아래에 둔다(DIAG-01 `peer-benchmark`와 같음). 쿼리 값은 없다.
+- 한 번 호출로 화면의 보기 전환(직군 × 연령, 직군별, 연령별)에 필요한 값을 모두 준다(집단 20개라 응답이 작다).
+- 응답 `200`:
+
+  | 필드 | 형식 | 설명 |
+  |---|---|---|
+  | `modelVersion`, `minGroupSize` | 문자열 또는 `null`, 정수 | 통계 기준 모델(ACTIVE, 없으면 `null`), 숨김 기준(5) |
+  | `me` | 객체 또는 `null` | 통계에 들어간 **내 평가**: `workerTypeCode`, `ageBandCode`(평가 시점 값이라 격자의 내 칸과 같다), `tradScore`, `altScore`, `tradGradeBandCode`, `altGradeBandCode`. 본인 값이라 숨기지 않는다. 기존 모델로 산출할 수 없었으면 `trad*`가 `null`. ACTIVE 모델로 점수가 나온 평가가 없으면 `me` 자체가 `null` |
+  | `overall` | 집단 | 전체(`groupCode` = `ALL`). N-26-7 요약표의 전체 행, N-26-6 "전체 평균 대비" |
+  | `byWorkerType[]` | 집단 3개 | `EMPLOYEE`·`SELF_EMPLOYED`·`FREELANCER` 고정 순서. 격자의 행 평균, N-26-7 직군별 |
+  | `byAgeBand[]` | 집단 4개 | `20S`·`30S`·`40S`·`50_PLUS` 고정 순서. 격자의 열 평균, N-26-7 연령별 |
+  | `grid[]` | 12칸 | `{ workerTypeCode, ageBandCode, stats: 집단 }`, 직군 순서 → 연령대 순서(0명 칸도 있음). `stats.groupCode`는 `직군:연령대`(예: `EMPLOYEE:30S`) |
+
+  **집단** = ADM-03 `groups[]` 한 줄과 같은 모양: `groupCode`, `memberCount`, `avgTradScore`, `avgAltScore`, `avgScoreUplift`, `standardOrAboveRatePct`, `gradeDistribution`, `tradStandardOrAboveRatePct`, `tradGradeDistribution`, `tradScoredMemberCount`(뜻·숨김 규칙은 위 ADM-03 절).
+
+  ```json
+  { "modelVersion": "LGBM-BASE-0.2", "minGroupSize": 5,
+    "me": { "workerTypeCode": "EMPLOYEE", "ageBandCode": "30S", "tradScore": 640, "altScore": 700,
+            "tradGradeBandCode": "CAUTION", "altGradeBandCode": "STANDARD" },
+    "overall": { "groupCode": "ALL", "memberCount": 14, "avgTradScore": 636.9, "avgAltScore": 705.4, "avgScoreUplift": 68.8, … },
+    "byWorkerType": [ { "groupCode": "EMPLOYEE", "memberCount": 6, "avgAltScore": 720.0, … }, … ],
+    "byAgeBand": [ { "groupCode": "20S", "memberCount": 3, "avgAltScore": null, … }, … ],
+    "grid": [ { "workerTypeCode": "EMPLOYEE", "ageBandCode": "20S", "stats": { "groupCode": "EMPLOYEE:20S", "memberCount": 1, "avgAltScore": null, … } }, … ] }
+  ```
+  (mock 예시값, 줄였다)
+- 화면이 계산할 것: 칸을 고른 뒤 "전체·직군·연령 평균 대비"는 `overall`·`byWorkerType`·`byAgeBand`의 같은 필드와 빼서 보여 준다. 내 칸은 `me.workerTypeCode`·`me.ageBandCode`로 찾는다.
+- 알려진 한계
+  - ADM-03과 같다: 등급 구간 버전을 거르지 않아 CUT-0.3 전환(#137) 전후 평가의 등급이 섞일 수 있다. 시연 DB는 평가 회원이 적어 격자 칸 대부분이 5명 미만('—')으로 보인다.
+  - **빼기로 숨긴 값을 알아낼 수 있다.** 5명 기준은 값마다 따로 걸기 때문에, 행(직군) 평균은 보이고 그 행의 칸 하나만 숨겨졌으면 `행 합계 − 보이는 칸 합계`로 숨긴 칸(예: 1명)의 점수를 계산할 수 있다(인원 수는 보인다). 관리자 통계보다 보는 사람이 많아 문제가 커진다. 막으려면 2차 숨김(숨긴 칸이 하나뿐인 행·열은 다른 칸이나 평균도 숨김)이 필요하다. 지금은 기준을 ADM-03과 같게 두고 팀 결정을 기다린다.
+- 프론트: `features/comparison/api/groupComparisonApi.js`의 `getGroupComparison()`. mock은 관리자 통계 mock의 예시 회원 14명·계산을 그대로 쓴다(데모 계정 `employee`만 `me`가 있다, 관리자 403).
+- 화면: 🆕 11/23 `features/comparison/components/GroupCompareSection.jsx`(동주 님 `ComparisonPage`의 내 위치 카드 아래). 보기 전환(직군 × 연령 / 직군별 / 연령대별) 세 가지 모두 11/06 UI처럼 왼쪽은 공통 `HeatmapGrid` 색 칸(숨긴 값 '—', 11/23 동주 님 동의로 null 처리 추가)과 "칸에 표시할 값"(대안 점수·상승폭·보통 이상), 오른쪽은 선택한 집단 패널. 직군별·연령대별은 집단마다 기존 → 대안 두 칸(명세의 점 그래프 대신)이고 아래에 요약표(전체 행 포함).
 
 ---
 
