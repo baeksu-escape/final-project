@@ -5,4 +5,3 @@ import '../mocks/creditMockHandlers.js'
 export function fetchCreditReport() {
   return apiGet('/api/report/me')
 }
-

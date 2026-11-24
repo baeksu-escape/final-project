@@ -58,7 +58,7 @@ const COPY = {
   },
   comparison: {
     headline: '나와 비슷한 사람들은\n어느 정도일까요',
-    body: '같은 직군·연령대의 평균과 내 점수를 나란히 놓고 봅니다. 어디가 앞서고 어디가 부족한지 한눈에 알 수 있어요. (준비 중)',
+    body: '같은 직군·연령대 회원의 평균과 내 점수를 나란히 비교해, 내 위치와 차이를 한눈에 확인할 수 있어요.',
     preview: ({ myScore, topPct, avgScore }) => (
       <div className="hub-preview__rings">
         <ScoreRing value={myScore} label="나" sub="대안 점수" />
@@ -69,14 +69,17 @@ const COPY = {
   'asset-debt': {
     headline: '가진 것과 갚을 것,\n건강한 균형인가요',
     body: '총자산·연소득·총부채로 상환 부담률(DSR), 자산 대비 부채, 순자산 대비 부채를 계산하고 안전·주의·위험으로 알려 줍니다.',
-    preview: ({ ratios }) => (
+    preview: ({ ratios, unavailableReasons }) => (
       <>
         <div className="hub-preview__rings">
           {['dsr', 'debtToAsset', 'debtToNetAsset'].map((key, index) => Number.isFinite(ratios[key])
             ? <ScoreRing key={key} value={ratios[key]} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub={formatPct(ratios[key])} tone={riskTone(ratios[key], ['dsr', 'debtToAsset', 'debtToNetAsset'][index])} size={160} />
-            : <ScoreRing key={key} value={null} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub="미입력" tone="var(--line2)" size={160} />)}
+            : key === 'debtToNetAsset' && unavailableReasons?.[key] === 'net_asset_not_positive'
+              ? <ScoreRing key={key} value={null} max={100} label="순자산 대비" sub="계산 불가 · 순자산 0 이하" tone="var(--bad)" size={160} />
+              : <ScoreRing key={key} value={null} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub="미입력" tone="var(--line2)" size={160} />)}
         </div>
-        {['dsr', 'debtToAsset', 'debtToNetAsset'].some((key) => !Number.isFinite(ratios[key])) && <p className="hint">입력하지 않은 항목이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면으로 이동</Link></p>}
+        {unavailableReasons?.debtToNetAsset === 'net_asset_not_positive' && <p className="hint" style={{ color: 'var(--bad)', fontWeight: 600, textAlign: 'center' }}>부채가 자산보다 많아 순자산 대비 비율을 계산할 수 없어요. 위험 단계로 보세요.</p>}
+        {['dsr', 'debtToAsset', 'debtToNetAsset'].some((key) => ['income_missing', 'asset_missing', 'debt_missing', 'asset_or_debt_missing'].includes(unavailableReasons?.[key])) && <p className="hint">입력하지 않은 항목이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면으로 이동</Link></p>}
       </>
     ),
   },
@@ -92,7 +95,9 @@ const COPY = {
     body: '금리 상승·소득 감소 같은 상황을 골라 보면 매달 갚을 돈과 상환 여력(소득 대비 상환 부담)이 어떻게 바뀌는지 계산합니다. 나빠질 때와 좋아질 때를 모두 볼 수 있어요.',
     preview: ({ ratios }) => (
       <div className="hub-preview__rings">
-        {ratios.map((ratio, index) => <ScoreRing key={index} value={ratio} max={100} label={['지금', '금리 +2%p', '소득 -15%'][index]} sub={`상환 부담 ${formatPct(ratio)}`} tone={riskTone(ratio, 'dsr')} size={160} />)}
+        {ratios.map((ratio, index) => Number.isFinite(ratio)
+          ? <ScoreRing key={index} value={ratio} max={100} label={['지금', '금리 +2%p', '소득 -15%'][index]} sub={`상환 부담 ${formatPct(ratio)}`} tone={riskTone(ratio, 'dsr')} size={160} />
+          : <ScoreRing key={index} value={null} max={100} label={['지금', '금리 +2%p', '소득 -15%'][index]} sub="불러오지 못했어요" tone="var(--line2)" size={160} />)}
       </div>
     ),
   },
@@ -185,10 +190,11 @@ export default function GroupHubPage({ groupKey }) {
     getScorePercentile().then((response) => {
       if (!active) return
       const workerGroup = response.groups?.find((item) => item.groupType === 'WORKER_TYPE')
+      const minGroupSize = response.minGroupSize ?? 5
       if (!workerGroup) {
         setPercentileState({ scope, status: 'error' })
-      } else if (workerGroup.topPct == null || workerGroup.avgScore == null || workerGroup.memberCount < response.minGroupSize) {
-        setPercentileState({ scope, status: 'smallGroup', data: { myScore: Number.isInteger(response.myScore) ? response.myScore : null } })
+      } else if (workerGroup.topPct == null || workerGroup.avgScore == null || workerGroup.memberCount < minGroupSize) {
+        setPercentileState({ scope, status: 'smallGroup', data: { myScore: Number.isInteger(response.myScore) ? response.myScore : null, minGroupSize } })
       } else if (!Number.isInteger(response.myScore) || !Number.isFinite(workerGroup.topPct) || !Number.isFinite(workerGroup.avgScore)) {
         setPercentileState({ scope, status: 'error' })
       } else {
@@ -210,11 +216,14 @@ export default function GroupHubPage({ groupKey }) {
     })).then((result) => {
       if (!active) return
       const ratios = result?.ratios
-      if (!['dsr', 'debtToAsset', 'debtToNetAsset'].some((key) => Number.isFinite(ratios?.[key]?.value))) {
+      const netAssetUnavailable = ratios?.debtToNetAsset?.unavailableReason === 'net_asset_not_positive'
+      if (!['dsr', 'debtToAsset', 'debtToNetAsset'].some((key) => Number.isFinite(ratios?.[key]?.value)) && !netAssetUnavailable) {
         setAssetState({ scope, status: 'empty' })
       } else {
         setAssetState({ scope, status: 'ready', data: { ratios: {
           dsr: ratios.dsr?.value ?? null, debtToAsset: ratios.debtToAsset?.value ?? null, debtToNetAsset: ratios.debtToNetAsset?.value ?? null,
+        }, unavailableReasons: {
+          dsr: ratios.dsr?.unavailableReason, debtToAsset: ratios.debtToAsset?.unavailableReason, debtToNetAsset: ratios.debtToNetAsset?.unavailableReason,
         } } })
       }
     }).catch((error) => {
@@ -256,12 +265,14 @@ export default function GroupHubPage({ groupKey }) {
         recalculateMemberScenario({ ratePctPoint: 0, incomePct: -15, expensePct: 0 }),
       ])
       if (!active) return
-      const baseRatio = scenarios.find((result) => result.status === 'fulfilled')?.value?.current?.dsrPct
-      const changedRatios = scenarios.map((result) => result.status === 'fulfilled' ? result.value?.changed?.dsrPct : null)
-      if (!Number.isFinite(baseRatio) || changedRatios.some((value) => !Number.isFinite(value))) {
-        const missing = scenarios.some((result) => result.status === 'rejected' && isMissingData(result.reason))
-        setScenarioState({ scope, status: missing ? 'empty' : 'error' })
-      } else setScenarioState({ scope, status: 'ready', data: { ratios: [baseRatio, ...changedRatios] } })
+      const responses = scenarios.map((result) => result.status === 'fulfilled' ? result.value : null)
+      const baseRatio = responses.find((response) => Number.isFinite(response?.current?.dsrPct))?.current?.dsrPct
+      if (!Number.isFinite(baseRatio)) {
+        setScenarioState({ scope, status: 'error' })
+      } else {
+        const changedRatios = responses.map((response) => Number.isFinite(response?.changed?.dsrPct) ? response.changed.dsrPct : null)
+        setScenarioState({ scope, status: 'ready', data: { ratios: [baseRatio, ...changedRatios] } })
+      }
     }).catch((error) => {
       if (active) setScenarioState({ scope, status: isMissingData(error) ? 'empty' : 'error' })
     })
@@ -324,7 +335,7 @@ export default function GroupHubPage({ groupKey }) {
                           <ScoreRing value={null} label="같은 직군 평균" sub="비교 회원 부족" tone="var(--line2)" />
                         </div>
                       )}
-                      <p className="hint" role="status" style={{ marginTop: 'var(--sp-4)', fontWeight: 600, fontSize: '0.95rem', textAlign: 'center' }}>같은 직군 회원이 5명 이상 모이면 평균과 내 위치를 보여 드려요.</p>
+                      <p className="hint" role="status" style={{ marginTop: 'var(--sp-4)', fontWeight: 600, fontSize: '0.95rem', textAlign: 'center' }}>같은 직군 회원이 {view.data?.minGroupSize}명 이상 모이면 평균과 내 위치를 보여 드려요.</p>
                     </>
                   ) : view.status === 'empty' ? (
                     <p className="hint" role="status">
