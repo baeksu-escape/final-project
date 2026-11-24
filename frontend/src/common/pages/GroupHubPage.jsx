@@ -4,6 +4,7 @@ import { CountUp, ScoreRing, TrendArea } from '../components/viz.jsx'
 import { NAV_GROUPS, PATHS } from '../config/navigation.js'
 import { useAuth } from '../auth/useAuth.js'
 import Button from '../components/Button.jsx'
+import Notice from '../components/Notice.jsx'
 import ScoreGauge from '../../features/credit/components/ScoreGauge.jsx'
 import { fetchCreditReport } from '../../features/credit/api/creditApi.js'
 import { getScorePercentile } from '../../features/comparison/api/scorePercentileApi.js'
@@ -53,7 +54,7 @@ const ASSET_DEBT_UNAVAILABLE_COPY = {
 const COPY = {
   report: {
     headline: '두 모델이 본 내 점수를\n한 화면에서 비교해요',
-    body: '금융 이력만 보는 기존 모델과, 통신비·연금 같은 납부 기록까지 보는 대안 모델. 두 점수의 차이와 그 차이를 만든 항목을 함께 보여 줍니다.',
+    body: '금융 이력만 보는 기존 모델과, 통신비·연금 같은 납부 기록까지 보는 대안 모델. 두 점수와, 모델이 점수를 계산할 때 크게 작용한 항목을 함께 보여 줍니다.',
     preview: ({ traditionalScore, alternativeScore, bands }) => (
       <div className="hub-preview__pair">
         <div><p>기존 모델</p><ScoreGauge score={traditionalScore} bands={bands} label="기존 모델" /></div>
@@ -95,7 +96,7 @@ const COPY = {
                 : <ScoreRing key={key} value={null} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub={reason.sub} tone={reason.tone ?? 'var(--line2)'} size={160} />
             })}
           </div>
-          {hasNetAssetRisk && <p className="hint" style={{ color: 'var(--bad)', fontWeight: 600, textAlign: 'center' }}>부채가 자산보다 많아 순자산 대비 비율을 계산할 수 없어요. 위험 단계로 보세요.</p>}
+          {hasNetAssetRisk && <Notice type="warn">부채가 자산보다 많아 순자산 대비 비율을 계산할 수 없어요. 위험 단계로 보세요.</Notice>}
           {hasMissing && <p className="hint">입력하지 않은 항목이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면으로 이동</Link></p>}
           {hasZero && <p className="hint">값이 0이라 계산할 수 없는 비율이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면에서 확인해 보세요.</Link></p>}
         </>
@@ -256,7 +257,7 @@ export default function GroupHubPage({ groupKey }) {
     let active = true
     getCashFlowData(user?.userId).then((data) => {
       if (!active) return
-      const recentMonths = data.months.slice(-6)
+      const recentMonths = (data?.months ?? []).slice(-6)
       if (recentMonths.length !== 6 || recentMonths.some((month) => !Number.isFinite(month.incomeAmount))) {
         setCashFlowState({ scope, status: 'empty' })
         return
@@ -344,7 +345,12 @@ export default function GroupHubPage({ groupKey }) {
               {copy && (
                 <div className="hub-preview" data-hub-reveal>
                   <span className="hub-preview__badge">미리보기</span>
-                  {!view ? copy.preview({}) : view.status === 'ready' ? copy.preview(view.data) : view.status === 'loading' ? (
+                  {!view ? copy.preview({}) : view.status === 'ready' ? (
+                    <>
+                      {copy.preview(view.data)}
+                      {tab.key === 'scenario' && view.data.ratios.slice(1).some((ratio) => !Number.isFinite(ratio)) && <Button size="sm" onClick={() => retryPreview('scenario')}>다시 시도</Button>}
+                    </>
+                  ) : view.status === 'loading' ? (
                     <p className="hint" role="status">불러오는 중…</p>
                   ) : view.status === 'smallGroup' ? (
                     <>
@@ -354,7 +360,7 @@ export default function GroupHubPage({ groupKey }) {
                           <ScoreRing value={null} label="같은 직군 평균" sub="비교 회원 부족" tone="var(--line2)" />
                         </div>
                       )}
-                      <p className="hint" role="status" style={{ marginTop: 'var(--sp-4)', fontWeight: 600, fontSize: '0.95rem', textAlign: 'center' }}>같은 직군 회원이 {view.data?.minGroupSize}명 이상 모이면 평균과 내 위치를 보여 드려요.</p>
+                      <Notice type="info">같은 직군 회원이 {view.data?.minGroupSize}명 이상 모이면 평균과 내 위치를 보여 드려요.</Notice>
                     </>
                   ) : view.status === 'empty' ? (
                     <p className="hint" role="status">

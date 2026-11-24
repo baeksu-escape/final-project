@@ -72,6 +72,7 @@
 .shap-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.5fr) 56px; gap: 14px; align-items: center; padding: 6px 0; font-size: 14px; }
 .shap-row + .shap-row { border-top: 1px solid var(--line); padding-top: 10px; }
 .shap-label { min-width: 0; color: var(--fg2); }
+.shap-note { font-weight: 600; color: var(--acc); }
 .shap-tag { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 6px; background: var(--sel); color: var(--acc); font-size: 11px; font-weight: 800; vertical-align: 1px; }
 .shap-bar { position: relative; display: block; height: 10px; border-radius: 999px; background: var(--panel2); }
 .shap-bar > span { position: absolute; top: 0; bottom: 0; border-radius: 999px; }

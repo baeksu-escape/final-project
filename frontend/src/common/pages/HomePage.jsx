@@ -57,8 +57,8 @@ export default function HomePage() {
   const scored = report?.gradeStatusCode === 'SCORED' && alt?.score != null
   const diff = report?.comparison?.scoreDiff
   const scoredHistory = [...history]
-    .filter((item) => item.gradeStatusCode === 'SCORED' && item.alternativeScore != null)
-    .sort((a, b) => a.calculatedAt.localeCompare(b.calculatedAt))
+    .filter((item) => item.gradeStatusCode === 'SCORED' && item.alternativeScore != null && item.calculatedAt && !Number.isNaN(new Date(item.calculatedAt).getTime()))
+    .sort((a, b) => new Date(a.calculatedAt) - new Date(b.calculatedAt))
   const visibleHistory = scoredHistory.slice(-6)
   const trend = visibleHistory
     .map((item) => ({ label: `${new Date(item.calculatedAt).getMonth() + 1}월`, value: item.alternativeScore }))
