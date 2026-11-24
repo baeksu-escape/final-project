@@ -81,7 +81,7 @@ export default function ShapFactorsCard({ shap, alternativeScore }) {
                   </span>
                   <b className={`shap-score num ${direction}`}>{factor.shapScore > 0 ? '+' : ''}{factor.shapScore}</b>
                 </div>
-                {note && <p className="hint">{note}</p>}
+                {note && <p className="hint" style={{ fontWeight: 600 }}><span aria-hidden="true">★ </span>{note}</p>}
                 </Fragment>
               )
             })}

@@ -7,7 +7,6 @@ import Button from '../components/Button.jsx'
 import ScoreGauge from '../../features/credit/components/ScoreGauge.jsx'
 import { fetchCreditReport } from '../../features/credit/api/creditApi.js'
 import { getScorePercentile } from '../../features/comparison/api/scorePercentileApi.js'
-import { getCreditCareBase } from '../../features/simulation/api/simulationApi.js'
 import { calculateAssetDebtPreview, getAssetDebtData, getCashFlowData } from '../../features/diagnosis/api/financeApi.js'
 import { getScenarioBase, recalculateMemberScenario } from '../../features/diagnosis/api/diagnosisApi.js'
 import { ASSET_DEBT_RISK_THRESHOLDS } from '../../features/diagnosis/utils/financeCalculations.js'
@@ -15,14 +14,26 @@ import { DATA_INPUT_PATHS } from '../../features/dataInput/dataInputPaths.js'
 import '../../features/credit/credit.css'
 import './hub.css'
 
-// N-18 시뮬레이터 소개에는 SIM-01 현재 점수만 표시하고 예상 계산은 기능 화면으로 안내한다.
-function SimPreview({ score }) {
+// N-18 시뮬레이터 미리보기 — 카드 사용률 예시와 예상 점수 변화를 보여 준다.
+const SIM_STEPS = [{ util: 90, score: 701 }, { util: 60, score: 708 }, { util: 30, score: 716 }]
+function SimPreview() {
+  const [i, setI] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => setI((n) => (n + 1) % SIM_STEPS.length), 1800)
+    return () => clearInterval(timer)
+  }, [])
+  const step = SIM_STEPS[i]
   return (
     <div className="hub-sim">
+      <div className="hub-sim__control">
+        <span>카드 한도 사용률 (예시)</span>
+        <b className="num">{step.util}%</b>
+        <div className="hub-sim__track"><i style={{ width: `${step.util}%` }} /></div>
+      </div>
       <div className="hub-sim__result">
-        <span>현재 대안 점수</span>
-        <b className="num"><CountUp key={score} value={score} duration={700} /><small>점</small></b>
-        <p className="hint">조건을 바꿔 예상 점수를 계산해 보세요.</p>
+        <span>예상 대안 점수 (예시)</span>
+        <b className="num"><CountUp key={step.score} value={step.score} duration={700} /><small>점</small></b>
+        <em className="num">{step.score > 701 ? `+${step.score - 701}점` : '지금 점수'}</em>
       </div>
     </div>
   )
@@ -43,7 +54,7 @@ const COPY = {
   simulator: {
     headline: '무엇을 바꾸면\n점수가 오를까요',
     body: '카드 사용률, 연체 횟수, 납부 기간을 움직여 보면 예상 점수와 받을 수 있는 대출이 바로 달라집니다. 실제 점수는 바뀌지 않으니 마음껏 시험해 보세요.',
-    preview: ({ score }) => <SimPreview score={score} />,
+    preview: () => <SimPreview />,
   },
   comparison: {
     headline: '나와 비슷한 사람들은\n어느 정도일까요',
@@ -142,11 +153,10 @@ export default function GroupHubPage({ groupKey }) {
   const scope = `${groupKey}:${user?.userId ?? ''}`
   const [reportState, setReportState] = useState(null)
   const [percentileState, setPercentileState] = useState(null)
-  const [simulationState, setSimulationState] = useState(null)
   const [assetState, setAssetState] = useState(null)
   const [cashFlowState, setCashFlowState] = useState(null)
   const [scenarioState, setScenarioState] = useState(null)
-  const [retries, setRetries] = useState({ report: 0, percentile: 0, simulation: 0, asset: 0, cashFlow: 0, scenario: 0 })
+  const [retries, setRetries] = useState({ report: 0, percentile: 0, asset: 0, cashFlow: 0, scenario: 0 })
   useHubReveal()
   // N-12-6 리포트 점수와 등급 구간은 점수 산출에 성공했을 때만 표시한다.
   useEffect(() => {
@@ -178,7 +188,7 @@ export default function GroupHubPage({ groupKey }) {
       if (!workerGroup) {
         setPercentileState({ scope, status: 'error' })
       } else if (workerGroup.topPct == null || workerGroup.avgScore == null || workerGroup.memberCount < response.minGroupSize) {
-        setPercentileState({ scope, status: 'smallGroup' })
+        setPercentileState({ scope, status: 'smallGroup', data: { myScore: Number.isInteger(response.myScore) ? response.myScore : null } })
       } else if (!Number.isInteger(response.myScore) || !Number.isFinite(workerGroup.topPct) || !Number.isFinite(workerGroup.avgScore)) {
         setPercentileState({ scope, status: 'error' })
       } else {
@@ -189,19 +199,6 @@ export default function GroupHubPage({ groupKey }) {
     })
     return () => { active = false }
   }, [groupKey, scope, retries.percentile])
-  // N-18 SIM-01 현재 점수가 있을 때만 시뮬레이터 소개값을 보여 준다.
-  useEffect(() => {
-    if (groupKey !== 'credit') return undefined
-    let active = true
-    getCreditCareBase().then((response) => {
-      if (!active) return
-      if (!Number.isInteger(response?.score) || response.score < 0 || response.score > 1000) setSimulationState({ scope, status: 'empty' })
-      else setSimulationState({ scope, status: 'ready', data: { score: response.score } })
-    }).catch((error) => {
-      if (active) setSimulationState({ scope, status: isMissingData(error) ? 'empty' : 'error' })
-    })
-    return () => { active = false }
-  }, [groupKey, scope, retries.simulation])
   // N-16-1·2 DIAG-03-1 저장값과 공통 재계산 결과가 모두 있을 때 세 비율을 표시한다.
   useEffect(() => {
     if (groupKey !== 'finance') return undefined
@@ -273,19 +270,18 @@ export default function GroupHubPage({ groupKey }) {
   const states = {
     report: stateForScope(reportState, scope),
     comparison: stateForScope(percentileState, scope),
-    simulator: stateForScope(simulationState, scope),
     'asset-debt': stateForScope(assetState, scope),
     'cash-flow': stateForScope(cashFlowState, scope),
     scenario: stateForScope(scenarioState, scope),
   }
   const stateSetters = {
-    report: setReportState, comparison: setPercentileState, simulator: setSimulationState,
+    report: setReportState, comparison: setPercentileState,
     'asset-debt': setAssetState, 'cash-flow': setCashFlowState, scenario: setScenarioState,
   }
   // N-12·N-13·N-16·N-17·N-18·N-21 각 소개 미리보기는 해당 요청만 다시 불러온다.
   const retryPreview = (key) => {
     stateSetters[key]({ scope, status: 'loading' })
-    const retryKey = ({ comparison: 'percentile', simulator: 'simulation', 'asset-debt': 'asset', 'cash-flow': 'cashFlow' })[key] ?? key
+    const retryKey = ({ comparison: 'percentile', 'asset-debt': 'asset', 'cash-flow': 'cashFlow' })[key] ?? key
     setRetries((current) => ({ ...current, [retryKey]: current[retryKey] + 1 }))
   }
   if (!group) return null
@@ -321,7 +317,15 @@ export default function GroupHubPage({ groupKey }) {
                   {!view ? copy.preview({}) : view.status === 'ready' ? copy.preview(view.data) : view.status === 'loading' ? (
                     <p className="hint" role="status">불러오는 중…</p>
                   ) : view.status === 'smallGroup' ? (
-                    <p className="hint" role="status">비교할 회원이 아직 적어요.</p>
+                    <>
+                      {Number.isInteger(view.data?.myScore) && (
+                        <div className="hub-preview__rings">
+                          <ScoreRing value={view.data.myScore} label="나" sub="대안 점수" />
+                          <ScoreRing value={null} label="같은 직군 평균" sub="비교 회원 부족" tone="var(--line2)" />
+                        </div>
+                      )}
+                      <p className="hint" role="status" style={{ marginTop: 'var(--sp-4)', fontWeight: 600, fontSize: '0.95rem', textAlign: 'center' }}>같은 직군 회원이 5명 이상 모이면 평균과 내 위치를 보여 드려요.</p>
+                    </>
                   ) : view.status === 'empty' ? (
                     <p className="hint" role="status">
                       {['report', 'comparison', 'simulator'].includes(tab.key) ? '아직 점수가 없어요. ' : '입력하지 않은 항목이 있어요. '}
