@@ -44,7 +44,7 @@ function requireAdmin(token) {
   if (!currentUser(token).isAdmin) fail(403, 'FORBIDDEN', '권한이 없습니다.')
 }
 
-/* ---------- 글·댓글 (COMM-01~06) ---------- */
+/* ---------- 글·댓글 (COMM-01~06·09) ---------- */
 
 function findPost(postId) {
   const post = mockPosts.find((item) => item.postId === postId && item.status !== DELETED)
@@ -270,6 +270,24 @@ registerMockHandlers({
     mockPosts.push({ postId, authorId: loginId, ...checkPostWrite(body), createdAt: nowText(), updatedAt: null, status: VISIBLE })
     registerPostRoutes(postId)
     return { postId }
+  },
+
+  // COMM-09 내가 쓴 댓글 — 삭제 댓글·삭제된 글의 댓글은 빼고 최신순. 관리자는 403(/api/members/me/** = ROLE_USER)
+  'GET /api/members/me/comments': ({ token, query }) => {
+    const { loginId, isAdmin } = currentUser(token)
+    if (isAdmin) fail(403, 'FORBIDDEN', '권한이 없습니다.')
+    const page = Math.max(1, Number(query.get('page')) || 1)
+    const size = Math.min(50, Math.max(1, Number(query.get('size')) || 10))
+    const postOf = (comment) => mockPosts.find((post) => post.postId === comment.postId)
+    const rows = mockComments
+      .filter((comment) => comment.authorId === loginId && comment.status !== DELETED && postOf(comment).status !== DELETED)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.commentId - a.commentId)
+    const items = rows.slice((page - 1) * size, page * size).map((comment) => {
+      const { commentId, content, nickname, createdAt, hidden } = commentView(comment, loginId)
+      const post = postOf(comment)
+      return { commentId, postId: post.postId, postTitle: post.status === HIDDEN ? null : post.title, content, nickname, createdAt, hidden }
+    })
+    return { items, page, size, totalCount: rows.length }
   },
 
   // N-33-1·2 신고 접수 + 기준 건수 자동 숨김

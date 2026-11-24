@@ -402,59 +402,6 @@
   padding: 32px;
 }
 
-.lounge-hot {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.lounge-hot:empty {
-  display: none;
-}
-
-.lounge-hot__card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 140px;
-  padding: 20px;
-  border: 0;
-  border-radius: 20px;
-  background: var(--panel2);
-  color: var(--fg);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 0.2s, background 0.2s;
-}
-
-.lounge-hot__card:hover {
-  transform: translateY(-3px);
-  background: var(--sel);
-}
-
-.lounge-hot__badge {
-  align-self: flex-start;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--panel);
-  color: #7c5cff;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.lounge-hot__card b {
-  font-size: 16.5px;
-  font-weight: 700;
-  line-height: 1.45;
-}
-
-.lounge-hot__meta {
-  margin-top: auto;
-  color: var(--mut2);
-  font-size: 13px;
-}
-
 .lounge-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -583,10 +530,6 @@
 @media (max-width: 760px) {
   .lounge-list {
     padding: 22px 16px;
-  }
-
-  .lounge-hot {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .lounge-feed__row {

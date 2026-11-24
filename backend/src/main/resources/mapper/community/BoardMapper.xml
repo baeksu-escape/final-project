@@ -84,6 +84,33 @@
          ORDER BY C.CREATED_AT, C.COMMENT_ID
     </select>
 
+    <!-- COMM-09 내가 쓴 댓글 조건: 삭제 댓글과 삭제된 글의 댓글은 뺀다. 숨김 글·숨김 댓글은 남긴다(내용·제목은 비워서 보냄). -->
+    <sql id="myCommentWhere">
+         WHERE C.USER_ID = #{userId}
+           AND C.STATUS_CODE &lt;&gt; 'DELETED'
+           AND P.STATUS_CODE &lt;&gt; 'DELETED'
+    </sql>
+
+    <!-- COMM-09 내가 쓴 댓글 한 쪽(최신순). 숨김 글의 제목은 내보내지 않는다. -->
+    <select id="selectMyComments" resultType="com.baeksuescape.community.dto.CommentRow">
+        SELECT C.COMMENT_ID AS commentId, C.POST_ID AS postId, C.USER_ID AS userId, C.CONTENT AS content, C.STATUS_CODE AS statusCode,
+               CASE WHEN P.STATUS_CODE = 'VISIBLE' THEN P.TITLE END AS postTitle,
+               <include refid="authorName"/> AS nickname, C.CREATED_AT AS createdAt
+          FROM BOARD_COMMENT C
+          JOIN BOARD_POST P ON P.POST_ID = C.POST_ID
+          LEFT JOIN APP_USER U ON U.USER_ID = C.USER_ID
+        <include refid="myCommentWhere"/>
+         ORDER BY C.CREATED_AT DESC, C.COMMENT_ID DESC
+        OFFSET #{offset} ROWS FETCH NEXT #{limit} ROWS ONLY
+    </select>
+
+    <select id="countMyComments" resultType="int">
+        SELECT COUNT(*)
+          FROM BOARD_COMMENT C
+          JOIN BOARD_POST P ON P.POST_ID = C.POST_ID
+        <include refid="myCommentWhere"/>
+    </select>
+
     <select id="selectComment" resultType="com.baeksuescape.community.dto.CommentRow">
         SELECT C.COMMENT_ID AS commentId, C.POST_ID AS postId, C.USER_ID AS userId, C.CONTENT AS content, C.STATUS_CODE AS statusCode,
                <include refid="authorName"/> AS nickname, C.CREATED_AT AS createdAt

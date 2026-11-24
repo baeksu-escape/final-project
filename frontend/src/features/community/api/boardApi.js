@@ -3,11 +3,12 @@ import { PAGE_SIZE } from '../config/communityCodes.js'
 // mock 모드에서 쓸 응답을 등록한다(VITE_USE_MOCK=false면 등록돼도 쓰이지 않는다).
 import '../mocks/communityMockHandlers.js'
 
-// N-06 신용 라운지 API 경로 — 범영님 API 정의서 v0.2 COMM-01~06과 같다.
+// N-06 신용 라운지 API 경로 — 범영님 API 정의서 v0.2 COMM-01~06·09와 같다.
 export const BOARD_API = Object.freeze({
   POSTS: '/api/board/posts',
   post: (postId) => `/api/board/posts/${postId}`,
   comments: (postId) => `/api/board/posts/${postId}/comments`,
+  MY_COMMENTS: '/api/members/me/comments',
 })
 
 // N-06-1 글 목록·검색 — → { items: [{ postId, title, nickname, commentCount, createdAt, hidden, mine }], page, size, totalCount }
@@ -40,4 +41,10 @@ export function deletePost(postId) {
 // N-06-3 댓글 쓰기 — { content } → { commentId }
 export function createComment(postId, content) {
   return apiPost(BOARD_API.comments(postId), { content })
+}
+
+// N-06 COMM-09 내가 쓴 댓글 — → { items: [{ commentId, postId, postTitle, content, nickname, createdAt, hidden }], page, size, totalCount }
+// 최신순. 숨김 댓글은 content가, 숨김 글의 댓글은 postTitle이 null이다.
+export function fetchMyComments({ page = 1 } = {}) {
+  return apiGet(`${BOARD_API.MY_COMMENTS}?${new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) })}`)
 }

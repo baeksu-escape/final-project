@@ -181,6 +181,30 @@ class CommunityApiContractTest {
                 .andExpect(jsonPath("$.commentId").value(21));
     }
 
+    // ---- COMM-09 내가 쓴 댓글 ----
+
+    @Test
+    void 내가_쓴_댓글은_일반_사용자만_보고_items와_쪽_정보를_준다() throws Exception {
+        given(boardService.myComments(7L, 2, 10)).willReturn(new BoardDtos.MyCommentPage(
+                List.of(new BoardDtos.MyComment(21L, 3L, "적금 질문", null, "닉네임", AT, true)), 2, 10, 11));
+
+        mvc.perform(asUser(get("/api/members/me/comments").param("page", "2")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].commentId").value(21))
+                .andExpect(jsonPath("$.items[0].postId").value(3))
+                .andExpect(jsonPath("$.items[0].postTitle").value("적금 질문"))
+                .andExpect(jsonPath("$.items[0].content").value((Object) null))
+                .andExpect(jsonPath("$.items[0].nickname").value("닉네임"))
+                .andExpect(jsonPath("$.items[0].createdAt").exists())
+                .andExpect(jsonPath("$.items[0].hidden").value(true))
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalCount").value(11));
+
+        mvc.perform(get("/api/members/me/comments")).andExpect(status().isUnauthorized());
+        mvc.perform(asAdmin(get("/api/members/me/comments"))).andExpect(status().isForbidden());
+    }
+
     // ---- COMM-07 신고 ----
 
     @Test

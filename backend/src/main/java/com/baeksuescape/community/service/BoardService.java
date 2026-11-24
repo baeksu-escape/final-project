@@ -45,7 +45,7 @@ public class BoardService {
     // N-06-1 글 목록 한 쪽(최신순, 기본 10개). 검색어는 보이는 글의 제목·내용에서 찾는다.
     public BoardDtos.PostPage list(long userId, int page, int size, String keyword) {
         int safePage = Math.max(page, 1);
-        int safeSize = size < 1 || size > MAX_PAGE_SIZE ? DEFAULT_PAGE_SIZE : size;
+        int safeSize = safeSize(size);
         String likePattern = toLikePattern(keyword);
         int total = boardMapper.countPosts(likePattern);
         List<BoardDtos.PostSummary> items = boardMapper.selectPosts(likePattern, (safePage - 1) * safeSize, safeSize).stream()
@@ -71,6 +71,21 @@ public class BoardService {
     public BoardDtos.CommentList comments(long userId, long postId) {
         requireLivePost(postId);
         return new BoardDtos.CommentList(commentViews(userId, postId));
+    }
+
+    // COMM-09 내가 쓴 댓글 한 쪽(최신순, 쪽 규칙은 글 목록과 같음). 삭제 댓글·삭제된 글의 댓글은 빼고, 숨김 댓글은 내용을 비운다.
+    public BoardDtos.MyCommentPage myComments(long userId, int page, int size) {
+        int safePage = Math.max(page, 1);
+        int safeSize = safeSize(size);
+        int total = boardMapper.countMyComments(userId);
+        List<BoardDtos.MyComment> items = boardMapper.selectMyComments(userId, (safePage - 1) * safeSize, safeSize).stream()
+                .map(row -> {
+                    boolean hidden = HIDDEN.equals(row.getStatusCode());
+                    return new BoardDtos.MyComment(row.getCommentId(), row.getPostId(), row.getPostTitle(),
+                            hidden ? null : row.getContent(), row.getNickname(), row.getCreatedAt(), hidden);
+                })
+                .toList();
+        return new BoardDtos.MyCommentPage(items, safePage, safeSize, total);
     }
 
     // N-06-2 글 작성 — 저장하고 글 기록(CREATE)을 남긴다.
@@ -133,6 +148,11 @@ public class BoardService {
         if (keyword == null || keyword.isBlank()) return null;
         String escaped = keyword.trim().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
         return "%" + escaped + "%";
+    }
+
+    // 한 쪽 개수 — 1~50이 아니면 기본 10개
+    private static int safeSize(int size) {
+        return size < 1 || size > MAX_PAGE_SIZE ? DEFAULT_PAGE_SIZE : size;
     }
 
     private List<BoardDtos.Comment> commentViews(long userId, long postId) {

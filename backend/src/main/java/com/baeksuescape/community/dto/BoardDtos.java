@@ -29,6 +29,15 @@ public final class BoardDtos {
     public record CommentList(List<Comment> comments) {
     }
 
+    // COMM-09 내가 쓴 댓글 한 줄. 숨김 댓글은 content가, 숨김 글의 댓글은 postTitle이 null이다.
+    public record MyComment(Long commentId, Long postId, String postTitle, String content, String nickname, LocalDateTime createdAt,
+            boolean hidden) {
+    }
+
+    // COMM-09 내가 쓴 댓글 한 쪽. totalCount는 내 댓글 전체 수
+    public record MyCommentPage(List<MyComment> items, int page, int size, int totalCount) {
+    }
+
     // COMM-02 글 상세 + 댓글 목록. updatedAt은 수정한 적이 없으면 null
     public record PostDetail(Long postId, String title, String content, String nickname, LocalDateTime createdAt, LocalDateTime updatedAt,
             boolean hidden, boolean mine, List<Comment> comments) {

@@ -269,7 +269,7 @@
 | COMM-06 | `GET`·`POST /api/board/posts/{postId}/comments` | N-06-3 댓글 작성·조회 (1000자) | `BOARD_COMMENT` | USER | ✅ (PR #80) |
 | COMM-07 | `POST /api/reports` | N-06-4 신고하기 진입, N-33-1 신고 접수, N-33-2 기준 건수 자동 숨김 (본인 글 불가, 같은 대상 중복 불가, 하루 3번, '기타'만 상세 500자) | `CONTENT_REPORT`, `APP_SETTING` | USER | ✅ (PR #80) |
 | COMM-08 | `GET /api/members/me/posts?page&size` | 마이페이지 [게시판관리] 내가 쓴 글 목록 (N-ID 미정). 본인 글만, 삭제 글 제외, 숨김 글은 `hidden: true`. `page`·기본 개수는 COMM-01 규칙(1부터, 기본 10개). 응답 `{ items: [{ postId, title, createdAt, commentCount, hidden }], page, size, totalCount }` | `BOARD_POST`, `BOARD_COMMENT` | USER | 🟡 제안 (우찬, FP-222 화면에서 사용 예정. 담당·경로는 C팀 확정) 🆕 11/23 |
-| COMM-09 | `GET /api/members/me/comments?page&size` | 마이페이지 [게시판관리] 내가 쓴 댓글 목록 (N-ID 미정). 본인 댓글만, 삭제된 글의 댓글 제외. `page`·기본 개수는 COMM-01 규칙(1부터, 기본 10개). 응답 `{ items: [{ commentId, postId, postTitle, content(앞부분), createdAt }], page, size, totalCount }` | `BOARD_COMMENT`, `BOARD_POST` | USER | 🟡 제안 (우찬, FP-222 화면에서 사용 예정. 담당·경로는 C팀 확정) 🆕 11/23 |
+| COMM-09 | `GET /api/members/me/comments?page&size` | 신용 라운지 [내가 쓴 댓글] 탭 목록 (N-06, 세부 N-ID 미정). 본인 댓글만 최신순, 삭제 댓글과 삭제된 글의 댓글 제외. `page`·기본 개수는 COMM-01 규칙(1부터, 기본 10개). 응답 `{ items: [{ commentId, postId, postTitle, content, nickname, createdAt, hidden }], page, size, totalCount }` — 숨김 댓글은 `content` null + `hidden: true`, 숨김 글의 댓글은 `postTitle` null 🆕 11/24 | `BOARD_COMMENT`, `BOARD_POST` | USER | ✅ 동주 (FP-191) 🆕 11/24 |
 
 - 게시글 본문은 DDL C9로 `CLOB` → `VARCHAR2(1300 CHAR)`(PR #80). 기존 DB는 `docs/spec/sql/alter_board_post_content_varchar2.sql`. 공용 DB는 11/18 적용 완료(범영). CLOB 상태의 DB에서도 글쓰기·검색·수정·삭제가 동작하는 것을 11/17 로컬에서 확인했다.
 - 탈퇴 회원 글은 그대로 두고 작성자만 "탈퇴한 회원"으로 표시한다. 알림(D-25)은 넣지 않았다.

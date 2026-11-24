@@ -17,4 +17,6 @@ public class CommentRow {
     private String statusCode;
     private String nickname;
     private LocalDateTime createdAt;
+    // 댓글이 달린 글 제목 — 내가 쓴 댓글(COMM-09) 조회에서만 채운다. 숨김 글이면 null
+    private String postTitle;
 }

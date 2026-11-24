@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Notice, Toast } from '../../../common/components/index.js'
-import { createComment, createPost, deletePost, fetchPost, fetchPosts, updatePost } from '../api/boardApi.js'
+import { createComment, createPost, deletePost, fetchMyComments, fetchPost, fetchPosts, updatePost } from '../api/boardApi.js'
+import MyCommentTable from '../components/MyCommentTable.jsx'
 import Pager from '../components/Pager.jsx'
 import PostDetail from '../components/PostDetail.jsx'
 import PostForm from '../components/PostForm.jsx'
@@ -16,6 +17,9 @@ const FEED_TABS = [
   { key: 'talk', label: '댓글 많은 글', pick: (post) => !post.hidden && post.commentCount > 0 },
   { key: 'mine', label: '내 글', pick: (post) => post.mine },
 ]
+// 내가 쓴 댓글 탭(COMM-09) — 글 목록을 거르지 않고 내 댓글을 서버에서 따로 읽는다
+const COMMENTS_TAB = 'comments'
+const LIST_TABS = [...FEED_TABS, { key: COMMENTS_TAB, label: '내가 쓴 댓글' }]
 
 // FP-223 주소(?post=3, ?post=3&mode=edit, ?mode=write)에서 지금 볼 화면을 읽는다. 번호가 이상하면 목록으로 본다.
 function readView(params) {
@@ -33,7 +37,7 @@ function toSearch({ mode, postId }) {
   return {}
 }
 
-// N-06 신용 라운지 — 글 목록·검색(N-06-1), 상세·댓글(N-06-1·3), 글쓰기(N-06-2), 내 글 수정·삭제(N-06-5·6),
+// N-06 신용 라운지 — 글 목록·검색(N-06-1), 내가 쓴 댓글(COMM-09), 상세·댓글(N-06-1·3), 글쓰기(N-06-2), 내 글 수정·삭제(N-06-5·6),
 // 글·댓글 신고(N-33-1)를 한 화면에서 목록 ↔ 상세 ↔ 쓰기·수정으로 바꿔 가며 보여 준다. 이름 대신 닉네임만 보인다.
 export default function LoungePage() {
   // mode: list | detail | write | edit — 주소에 남겨 브라우저 뒤로가기가 라운지 안에서 한 단계씩 돌아가게 한다(FP-223)
@@ -54,6 +58,8 @@ export default function LoungePage() {
   const [reportedKeys, setReportedKeys] = useState([])
   const [toast, setToast] = useState('')
   const [feedTab, setFeedTab] = useState('all')
+  const [commentPage, setCommentPage] = useState(1)
+  const [myComments, setMyComments] = useState({ data: null, error: '' })
 
   // 목록 — 쪽·검색어가 바뀌거나 저장·삭제 뒤에 다시 읽는다
   useEffect(() => {
@@ -65,6 +71,19 @@ export default function LoungePage() {
       alive = false
     }
   }, [page, keyword, listVersion])
+
+  // 내가 쓴 댓글 — 탭을 열거나 쪽이 바뀌거나 댓글을 쓴 뒤에 다시 읽는다
+  const commentsOpen = feedTab === COMMENTS_TAB
+  useEffect(() => {
+    if (!commentsOpen) return undefined
+    let alive = true
+    fetchMyComments({ page: commentPage })
+      .then((data) => alive && setMyComments({ data, error: '' }))
+      .catch((err) => alive && setMyComments({ data: null, error: err.message }))
+    return () => {
+      alive = false
+    }
+  }, [commentsOpen, commentPage, listVersion])
 
   // 상세 — 고른 글이 바뀌거나 댓글·신고 뒤에 다시 읽는다
   const postId = view.postId
@@ -173,55 +192,50 @@ export default function LoungePage() {
       <p className="hint">불러오는 중…</p>
     )
   } else {
-    const data = list.data
+    const { data, error } = commentsOpen ? myComments : list
     const totalPages = data ? Math.max(1, Math.ceil(data.totalCount / PAGE_SIZE)) : 1
     body = (
       <section className="card lounge-list" aria-labelledby="lounge-list-title">
         <div className="lounge-list__head">
           <h2 id="lounge-list-title" className="card__title">
-            전체 글 {data && <span className="lounge-count">{data.totalCount}건</span>}
+            {commentsOpen ? '내가 쓴 댓글' : '전체 글'} {data && <span className="lounge-count">{data.totalCount}건</span>}
           </h2>
-          <form className="lounge-search" onSubmit={handleSearch} role="search">
-            <label htmlFor="lounge-search-input" className="sr-only">
-              제목·내용 검색
-            </label>
-            <input
-              id="lounge-search-input"
-              className="text-input__control"
-              value={keywordInput}
-              onChange={(event) => setKeywordInput(event.target.value)}
-              placeholder="제목·내용 검색 (예: DSR)"
-            />
-            <Button type="submit" size="sm">
-              검색
-            </Button>
-          </form>
+          {/* 검색은 글만 찾으므로 내가 쓴 댓글 탭에서는 숨긴다 */}
+          {!commentsOpen && (
+            <form className="lounge-search" onSubmit={handleSearch} role="search">
+              <label htmlFor="lounge-search-input" className="sr-only">
+                제목·내용 검색
+              </label>
+              <input
+                id="lounge-search-input"
+                className="text-input__control"
+                value={keywordInput}
+                onChange={(event) => setKeywordInput(event.target.value)}
+                placeholder="제목·내용 검색 (예: DSR)"
+              />
+              <Button type="submit" size="sm">
+                검색
+              </Button>
+            </form>
+          )}
         </div>
-        {list.error && <Notice type="warn">{list.error}</Notice>}
-        {!data && !list.error && <p className="hint">불러오는 중…</p>}
+        <div className="lounge-tabs" role="tablist" aria-label="글 보기">
+          {LIST_TABS.map((tab) => (
+            <button key={tab.key} type="button" role="tab" aria-selected={feedTab === tab.key} className="lounge-tabs__btn" onClick={() => setFeedTab(tab.key)}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {error && <Notice type="warn">{error}</Notice>}
+        {!data && !error && <p className="hint">불러오는 중…</p>}
         {data && (
           <>
-            {/* 이야기가 많은 글 3개 — 지금 쪽에서 댓글 수가 많은 순 */}
-            {feedTab === 'all' && (
-              <div className="lounge-hot">
-                {[...data.items].filter((post) => !post.hidden && post.commentCount > 0).sort((a, b) => b.commentCount - a.commentCount).slice(0, 3).map((post) => (
-                  <button key={post.postId} type="button" className="lounge-hot__card" onClick={() => openPost(post.postId)}>
-                    <span className="lounge-hot__badge">이야기 중</span>
-                    <b>{post.title}</b>
-                    <span className="lounge-hot__meta">{post.nickname} · 댓글 <span className="num">{post.commentCount}</span></span>
-                  </button>
-                ))}
-              </div>
+            {commentsOpen ? (
+              <MyCommentTable items={data.items} onOpen={openPost} />
+            ) : (
+              <PostTable items={data.items.filter(FEED_TABS.find((tab) => tab.key === feedTab).pick)} startNo={data.totalCount - (data.page - 1) * PAGE_SIZE} onOpen={openPost} />
             )}
-            <div className="lounge-tabs" role="tablist" aria-label="글 보기">
-              {FEED_TABS.map((tab) => (
-                <button key={tab.key} type="button" role="tab" aria-selected={feedTab === tab.key} className="lounge-tabs__btn" onClick={() => setFeedTab(tab.key)}>
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            <PostTable items={data.items.filter(FEED_TABS.find((tab) => tab.key === feedTab).pick)} startNo={data.totalCount - (data.page - 1) * PAGE_SIZE} onOpen={openPost} />
-            <Pager page={data.page} totalPages={totalPages} onChange={setPage} />
+            <Pager page={data.page} totalPages={totalPages} onChange={commentsOpen ? setCommentPage : setPage} />
           </>
         )}
       </section>

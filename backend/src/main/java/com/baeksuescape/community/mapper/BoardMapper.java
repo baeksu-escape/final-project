@@ -40,6 +40,11 @@ public interface BoardMapper {
     // N-06-3 한 글의 댓글: 삭제 댓글을 빼고 오래된 순
     List<CommentRow> selectComments(@Param("postId") long postId);
 
+    // COMM-09 내가 쓴 댓글: 삭제 댓글·삭제된 글의 댓글을 빼고 최신순. 글이 숨김이면 postTitle은 null
+    List<CommentRow> selectMyComments(@Param("userId") long userId, @Param("offset") int offset, @Param("limit") int limit);
+
+    int countMyComments(@Param("userId") long userId);
+
     // 댓글 한 개(상태와 상관없이). 없으면 null
     CommentRow selectComment(@Param("commentId") long commentId);
 

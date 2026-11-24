@@ -194,4 +194,44 @@ class BoardServiceTest {
         assertThat(service.addComment(ME, 1L, new BoardDtos.CommentWrite(" 좋은 정보네요 ")).commentId()).isEqualTo(21L);
         verify(boardMapper, never()).insertPostLog(anyLong(), anyString(), anyString(), any(), any(), anyString(), isNull(), eq(NOW));
     }
+
+    // COMM-09 내가 쓴 댓글 한 행
+    private static CommentRow myComment(long commentId, String status, String postTitle) {
+        CommentRow row = new CommentRow();
+        row.setCommentId(commentId);
+        row.setPostId(3L);
+        row.setUserId(ME);
+        row.setContent("댓글" + commentId);
+        row.setStatusCode(status);
+        row.setNickname("닉네임");
+        row.setCreatedAt(NOW);
+        row.setPostTitle(postTitle);
+        return row;
+    }
+
+    @Test
+    void 내가_쓴_댓글은_쪽을_나누고_숨김_댓글은_내용을_비운다() {
+        given(boardMapper.countMyComments(ME)).willReturn(12);
+        given(boardMapper.selectMyComments(ME, 10, 10))
+                .willReturn(List.of(myComment(2, "VISIBLE", null), myComment(1, "HIDDEN_BY_REPORT", "제목3")));
+
+        BoardDtos.MyCommentPage page = service.myComments(ME, 2, 10);
+
+        assertThat(page.page()).isEqualTo(2);
+        assertThat(page.size()).isEqualTo(10);
+        assertThat(page.totalCount()).isEqualTo(12);
+        assertThat(page.items().get(0)).isEqualTo(new BoardDtos.MyComment(2L, 3L, null, "댓글2", "닉네임", NOW, false));
+        assertThat(page.items().get(1)).isEqualTo(new BoardDtos.MyComment(1L, 3L, "제목3", null, "닉네임", NOW, true));
+    }
+
+    @Test
+    void 내가_쓴_댓글은_쪽_값이_이상하면_첫_쪽_10개로_본다() {
+        given(boardMapper.selectMyComments(ME, 0, 10)).willReturn(List.of(myComment(1, "VISIBLE", "제목3")));
+
+        BoardDtos.MyCommentPage page = service.myComments(ME, 0, 51);
+
+        assertThat(page.page()).isEqualTo(1);
+        assertThat(page.size()).isEqualTo(10);
+        assertThat(page.items()).hasSize(1);
+    }
 }

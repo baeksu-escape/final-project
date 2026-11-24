@@ -65,6 +65,9 @@ export const mockComments = [
   { commentId: 401, postId: 4, authorId: 'ju_ara', content: '저는 성수기 수입의 30%를 따로 떼어 둬요.', createdAt: at('2026-10-28 22:05'), status: 'VISIBLE' },
   { commentId: 301, postId: 3, authorId: 'an_hyuk88', content: '너 같은 사람이 연체하는 거지. 남 탓 그만해라.', createdAt: at('2026-10-30 19:02'), status: 'HIDDEN_BY_REPORT' },
   { commentId: 302, postId: 3, authorId: 'ch_hoyoung', content: '40%가 은행에서 보는 기준이라 넘으면 한도가 줄어드는 경우가 많아요.', createdAt: at('2026-10-26 10:11'), status: 'VISIBLE' },
+  // 데모 계정 employee의 댓글 — 내가 쓴 댓글 탭(COMM-09) 확인용(보이는 것 1개, 신고로 숨김 1개)
+  { commentId: 303, postId: 3, authorId: 'employee', content: '저도 궁금했는데 감사합니다. 상환 기간을 늘리면 부담률이 내려가더라고요.', createdAt: at('2026-10-26 11:25'), status: 'VISIBLE' },
+  { commentId: 402, postId: 4, authorId: 'employee', content: '(시연용 숨김 댓글)', createdAt: at('2026-10-28 23:10'), status: 'HIDDEN_BY_REPORT' },
   { commentId: 101, postId: 1, authorId: 'ki_minsu', content: '다시 꾸준히 내면 대안 점수에 다시 반영된다고 나오더라고요.', createdAt: at('2026-10-24 13:30'), status: 'VISIBLE' },
 ]
 
