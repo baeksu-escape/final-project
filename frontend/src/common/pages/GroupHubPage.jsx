@@ -40,6 +40,16 @@ function SimPreview() {
 }
 
 // 큰 분류 화면의 기능별 제목·설명과 연결된 실제 자료 미리보기 정의.
+const ASSET_DEBT_UNAVAILABLE_COPY = {
+  income_missing: { sub: '미입력', notice: 'missing' },
+  income_zero: { sub: '계산 불가 · 소득 0', notice: 'zero' },
+  asset_missing: { sub: '미입력', notice: 'missing' },
+  debt_missing: { sub: '미입력', notice: 'missing' },
+  asset_zero: { sub: '계산 불가 · 자산 0', notice: 'zero' },
+  asset_or_debt_missing: { sub: '미입력', notice: 'missing' },
+  net_asset_not_positive: { sub: '계산 불가 · 순자산 0 이하', notice: 'netAsset', tone: 'var(--bad)' },
+  unknown: { sub: '미입력', notice: 'missing' },
+}
 const COPY = {
   report: {
     headline: '두 모델이 본 내 점수를\n한 화면에서 비교해요',
@@ -69,19 +79,28 @@ const COPY = {
   'asset-debt': {
     headline: '가진 것과 갚을 것,\n건강한 균형인가요',
     body: '총자산·연소득·총부채로 상환 부담률(DSR), 자산 대비 부채, 순자산 대비 부채를 계산하고 안전·주의·위험으로 알려 줍니다.',
-    preview: ({ ratios, unavailableReasons }) => (
-      <>
-        <div className="hub-preview__rings">
-          {['dsr', 'debtToAsset', 'debtToNetAsset'].map((key, index) => Number.isFinite(ratios[key])
-            ? <ScoreRing key={key} value={ratios[key]} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub={formatPct(ratios[key])} tone={riskTone(ratios[key], ['dsr', 'debtToAsset', 'debtToNetAsset'][index])} size={160} />
-            : key === 'debtToNetAsset' && unavailableReasons?.[key] === 'net_asset_not_positive'
-              ? <ScoreRing key={key} value={null} max={100} label="순자산 대비" sub="계산 불가 · 순자산 0 이하" tone="var(--bad)" size={160} />
-              : <ScoreRing key={key} value={null} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub="미입력" tone="var(--line2)" size={160} />)}
-        </div>
-        {unavailableReasons?.debtToNetAsset === 'net_asset_not_positive' && <p className="hint" style={{ color: 'var(--bad)', fontWeight: 600, textAlign: 'center' }}>부채가 자산보다 많아 순자산 대비 비율을 계산할 수 없어요. 위험 단계로 보세요.</p>}
-        {['dsr', 'debtToAsset', 'debtToNetAsset'].some((key) => ['income_missing', 'asset_missing', 'debt_missing', 'asset_or_debt_missing'].includes(unavailableReasons?.[key])) && <p className="hint">입력하지 않은 항목이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면으로 이동</Link></p>}
-      </>
-    ),
+    preview: ({ ratios, unavailableReasons }) => {
+      const reasons = Object.values(unavailableReasons ?? {}).map((code) => ASSET_DEBT_UNAVAILABLE_COPY[code] ?? ASSET_DEBT_UNAVAILABLE_COPY.unknown)
+      const hasMissing = reasons.some((reason) => reason.notice === 'missing')
+      const hasZero = reasons.some((reason) => reason.notice === 'zero')
+      const hasNetAssetRisk = reasons.some((reason) => reason.notice === 'netAsset')
+      return (
+        <>
+          <div className="hub-preview__rings">
+            {['dsr', 'debtToAsset', 'debtToNetAsset'].map((key, index) => {
+              const value = ratios[key]
+              const reason = ASSET_DEBT_UNAVAILABLE_COPY[unavailableReasons?.[key]] ?? ASSET_DEBT_UNAVAILABLE_COPY.unknown
+              return Number.isFinite(value)
+                ? <ScoreRing key={key} value={value} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub={formatPct(value)} tone={riskTone(value, ['dsr', 'debtToAsset', 'debtToNetAsset'][index])} size={160} />
+                : <ScoreRing key={key} value={null} max={100} label={['상환 부담률', '자산 대비 부채', '순자산 대비'][index]} sub={reason.sub} tone={reason.tone ?? 'var(--line2)'} size={160} />
+            })}
+          </div>
+          {hasNetAssetRisk && <p className="hint" style={{ color: 'var(--bad)', fontWeight: 600, textAlign: 'center' }}>부채가 자산보다 많아 순자산 대비 비율을 계산할 수 없어요. 위험 단계로 보세요.</p>}
+          {hasMissing && <p className="hint">입력하지 않은 항목이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면으로 이동</Link></p>}
+          {hasZero && <p className="hint">값이 0이라 계산할 수 없는 비율이 있어요. <Link to={PATHS.ASSET_DEBT}>자산·부채 화면에서 확인해 보세요.</Link></p>}
+        </>
+      )
+    },
   },
   'cash-flow': {
     headline: '들어오고 나가는 돈,\n흔들림까지 봅니다',
@@ -216,8 +235,8 @@ export default function GroupHubPage({ groupKey }) {
     })).then((result) => {
       if (!active) return
       const ratios = result?.ratios
-      const netAssetUnavailable = ratios?.debtToNetAsset?.unavailableReason === 'net_asset_not_positive'
-      if (!['dsr', 'debtToAsset', 'debtToNetAsset'].some((key) => Number.isFinite(ratios?.[key]?.value)) && !netAssetUnavailable) {
+      const hasUnavailableReason = Object.values(ratios ?? {}).some((ratio) => ratio?.unavailableReason != null)
+      if (!['dsr', 'debtToAsset', 'debtToNetAsset'].some((key) => Number.isFinite(ratios?.[key]?.value)) && !hasUnavailableReason) {
         setAssetState({ scope, status: 'empty' })
       } else {
         setAssetState({ scope, status: 'ready', data: { ratios: {
