@@ -23,6 +23,7 @@ export default function HomePage() {
   const [report, setReport] = useState(null)
   const [reportError, setReportError] = useState(false)
   const [history, setHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(true)
   const [historyError, setHistoryError] = useState(false)
   // [다시 시도]를 누르면 1씩 올려 다시 불러온다
   const [reloadKey, setReloadKey] = useState(0)
@@ -41,8 +42,8 @@ export default function HomePage() {
   useEffect(() => {
     let active = true
     fetchDiagnosisHistory()
-      .then(({ items }) => { if (active) setHistory(items ?? []) })
-      .catch(() => { if (active) setHistoryError(true) })
+      .then(({ items }) => { if (active) { setHistory(items ?? []); setHistoryLoading(false) } })
+      .catch(() => { if (active) { setHistoryError(true); setHistoryLoading(false) } })
     return () => { active = false }
   }, [historyReloadKey])
 
@@ -58,9 +59,10 @@ export default function HomePage() {
   const scoredHistory = [...history]
     .filter((item) => item.gradeStatusCode === 'SCORED' && item.alternativeScore != null)
     .sort((a, b) => a.calculatedAt.localeCompare(b.calculatedAt))
-  const trend = scoredHistory.slice(-6)
+  const visibleHistory = scoredHistory.slice(-6)
+  const trend = visibleHistory
     .map((item) => ({ label: `${new Date(item.calculatedAt).getMonth() + 1}월`, value: item.alternativeScore }))
-  const modelChanges = scoredHistory.slice(1).filter((item, index) => item.modelVersion !== scoredHistory[index].modelVersion)
+  const modelChanges = visibleHistory.slice(1).filter((item, index) => item.modelVersion !== visibleHistory[index].modelVersion)
   const latestModelChange = modelChanges.at(-1)
   const factors = [...(report?.shap?.factors ?? [])]
     .filter((factor) => factor.shapScore !== 0)
@@ -104,8 +106,10 @@ export default function HomePage() {
           {historyError ? (
             <div role="alert">
               <p className="hint">점수 추이를 불러오지 못했습니다.</p>
-              <Button size="sm" onClick={() => { setHistoryError(false); setHistoryReloadKey((key) => key + 1) }}>다시 시도</Button>
+              <Button size="sm" onClick={() => { setHistoryError(false); setHistoryLoading(true); setHistoryReloadKey((key) => key + 1) }}>다시 시도</Button>
             </div>
+          ) : historyLoading ? (
+            <p className="hint">불러오는 중…</p>
           ) : trend.length <= 1 ? (
             <p className="hint">평가가 2번 이상 쌓이면 추이가 보여요.</p>
           ) : (
