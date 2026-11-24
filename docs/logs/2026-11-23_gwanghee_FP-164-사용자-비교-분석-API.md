@@ -40,7 +40,7 @@
 - API: ADM-04 새로 구현. 경로를 `/api/stats/compare`에서 `/api/members/me/group-comparison`으로 바꿨다(아직 쓰는 곳이 없었다).
 
 ## 확인
-- 백엔드 새 시험 7개(서비스 4, API 3), 기존 관리자 통계 시험 10개 통과. 전체 `./mvnw clean test` 통과
+- 백엔드 새 시험 7개(서비스 4, API 3), 기존 관리자 통계 시험 10개 통과. 전체 `./mvnw clean test` 통과(11/24 최신 develop #149 반영 후 491개)
 - 프론트 `npm run lint`·`npm run build` 통과
 - mock을 node로 직접 불러 확인: `employee` 계정은 `me`가 급여소득자·30대 640 → 700, `self` 계정은 `me` null, 관리자 403
 - 확인 못 함: 실제 DB(로컬 Oracle)에서 호출. 매퍼는 ADM-03과 같아 `AdminStatsMapperIT`가 이미 확인한다

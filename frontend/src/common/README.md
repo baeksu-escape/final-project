@@ -28,7 +28,7 @@ A팀이 만든 공통 프론트입니다. 다른 팀은 이 틀과 부품 위에
   - `CompareBar`: 나와 동년배/직군 평균 수평 비교 (`myValue`, `avgValue`, `unit`, `label`) — N-15-3
   - `TrendLineChart`: 4분기/12개월 추이선 및 기준선 (`data: [{ label, value }]`, `baseline`, `unit`) — N-24-3, N-10-2
   - `BarChart`: 항목별 수치 비교 및 0 기준 상하 증감(±) 막대 (`data: [{ label, value, color, tag }]`, `unit`) — N-24-3, N-12-8
-  - `HeatmapGrid`: 직군 × 연령 매트릭스 히트맵 (`rows`, `columns`, `data`, `myCell`, `onSelectCell`, `unit`) — N-26-3, N-26-6
+  - `HeatmapGrid`: 직군 × 연령 매트릭스 히트맵 (`rows`, `columns`, `data`, `myCell`, `selectedCell`, `onSelectCell`, `unit`, `rowSummary`·`colSummary`·`totalSummary`, `formatValue`) — N-26-3, N-26-6 · 값이 `null`(인원이 적어 숨긴 값 등)이면 '—'로 보이고 색 범위에서 빠진다. `formatValue`로 "+42점"·"56%"처럼 표시를 바꾼다(11/23 FP-164)
   - 사용 예시: `import { CompareBar, TrendLineChart, BarChart, HeatmapGrid } from '../../common/components/index.js'`
   - 각 props의 의미와 `data` 형식은 차트 파일 맨 위 주석에 있습니다.
 - **로그인 정보:** `const { user, logout } = useAuth()`
