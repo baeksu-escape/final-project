@@ -15,7 +15,7 @@
 -- ⚠️ 데모 계정(demo_employee·demo_self·demo_free)에 화면에서 입력한 근무기간이 있으면 이 값으로 바뀐다.
 -- 대상이 400명이 아니면 바꾸지 않고 멈춘다.
 -- 실행: SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로. 11/20 규칙대로 작성자가 로컬·공용 DB에 적용하고 DB 변경 채널에 남긴다.
--- 나중에 시드 생성기(dummy_db/tools/build_db.py)와 10_seed_app_user.sql도 같은 계산식으로 맞춘다.
+-- 새로 만드는 DB는 시드(10_seed_app_user.sql, 생성기 build_db.py의 work_period_months)에 같은 값이 이미 들어 있다.
 -- ====================================================================
 WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
 WHENEVER OSERROR EXIT FAILURE ROLLBACK
