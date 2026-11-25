@@ -20,9 +20,8 @@
 .credit-gauge--tone-caution { --gauge: var(--warn); }
 .credit-gauge--tone-standard { --gauge: var(--acc); }
 .credit-gauge--tone-good { --gauge: var(--mint); }
-.credit-gauge--tone-caution:not(.credit-gauge--alternative) { --gauge: color-mix(in srgb, var(--mut2) 55%, var(--line2)); }
-.credit-gauge--tone-standard:not(.credit-gauge--alternative) { --gauge: var(--mut2); }
-.credit-gauge--tone-good:not(.credit-gauge--alternative) { --gauge: var(--fg); }
+/* 기존 모델 게이지 값 선은 등급과 상관없이 회색 하나로 보여 준다. */
+.credit-gauge:not(.credit-gauge--alternative) { --gauge: var(--mut2); }
 .credit-gauge__seg { fill: none; stroke-width: 20; stroke-linecap: butt; }
 .credit-gauge__seg--caution { stroke: color-mix(in srgb, var(--warn) 18%, var(--panel2)); }
 .credit-gauge__seg--standard { stroke: color-mix(in srgb, var(--acc) 18%, var(--panel2)); }
