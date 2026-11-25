@@ -30,7 +30,7 @@ export default function NumberInput({ label, value, onChange, min, max, step, un
     selection.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd }
   }
 
-  // 부호·소수점과 입력 범위를 확인하고 완성된 숫자만 부모에 전달한다.
+  // 부호·소수점과 입력 범위 또는 자릿수를 확인하고 완성된 숫자만 부모에 전달한다.
   function handleChange(event) {
     const input = event.target
     const next = input.value
@@ -38,12 +38,13 @@ export default function NumberInput({ label, value, onChange, min, max, step, un
     const complete = next !== '' && next !== '-' && next !== '.' && next !== '-.' && !next.endsWith('.')
     const number = Number(next)
     const outOfRange = complete && ((max != null && number > Number(max)) || (negative && number < Number(min)))
-    if (!pattern.test(next) || outOfRange) {
+    const tooManyDigits = max == null && (next.match(/\d/g) ?? []).length > 15
+    if (!pattern.test(next) || outOfRange || tooManyDigits) {
       input.value = text
       input.setSelectionRange(selection.current.start, selection.current.end)
-      setBlockedMessage(!pattern.test(next) ? '숫자만 입력할 수 있어요.' : max == null
+      setBlockedMessage(!pattern.test(next) ? '숫자만 입력할 수 있어요.' : outOfRange && max == null
         ? `${min}${unit ?? ''} 이상 입력할 수 있어요.`
-        : `${min ?? 0}~${max}${unit ?? ''}까지 입력할 수 있어요.`)
+        : tooManyDigits ? '15자리까지 입력할 수 있어요.' : `${min ?? 0}~${max}${unit ?? ''}까지 입력할 수 있어요.`)
       clearTimeout(timer.current)
       setBlocked(true)
       timer.current = setTimeout(() => setBlocked(false), 1500)
