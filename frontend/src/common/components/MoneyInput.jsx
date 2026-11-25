@@ -9,6 +9,7 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
   const errorId = `${id}-error`
   const inputRef = useRef(null)
   const cursorRef = useRef(null)
+  const previousSelection = useRef({ start: 0, end: 0 })
 
   // 입력 뒤 숫자 개수를 기준으로 쉼표가 바뀐 문자열에서도 커서를 원래 자리에 둔다.
   useLayoutEffect(() => {
@@ -19,6 +20,12 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
 
   // 숫자만 변환해 기존 숫자·null 계약으로 전달하고, 값이 같아 다시 그려지지 않아도 커서를 복원한다.
   const updateValue = (input, text, cursor) => {
+    if ((text.match(/\d/g) ?? []).length > 15) {
+      input.value = formatWithComma(value)
+      input.setSelectionRange(previousSelection.current.start, previousSelection.current.end)
+      cursorRef.current = null
+      return
+    }
     const digitsBefore = (text.slice(0, cursor).match(/\d/g) ?? []).length
     const nextValue = parseDigits(text)
     cursorRef.current = digitsBefore
@@ -41,10 +48,20 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
         autoComplete="off"
         className="money-input__control"
         value={formatWithComma(value)}
+        onSelect={(event) => {
+          previousSelection.current = { start: event.target.selectionStart, end: event.target.selectionEnd }
+        }}
+        onBeforeInput={(event) => {
+          previousSelection.current = { start: event.target.selectionStart, end: event.target.selectionEnd }
+        }}
+        onPaste={(event) => {
+          previousSelection.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd }
+        }}
         onChange={(event) => updateValue(event.target, event.target.value, event.target.selectionStart ?? 0)}
         onKeyDown={(event) => {
           const input = event.currentTarget
           const cursor = input.selectionStart
+          previousSelection.current = { start: cursor, end: input.selectionEnd }
           if (event.key === 'Delete' && cursor !== null && cursor === input.selectionEnd && input.value[cursor] === ',') {
             event.preventDefault()
             updateValue(input, input.value.slice(0, cursor) + input.value.slice(cursor + 2), cursor)
