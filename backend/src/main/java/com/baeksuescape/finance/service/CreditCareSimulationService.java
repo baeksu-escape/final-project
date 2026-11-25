@@ -35,7 +35,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * FP-170 N-18 신용케어 시뮬레이터 — SIM-01 입력 10개의 내 실제 값, SIM-02 바꾼 값으로 점수 재계산(FastAPI ML-04, 저장 안 함).
+ * FP-170 N-18 신용케어 시뮬레이터 — SIM-01 입력 10개의 내 현재 값, SIM-02 바꾼 값으로 점수 재계산(FastAPI ML-04, 저장 안 함).
  * 출발 평가는 점수가 나온(SCORED) 가장 최근 평가다. 저장된 피처값(FEATURE_SNAPSHOT)은 서버 안에서만 쓰고 화면에 보내지 않는다.
  */
 @Service
@@ -65,7 +65,7 @@ public class CreditCareSimulationService {
             "NEW_LOAN_COUNT_3M", "LOAN_BALANCE_AMT", "PRIVATE_LENDER_LOAN_BALANCE_AMT", EASYPAY, CARD_LIMIT, CARD_SPEND);
     /**
      * N-18-2 통신비 정시 납부·공과금 미납 개월 수의 상한은 12다.
-     * 통신비 정시 납부 0~12는 11/25 확정이다.
+     * 통신비 정시 납부 0~12는 11/20 범영·광희 확정이다.
      */
     static final int MAX_MONTHS = 12;
     private static final Set<String> MONTH_KEYS = Set.of(TELECOM, UTILITY);
