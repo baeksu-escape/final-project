@@ -16,22 +16,24 @@ export default function NumberInput({ label, value, onChange, min, max, step, un
     selection.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd }
   }
 
-  // 부호와 소수점의 허용 위치를 확인하고 완성된 숫자만 부모에 전달한다.
+  // 부호·소수점과 입력 범위를 확인하고 완성된 숫자만 부모에 전달한다.
   function handleChange(event) {
     const input = event.target
     const next = input.value
     const negative = Number(min) < 0
     const decimal = step != null && Number.isFinite(Number(step)) && !Number.isInteger(Number(step))
     const pattern = new RegExp(`^${negative ? '-?' : ''}\\d*${decimal ? '(?:\\.\\d*)?' : ''}$`)
-    if (!pattern.test(next)) {
+    const complete = next !== '' && next !== '-' && next !== '.' && next !== '-.' && !next.endsWith('.')
+    const number = Number(next)
+    const outOfRange = complete && ((max != null && number > Number(max)) || (negative && number < Number(min)))
+    if (!pattern.test(next) || outOfRange) {
       input.value = text
       input.setSelectionRange(selection.current.start, selection.current.end)
       return
     }
     setText(next)
     if (next === '') onChange(null)
-    else if (next !== '-' && next !== '.' && next !== '-.' && !next.endsWith('.')) {
-      const number = Number(next)
+    else if (complete) {
       if (Number.isFinite(number)) onChange(number)
     }
   }
