@@ -691,7 +691,12 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 |---|---|---|
 | `TELECOM_ON_TIME_MONTHS` | 0~12 정수 | 🟡 임시. 정의서 8-2에서 0–12 대 18·24개월 확인 중(TODO) |
 | `UTILITY_LATE_MONTHS` | 0~12 정수 | 확정(정의서 8-2, 학습 데이터 기준) |
-| 나머지 8개 (연체·현금서비스·신규 대출·간편결제 월 건수·대출 잔액·대부업 잔액·카드 한도·월 카드 사용액) | 0 이상 정수 | 상한은 UI 슬라이더 범위가 정해지면 추가(TODO) |
+| ~~나머지 8개 (연체·현금서비스·신규 대출·간편결제 월 건수·대출 잔액·대부업 잔액·카드 한도·월 카드 사용액)~~ | ~~0 이상 정수~~ | ~~상한은 UI 슬라이더 범위가 정해지면 추가(TODO)~~ 🆕 11/25 아래 기준 적용 |
+| `DELINQ_COUNT_12M` | 0~6 정수 | 화면 SLIDER_FIELDS·학습 데이터 기준 🆕 11/25 |
+| `CASH_ADVANCE_MONTHS` | 0~10 정수 | 화면 SLIDER_FIELDS·학습 데이터 기준 🆕 11/25 |
+| `NEW_LOAN_COUNT_3M` | 0~4 정수 | 화면 SLIDER_FIELDS·학습 데이터 기준 🆕 11/25 |
+| `EASYPAY_MONTHLY_COUNT` | 0~60 정수 | 화면 SLIDER_FIELDS·학습 데이터 기준 🆕 11/25 |
+| `LOAN_BALANCE_AMT`·`PRIVATE_LENDER_LOAN_BALANCE_AMT`·`CARD_LIMIT_AMT`·`CARD_MONTHLY_SPEND_AMT` | 0 이상 정수 | 금액은 상한 없음 🆕 11/25 |
 
 - 범위가 정해지면 FastAPI에도 422 검사를 넣을지 B조와 함께 정한다.
 
@@ -714,7 +719,7 @@ API가 아니라 백엔드 기능들이 함께 쓰는 함수다. `finance/util/R
 오류 400 `INVALID_INPUT` (`fieldErrors[].field`는 `changes.<키>`):
 - 모르는 키 → "모르는 항목입니다."
 - 음수·소수·숫자가 아닌 값 → "0 이상의 정수를 입력해 주세요."
-- 상한 초과 → "0~12 사이로 입력해 주세요."
+- 상한 초과 → ~~"0~12 사이로 입력해 주세요."~~ 해당 키의 상한 N을 써서 "0~N 사이로 입력해 주세요." 🆕 11/25
 - 카드 한쪽만 → `changes.CARD_LIMIT_AMT` "카드 한도와 월 카드 사용액은 함께 보내야 합니다."
 - ML-04가 422를 주면 Spring이 같은 공통 형식(400)으로 바꾼다.
 
