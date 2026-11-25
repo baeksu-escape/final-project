@@ -238,7 +238,7 @@
   4. 바꿀 수 있는 입력은 10개로 확정(공과금 미납 개월 수 `UTILITY_LATE_MONTHS` 포함, 11/17 범영). 통신비 정시 납부 범위는 0~12개월이다(B팀 명세서 4-4).
 - ✅ 11/17 광희 확인: SIM-02는 ML-04 규칙(10개 키, 모르는 키 422, 카드 한도·사용액 함께, 바뀌지 않은 값은 보내지 않음)에 맞춰 처음부터 만든다. ML-04 422의 `fieldErrors`는 공통 `INVALID_INPUT`으로 바꿔 화면에 전달한다.
 - ✅ 11/17 범영 결정: **입력 범위 검사는 Spring SIM-02가 화면 범위로 먼저 한다.** FastAPI ML-04는 지금 범위를 검사하지 않고 그대로 계산한다(소수는 정수로 자름).
-- SIM-02 범위: 10개 키 모두 0 이상 정수, `TELECOM_ON_TIME_MONTHS`·`UTILITY_LATE_MONTHS`는 0~12. 나머지 상한은 화면 슬라이더 범위가 정해지면 추가한다. `EASYPAY_MONTHLY_COUNT`는 **월 횟수 그대로** 보낸다. 🟡 FastAPI ML-04가 지금은 × 12로 12개월 값을 만들지만, 변환 방식은 피처 정의서 9장에서 아직 정하지 않았다(코드 TODO). `null`은 키를 뺀 것과 같다.
+- SIM-02 범위: 10개 키 모두 0 이상 정수, `TELECOM_ON_TIME_MONTHS`·`UTILITY_LATE_MONTHS`는 0~12. ~~나머지 상한은 화면 슬라이더 범위가 정해지면 추가한다.~~ `DELINQ_COUNT_12M` 0~6, `CASH_ADVANCE_MONTHS` 0~10, `NEW_LOAN_COUNT_3M` 0~4, `EASYPAY_MONTHLY_COUNT` 0~60이며 상한 초과는 400 `INVALID_INPUT`(각 필드 "0~N 사이로 입력해 주세요.")이다 🆕 11/25. `EASYPAY_MONTHLY_COUNT`는 **월 횟수 그대로** 보낸다. 🟡 FastAPI ML-04가 지금은 × 12로 12개월 값을 만들지만, 변환 방식은 피처 정의서 9장에서 아직 정하지 않았다(코드 TODO). `null`은 키를 뺀 것과 같다.
 - SIM-02 응답 = ML-04 응답에서 `requestId`·`shap`을 빼고 감점 요인에 `featureName`을 더한다(그 평가의 `FEATURE_SET_VERSION`으로 `DIM_FEATURE` 조회. Mock `FS-DRAFT` 39개 / 실제 `FS-V1` 38개).
 - SIM-02 오류 전달: ML-04 422 → 400 `INVALID_INPUT`, 503 `MODEL_NOT_READY` → 503, 409 `VERSION_MISMATCH` → 409(점수를 다시 산출하라는 안내), 연결 실패·타임아웃·그 밖의 5xx → 503 `MODEL_NOT_READY`. 시뮬레이터는 저장하지 않으므로 NOT_SCORABLE로 저장하지 않는다.
 - SIM-04는 금리·한도·등급만 돌려주는 실제 API다. SIM-03은 만들지 않고, 시뮬레이터의 상품 추천은 화면이 SIM-04와 LOAN-01(대출 상품 목록, 경환 FP-90)을 합쳐 보여 준다. 🆕 11/20
