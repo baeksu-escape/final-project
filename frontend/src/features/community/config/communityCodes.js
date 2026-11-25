@@ -27,6 +27,9 @@ export const REPORT_STATUSES = Object.freeze([
   { value: 'REJECTED', label: '반려' },
 ])
 
+// N-34-1 상태 필터 선택지(FP-277) — '검토 중'은 저장하는 곳이 없어 늘 0건이라 필터에서만 뺀다. 목록의 상태 이름은 위 4개를 쓴다.
+export const REPORT_STATUS_FILTERS = Object.freeze(REPORT_STATUSES.filter((item) => item.value !== 'IN_REVIEW'))
+
 // N-34-3 관리자 처리 결과 3개 — 처리 기록·저장 알림의 이름 표시용. 예전에 '숨김 유지'로 처리한 기록도 이름이 보여야 해서 3개를 그대로 둔다.
 export const REPORT_RESULTS = Object.freeze([
   { value: 'KEEP_HIDDEN', label: '숨김 유지', hint: '일반 사용자에게 계속 숨김' },

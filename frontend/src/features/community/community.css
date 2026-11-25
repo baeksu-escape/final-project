@@ -444,6 +444,11 @@
   transition: background 0.15s;
 }
 
+/* 내가 쓴 댓글 줄 — 댓글 · 게시글 제목 · 닉네임 · 등록일 */
+.lounge-feed__row--comment {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 160px 90px;
+}
+
 .lounge-feed__row:hover {
   background: var(--panel2);
 }

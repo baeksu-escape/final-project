@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Button, Chip, Notice } from '../../../common/components/index.js'
 import { COMMENT_MAX, formatDateTime } from '../config/communityCodes.js'
+import CommentItem from './CommentItem.jsx'
 
 // N-06-1·3 글 상세 — 본문, 댓글 목록과 댓글 쓰기. 내 글이면 수정(N-06-5)·삭제(N-06-6, 한 번 더 확인)를,
-// 남의 글·댓글이면 신고 버튼(N-33-1)을 보여 준다. 숨김 글은 안내 문구만 보여 준다.
-// onReport({ targetType, targetId }) · onAddComment(content)는 Promise를 돌려준다.
-export default function PostDetail({ post, reportedKeys, onBack, onEdit, onDelete, onReport, onAddComment }) {
+// 남의 글·댓글이면 신고 버튼(N-33-1)을 보여 준다. 숨김 글은 안내 문구만 보여 주고 본인도 고치거나 지울 수 없다.
+// onReport({ targetType, targetId }) · onAddComment(content) · onSaveComment(commentId, content) · onDeleteComment(commentId)는 Promise를 돌려준다.
+export default function PostDetail({ post, reportedKeys, onBack, onEdit, onDelete, onReport, onAddComment, onSaveComment, onDeleteComment }) {
   const [askDelete, setAskDelete] = useState(false)
   const [comment, setComment] = useState('')
   const [commentError, setCommentError] = useState('')
@@ -19,11 +20,6 @@ export default function PostDetail({ post, reportedKeys, onBack, onEdit, onDelet
           <Button size="sm" onClick={onBack}>
             목록으로
           </Button>
-          {post.mine && (
-            <Button size="sm" variant="danger" onClick={onDelete}>
-              삭제
-            </Button>
-          )}
         </div>
       </section>
     )
@@ -111,24 +107,15 @@ export default function PostDetail({ post, reportedKeys, onBack, onEdit, onDelet
 
       <section className="lounge-comments" aria-label="댓글">
         <p className="form-field__label">댓글 {post.comments.length}</p>
-        {post.comments.map((item) =>
-          item.hidden ? (
-            <div key={item.commentId} className="lounge-comment lounge-comment--hidden">
-              신고로 숨김 처리된 댓글입니다.
-            </div>
-          ) : (
-            <div key={item.commentId} className="lounge-comment">
-              <div className="lounge-comment__head">
-                <p className="lounge-meta">
-                  <b>{item.nickname}</b>
-                  <span>{formatDateTime(item.createdAt)}</span>
-                </p>
-                {reportButton('COMMENT', item.commentId, item.mine)}
-              </div>
-              <p className="lounge-comment__body">{item.content}</p>
-            </div>
-          ),
-        )}
+        {post.comments.map((item) => (
+          <CommentItem
+            key={item.commentId}
+            comment={item}
+            reportAction={reportButton('COMMENT', item.commentId, item.mine)}
+            onSave={(content) => onSaveComment(item.commentId, content)}
+            onDelete={() => onDeleteComment(item.commentId)}
+          />
+        ))}
       </section>
 
       <form className="l-stack" onSubmit={handleComment}>

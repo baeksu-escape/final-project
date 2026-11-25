@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -108,7 +110,7 @@ class CommunityApiContractTest {
 
     @Test
     void 글_목록은_items와_쪽_정보를_준다() throws Exception {
-        given(boardService.list(7L, 2, 10, "적금")).willReturn(new BoardDtos.PostPage(
+        given(boardService.list(7L, 2, 10, "적금", null, null)).willReturn(new BoardDtos.PostPage(
                 List.of(new BoardDtos.PostSummary(3L, null, "탈퇴한 회원", 4, AT, true, false)), 2, 10, 11));
 
         mvc.perform(asUser(get("/api/board/posts").param("page", "2").param("keyword", "적금")))
@@ -179,6 +181,58 @@ class CommunityApiContractTest {
         mvc.perform(asUser(json(post("/api/board/posts/3/comments"), "{\"content\":\"좋은 정보네요\"}")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.commentId").value(21));
+    }
+
+    @Test
+    @DisplayName("글 목록은 filter·sort 쿼리를 서비스로 넘긴다")
+    void postList_passesFilterAndSort() throws Exception {
+        given(boardService.list(7L, 1, 10, null, "mine", "comments")).willReturn(new BoardDtos.PostPage(List.of(), 1, 10, 0));
+
+        mvc.perform(asUser(get("/api/board/posts").param("filter", "mine").param("sort", "comments")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCount").value(0));
+        verify(boardService).list(7L, 1, 10, null, "mine", "comments");
+    }
+
+    // ---- COMM-10·11 내 댓글 수정·삭제 ----
+
+    @Test
+    @DisplayName("댓글을 고치고 지우면 빈 객체를 주고, 토큰의 회원 번호와 경로의 글·댓글 번호를 넘긴다")
+    void comment_updateAndDelete() throws Exception {
+        mvc.perform(asUser(json(put("/api/board/posts/3/comments/21"), "{\"content\":\"고친 댓글\"}")))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{}", true));
+        verify(boardService).updateComment(7L, 3L, 21L, new BoardDtos.CommentWrite("고친 댓글"));
+
+        mvc.perform(asUser(delete("/api/board/posts/3/comments/21")))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{}", true));
+        verify(boardService).deleteComment(7L, 3L, 21L);
+    }
+
+    @Test
+    @DisplayName("댓글 수정은 빈 내용·1000자 초과면 400, 로그인 전이면 수정·삭제 모두 401이다")
+    void comment_invalidAndUnauthorized() throws Exception {
+        for (String text : List.of(" ", "가".repeat(1001))) {
+            mvc.perform(asUser(json(put("/api/board/posts/3/comments/21"), "{\"content\":\"" + text + "\"}")))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                    .andExpect(jsonPath("$.fieldErrors[0].field").value("content"));
+        }
+        mvc.perform(json(put("/api/board/posts/3/comments/21"), "{\"content\":\"댓글\"}")).andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/board/posts/3/comments/21")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(boardService);
+    }
+
+    @Test
+    @DisplayName("숨겨진 댓글 오류는 공통 오류 형식 409 COMMENT_HIDDEN으로 나간다")
+    void comment_hidden_conflict() throws Exception {
+        willThrow(new ApiException(HttpStatus.CONFLICT, "COMMENT_HIDDEN", "신고로 숨김 처리된 댓글은 고치거나 지울 수 없습니다."))
+                .given(boardService).deleteComment(7L, 3L, 21L);
+
+        mvc.perform(asUser(delete("/api/board/posts/3/comments/21")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COMMENT_HIDDEN"));
     }
 
     // ---- COMM-09 내가 쓴 댓글 ----

@@ -44,15 +44,21 @@ function requireAdmin(token) {
   if (!currentUser(token).isAdmin) fail(403, 'FORBIDDEN', '권한이 없습니다.')
 }
 
-/* ---------- 글·댓글 (COMM-01~06·09) ---------- */
+/* ---------- 글·댓글 (COMM-01~06·09~11) ---------- */
 
 function findPost(postId) {
   const post = mockPosts.find((item) => item.postId === postId && item.status !== DELETED)
   if (!post) fail(404, 'POST_NOT_FOUND', '글을 찾을 수 없습니다.')
   return post
 }
-function requireOwner(post, loginId) {
-  if (post.authorId !== loginId) fail(403, 'NOT_OWNER', '내가 쓴 글만 고치거나 지울 수 있습니다.')
+function requireOwner(item, loginId, kind = '글') {
+  if (item.authorId !== loginId) fail(403, 'NOT_OWNER', `내가 쓴 ${kind}만 고치거나 지울 수 있습니다.`)
+}
+function checkCommentWrite(body) {
+  const content = String(body?.content ?? '').trim()
+  if (!content) invalid('content', '댓글을 입력해 주세요.')
+  if (content.length > COMMENT_MAX) invalid('content', `댓글은 ${COMMENT_MAX}자까지 쓸 수 있습니다.`)
+  return content
 }
 function checkPostWrite(body) {
   const title = String(body?.title ?? '').trim()
@@ -113,11 +119,12 @@ function registerPostRoutes(postId) {
       Object.assign(post, checkPostWrite(body), { updatedAt: nowText() })
       return {}
     },
-    // N-06-6 내 글 삭제 — 숨김 글도 지울 수 있다
+    // N-06-6 내 글 삭제 — 숨김 글은 지울 수 없다
     [`DELETE ${path}`]: ({ token }) => {
       const { loginId } = currentUser(token)
       const post = findPost(postId)
       requireOwner(post, loginId)
+      if (post.status !== VISIBLE) fail(409, 'POST_HIDDEN', '신고로 숨김 처리된 글은 삭제할 수 없습니다.')
       post.status = DELETED
       return {}
     },
@@ -132,12 +139,37 @@ function registerPostRoutes(postId) {
       const { loginId } = currentUser(token)
       const post = findPost(postId)
       if (post.status !== VISIBLE) fail(409, 'POST_HIDDEN', '신고로 숨김 처리된 글에는 댓글을 달 수 없습니다.')
-      const content = String(body?.content ?? '').trim()
-      if (!content) invalid('content', '댓글을 입력해 주세요.')
-      if (content.length > COMMENT_MAX) invalid('content', `댓글은 ${COMMENT_MAX}자까지 쓸 수 있습니다.`)
+      const content = checkCommentWrite(body)
       const commentId = ++mockSeq.comment
       mockComments.push({ commentId, postId, authorId: loginId, content, createdAt: nowText(), status: VISIBLE })
+      registerCommentRoutes(postId, commentId)
       return { commentId }
+    },
+  })
+}
+
+// COMM-10·11 내 댓글 수정·삭제 — 댓글마다 등록한다. 숨긴 글·숨긴 댓글은 본인도 고치거나 지울 수 없다.
+function registerCommentRoutes(postId, commentId) {
+  const path = `/api/board/posts/${postId}/comments/${commentId}`
+  const findEditable = (token) => {
+    const { loginId } = currentUser(token)
+    const post = findPost(postId)
+    const comment = mockComments.find((item) => item.commentId === commentId && item.status !== DELETED)
+    if (!comment) fail(404, 'COMMENT_NOT_FOUND', '댓글을 찾을 수 없습니다.')
+    requireOwner(comment, loginId, '댓글')
+    if (post.status !== VISIBLE) fail(409, 'POST_HIDDEN', '신고로 숨김 처리된 글의 댓글은 고치거나 지울 수 없습니다.')
+    if (comment.status !== VISIBLE) fail(409, 'COMMENT_HIDDEN', '신고로 숨김 처리된 댓글은 고치거나 지울 수 없습니다.')
+    return comment
+  }
+  registerMockHandlers({
+    [`PUT ${path}`]: ({ token, body }) => {
+      const comment = findEditable(token)
+      comment.content = checkCommentWrite(body)
+      return {}
+    },
+    [`DELETE ${path}`]: ({ token }) => {
+      findEditable(token).status = DELETED
+      return {}
     },
   })
 }
@@ -238,23 +270,28 @@ function registerReportRoutes(reportId) {
 }
 
 registerMockHandlers({
-  // N-06-1 글 목록 — 삭제 글은 빼고, 검색은 보이는 글에서만. 최신순.
+  // N-06-1 글 목록 — 삭제 글은 빼고, 검색은 보이는 글에서만. 최신순. filter=mine은 내 글, sort=comments는 댓글 많은 순(같으면 최신순).
   'GET /api/board/posts': ({ token, query }) => {
     const { loginId } = currentUser(token)
     const page = Math.max(1, Number(query.get('page')) || 1)
     const size = Math.min(50, Math.max(1, Number(query.get('size')) || 10))
     const keyword = (query.get('keyword') ?? '').trim()
+    const mineOnly = query.get('filter') === 'mine'
+    const byComments = query.get('sort') === 'comments'
+    const commentCountOf = (post) => mockComments.filter((c) => c.postId === post.postId && c.status !== DELETED).length
     const rows = mockPosts
       .filter((post) => post.status !== DELETED)
       .filter((post) => !keyword || (post.status === VISIBLE && (post.title + post.content).includes(keyword)))
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.postId - a.postId)
+      .filter((post) => !mineOnly || post.authorId === loginId)
+      .filter((post) => !byComments || (post.status === VISIBLE && commentCountOf(post) > 0))
+      .sort((a, b) => (byComments ? commentCountOf(b) - commentCountOf(a) : 0) || b.createdAt.localeCompare(a.createdAt) || b.postId - a.postId)
     const items = rows.slice((page - 1) * size, page * size).map((post) => {
       const hidden = post.status === HIDDEN
       return {
         postId: post.postId,
         title: hidden ? null : post.title,
         nickname: nicknameOf(post.authorId),
-        commentCount: mockComments.filter((c) => c.postId === post.postId && c.status !== DELETED).length,
+        commentCount: commentCountOf(post),
         createdAt: post.createdAt,
         hidden,
         mine: post.authorId === loginId,
@@ -393,6 +430,7 @@ registerMockHandlers({
   },
 })
 
-// 처음 들어 있는 글·신고의 번호별 경로를 등록한다
+// 처음 들어 있는 글·댓글·신고의 번호별 경로를 등록한다
 mockPosts.forEach((post) => registerPostRoutes(post.postId))
+mockComments.forEach((comment) => registerCommentRoutes(comment.postId, comment.commentId))
 mockReports.forEach((report) => registerReportRoutes(report.reportId))

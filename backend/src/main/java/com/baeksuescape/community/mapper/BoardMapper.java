@@ -14,9 +14,12 @@ import com.baeksuescape.community.dto.PostRow;
 public interface BoardMapper {
 
     // N-06-1 목록: 삭제 글을 빼고 최신순. likePattern은 '%검색어%'(특수문자는 \로 막은 값)이고 null이면 전체.
-    List<PostRow> selectPosts(@Param("likePattern") String likePattern, @Param("offset") int offset, @Param("limit") int limit);
+    // ownerUserId가 있으면 그 회원 글만, byComments면 댓글이 달린 보이는 글만 댓글 많은 순(같으면 최신순)으로 준다.
+    List<PostRow> selectPosts(@Param("likePattern") String likePattern, @Param("ownerUserId") Long ownerUserId,
+            @Param("byComments") boolean byComments, @Param("offset") int offset, @Param("limit") int limit);
 
-    int countPosts(@Param("likePattern") String likePattern);
+    int countPosts(@Param("likePattern") String likePattern, @Param("ownerUserId") Long ownerUserId,
+            @Param("byComments") boolean byComments);
 
     // 글 한 개(상태와 상관없이). 없으면 null
     PostRow selectPost(@Param("postId") long postId);
@@ -50,6 +53,9 @@ public interface BoardMapper {
 
     // 댓글 저장. 저장하면 row.commentId에 새 번호가 채워진다.
     int insertComment(CommentRow row);
+
+    // 보이는 댓글만 고친다. 그 사이 숨겨졌거나 지워졌으면 0
+    int updateCommentContent(@Param("commentId") long commentId, @Param("content") String content, @Param("now") LocalDateTime now);
 
     // 상태가 fromStatus일 때만 바꾼다. 그 사이 다른 처리로 바뀌었으면 0
     int updateCommentStatus(@Param("commentId") long commentId, @Param("fromStatus") String fromStatus,

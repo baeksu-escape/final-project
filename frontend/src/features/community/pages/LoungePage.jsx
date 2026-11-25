@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Notice, Toast } from '../../../common/components/index.js'
-import { createComment, createPost, deletePost, fetchMyComments, fetchPost, fetchPosts, updatePost } from '../api/boardApi.js'
+import { createComment, createPost, deleteComment, deletePost, fetchMyComments, fetchPost, fetchPosts, updateComment, updatePost } from '../api/boardApi.js'
 import MyCommentTable from '../components/MyCommentTable.jsx'
 import Pager from '../components/Pager.jsx'
 import PostDetail from '../components/PostDetail.jsx'
@@ -11,15 +11,16 @@ import ReportModal from '../components/ReportModal.jsx'
 import { PAGE_SIZE } from '../config/communityCodes.js'
 import '../community.css'
 
-// UI 리뉴얼 — 목록 위 보기 탭(지금 쪽의 글에서 거른다. 서버 검색·쪽 넘기기는 그대로)
-const FEED_TABS = [
-  { key: 'all', label: '전체보기', pick: () => true },
-  { key: 'talk', label: '댓글 많은 글', pick: (post) => !post.hidden && post.commentCount > 0 },
-  { key: 'mine', label: '내 글', pick: (post) => post.mine },
-]
-// 내가 쓴 댓글 탭(COMM-09) — 글 목록을 거르지 않고 내 댓글을 서버에서 따로 읽는다
+// 목록 위 보기 탭 — query를 서버에 보내 전체 글에서 고른다(COMM-01, FP-279). title은 목록 제목
 const COMMENTS_TAB = 'comments'
-const LIST_TABS = [...FEED_TABS, { key: COMMENTS_TAB, label: '내가 쓴 댓글' }]
+const LIST_TABS = [
+  { key: 'all', label: '전체보기', title: '전체 글', query: {} },
+  { key: 'talk', label: '댓글 많은 글', title: '댓글 많은 글', query: { sort: 'comments' } },
+  { key: 'mine', label: '내 글', title: '내 글', query: { filter: 'mine' } },
+  // 내가 쓴 댓글(COMM-09)은 글 목록 대신 내 댓글을 따로 읽는다
+  { key: COMMENTS_TAB, label: '내가 쓴 댓글', title: '내가 쓴 댓글' },
+]
+const tabOf = (key) => LIST_TABS.find((tab) => tab.key === key)
 
 // FP-223 주소(?post=3, ?post=3&mode=edit, ?mode=write)에서 지금 볼 화면을 읽는다. 번호가 이상하면 목록으로 본다.
 function readView(params) {
@@ -37,7 +38,7 @@ function toSearch({ mode, postId }) {
   return {}
 }
 
-// N-06 신용 라운지 — 글 목록·검색(N-06-1), 내가 쓴 댓글(COMM-09), 상세·댓글(N-06-1·3), 글쓰기(N-06-2), 내 글 수정·삭제(N-06-5·6),
+// N-06 신용 라운지 — 글 목록·검색(N-06-1), 내가 쓴 댓글(COMM-09), 상세·댓글(N-06-1·3), 글쓰기(N-06-2), 내 글 수정·삭제(N-06-5·6), 내 댓글 수정·삭제(COMM-10·11),
 // 글·댓글 신고(N-33-1)를 한 화면에서 목록 ↔ 상세 ↔ 쓰기·수정으로 바꿔 가며 보여 준다. 이름 대신 닉네임만 보인다.
 export default function LoungePage() {
   // mode: list | detail | write | edit — 주소에 남겨 브라우저 뒤로가기가 라운지 안에서 한 단계씩 돌아가게 한다(FP-223)
@@ -48,7 +49,8 @@ export default function LoungePage() {
   const [page, setPage] = useState(1)
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
-  const [list, setList] = useState({ data: null, error: '' })
+  // tab: 어느 탭으로 읽은 목록인지(탭을 바꾼 직후 앞 탭의 글이 잠깐 보이지 않게)
+  const [list, setList] = useState({ tab: 'all', data: null, error: '' })
   const [detail, setDetail] = useState({ postId: null, post: null, error: '' })
   // 저장·삭제 뒤에 목록·상세를 다시 불러오려고 1씩 올린다
   const [listVersion, setListVersion] = useState(0)
@@ -61,24 +63,33 @@ export default function LoungePage() {
   const [commentPage, setCommentPage] = useState(1)
   const [myComments, setMyComments] = useState({ data: null, error: '' })
 
-  // 목록 — 쪽·검색어가 바뀌거나 저장·삭제 뒤에 다시 읽는다
+  const commentsOpen = feedTab === COMMENTS_TAB
+  // 목록 — 탭·쪽·검색어가 바뀌거나 저장·삭제 뒤에 다시 읽는다. 지워서 마지막 쪽이 비었으면 앞쪽으로 옮긴다.
   useEffect(() => {
+    if (feedTab === COMMENTS_TAB) return undefined
     let alive = true
-    fetchPosts({ page, keyword })
-      .then((data) => alive && setList({ data, error: '' }))
-      .catch((err) => alive && setList({ data: null, error: err.message }))
+    fetchPosts({ page, keyword, ...tabOf(feedTab).query })
+      .then((data) => {
+        if (!alive) return
+        if (data.items.length === 0 && page > 1) setPage(page - 1)
+        else setList({ tab: feedTab, data, error: '' })
+      })
+      .catch((err) => alive && setList({ tab: feedTab, data: null, error: err.message }))
     return () => {
       alive = false
     }
-  }, [page, keyword, listVersion])
+  }, [feedTab, page, keyword, listVersion])
 
-  // 내가 쓴 댓글 — 탭을 열거나 쪽이 바뀌거나 댓글을 쓴 뒤에 다시 읽는다
-  const commentsOpen = feedTab === COMMENTS_TAB
+  // 내가 쓴 댓글 — 탭을 열거나 쪽이 바뀌거나 댓글을 쓰고 고치고 지운 뒤에 다시 읽는다
   useEffect(() => {
     if (!commentsOpen) return undefined
     let alive = true
     fetchMyComments({ page: commentPage })
-      .then((data) => alive && setMyComments({ data, error: '' }))
+      .then((data) => {
+        if (!alive) return
+        if (data.items.length === 0 && commentPage > 1) setCommentPage(commentPage - 1)
+        else setMyComments({ data, error: '' })
+      })
       .catch((err) => alive && setMyComments({ data: null, error: err.message }))
     return () => {
       alive = false
@@ -110,6 +121,13 @@ export default function LoungePage() {
   const goBack = (fallback) => (location.state?.inLounge ? navigate(-1) : setView(fallback, true))
   const toList = () => goBack({ mode: 'list', postId: null })
   const openPost = (id) => setView({ mode: 'detail', postId: id })
+
+  // 탭을 바꾸면 첫 쪽부터 본다
+  const handleTab = (key) => {
+    setFeedTab(key)
+    setPage(1)
+    setCommentPage(1)
+  }
 
   const handleSearch = (event) => {
     event.preventDefault()
@@ -151,6 +169,20 @@ export default function LoungePage() {
     reloadAll()
   }
 
+  // N-06 내 댓글 수정(COMM-10)
+  const handleSaveComment = async (commentId, content) => {
+    await updateComment(postId, commentId, content)
+    setToast('댓글을 고쳤습니다.')
+    reloadAll()
+  }
+
+  // N-06 내 댓글 삭제(COMM-11)
+  const handleDeleteComment = async (commentId) => {
+    await deleteComment(postId, commentId)
+    setToast('댓글을 삭제했습니다.')
+    reloadAll()
+  }
+
   // N-33-1·2 신고 접수 — 기준 건수가 차서 숨겨졌으면 그렇게 알려 준다
   const handleReported = (result) => {
     const key = `${reportTarget.targetType}:${reportTarget.targetId}`
@@ -187,18 +219,21 @@ export default function LoungePage() {
         onDelete={handleDelete}
         onReport={setReportTarget}
         onAddComment={handleAddComment}
+        onSaveComment={handleSaveComment}
+        onDeleteComment={handleDeleteComment}
       />
     ) : (
       <p className="hint">불러오는 중…</p>
     )
   } else {
-    const { data, error } = commentsOpen ? myComments : list
+    const posts = list.tab === feedTab ? list : { data: null, error: '' }
+    const { data, error } = commentsOpen ? myComments : posts
     const totalPages = data ? Math.max(1, Math.ceil(data.totalCount / PAGE_SIZE)) : 1
     body = (
       <section className="card lounge-list" aria-labelledby="lounge-list-title">
         <div className="lounge-list__head">
           <h2 id="lounge-list-title" className="card__title">
-            {commentsOpen ? '내가 쓴 댓글' : '전체 글'} {data && <span className="lounge-count">{data.totalCount}건</span>}
+            {tabOf(feedTab).title} {data && <span className="lounge-count">{data.totalCount}건</span>}
           </h2>
           {/* 검색은 글만 찾으므로 내가 쓴 댓글 탭에서는 숨긴다 */}
           {!commentsOpen && (
@@ -221,7 +256,7 @@ export default function LoungePage() {
         </div>
         <div className="lounge-tabs" role="tablist" aria-label="글 보기">
           {LIST_TABS.map((tab) => (
-            <button key={tab.key} type="button" role="tab" aria-selected={feedTab === tab.key} className="lounge-tabs__btn" onClick={() => setFeedTab(tab.key)}>
+            <button key={tab.key} type="button" role="tab" aria-selected={feedTab === tab.key} className="lounge-tabs__btn" onClick={() => handleTab(tab.key)}>
               {tab.label}
             </button>
           ))}
@@ -233,7 +268,7 @@ export default function LoungePage() {
             {commentsOpen ? (
               <MyCommentTable items={data.items} onOpen={openPost} />
             ) : (
-              <PostTable items={data.items.filter(FEED_TABS.find((tab) => tab.key === feedTab).pick)} startNo={data.totalCount - (data.page - 1) * PAGE_SIZE} onOpen={openPost} />
+              <PostTable items={data.items} startNo={data.totalCount - (data.page - 1) * PAGE_SIZE} onOpen={openPost} />
             )}
             <Pager page={data.page} totalPages={totalPages} onChange={commentsOpen ? setCommentPage : setPage} />
           </>

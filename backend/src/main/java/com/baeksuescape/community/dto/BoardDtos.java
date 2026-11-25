@@ -52,7 +52,7 @@ public final class BoardDtos {
     public record PostCreated(Long postId) {
     }
 
-    // COMM-06 댓글 작성
+    // COMM-06 댓글 작성·COMM-10 댓글 수정
     public record CommentWrite(
             @NotBlank(message = "댓글을 입력해 주세요.") @Size(max = 1000, message = "댓글은 1000자까지 쓸 수 있습니다.") String content) {
     }

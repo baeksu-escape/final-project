@@ -8,16 +8,24 @@
         CASE WHEN U.USER_ID IS NULL OR U.ACCOUNT_STATUS_CODE = 'WITHDRAWN' THEN '탈퇴한 회원' ELSE U.NICKNAME END
     </sql>
 
-    <!-- 목록 검색: 보이는 글의 제목·내용에서만 찾는다(숨김 글 내용이 검색으로 드러나지 않게). -->
+    <!-- 목록 조건(목록·개수가 함께 쓴다). 검색은 보이는 글의 제목·내용에서만 찾는다(숨김 글 내용이 검색으로 드러나지 않게).
+         ownerUserId가 있으면 그 회원 글만(숨긴 글 포함), byComments면 댓글이 1개 이상 달린 보이는 글만 고른다. -->
     <sql id="postListWhere">
         WHERE P.STATUS_CODE &lt;&gt; 'DELETED'
         <if test="likePattern != null">
             AND P.STATUS_CODE = 'VISIBLE'
             AND (P.TITLE LIKE #{likePattern} ESCAPE '\' OR P.CONTENT LIKE #{likePattern} ESCAPE '\')
         </if>
+        <if test="ownerUserId != null">
+            AND P.USER_ID = #{ownerUserId}
+        </if>
+        <if test="byComments">
+            AND P.STATUS_CODE = 'VISIBLE'
+            AND EXISTS (SELECT 1 FROM BOARD_COMMENT C WHERE C.POST_ID = P.POST_ID AND C.STATUS_CODE &lt;&gt; 'DELETED')
+        </if>
     </sql>
 
-    <!-- N-06-1 목록 한 쪽. 댓글 수는 삭제되지 않은 댓글만 센다. -->
+    <!-- N-06-1 목록 한 쪽. 댓글 수는 삭제되지 않은 댓글만 센다. byComments면 댓글 많은 순, 댓글 수가 같으면 최신순. -->
     <select id="selectPosts" resultType="com.baeksuescape.community.dto.PostRow">
         SELECT P.POST_ID AS postId, P.USER_ID AS userId, P.TITLE AS title, P.STATUS_CODE AS statusCode,
                <include refid="authorName"/> AS nickname,
@@ -26,7 +34,7 @@
           FROM BOARD_POST P
           LEFT JOIN APP_USER U ON U.USER_ID = P.USER_ID
         <include refid="postListWhere"/>
-         ORDER BY P.CREATED_AT DESC, P.POST_ID DESC
+         ORDER BY <if test="byComments">commentCount DESC,</if> P.CREATED_AT DESC, P.POST_ID DESC
         OFFSET #{offset} ROWS FETCH NEXT #{limit} ROWS ONLY
     </select>
 
@@ -124,6 +132,14 @@
         INSERT INTO BOARD_COMMENT (POST_ID, USER_ID, CONTENT, STATUS_CODE, CREATED_AT)
         VALUES (#{postId}, #{userId}, #{content}, 'VISIBLE', #{createdAt})
     </insert>
+
+    <!-- N-06 내 댓글 수정(COMM-10): 보이는 댓글만 -->
+    <update id="updateCommentContent">
+        UPDATE BOARD_COMMENT
+           SET CONTENT = #{content}, UPDATED_AT = #{now}
+         WHERE COMMENT_ID = #{commentId}
+           AND STATUS_CODE = 'VISIBLE'
+    </update>
 
     <update id="updateCommentStatus">
         UPDATE BOARD_COMMENT

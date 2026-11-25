@@ -20,6 +20,7 @@ import java.time.ZoneId;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -74,10 +75,11 @@ class BoardServiceTest {
 
     @Test
     void 목록은_10개씩_나누고_숨김_글은_제목을_비운다() {
-        given(boardMapper.countPosts(null)).willReturn(12);
-        given(boardMapper.selectPosts(null, 10, 10)).willReturn(List.of(post(2, ME, "VISIBLE"), post(1, OTHER, "HIDDEN_BY_REPORT")));
+        given(boardMapper.countPosts(null, null, false)).willReturn(12);
+        given(boardMapper.selectPosts(null, null, false, 10, 10))
+                .willReturn(List.of(post(2, ME, "VISIBLE"), post(1, OTHER, "HIDDEN_BY_REPORT")));
 
-        BoardDtos.PostPage page = service.list(ME, 2, 0, "  ");
+        BoardDtos.PostPage page = service.list(ME, 2, 0, "  ", null, null);
 
         assertThat(page.page()).isEqualTo(2);
         assertThat(page.size()).isEqualTo(10);
@@ -163,13 +165,33 @@ class BoardServiceTest {
     }
 
     @Test
-    void 신고로_숨겨진_글도_작성자는_삭제할_수_있다() {
-        given(boardMapper.selectPost(1L)).willReturn(post(1, ME, "HIDDEN_BY_REPORT"));
-        given(boardMapper.updatePostStatus(1L, "HIDDEN_BY_REPORT", "DELETED", NOW)).willReturn(1);
+    @DisplayName("내 글을 지우면 상태를 DELETED로 바꾸고 DELETE 기록을 남긴다")
+    void deletePost_ok() {
+        given(boardMapper.selectPost(1L)).willReturn(post(1, ME, "VISIBLE"));
+        given(boardMapper.updatePostStatus(1L, "VISIBLE", "DELETED", NOW)).willReturn(1);
 
         service.delete(ME, 1L);
 
-        verify(boardMapper).insertPostLog(1L, "DELETE", "USER", ME, "HIDDEN_BY_REPORT", "DELETED", null, NOW);
+        verify(boardMapper).insertPostLog(1L, "DELETE", "USER", ME, "VISIBLE", "DELETED", null, NOW);
+    }
+
+    @Test
+    @DisplayName("신고로 숨겨진 글은 작성자도 지울 수 없다(409 POST_HIDDEN, 11/25 결정)")
+    void deletePost_hidden_conflict() {
+        given(boardMapper.selectPost(1L)).willReturn(post(1, ME, "HIDDEN_BY_REPORT"));
+
+        assertError(() -> service.delete(ME, 1L), 409, "POST_HIDDEN");
+        verify(boardMapper, never()).updatePostStatus(anyLong(), anyString(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("지우는 사이 글이 숨겨졌으면 409 STATUS_CHANGED이고 기록을 남기지 않는다")
+    void deletePost_changedMeanwhile_conflict() {
+        given(boardMapper.selectPost(1L)).willReturn(post(1, ME, "VISIBLE"));
+        given(boardMapper.updatePostStatus(1L, "VISIBLE", "DELETED", NOW)).willReturn(0);
+
+        assertError(() -> service.delete(ME, 1L), 409, "STATUS_CHANGED");
+        verify(boardMapper, never()).insertPostLog(anyLong(), anyString(), anyString(), any(), any(), anyString(), any(), any());
     }
 
     @Test
@@ -193,6 +215,134 @@ class BoardServiceTest {
 
         assertThat(service.addComment(ME, 1L, new BoardDtos.CommentWrite(" 좋은 정보네요 ")).commentId()).isEqualTo(21L);
         verify(boardMapper, never()).insertPostLog(anyLong(), anyString(), anyString(), any(), any(), anyString(), isNull(), eq(NOW));
+    }
+
+    @Test
+    @DisplayName("filter=mine은 내 글만, sort=comments는 댓글 많은 순으로 읽고 개수도 같은 조건으로 센다")
+    void list_filterAndSort() {
+        given(boardMapper.countPosts(null, ME, false)).willReturn(3);
+        given(boardMapper.selectPosts(null, ME, false, 0, 10)).willReturn(List.of(post(1, ME, "VISIBLE")));
+        given(boardMapper.countPosts("%적금%", null, true)).willReturn(5);
+        given(boardMapper.selectPosts("%적금%", null, true, 0, 10)).willReturn(List.of(post(2, OTHER, "VISIBLE")));
+
+        BoardDtos.PostPage mine = service.list(ME, 1, 10, null, "mine", null);
+        BoardDtos.PostPage popular = service.list(ME, 1, 10, "적금", null, "comments");
+
+        assertThat(mine.totalCount()).isEqualTo(3);
+        assertThat(mine.items().get(0).mine()).isTrue();
+        assertThat(popular.totalCount()).isEqualTo(5);
+        assertThat(popular.items().get(0).postId()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("정해진 값이 아닌 filter·sort는 무시하고 전체 글을 최신순으로 읽는다")
+    void list_unknownFilterAndSort_ignored() {
+        given(boardMapper.countPosts(null, null, false)).willReturn(1);
+        given(boardMapper.selectPosts(null, null, false, 0, 10)).willReturn(List.of(post(1, OTHER, "VISIBLE")));
+
+        assertThat(service.list(ME, 1, 10, null, "other", "views").items()).hasSize(1);
+    }
+
+    // 1번 글(postStatus)과 21번 댓글을 준비한다.
+    private void givenComment(String postStatus, long commentUserId, long commentPostId, String commentStatus) {
+        given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, postStatus));
+        CommentRow row = new CommentRow();
+        row.setCommentId(21L);
+        row.setPostId(commentPostId);
+        row.setUserId(commentUserId);
+        row.setContent("댓글");
+        row.setStatusCode(commentStatus);
+        given(boardMapper.selectComment(21L)).willReturn(row);
+    }
+
+    // 댓글 수정·삭제가 같은 오류로 막히고 DB를 바꾸지 않는지 본다.
+    private void assertCommentBlocked(int status, String code) {
+        assertError(() -> service.updateComment(ME, 1L, 21L, new BoardDtos.CommentWrite("새 댓글")), status, code);
+        assertError(() -> service.deleteComment(ME, 1L, 21L), status, code);
+        verify(boardMapper, never()).updateCommentContent(anyLong(), anyString(), any());
+        verify(boardMapper, never()).updateCommentStatus(anyLong(), anyString(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("내 댓글을 고치면 앞뒤 공백을 지우고 저장한다")
+    void updateComment_ok() {
+        givenComment("VISIBLE", ME, 1L, "VISIBLE");
+        given(boardMapper.updateCommentContent(21L, "새 댓글", NOW)).willReturn(1);
+
+        service.updateComment(ME, 1L, 21L, new BoardDtos.CommentWrite(" 새 댓글 "));
+
+        verify(boardMapper).updateCommentContent(21L, "새 댓글", NOW);
+    }
+
+    @Test
+    @DisplayName("내 댓글을 지우면 상태만 DELETED로 바꾼다")
+    void deleteComment_ok() {
+        givenComment("VISIBLE", ME, 1L, "VISIBLE");
+        given(boardMapper.updateCommentStatus(21L, "VISIBLE", "DELETED", NOW)).willReturn(1);
+
+        service.deleteComment(ME, 1L, 21L);
+
+        verify(boardMapper).updateCommentStatus(21L, "VISIBLE", "DELETED", NOW);
+    }
+
+    @Test
+    @DisplayName("지워진 글의 댓글은 404 POST_NOT_FOUND다")
+    void comment_postDeleted_notFound() {
+        givenComment("DELETED", ME, 1L, "VISIBLE");
+        assertCommentBlocked(404, "POST_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("없는 댓글은 404 COMMENT_NOT_FOUND다")
+    void comment_notFound() {
+        given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "VISIBLE"));
+        assertCommentBlocked(404, "COMMENT_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("지워진 댓글은 404 COMMENT_NOT_FOUND다")
+    void comment_deleted_notFound() {
+        givenComment("VISIBLE", ME, 1L, "DELETED");
+        assertCommentBlocked(404, "COMMENT_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("다른 글에 달린 댓글이면 404 COMMENT_NOT_FOUND다")
+    void comment_ofOtherPost_notFound() {
+        givenComment("VISIBLE", ME, 2L, "VISIBLE");
+        assertCommentBlocked(404, "COMMENT_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("남의 댓글은 고치거나 지울 수 없다(403 NOT_OWNER)")
+    void comment_notOwner_forbidden() {
+        givenComment("VISIBLE", OTHER, 1L, "VISIBLE");
+        assertCommentBlocked(403, "NOT_OWNER");
+    }
+
+    @Test
+    @DisplayName("신고로 숨겨진 댓글은 본인도 고치거나 지울 수 없다(409 COMMENT_HIDDEN)")
+    void comment_hidden_conflict() {
+        givenComment("VISIBLE", ME, 1L, "HIDDEN_BY_REPORT");
+        assertCommentBlocked(409, "COMMENT_HIDDEN");
+    }
+
+    @Test
+    @DisplayName("숨겨진 글에 달린 내 댓글도 고치거나 지울 수 없다(409 POST_HIDDEN)")
+    void comment_ofHiddenPost_conflict() {
+        givenComment("HIDDEN_BY_REPORT", ME, 1L, "VISIBLE");
+        assertCommentBlocked(409, "POST_HIDDEN");
+    }
+
+    @Test
+    @DisplayName("고치거나 지우는 사이 댓글이 숨겨졌으면 409 STATUS_CHANGED다")
+    void comment_changedMeanwhile_conflict() {
+        givenComment("VISIBLE", ME, 1L, "VISIBLE");
+        given(boardMapper.updateCommentContent(21L, "새 댓글", NOW)).willReturn(0);
+        given(boardMapper.updateCommentStatus(21L, "VISIBLE", "DELETED", NOW)).willReturn(0);
+
+        assertError(() -> service.updateComment(ME, 1L, 21L, new BoardDtos.CommentWrite("새 댓글")), 409, "STATUS_CHANGED");
+        assertError(() -> service.deleteComment(ME, 1L, 21L), 409, "STATUS_CHANGED");
     }
 
     // COMM-09 내가 쓴 댓글 한 행

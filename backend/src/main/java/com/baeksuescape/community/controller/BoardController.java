@@ -19,7 +19,7 @@ import com.baeksuescape.global.security.AuthUser;
 
 import jakarta.validation.Valid;
 
-// FP-192 N-06 신용 라운지 글·댓글 API (API 정의서 v0.2 COMM-01~06). 로그인한 사용자만 부르고, 작성자는 토큰의 USER_ID다.
+// FP-192 N-06 신용 라운지 글·댓글 API (API 정의서 v0.2 COMM-01~06·10·11). 로그인한 사용자만 부르고, 작성자는 토큰의 USER_ID다.
 @RestController
 @RequestMapping("/api/board/posts")
 public class BoardController {
@@ -30,11 +30,12 @@ public class BoardController {
         this.boardService = boardService;
     }
 
-    // COMM-01 N-06-1 글 목록 (page는 1부터, 기본 10개, keyword는 제목·내용 검색)
+    // COMM-01 N-06-1 글 목록 (page는 1부터, 기본 10개, keyword는 제목·내용 검색, filter=mine은 내 글, sort=comments는 댓글 많은 순)
     @GetMapping
     public BoardDtos.PostPage list(@AuthenticationPrincipal AuthUser user, @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size, @RequestParam(required = false) String keyword) {
-        return boardService.list(user.userId(), page, size, keyword);
+            @RequestParam(defaultValue = "10") int size, @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String filter, @RequestParam(required = false) String sort) {
+        return boardService.list(user.userId(), page, size, keyword, filter, sort);
     }
 
     // COMM-02 N-06-1 글 상세 + 댓글
@@ -75,5 +76,21 @@ public class BoardController {
     public BoardDtos.CommentCreated addComment(@AuthenticationPrincipal AuthUser user, @PathVariable long postId,
             @Valid @RequestBody BoardDtos.CommentWrite request) {
         return boardService.addComment(user.userId(), postId, request);
+    }
+
+    // COMM-10 N-06 내 댓글 수정
+    @PutMapping("/{postId}/comments/{commentId}")
+    public Map<String, Object> updateComment(@AuthenticationPrincipal AuthUser user, @PathVariable long postId,
+            @PathVariable long commentId, @Valid @RequestBody BoardDtos.CommentWrite request) {
+        boardService.updateComment(user.userId(), postId, commentId, request);
+        return Map.of();
+    }
+
+    // COMM-11 N-06 내 댓글 삭제
+    @DeleteMapping("/{postId}/comments/{commentId}")
+    public Map<String, Object> deleteComment(@AuthenticationPrincipal AuthUser user, @PathVariable long postId,
+            @PathVariable long commentId) {
+        boardService.deleteComment(user.userId(), postId, commentId);
+        return Map.of();
     }
 }
