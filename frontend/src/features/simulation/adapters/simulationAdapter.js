@@ -3,6 +3,7 @@ import { GRADE_LABELS } from '../../../common/config/grades.js'
 // N-18 서버(또는 mock) 응답을 화면 모델로 바꾸고, 입력을 검증한다. 화면 상태와 API 호출은 여기서 다루지 않는다.
 
 // N-18-2·N-18-3 입력 10개와 화면 범위. 슬라이더 범위는 11/20 범영 확정 학습 데이터 최댓값 기준이며 금액은 원 단위 0 이상이다.
+// 서버 CreditCareSimulationService의 SLIDER_MAX_VALUES·MAX_MONTHS와 상한을 같이 맞춘다.
 export const SLIDER_FIELDS = [
   { key: 'telecomOnTimeMonths', label: '통신비 정시 납부 기간', min: 0, max: 12, unit: '개월' },
   { key: 'delinquencyCount', label: '최근 1년 연체 횟수', min: 0, max: 6, unit: '회' },
@@ -38,7 +39,7 @@ export function formatSigned(value) {
   return `${value > 0 ? '+' : '−'}${Math.abs(value).toLocaleString('ko-KR')}`
 }
 
-// N-18-1 서버가 준 실제 값이 0 이상 안전한 정수인지만 본다. 슬라이더 범위 밖 값도 실제 값이므로 오류로 보지 않는다(NULL은 따로 처리).
+// N-18-1 서버가 준 현재 값이 0 이상 안전한 정수인지만 본다. 슬라이더 범위 밖 값도 현재 값이므로 오류로 보지 않는다(NULL은 따로 처리).
 const isStoredValue = (value) => Number.isSafeInteger(value) && value >= 0
 
 // 값 하나가 화면 범위 안의 0 이상 안전한 정수인지 본다. NULL(미입력)은 통과시키지 않는다.
@@ -92,6 +93,12 @@ export function adaptReductionFactors(list) {
   })
 }
 
+// N-18-8 감점 요인에 공통으로 연결할 화면과 직접 입력 안내 문구다.
+const CASH_FLOW_LINK = { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' }
+const ASSET_DEBT_LINK = { linkKey: 'ASSET_DEBT', linkText: '자산·부채 화면에서 확인해 보세요.' }
+const DIRECT_INPUT_HINT = '값을 직접 바꿔 계산해 보세요.'
+const UNEDITABLE_HINT = '시뮬레이터에서 바꿀 수 없는 항목이에요.'
+
 // N-18-8·9 감점 피처별 예시와 관련 화면을 정리한다. 목록에 없는 피처는 시뮬레이터에서 바꿀 수 없는 항목으로 안내한다.
 export const DEDUCTION_ACTIONS = {
   DQ1200001: { key: 'delinquencyCount', value: 0, text: '연체 횟수 0회' },
@@ -101,35 +108,39 @@ export const DEDUCTION_ACTIONS = {
   CF1231605: { key: 'cashAdvanceMonths', value: 0, text: '현금서비스 이용 기간 0개월' },
   utility_late_months: { key: 'utilityUnpaidMonths', value: 0, text: '공과금 미납 0개월' },
   LA0099212: { key: 'privateLenderBalance', value: 0, text: '대부업 대출 잔액 0원' },
-  income_svc_12m_krw: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
-  income_cv_svc_12m: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
-  zero_income_months_svc_12m: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
-  expense_avg_month_krw: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
-  expense_ratio_svc_12m: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
-  deficit_months_svc_12m: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
-  worst_month_net_cash_svc_12m_krw: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
-  debt_service_current_krw: { linkKey: 'ASSET_DEBT', linkText: '자산·부채 화면에서 확인해 보세요.' },
-  dsr_svc_12m: { linkKey: 'ASSET_DEBT', linkText: '자산·부채 화면에서 확인해 보세요.' },
-  L00000001: { linkKey: 'ASSET_DEBT', linkText: '자산·부채 화면에서 확인해 보세요.' },
-  LRZ021201: { linkKey: 'ASSET_DEBT', linkText: '자산·부채 화면에서 확인해 보세요.' },
-  dp_payment_count_12m: { inputKey: 'easyPayMonthlyCount', hint: '값을 직접 바꿔 계산해 보세요.' },
-  debt_balance_krw: { inputKey: 'loanBalance', hint: '값을 직접 바꿔 계산해 보세요.' },
+  income_svc_12m_krw: CASH_FLOW_LINK,
+  income_cv_svc_12m: CASH_FLOW_LINK,
+  zero_income_months_svc_12m: CASH_FLOW_LINK,
+  expense_avg_month_krw: CASH_FLOW_LINK,
+  expense_ratio_svc_12m: CASH_FLOW_LINK,
+  deficit_months_svc_12m: CASH_FLOW_LINK,
+  worst_month_net_cash_svc_12m_krw: CASH_FLOW_LINK,
+  debt_service_current_krw: ASSET_DEBT_LINK,
+  dsr_svc_12m: ASSET_DEBT_LINK,
+  L00000001: ASSET_DEBT_LINK,
+  LRZ021201: ASSET_DEBT_LINK,
+  dp_payment_count_12m: { inputKey: 'easyPayMonthlyCount', hint: DIRECT_INPUT_HINT },
+  debt_balance_krw: { inputKey: 'loanBalance', hint: DIRECT_INPUT_HINT },
 }
 
 // N-18-8·9 감점 코드에 예시, 관련 화면 또는 안내를 연결한다. 저장값이 있고 그 값보다 나아지는 예시만 제공한다.
 export function addDeductionExamples(deductions, baseline, values) {
   return deductions?.map((item) => {
     const action = Object.hasOwn(DEDUCTION_ACTIONS, item.featureCode) ? DEDUCTION_ACTIONS[item.featureCode] : null
-    if (!action) return { ...item, editable: false, hint: '시뮬레이터에서 바꿀 수 없는 항목이에요.' }
-    const inputKey = action.key ?? action.inputKey
-    if (inputKey && baseline?.[inputKey] == null) return { ...item, editable: false, hint: '값을 직접 바꿔 계산해 보세요.' }
-    if (!action.key) return { ...item, ...action, editable: false }
-    const example = action
-    const fallback = { ...item, editable: false, hint: '값을 직접 바꿔 계산해 보세요.' }
-    if (!isStoredValue(values?.[example.key])) return fallback
+    // 목록에 없는 요인은 변경할 수 없다고 안내한다.
+    if (!action) return { ...item, editable: false, hint: UNEDITABLE_HINT }
+    // 관련 화면이 있는 요인은 링크로 안내한다.
+    if (action.linkKey) return { ...item, ...action, editable: false }
+    // 직접 입력 항목은 저장값이 있을 때만 입력 키도 전달한다.
+    if (action.inputKey) return baseline?.[action.inputKey] == null
+      ? { ...item, editable: false, hint: DIRECT_INPUT_HINT }
+      : { ...item, ...action, editable: false }
+    // 예시는 저장값과 현재 입력을 확인하고 개선되는 경우에만 제공한다.
+    const fallback = { ...item, editable: false, hint: DIRECT_INPUT_HINT }
+    if (baseline?.[action.key] == null || !isStoredValue(values?.[action.key])) return fallback
 
-    const { key, text } = example
-    let target = example.value
+    const { key, text } = action
+    let target = action.value
     if (key === 'cardMonthlyUsage') {
       if (!baseline.cardLimitAmount || !isStoredValue(values.cardLimitAmount) || values.cardLimitAmount === 0) return fallback
       target = Math.floor(values.cardLimitAmount * 0.3)

@@ -45,7 +45,7 @@ export function useSimulation(userId) {
 
   const ready = loaded.userId === userId && loaded.revision === revision
   const base = ready ? loaded : { ...EMPTY, userId }
-  // 불러온 값이 바뀌면 입력 칸을 내 실제 값으로 다시 채운다(다른 회원 값이 남지 않게 key로 구분).
+  // 불러온 값이 바뀌면 입력 칸을 내 현재 값으로 다시 채운다(다른 회원 값이 남지 않게 key로 구분).
   const current = form.key === formKey && ready ? form : { key: formKey, values: base.baseline, ...IDLE_FORM }
 
   // N-18-4·N-18-5 계산 요청 하나를 보낸다. 그사이 입력이 바뀌거나 취소되면(seq 변경) 응답을 버린다.
@@ -91,7 +91,7 @@ export function useSimulation(userId) {
     runCalc({ ...current.values }, calcSeq.current)
   }
 
-  // N-18-10 바꾼 값과 결과를 지우고 내 실제 값으로 돌아간다. 진행 중인 계산을 취소한다.
+  // N-18-10 바꾼 값과 결과를 지우고 내 현재 값으로 돌아간다. 진행 중인 계산을 취소한다.
   const reset = () => {
     cancelPending()
     setForm({ key: formKey, values: base.baseline, ...IDLE_FORM })

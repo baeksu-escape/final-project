@@ -111,12 +111,12 @@ export default function SimulationPage() {
   )
 }
 
-// 슬라이더 위치: 범위 안 정수는 그대로, 범위 밖은 끝값, 비어 있거나 올바르지 않으면 0(최소값)에 둔다. 화면 위치일 뿐 실제 값은 바꾸지 않는다.
+// 슬라이더 위치: 범위 안 정수는 그대로, 범위 밖은 끝값, 비어 있거나 올바르지 않으면 0(최소값)에 둔다. 화면 위치일 뿐 현재 값은 바꾸지 않는다.
 function sliderValue(value, field) {
   return Number.isInteger(value) ? Math.min(field.max, Math.max(field.min, value)) : field.min
 }
 
-// 슬라이더 옆 값 표시: 저장값 없음, 비었거나 올바르지 않음, 범위 밖 실제 값을 구분해 0으로 보이지 않게 한다.
+// 슬라이더 옆 값 표시: 저장값 없음, 비었거나 올바르지 않음, 범위 밖 현재 값을 구분해 0으로 보이지 않게 한다.
 function sliderText(value, field, missing) {
   if (missing) return '값 없음'
   if (!Number.isInteger(value) || value < field.min) return '—'
