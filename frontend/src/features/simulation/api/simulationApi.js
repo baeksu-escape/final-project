@@ -107,7 +107,7 @@ export function getScoreBandOfferInfo(score) {
   return apiGet(`${SIMULATION_API.SCORE_BAND_OFFER}?score=${score}`)
 }
 
-// N-18-1·10 입력 10개의 내 실제 값과 출발 점수(SIM-01). [내 실제 값으로 되돌리기]도 이 값을 쓴다.
+// N-18-1·10 입력 10개의 내 현재 값과 출발 점수(SIM-01). [내 현재 값으로 되돌리기]도 이 값을 쓴다.
 // 응답: { baseRequestId, assessedAt, score, gradeBandCode, values: { TELECOM_ON_TIME_MONTHS: 8, ... }, topReductionFactors } — 값이 없으면 null.
 // topReductionFactors(N-18-8): 출발 평가의 감점 요인 최대 3개, SIM-02와 같은 모양. recoverScore는 null, 없으면 [].
 export function getCreditCareBase() {

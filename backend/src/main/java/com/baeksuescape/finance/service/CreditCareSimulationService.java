@@ -65,7 +65,7 @@ public class CreditCareSimulationService {
             "NEW_LOAN_COUNT_3M", "LOAN_BALANCE_AMT", "PRIVATE_LENDER_LOAN_BALANCE_AMT", EASYPAY, CARD_LIMIT, CARD_SPEND);
     /**
      * N-18-2 통신비 정시 납부·공과금 미납 개월 수의 상한은 12다.
-     * TODO(정의서 8-2) 통신비는 B팀 명세 예시의 18·24개월과 맞추는 중이라 12는 임시값이다(화면 mock과 같다).
+     * 통신비 정시 납부 0~12는 11/25 확정이다.
      */
     static final int MAX_MONTHS = 12;
     private static final Set<String> MONTH_KEYS = Set.of(TELECOM, UTILITY);

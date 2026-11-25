@@ -140,7 +140,7 @@ function handleCreditCareRecalculate({ body, token }) {
   }
 }
 
-// N-18-1·10 SIM-01 입력 10개의 내 실제 값 mock — 재계산 mock의 출발 값(base)과 같은 숫자를 돌려준다.
+// N-18-1·10 SIM-01 입력 10개의 내 현재 값 mock — 재계산 mock의 출발 값(base)과 같은 숫자를 돌려준다.
 // 실제 서버는 점수가 나온 최근 평가의 피처값과 그 기준월 카드 직접 입력에서 꺼낸다. 값이 없으면 null이다.
 function handleCreditCareBase({ token }) {
   requireSimulationAssessment(token)
