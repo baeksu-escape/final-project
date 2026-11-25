@@ -73,7 +73,7 @@ export default function AssetDebtPage() {
         {FIELDS.some(({ key: field }) => values[field] == null) && <p className="ad-hint" role="status">미입력: {FIELDS.filter(({ key: field }) => values[field] == null).map(({ label }) => label).join(' · ')}. 관련 값은 0원으로 대체하지 않고 계산 불가로 표시합니다.</p>}
         <p className="ad-summary-values">순자산 <strong>{formatAmount(result?.totalNetAssetAmount)}</strong> · 연 상환액 <strong>{formatAmount(result?.annualPaymentAmount)}</strong>{calculating && <span className="ad-hint" role="status"> · 계산하는 중</span>}</p>
         {invalid && <Notice type="warn">금액 형식을 확인해 주세요. 잘못된 입력으로 계산하지 않습니다.</Notice>}{calculationError && <Notice type="warn">{calculationError}</Notice>}
-        <Button onClick={() => setDraft({ key: null, values: null })}>내 데이터로 되돌리기</Button>
+        <Button onClick={() => setDraft({ key: null, values: null })}>내 현재 값으로 되돌리기</Button>
         <Notice>상환액 변화는 시연 가정입니다. 실제 신용평가·대출 심사 결과가 아닙니다.</Notice>
         {Array.isArray(result?.assumptions) && result.assumptions.length > 0 && <ul className="ad-hint">{result.assumptions.map((assumption, index) => <li key={index}>{assumption}</li>)}</ul>}
       </Card>
