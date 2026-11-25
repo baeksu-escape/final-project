@@ -2,7 +2,7 @@ import { useId, useLayoutEffect, useRef } from 'react'
 import { formatWithComma, parseDigits } from '../utils/number.js'
 import FieldError from './FieldError.jsx'
 
-// 금액 입력(원 단위) — 화면에는 천 단위 쉼표로 보이고, onChange에는 숫자(원)를, 비우면 null을 넘긴다. 숫자 외 문자는 무시한다.
+// 금액 입력(원 단위) — 화면에는 천 단위 쉼표로 보이고, onChange에는 숫자(원)를, 비우면 null을 넘긴다. 숫자 외 문자는 무시하고 15자리를 넘는 입력은 받지 않는다.
 // 사용 예: <MoneyInput label="월 소득" value={income} onChange={setIncome} error={errors.income} />
 export default function MoneyInput({ label, value, onChange, error, name, placeholder, disabled = false }) {
   const id = useId()

@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react'
 import FieldError from './FieldError.jsx'
 
-// 숫자 입력 — 입력 중 문자열을 보존하고 완성된 숫자 또는 빈 값만 전달한다. 외부 값이 바뀌면 입력 표시도 맞춘다.
+// 숫자 입력(텍스트 칸, 스핀 버튼 없음) — 숫자만 받고, '-'는 min이 음수일 때만, '.'은 step이 소수일 때만 받는다. max를 넘는 입력은 받지 않는다. onChange에는 완성된 숫자를, 비우면 null을 넘긴다.
 // 사용 예: <NumberInput label="재직 기간" unit="개월" value={months} onChange={setMonths} min={0} max={600} />
 export default function NumberInput({ label, value, onChange, min, max, step, unit, error, name, disabled = false }) {
   const id = useId()
