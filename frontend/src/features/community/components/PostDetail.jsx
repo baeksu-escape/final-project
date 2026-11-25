@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Chip, Notice } from '../../../common/components/index.js'
-import { COMMENT_MAX, formatDateTime } from '../config/communityCodes.js'
+import { COMMENT_MAX, POST_CATEGORIES, formatDateTime, labelOf } from '../config/communityCodes.js'
 import CommentItem from './CommentItem.jsx'
 
 // N-06-1·3 글 상세 — 본문, 댓글 목록과 댓글 쓰기. 내 글이면 수정(N-06-5)·삭제(N-06-6, 한 번 더 확인)를,
@@ -69,6 +69,7 @@ export default function PostDetail({ post, reportedKeys, onBack, onEdit, onDelet
             {post.title}
           </h2>
           <p className="lounge-meta">
+            <span>{labelOf(POST_CATEGORIES, post.categoryCode)}</span>
             <span>
               {post.nickname}
               {post.mine && ' · 내 글'}

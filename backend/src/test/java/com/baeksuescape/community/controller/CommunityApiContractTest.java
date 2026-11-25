@@ -110,12 +110,13 @@ class CommunityApiContractTest {
 
     @Test
     void 글_목록은_items와_쪽_정보를_준다() throws Exception {
-        given(boardService.list(7L, 2, 10, "적금", null, null)).willReturn(new BoardDtos.PostPage(
-                List.of(new BoardDtos.PostSummary(3L, null, "탈퇴한 회원", 4, AT, true, false)), 2, 10, 11));
+        given(boardService.list(7L, 2, 10, "적금", null, null, "LOAN")).willReturn(new BoardDtos.PostPage(
+                List.of(new BoardDtos.PostSummary(3L, "LOAN", null, "탈퇴한 회원", 4, AT, true, false)), 2, 10, 11));
 
-        mvc.perform(asUser(get("/api/board/posts").param("page", "2").param("keyword", "적금")))
+        mvc.perform(asUser(get("/api/board/posts").param("page", "2").param("keyword", "적금").param("category", "LOAN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].postId").value(3))
+                .andExpect(jsonPath("$.items[0].categoryCode").value("LOAN"))
                 .andExpect(jsonPath("$.items[0].title").value((Object) null))
                 .andExpect(jsonPath("$.items[0].nickname").value("탈퇴한 회원"))
                 .andExpect(jsonPath("$.items[0].commentCount").value(4))
@@ -129,15 +130,29 @@ class CommunityApiContractTest {
 
     @Test
     void 글_상세는_댓글을_함께_준다() throws Exception {
-        given(boardService.detail(7L, 3L)).willReturn(new BoardDtos.PostDetail(3L, "제목", "내용", "닉네임", AT, null, false, true,
+        given(boardService.detail(7L, 3L)).willReturn(new BoardDtos.PostDetail(3L, "CARD", "제목", "내용", "닉네임", AT, null, false, true,
                 List.of(new BoardDtos.Comment(9L, "댓글", "다른닉", AT, false, false))));
 
         mvc.perform(asUser(get("/api/board/posts/3")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categoryCode").value("CARD"))
                 .andExpect(jsonPath("$.title").value("제목"))
                 .andExpect(jsonPath("$.mine").value(true))
                 .andExpect(jsonPath("$.comments[0].commentId").value(9))
                 .andExpect(jsonPath("$.comments[0].content").value("댓글"));
+    }
+
+    @Test
+    void 글_카테고리는_정해진_값만_받는다() throws Exception {
+        given(boardService.create(eq(7L), any())).willReturn(new BoardDtos.PostCreated(12L));
+        for (String code : List.of("CREDIT_SCORE", "LOAN", "CARD", "EMPLOYEE", "SELF_EMPLOYED", "FREELANCER", "FREE")) {
+            mvc.perform(asUser(json(post("/api/board/posts"),
+                    "{\"title\":\"글\",\"content\":\"내용\",\"categoryCode\":\"" + code + "\"}"))).andExpect(status().isOk());
+        }
+        mvc.perform(asUser(json(put("/api/board/posts/12"), "{\"title\":\"글\",\"content\":\"내용\",\"categoryCode\":\"ETC\"}")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("categoryCode"));
     }
 
     @Test
@@ -186,12 +201,12 @@ class CommunityApiContractTest {
     @Test
     @DisplayName("글 목록은 filter·sort 쿼리를 서비스로 넘긴다")
     void postList_passesFilterAndSort() throws Exception {
-        given(boardService.list(7L, 1, 10, null, "mine", "comments")).willReturn(new BoardDtos.PostPage(List.of(), 1, 10, 0));
+        given(boardService.list(7L, 1, 10, null, "mine", "comments", null)).willReturn(new BoardDtos.PostPage(List.of(), 1, 10, 0));
 
         mvc.perform(asUser(get("/api/board/posts").param("filter", "mine").param("sort", "comments")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalCount").value(0));
-        verify(boardService).list(7L, 1, 10, null, "mine", "comments");
+        verify(boardService).list(7L, 1, 10, null, "mine", "comments", null);
     }
 
     // ---- COMM-10·11 내 댓글 수정·삭제 ----
@@ -239,16 +254,17 @@ class CommunityApiContractTest {
 
     @Test
     void 내가_쓴_댓글은_일반_사용자만_보고_items와_쪽_정보를_준다() throws Exception {
-        given(boardService.myComments(7L, 2, 10)).willReturn(new BoardDtos.MyCommentPage(
-                List.of(new BoardDtos.MyComment(21L, 3L, "적금 질문", null, "닉네임", AT, true)), 2, 10, 11));
+        given(boardService.myComments(7L, 2, 10, "적금", "LOAN")).willReturn(new BoardDtos.MyCommentPage(
+                List.of(new BoardDtos.MyComment(21L, 3L, "LOAN", "적금 질문", "글쓴이", null, AT, true)), 2, 10, 11));
 
-        mvc.perform(asUser(get("/api/members/me/comments").param("page", "2")))
+        mvc.perform(asUser(get("/api/members/me/comments").param("page", "2").param("keyword", "적금").param("category", "LOAN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].commentId").value(21))
                 .andExpect(jsonPath("$.items[0].postId").value(3))
+                .andExpect(jsonPath("$.items[0].categoryCode").value("LOAN"))
                 .andExpect(jsonPath("$.items[0].postTitle").value("적금 질문"))
                 .andExpect(jsonPath("$.items[0].content").value((Object) null))
-                .andExpect(jsonPath("$.items[0].nickname").value("닉네임"))
+                .andExpect(jsonPath("$.items[0].postNickname").value("글쓴이"))
                 .andExpect(jsonPath("$.items[0].createdAt").exists())
                 .andExpect(jsonPath("$.items[0].hidden").value(true))
                 .andExpect(jsonPath("$.page").value(2))

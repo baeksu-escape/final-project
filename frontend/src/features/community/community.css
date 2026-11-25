@@ -427,6 +427,74 @@
   color: var(--panel);
 }
 
+/* 카테고리 작은 버튼 — 탭보다 작고 옅게, 고른 것은 옅은 파랑 */
+.lounge-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.lounge-cats__btn {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--panel2);
+  color: var(--mut);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lounge-cats__btn:hover {
+  color: var(--fg);
+}
+
+.lounge-cats__btn[aria-pressed='true'] {
+  background: var(--sel);
+  color: var(--acc);
+}
+
+/* 목록 자리 — 글 수와 상관없이 10줄 높이를 지켜 탭·카테고리·쪽을 바꿔도 화면 크기가 그대로다 */
+.lounge-results {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 724px;
+}
+
+.lounge-results__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* 새 결과를 기다리는 동안 앞 목록을 흐리게 둔다. 빨리 오면 깜빡이지 않게 잠깐 뒤에 흐려진다. */
+.lounge-results__body[inert] {
+  opacity: 0.4;
+  transition: opacity 0.15s 0.2s;
+}
+
+.lounge-results__loading {
+  position: absolute;
+  top: 96px;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  margin: 0;
+  text-align: center;
+  animation: lounge-loading 0s 0.2s backwards;
+}
+
+@keyframes lounge-loading {
+  from {
+    visibility: hidden;
+  }
+}
+
 .lounge-feed {
   margin: 0;
   padding: 0;
@@ -444,9 +512,34 @@
   transition: background 0.15s;
 }
 
-/* 내가 쓴 댓글 줄 — 댓글 · 게시글 제목 · 닉네임 · 등록일 */
+/* 글 줄 — 카테고리 · 제목 · 회원 · 쓴 날짜 */
+.lounge-feed__row--post {
+  grid-template-columns: 84px minmax(0, 1fr) 160px 90px;
+}
+
+.lounge-feed__category {
+  color: var(--mut);
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+/* 열 제목 줄 — 위쪽 굵은 선·회색 바탕·굵은 글자로 글 줄과 구별한다 */
+.lounge-feed__head {
+  padding: 12px 8px;
+  border-top: 2px solid var(--fg);
+  border-bottom: 0;
+  background: var(--panel2);
+}
+
+.lounge-feed__head > span {
+  color: var(--fg);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+/* 내가 쓴 댓글 줄 — 카테고리 · 게시글 제목 · 댓글 · 게시글 쓴 회원 · 댓글 쓴 날짜 */
 .lounge-feed__row--comment {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 160px 90px;
+  grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1.2fr) 160px 90px;
 }
 
 .lounge-feed__row:hover {
@@ -492,7 +585,11 @@
 }
 
 .lounge-feed__row--hidden .lounge-feed__title {
+  display: block;
+  overflow: hidden;
   color: var(--mut2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: default;
 }
 
@@ -523,7 +620,6 @@
 .lounge-feed__date {
   color: var(--mut2);
   font-size: 13.5px;
-  text-align: right;
 }
 
 .lounge-empty {
@@ -538,7 +634,21 @@
   }
 
   .lounge-feed__row {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) 76px;
+  }
+
+  .lounge-feed__row--post {
+    grid-template-columns: 64px minmax(0, 1fr) 76px;
+    gap: 10px;
+  }
+
+  .lounge-feed__row--comment {
+    grid-template-columns: 64px minmax(0, 1fr) 76px;
+    gap: 10px;
+  }
+
+  .lounge-feed__row .lounge-feed__post {
+    display: none;
   }
 
   .lounge-feed__author {

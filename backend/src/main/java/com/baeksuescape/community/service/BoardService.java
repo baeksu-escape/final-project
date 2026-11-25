@@ -4,6 +4,7 @@ import static com.baeksuescape.community.service.CommunityCodes.ACTION_CREATE;
 import static com.baeksuescape.community.service.CommunityCodes.ACTION_DELETE;
 import static com.baeksuescape.community.service.CommunityCodes.ACTION_UPDATE;
 import static com.baeksuescape.community.service.CommunityCodes.ACTOR_USER;
+import static com.baeksuescape.community.service.CommunityCodes.CATEGORY_FREE;
 import static com.baeksuescape.community.service.CommunityCodes.COMMENT;
 import static com.baeksuescape.community.service.CommunityCodes.DELETED;
 import static com.baeksuescape.community.service.CommunityCodes.HIDDEN;
@@ -49,19 +50,22 @@ public class BoardService {
 
     // N-06-1 글 목록 한 쪽(최신순, 기본 10개). 검색어는 보이는 글의 제목·내용에서 찾는다.
     // filter=mine이면 내 글만, sort=comments면 전체 글에서 댓글 많은 순(같으면 최신순)으로 준다(FP-279).
-    public BoardDtos.PostPage list(long userId, int page, int size, String keyword, String filter, String sort) {
+    // category가 있으면 그 카테고리의 보이는 글만 준다.
+    public BoardDtos.PostPage list(long userId, int page, int size, String keyword, String filter, String sort, String category) {
         int safePage = Math.max(page, 1);
         int safeSize = safeSize(size);
         String likePattern = toLikePattern(keyword);
         Long ownerUserId = FILTER_MINE.equals(filter) ? userId : null;
         boolean byComments = SORT_COMMENTS.equals(sort);
-        int total = boardMapper.countPosts(likePattern, ownerUserId, byComments);
+        String categoryCode = blankToNull(category);
+        int total = boardMapper.countPosts(likePattern, ownerUserId, byComments, categoryCode);
         List<BoardDtos.PostSummary> items = boardMapper
-                .selectPosts(likePattern, ownerUserId, byComments, (safePage - 1) * safeSize, safeSize).stream()
+                .selectPosts(likePattern, ownerUserId, byComments, categoryCode, (safePage - 1) * safeSize, safeSize).stream()
                 .map(row -> {
                     boolean hidden = HIDDEN.equals(row.getStatusCode());
-                    return new BoardDtos.PostSummary(row.getPostId(), hidden ? null : row.getTitle(), row.getNickname(),
-                            row.getCommentCount(), row.getCreatedAt(), hidden, isMine(row.getUserId(), userId));
+                    return new BoardDtos.PostSummary(row.getPostId(), hidden ? null : row.getCategoryCode(),
+                            hidden ? null : row.getTitle(), row.getNickname(), row.getCommentCount(), row.getCreatedAt(), hidden,
+                            isMine(row.getUserId(), userId));
                 })
                 .toList();
         return new BoardDtos.PostPage(items, safePage, safeSize, total);
@@ -71,8 +75,8 @@ public class BoardService {
     public BoardDtos.PostDetail detail(long userId, long postId) {
         PostRow post = requireLivePost(postId);
         boolean hidden = HIDDEN.equals(post.getStatusCode());
-        return new BoardDtos.PostDetail(post.getPostId(), hidden ? null : post.getTitle(), hidden ? null : post.getContent(),
-                post.getNickname(), post.getCreatedAt(), post.getUpdatedAt(), hidden, isMine(post.getUserId(), userId),
+        return new BoardDtos.PostDetail(post.getPostId(), hidden ? null : post.getCategoryCode(),
+                hidden ? null : post.getTitle(), hidden ? null : post.getContent(), post.getNickname(), post.getCreatedAt(), post.getUpdatedAt(), hidden, isMine(post.getUserId(), userId),
                 commentViews(userId, postId));
     }
 
@@ -83,15 +87,19 @@ public class BoardService {
     }
 
     // COMM-09 내가 쓴 댓글 한 쪽(최신순, 쪽 규칙은 글 목록과 같음). 삭제 댓글·삭제된 글의 댓글은 빼고, 숨김 댓글은 내용을 비운다.
-    public BoardDtos.MyCommentPage myComments(long userId, int page, int size) {
+    // 검색어는 보이는 댓글의 내용이나 보이는 글의 제목에서 찾고, category가 있으면 그 카테고리의 보이는 글에 쓴 댓글만 준다.
+    public BoardDtos.MyCommentPage myComments(long userId, int page, int size, String keyword, String category) {
         int safePage = Math.max(page, 1);
         int safeSize = safeSize(size);
-        int total = boardMapper.countMyComments(userId);
-        List<BoardDtos.MyComment> items = boardMapper.selectMyComments(userId, (safePage - 1) * safeSize, safeSize).stream()
+        String likePattern = toLikePattern(keyword);
+        String categoryCode = blankToNull(category);
+        int total = boardMapper.countMyComments(userId, likePattern, categoryCode);
+        List<BoardDtos.MyComment> items = boardMapper
+                .selectMyComments(userId, likePattern, categoryCode, (safePage - 1) * safeSize, safeSize).stream()
                 .map(row -> {
                     boolean hidden = HIDDEN.equals(row.getStatusCode());
-                    return new BoardDtos.MyComment(row.getCommentId(), row.getPostId(), row.getPostTitle(),
-                            hidden ? null : row.getContent(), row.getNickname(), row.getCreatedAt(), hidden);
+                    return new BoardDtos.MyComment(row.getCommentId(), row.getPostId(), row.getCategoryCode(),
+                            row.getPostTitle(), row.getPostNickname(), hidden ? null : row.getContent(), row.getCreatedAt(), hidden);
                 })
                 .toList();
         return new BoardDtos.MyCommentPage(items, safePage, safeSize, total);
@@ -105,6 +113,7 @@ public class BoardService {
         row.setUserId(userId);
         row.setTitle(request.title().trim());
         row.setContent(request.content().trim());
+        row.setCategoryCode(request.categoryCode() == null ? CATEGORY_FREE : request.categoryCode());
         row.setCreatedAt(now);
         boardMapper.insertPost(row);
         boardMapper.insertPostLog(row.getPostId(), ACTION_CREATE, ACTOR_USER, userId, null, VISIBLE, null, now);
@@ -117,8 +126,9 @@ public class BoardService {
         PostRow post = requireLivePost(postId);
         requireOwner(post.getUserId(), userId, "글");
         LocalDateTime now = LocalDateTime.now(clock);
-        if (!VISIBLE.equals(post.getStatusCode())
-                || boardMapper.updatePostContent(postId, request.title().trim(), request.content().trim(), now) == 0) {
+        String categoryCode = request.categoryCode() == null ? post.getCategoryCode() : request.categoryCode();
+        if (!VISIBLE.equals(post.getStatusCode()) || boardMapper.updatePostContent(postId, categoryCode, request.title().trim(),
+                request.content().trim(), now) == 0) {
             throw new ApiException(HttpStatus.CONFLICT, "POST_HIDDEN", "신고로 숨김 처리된 글은 수정할 수 없습니다.");
         }
         boardMapper.insertPostLog(postId, ACTION_UPDATE, ACTOR_USER, userId, VISIBLE, VISIBLE, null, now);
@@ -180,6 +190,10 @@ public class BoardService {
         if (keyword == null || keyword.isBlank()) return null;
         String escaped = keyword.trim().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
         return "%" + escaped + "%";
+    }
+
+    private static String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text;
     }
 
     // 한 쪽 개수 — 1~50이 아니면 기본 10개

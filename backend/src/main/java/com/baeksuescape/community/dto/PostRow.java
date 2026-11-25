@@ -15,6 +15,7 @@ public class PostRow {
     private String title;
     private String content;
     private String statusCode;
+    private String categoryCode;
     private String nickname;
     private int commentCount;
     private LocalDateTime createdAt;

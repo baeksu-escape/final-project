@@ -12,27 +12,29 @@ export const BOARD_API = Object.freeze({
   MY_COMMENTS: '/api/members/me/comments',
 })
 
-// N-06-1 글 목록·검색 — → { items: [{ postId, title, nickname, commentCount, createdAt, hidden, mine }], page, size, totalCount }
+// N-06-1 글 목록·검색 — → { items: [{ postId, categoryCode, title, nickname, commentCount, createdAt, hidden, mine }], page, size, totalCount }
 // filter 'mine'은 내 글만, sort 'comments'는 전체 글에서 댓글 많은 순(같으면 최신순). 없으면 전체 글 최신순
-export function fetchPosts({ page = 1, keyword = '', filter = '', sort = '' } = {}) {
+// category는 글 카테고리 코드(그 카테고리의 보이는 글만)
+export function fetchPosts({ page = 1, keyword = '', filter = '', sort = '', category = '' } = {}) {
   const params = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) })
   if (keyword.trim()) params.set('keyword', keyword.trim())
   if (filter) params.set('filter', filter)
   if (sort) params.set('sort', sort)
+  if (category) params.set('category', category)
   return apiGet(`${BOARD_API.POSTS}?${params}`)
 }
 
-// N-06-1 글 상세 + 댓글 — → { postId, title, content, nickname, createdAt, updatedAt, hidden, mine, comments: [...] }
+// N-06-1 글 상세 + 댓글 — → { postId, categoryCode, title, content, nickname, createdAt, updatedAt, hidden, mine, comments: [...] }
 export function fetchPost(postId) {
   return apiGet(BOARD_API.post(postId))
 }
 
-// N-06-2 글쓰기 — { title, content } → { postId }
+// N-06-2 글쓰기 — { title, content, categoryCode } → { postId }
 export function createPost(payload) {
   return apiPost(BOARD_API.POSTS, payload)
 }
 
-// N-06-5 내 글 수정 — { title, content } → {}
+// N-06-5 내 글 수정 — { title, content, categoryCode } → {}
 export function updatePost(postId, payload) {
   return apiPut(BOARD_API.post(postId), payload)
 }
@@ -57,8 +59,11 @@ export function deleteComment(postId, commentId) {
   return apiDelete(BOARD_API.comment(postId, commentId))
 }
 
-// N-06 COMM-09 내가 쓴 댓글 — → { items: [{ commentId, postId, postTitle, content, nickname, createdAt, hidden }], page, size, totalCount }
-// 최신순. 숨김 댓글은 content가, 숨김 글의 댓글은 postTitle이 null이다.
-export function fetchMyComments({ page = 1 } = {}) {
-  return apiGet(`${BOARD_API.MY_COMMENTS}?${new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) })}`)
+// N-06 COMM-09 내가 쓴 댓글 — → { items: [{ commentId, postId, categoryCode, postTitle, postNickname, content, createdAt, hidden }], page, size, totalCount }
+// 최신순. 숨김 댓글은 content가, 숨김 글의 댓글은 categoryCode·postTitle·postNickname이 null이다. keyword는 댓글 내용·게시글 제목에서 찾고, category는 글 카테고리다.
+export function fetchMyComments({ page = 1, keyword = '', category = '' } = {}) {
+  const params = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) })
+  if (keyword.trim()) params.set('keyword', keyword.trim())
+  if (category) params.set('category', category)
+  return apiGet(`${BOARD_API.MY_COMMENTS}?${params}`)
 }

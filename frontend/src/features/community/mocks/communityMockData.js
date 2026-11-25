@@ -32,6 +32,12 @@ export const nicknameOf = (loginId) => NICK[loginId] ?? loginId
 // 날짜 '2026-10-29 10:12' → 서버 LocalDateTime 모양 '2026-10-29T10:12:00'
 const at = (text) => `${text.replace(' ', 'T')}:00`
 
+// 예시 글의 카테고리 (없는 번호는 자유)
+const CATEGORY_BY_POST = {
+  6: 'CREDIT_SCORE', 5: 'LOAN', 4: 'FREELANCER', 3: 'LOAN', 2: 'SELF_EMPLOYED', 1: 'CREDIT_SCORE',
+  21: 'CARD', 22: 'EMPLOYEE', 23: 'SELF_EMPLOYED', 24: 'FREELANCER', 25: 'CREDIT_SCORE', 26: 'CARD', 28: 'CREDIT_SCORE', 31: 'CARD', 32: 'LOAN',
+}
+
 // status: VISIBLE | HIDDEN_BY_REPORT | DELETED (DDL BOARD_POST.STATUS_CODE)
 export const mockPosts = [
   { postId: 8, authorId: 'op_jin33', title: '여기 가입만 하면 누구나 점수 50점 오릅니다', content: '여기 가입만 하면 누구나 점수가 50점 이상 올라갑니다.\n저는 하루 만에 올랐어요. 지금 바로 가입하세요.', createdAt: at('2026-11-02 08:15'), status: 'VISIBLE' },
@@ -57,7 +63,7 @@ export const mockPosts = [
     ['마이너스통장 잔액도 대출로 잡히나요?', 'ki_minsu', '2026-10-12 16:15'],
     ['가입 첫 주 후기', 'le_sujin', '2026-10-11 11:30'],
   ].map(([title, authorId, time], index) => ({ postId: 21 + index, authorId, title, content: `${title}\n\n(시연용 예시 글입니다.)`, createdAt: at(time), status: 'VISIBLE' })),
-].map((post) => ({ ...post, updatedAt: null }))
+].map((post) => ({ ...post, categoryCode: CATEGORY_BY_POST[post.postId] ?? 'FREE', updatedAt: null }))
 
 export const mockComments = [
   { commentId: 601, postId: 6, authorId: 'ju_ara', content: '저도 자동이체 걸어 두니 마음이 편하더라고요.', createdAt: at('2026-10-29 11:02'), status: 'VISIBLE' },

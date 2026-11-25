@@ -61,6 +61,7 @@ class BoardServiceTest {
         row.setTitle("제목" + postId);
         row.setContent("내용" + postId);
         row.setStatusCode(status);
+        row.setCategoryCode("LOAN");
         row.setNickname("닉네임");
         row.setCreatedAt(NOW);
         return row;
@@ -75,18 +76,20 @@ class BoardServiceTest {
 
     @Test
     void 목록은_10개씩_나누고_숨김_글은_제목을_비운다() {
-        given(boardMapper.countPosts(null, null, false)).willReturn(12);
-        given(boardMapper.selectPosts(null, null, false, 10, 10))
+        given(boardMapper.countPosts(null, null, false, null)).willReturn(12);
+        given(boardMapper.selectPosts(null, null, false, null, 10, 10))
                 .willReturn(List.of(post(2, ME, "VISIBLE"), post(1, OTHER, "HIDDEN_BY_REPORT")));
 
-        BoardDtos.PostPage page = service.list(ME, 2, 0, "  ", null, null);
+        BoardDtos.PostPage page = service.list(ME, 2, 0, "  ", null, null, null);
 
         assertThat(page.page()).isEqualTo(2);
         assertThat(page.size()).isEqualTo(10);
         assertThat(page.totalCount()).isEqualTo(12);
         assertThat(page.items().get(0).title()).isEqualTo("제목2");
         assertThat(page.items().get(0).mine()).isTrue();
+        assertThat(page.items().get(0).categoryCode()).isEqualTo("LOAN");
         assertThat(page.items().get(1).title()).isNull();
+        assertThat(page.items().get(1).categoryCode()).isNull();
         assertThat(page.items().get(1).hidden()).isTrue();
         assertThat(page.items().get(1).mine()).isFalse();
     }
@@ -119,6 +122,7 @@ class BoardServiceTest {
 
         assertThat(detail.hidden()).isTrue();
         assertThat(detail.title()).isNull();
+        assertThat(detail.categoryCode()).isNull();
         assertThat(detail.content()).isNull();
         assertThat(detail.comments().get(0).content()).isNull();
         assertThat(detail.comments().get(0).mine()).isTrue();
@@ -131,28 +135,67 @@ class BoardServiceTest {
             return 1;
         }).given(boardMapper).insertPost(any());
 
-        BoardDtos.PostCreated created = service.create(ME, new BoardDtos.PostWrite("  첫 글  ", "\n 안녕하세요 \n"));
+        BoardDtos.PostCreated created = service.create(ME, new BoardDtos.PostWrite("  첫 글  ", "\n 안녕하세요 \n", "LOAN"));
 
         assertThat(created.postId()).isEqualTo(11L);
         // 제목·댓글처럼 본문도 앞뒤 공백을 지우고 저장한다
-        verify(boardMapper).insertPost(argThat(row -> "첫 글".equals(row.getTitle()) && "안녕하세요".equals(row.getContent())));
+        verify(boardMapper).insertPost(argThat(row -> "첫 글".equals(row.getTitle()) && "안녕하세요".equals(row.getContent())
+                && "LOAN".equals(row.getCategoryCode())));
         verify(boardMapper).insertPostLog(11L, "CREATE", "USER", ME, null, "VISIBLE", null, NOW);
+    }
+
+    @Test
+    void 카테고리를_고르지_않으면_작성은_자유로_수정은_기존_값으로_둔다() {
+        given(boardMapper.selectPost(1L)).willReturn(post(1, ME, "VISIBLE"));
+        given(boardMapper.updatePostContent(1L, "LOAN", "t", "c", NOW)).willReturn(1);
+        willAnswer(invocation -> {
+            invocation.<PostRow>getArgument(0).setPostId(11L);
+            return 1;
+        }).given(boardMapper).insertPost(any());
+
+        service.create(ME, new BoardDtos.PostWrite("t", "c", null));
+        service.update(ME, 1L, new BoardDtos.PostWrite("t", "c", null));
+
+        verify(boardMapper).insertPost(argThat(row -> "FREE".equals(row.getCategoryCode())));
+        verify(boardMapper).updatePostContent(1L, "LOAN", "t", "c", NOW);
+    }
+
+    @Test
+    void 카테고리를_고르면_목록과_개수를_같은_조건으로_읽는다() {
+        given(boardMapper.countPosts("%적금%", null, false, "LOAN")).willReturn(1);
+        given(boardMapper.selectPosts("%적금%", null, false, "LOAN", 0, 10)).willReturn(List.of(post(1, OTHER, "VISIBLE")));
+
+        BoardDtos.PostPage page = service.list(ME, 1, 10, "적금", null, null, "LOAN");
+
+        assertThat(page.totalCount()).isEqualTo(1);
+        assertThat(page.items()).hasSize(1);
+    }
+
+    @Test
+    void 내가_쓴_댓글은_검색어와_카테고리를_목록과_개수에_함께_쓴다() {
+        given(boardMapper.countMyComments(ME, "%10\\%%", "LOAN")).willReturn(1);
+        given(boardMapper.selectMyComments(ME, "%10\\%%", "LOAN", 0, 10)).willReturn(List.of(myComment(1, "VISIBLE", "제목3")));
+
+        BoardDtos.MyCommentPage page = service.myComments(ME, 1, 10, " 10% ", "LOAN");
+
+        assertThat(page.totalCount()).isEqualTo(1);
+        assertThat(page.items()).hasSize(1);
     }
 
     @Test
     void 남의_글은_수정하거나_삭제할_수_없다() {
         given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "VISIBLE"));
-        assertError(() -> service.update(ME, 1L, new BoardDtos.PostWrite("t", "c")), 403, "NOT_OWNER");
+        assertError(() -> service.update(ME, 1L, new BoardDtos.PostWrite("t", "c", null)), 403, "NOT_OWNER");
         assertError(() -> service.delete(ME, 1L), 403, "NOT_OWNER");
-        verify(boardMapper, never()).updatePostContent(anyLong(), anyString(), anyString(), any());
+        verify(boardMapper, never()).updatePostContent(anyLong(), any(), anyString(), anyString(), any());
     }
 
     @Test
     void 내_글을_수정하면_UPDATE_기록을_남긴다() {
         given(boardMapper.selectPost(1L)).willReturn(post(1, ME, "VISIBLE"));
-        given(boardMapper.updatePostContent(1L, "새 제목", "새 내용", NOW)).willReturn(1);
+        given(boardMapper.updatePostContent(1L, "CARD", "새 제목", "새 내용", NOW)).willReturn(1);
 
-        service.update(ME, 1L, new BoardDtos.PostWrite(" 새 제목 ", "새 내용"));
+        service.update(ME, 1L, new BoardDtos.PostWrite(" 새 제목 ", "새 내용", "CARD"));
 
         verify(boardMapper).insertPostLog(1L, "UPDATE", "USER", ME, "VISIBLE", "VISIBLE", null, NOW);
     }
@@ -160,8 +203,8 @@ class BoardServiceTest {
     @Test
     void 신고로_숨겨진_글은_수정할_수_없다() {
         given(boardMapper.selectPost(1L)).willReturn(post(1, ME, "HIDDEN_BY_REPORT"));
-        assertError(() -> service.update(ME, 1L, new BoardDtos.PostWrite("t", "c")), 409, "POST_HIDDEN");
-        verify(boardMapper, never()).updatePostContent(anyLong(), anyString(), anyString(), any());
+        assertError(() -> service.update(ME, 1L, new BoardDtos.PostWrite("t", "c", null)), 409, "POST_HIDDEN");
+        verify(boardMapper, never()).updatePostContent(anyLong(), any(), anyString(), anyString(), any());
     }
 
     @Test
@@ -220,13 +263,13 @@ class BoardServiceTest {
     @Test
     @DisplayName("filter=mine은 내 글만, sort=comments는 댓글 많은 순으로 읽고 개수도 같은 조건으로 센다")
     void list_filterAndSort() {
-        given(boardMapper.countPosts(null, ME, false)).willReturn(3);
-        given(boardMapper.selectPosts(null, ME, false, 0, 10)).willReturn(List.of(post(1, ME, "VISIBLE")));
-        given(boardMapper.countPosts("%적금%", null, true)).willReturn(5);
-        given(boardMapper.selectPosts("%적금%", null, true, 0, 10)).willReturn(List.of(post(2, OTHER, "VISIBLE")));
+        given(boardMapper.countPosts(null, ME, false, null)).willReturn(3);
+        given(boardMapper.selectPosts(null, ME, false, null, 0, 10)).willReturn(List.of(post(1, ME, "VISIBLE")));
+        given(boardMapper.countPosts("%적금%", null, true, null)).willReturn(5);
+        given(boardMapper.selectPosts("%적금%", null, true, null, 0, 10)).willReturn(List.of(post(2, OTHER, "VISIBLE")));
 
-        BoardDtos.PostPage mine = service.list(ME, 1, 10, null, "mine", null);
-        BoardDtos.PostPage popular = service.list(ME, 1, 10, "적금", null, "comments");
+        BoardDtos.PostPage mine = service.list(ME, 1, 10, null, "mine", null, null);
+        BoardDtos.PostPage popular = service.list(ME, 1, 10, "적금", null, "comments", null);
 
         assertThat(mine.totalCount()).isEqualTo(3);
         assertThat(mine.items().get(0).mine()).isTrue();
@@ -237,10 +280,10 @@ class BoardServiceTest {
     @Test
     @DisplayName("정해진 값이 아닌 filter·sort는 무시하고 전체 글을 최신순으로 읽는다")
     void list_unknownFilterAndSort_ignored() {
-        given(boardMapper.countPosts(null, null, false)).willReturn(1);
-        given(boardMapper.selectPosts(null, null, false, 0, 10)).willReturn(List.of(post(1, OTHER, "VISIBLE")));
+        given(boardMapper.countPosts(null, null, false, null)).willReturn(1);
+        given(boardMapper.selectPosts(null, null, false, null, 0, 10)).willReturn(List.of(post(1, OTHER, "VISIBLE")));
 
-        assertThat(service.list(ME, 1, 10, null, "other", "views").items()).hasSize(1);
+        assertThat(service.list(ME, 1, 10, null, "other", "views", " ").items()).hasSize(1);
     }
 
     // 1번 글(postStatus)과 21번 댓글을 준비한다.
@@ -356,29 +399,31 @@ class BoardServiceTest {
         row.setNickname("닉네임");
         row.setCreatedAt(NOW);
         row.setPostTitle(postTitle);
+        row.setPostNickname("글쓴이");
+        row.setCategoryCode("LOAN");
         return row;
     }
 
     @Test
     void 내가_쓴_댓글은_쪽을_나누고_숨김_댓글은_내용을_비운다() {
-        given(boardMapper.countMyComments(ME)).willReturn(12);
-        given(boardMapper.selectMyComments(ME, 10, 10))
+        given(boardMapper.countMyComments(ME, null, null)).willReturn(12);
+        given(boardMapper.selectMyComments(ME, null, null, 10, 10))
                 .willReturn(List.of(myComment(2, "VISIBLE", null), myComment(1, "HIDDEN_BY_REPORT", "제목3")));
 
-        BoardDtos.MyCommentPage page = service.myComments(ME, 2, 10);
+        BoardDtos.MyCommentPage page = service.myComments(ME, 2, 10, null, null);
 
         assertThat(page.page()).isEqualTo(2);
         assertThat(page.size()).isEqualTo(10);
         assertThat(page.totalCount()).isEqualTo(12);
-        assertThat(page.items().get(0)).isEqualTo(new BoardDtos.MyComment(2L, 3L, null, "댓글2", "닉네임", NOW, false));
-        assertThat(page.items().get(1)).isEqualTo(new BoardDtos.MyComment(1L, 3L, "제목3", null, "닉네임", NOW, true));
+        assertThat(page.items().get(0)).isEqualTo(new BoardDtos.MyComment(2L, 3L, "LOAN", null, "글쓴이", "댓글2", NOW, false));
+        assertThat(page.items().get(1)).isEqualTo(new BoardDtos.MyComment(1L, 3L, "LOAN", "제목3", "글쓴이", null, NOW, true));
     }
 
     @Test
     void 내가_쓴_댓글은_쪽_값이_이상하면_첫_쪽_10개로_본다() {
-        given(boardMapper.selectMyComments(ME, 0, 10)).willReturn(List.of(myComment(1, "VISIBLE", "제목3")));
+        given(boardMapper.selectMyComments(ME, null, null, 0, 10)).willReturn(List.of(myComment(1, "VISIBLE", "제목3")));
 
-        BoardDtos.MyCommentPage page = service.myComments(ME, 0, 51);
+        BoardDtos.MyCommentPage page = service.myComments(ME, 0, 51, " ", " ");
 
         assertThat(page.page()).isEqualTo(1);
         assertThat(page.size()).isEqualTo(10);

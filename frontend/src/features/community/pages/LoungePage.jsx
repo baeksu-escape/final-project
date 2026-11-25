@@ -8,7 +8,7 @@ import PostDetail from '../components/PostDetail.jsx'
 import PostForm from '../components/PostForm.jsx'
 import PostTable from '../components/PostTable.jsx'
 import ReportModal from '../components/ReportModal.jsx'
-import { PAGE_SIZE } from '../config/communityCodes.js'
+import { PAGE_SIZE, POST_CATEGORIES } from '../config/communityCodes.js'
 import '../community.css'
 
 // 목록 위 보기 탭 — query를 서버에 보내 전체 글에서 고른다(COMM-01, FP-279). title은 목록 제목
@@ -49,8 +49,10 @@ export default function LoungePage() {
   const [page, setPage] = useState(1)
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
-  // tab: 어느 탭으로 읽은 목록인지(탭을 바꾼 직후 앞 탭의 글이 잠깐 보이지 않게)
-  const [list, setList] = useState({ tab: 'all', data: null, error: '' })
+  // 글 카테고리 필터(탭 4개가 함께 쓴다). ''이면 전체
+  const [category, setCategory] = useState('')
+  // key: 어떤 조건(탭·쪽·검색어·카테고리)으로 읽은 목록인지 — 지금 조건과 다르면 흐리게(누를 수 없게) 두고 '불러오는 중'을 보여 준다
+  const [list, setList] = useState({ key: null, data: null, error: '' })
   const [detail, setDetail] = useState({ postId: null, post: null, error: '' })
   // 저장·삭제 뒤에 목록·상세를 다시 불러오려고 1씩 올린다
   const [listVersion, setListVersion] = useState(0)
@@ -61,40 +63,42 @@ export default function LoungePage() {
   const [toast, setToast] = useState('')
   const [feedTab, setFeedTab] = useState('all')
   const [commentPage, setCommentPage] = useState(1)
-  const [myComments, setMyComments] = useState({ data: null, error: '' })
+  const [myComments, setMyComments] = useState({ key: null, data: null, error: '' })
 
   const commentsOpen = feedTab === COMMENTS_TAB
-  // 목록 — 탭·쪽·검색어가 바뀌거나 저장·삭제 뒤에 다시 읽는다. 지워서 마지막 쪽이 비었으면 앞쪽으로 옮긴다.
+  const listKey = JSON.stringify([feedTab, page, keyword, category])
+  const commentKey = JSON.stringify([commentPage, keyword, category])
+  // 목록 — 탭·쪽·검색어·카테고리가 바뀌거나 저장·삭제 뒤에 다시 읽는다. 지워서 마지막 쪽이 비었으면 앞쪽으로 옮긴다.
   useEffect(() => {
     if (feedTab === COMMENTS_TAB) return undefined
     let alive = true
-    fetchPosts({ page, keyword, ...tabOf(feedTab).query })
+    fetchPosts({ page, keyword, category, ...tabOf(feedTab).query })
       .then((data) => {
         if (!alive) return
         if (data.items.length === 0 && page > 1) setPage(page - 1)
-        else setList({ tab: feedTab, data, error: '' })
+        else setList({ key: listKey, data, error: '' })
       })
-      .catch((err) => alive && setList({ tab: feedTab, data: null, error: err.message }))
+      .catch((err) => alive && setList({ key: listKey, data: null, error: err.message }))
     return () => {
       alive = false
     }
-  }, [feedTab, page, keyword, listVersion])
+  }, [feedTab, page, keyword, category, listKey, listVersion])
 
-  // 내가 쓴 댓글 — 탭을 열거나 쪽이 바뀌거나 댓글을 쓰고 고치고 지운 뒤에 다시 읽는다
+  // 내가 쓴 댓글 — 탭을 열거나 쪽·검색어·카테고리가 바뀌거나 댓글을 쓰고 고치고 지운 뒤에 다시 읽는다
   useEffect(() => {
     if (!commentsOpen) return undefined
     let alive = true
-    fetchMyComments({ page: commentPage })
+    fetchMyComments({ page: commentPage, keyword, category })
       .then((data) => {
         if (!alive) return
         if (data.items.length === 0 && commentPage > 1) setCommentPage(commentPage - 1)
-        else setMyComments({ data, error: '' })
+        else setMyComments({ key: commentKey, data, error: '' })
       })
-      .catch((err) => alive && setMyComments({ data: null, error: err.message }))
+      .catch((err) => alive && setMyComments({ key: commentKey, data: null, error: err.message }))
     return () => {
       alive = false
     }
-  }, [commentsOpen, commentPage, listVersion])
+  }, [commentsOpen, commentPage, keyword, category, commentKey, listVersion])
 
   // 상세 — 고른 글이 바뀌거나 댓글·신고 뒤에 다시 읽는다
   const postId = view.postId
@@ -132,7 +136,15 @@ export default function LoungePage() {
   const handleSearch = (event) => {
     event.preventDefault()
     setPage(1)
+    setCommentPage(1)
     setKeyword(keywordInput.trim())
+  }
+
+  // 카테고리를 고르면 바로 첫 쪽부터 다시 읽는다
+  const handleCategory = (code) => {
+    setPage(1)
+    setCommentPage(1)
+    setCategory(code)
   }
 
   // N-06-2 글쓰기 → 쓴 글 상세로 (글쓰기 기록을 덮어써 뒤로가기로 빈 글쓰기 화면에 돌아가지 않는다)
@@ -226,33 +238,32 @@ export default function LoungePage() {
       <p className="hint">불러오는 중…</p>
     )
   } else {
-    const posts = list.tab === feedTab ? list : { data: null, error: '' }
-    const { data, error } = commentsOpen ? myComments : posts
+    // 지금 조건으로 읽은 결과가 아니면(ready가 거짓) 앞 목록을 흐리게 두고 누를 수 없게 한다 — 목록이 사라졌다 나오면 화면이 끊겨 보인다
+    const loaded = commentsOpen ? myComments : list
+    const ready = loaded.key === (commentsOpen ? commentKey : listKey)
+    const { data, error } = loaded
     const totalPages = data ? Math.max(1, Math.ceil(data.totalCount / PAGE_SIZE)) : 1
     body = (
       <section className="card lounge-list" aria-labelledby="lounge-list-title">
         <div className="lounge-list__head">
           <h2 id="lounge-list-title" className="card__title">
-            {tabOf(feedTab).title} {data && <span className="lounge-count">{data.totalCount}건</span>}
+            {tabOf(feedTab).title} {ready && data && <span className="lounge-count">{data.totalCount}건</span>}
           </h2>
-          {/* 검색은 글만 찾으므로 내가 쓴 댓글 탭에서는 숨긴다 */}
-          {!commentsOpen && (
-            <form className="lounge-search" onSubmit={handleSearch} role="search">
-              <label htmlFor="lounge-search-input" className="sr-only">
-                제목·내용 검색
-              </label>
-              <input
-                id="lounge-search-input"
-                className="text-input__control"
-                value={keywordInput}
-                onChange={(event) => setKeywordInput(event.target.value)}
-                placeholder="제목·내용 검색 (예: DSR)"
-              />
-              <Button type="submit" size="sm">
-                검색
-              </Button>
-            </form>
-          )}
+          <form className="lounge-search" onSubmit={handleSearch} role="search">
+            <label htmlFor="lounge-search-input" className="sr-only">
+              {commentsOpen ? '댓글·게시글 제목 검색' : '제목·내용 검색'}
+            </label>
+            <input
+              id="lounge-search-input"
+              className="text-input__control"
+              value={keywordInput}
+              onChange={(event) => setKeywordInput(event.target.value)}
+              placeholder={commentsOpen ? '댓글·게시글 제목 검색' : '제목·내용 검색 (예: DSR)'}
+            />
+            <Button type="submit" size="sm">
+              검색
+            </Button>
+          </form>
         </div>
         <div className="lounge-tabs" role="tablist" aria-label="글 보기">
           {LIST_TABS.map((tab) => (
@@ -261,18 +272,32 @@ export default function LoungePage() {
             </button>
           ))}
         </div>
-        {error && <Notice type="warn">{error}</Notice>}
-        {!data && !error && <p className="hint">불러오는 중…</p>}
-        {data && (
-          <>
-            {commentsOpen ? (
-              <MyCommentTable items={data.items} onOpen={openPost} />
-            ) : (
-              <PostTable items={data.items} startNo={data.totalCount - (data.page - 1) * PAGE_SIZE} onOpen={openPost} />
-            )}
-            <Pager page={data.page} totalPages={totalPages} onChange={commentsOpen ? setCommentPage : setPage} />
-          </>
-        )}
+        {/* 카테고리 작은 버튼 — 고른 것은 aria-pressed로 표시한다 */}
+        <div className="lounge-cats" role="group" aria-label="카테고리">
+          {[{ value: '', label: '전체' }, ...POST_CATEGORIES].map((item) => (
+            <button key={item.value} type="button" aria-pressed={category === item.value} className="lounge-cats__btn" onClick={() => handleCategory(item.value)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="lounge-results" aria-busy={!ready}>
+          {!ready && (
+            <p className="hint lounge-results__loading" role="status">
+              불러오는 중…
+            </p>
+          )}
+          {ready && error && <Notice type="warn">{error}</Notice>}
+          {data && (
+            <div className="lounge-results__body" inert={!ready}>
+              {commentsOpen ? (
+                <MyCommentTable items={data.items} searched={Boolean(keyword || category)} onOpen={openPost} />
+              ) : (
+                <PostTable items={data.items} startNo={data.totalCount - (data.page - 1) * PAGE_SIZE} onOpen={openPost} />
+              )}
+              <Pager page={data.page} totalPages={totalPages} onChange={commentsOpen ? setCommentPage : setPage} />
+            </div>
+          )}
+        </div>
       </section>
     )
   }

@@ -2,7 +2,7 @@ import { ApiError } from '../../../common/api/ApiError.js'
 import { ROLES } from '../../../common/config/roles.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { requireAccountByToken } from '../../auth/mocks/authMockHandlers.js'
-import { AUTO_HIDE_KEY, COMMENT_MAX, CONTENT_MAX, DETAIL_MAX, REPORT_REASONS, TITLE_MAX } from '../config/communityCodes.js'
+import { AUTO_HIDE_KEY, COMMENT_MAX, CONTENT_MAX, DEFAULT_CATEGORY, DETAIL_MAX, POST_CATEGORIES, REPORT_REASONS, TITLE_MAX } from '../config/communityCodes.js'
 import { mockComments, mockPosts, mockReports, mockSeq, mockSettings, nicknameOf } from './communityMockData.js'
 
 // N-06·N-33·N-34 신용 라운지 mock — 1단계 서버(BoardService·ReportService·AdminReportService)와 같은 규칙·응답 모양으로 흉내 낸다.
@@ -60,14 +60,17 @@ function checkCommentWrite(body) {
   if (content.length > COMMENT_MAX) invalid('content', `댓글은 ${COMMENT_MAX}자까지 쓸 수 있습니다.`)
   return content
 }
-function checkPostWrite(body) {
+// 글 입력 검사. 카테고리가 없으면 savedCategory(작성은 자유, 수정은 기존 값)로 둔다.
+function checkPostWrite(body, savedCategory = DEFAULT_CATEGORY) {
+  const categoryCode = body?.categoryCode ?? savedCategory
+  if (!POST_CATEGORIES.some((item) => item.value === categoryCode)) invalid('categoryCode', '카테고리 값이 올바르지 않습니다.')
   const title = String(body?.title ?? '').trim()
   const content = String(body?.content ?? '').trim()
   if (!title) invalid('title', '제목을 입력해 주세요.')
   if (title.length > TITLE_MAX) invalid('title', `제목은 ${TITLE_MAX}자까지 쓸 수 있습니다.`)
   if (!content) invalid('content', '내용을 입력해 주세요.')
   if (content.length > CONTENT_MAX) invalid('content', `내용은 ${CONTENT_MAX}자까지 쓸 수 있습니다.`)
-  return { title, content }
+  return { title, content, categoryCode }
 }
 
 // 댓글 한 개 응답. 숨김 댓글은 내용을 비운다. 삭제 댓글은 목록에서 뺀다.
@@ -100,6 +103,7 @@ function registerPostRoutes(postId) {
       const hidden = post.status === HIDDEN
       return {
         postId,
+        categoryCode: hidden ? null : post.categoryCode,
         title: hidden ? null : post.title,
         content: hidden ? null : post.content,
         nickname: nicknameOf(post.authorId),
@@ -116,7 +120,7 @@ function registerPostRoutes(postId) {
       const post = findPost(postId)
       requireOwner(post, loginId)
       if (post.status !== VISIBLE) fail(409, 'POST_HIDDEN', '신고로 숨김 처리된 글은 수정할 수 없습니다.')
-      Object.assign(post, checkPostWrite(body), { updatedAt: nowText() })
+      Object.assign(post, checkPostWrite(body, post.categoryCode), { updatedAt: nowText() })
       return {}
     },
     // N-06-6 내 글 삭제 — 숨김 글은 지울 수 없다
@@ -270,7 +274,7 @@ function registerReportRoutes(reportId) {
 }
 
 registerMockHandlers({
-  // N-06-1 글 목록 — 삭제 글은 빼고, 검색은 보이는 글에서만. 최신순. filter=mine은 내 글, sort=comments는 댓글 많은 순(같으면 최신순).
+  // N-06-1 글 목록 — 삭제 글은 빼고, 검색은 보이는 글에서만. 최신순. filter=mine은 내 글, sort=comments는 댓글 많은 순(같으면 최신순), category는 그 카테고리의 보이는 글.
   'GET /api/board/posts': ({ token, query }) => {
     const { loginId } = currentUser(token)
     const page = Math.max(1, Number(query.get('page')) || 1)
@@ -278,10 +282,12 @@ registerMockHandlers({
     const keyword = (query.get('keyword') ?? '').trim()
     const mineOnly = query.get('filter') === 'mine'
     const byComments = query.get('sort') === 'comments'
+    const category = (query.get('category') ?? '').trim()
     const commentCountOf = (post) => mockComments.filter((c) => c.postId === post.postId && c.status !== DELETED).length
     const rows = mockPosts
       .filter((post) => post.status !== DELETED)
       .filter((post) => !keyword || (post.status === VISIBLE && (post.title + post.content).includes(keyword)))
+      .filter((post) => !category || (post.status === VISIBLE && post.categoryCode === category))
       .filter((post) => !mineOnly || post.authorId === loginId)
       .filter((post) => !byComments || (post.status === VISIBLE && commentCountOf(post) > 0))
       .sort((a, b) => (byComments ? commentCountOf(b) - commentCountOf(a) : 0) || b.createdAt.localeCompare(a.createdAt) || b.postId - a.postId)
@@ -289,6 +295,7 @@ registerMockHandlers({
       const hidden = post.status === HIDDEN
       return {
         postId: post.postId,
+        categoryCode: hidden ? null : post.categoryCode,
         title: hidden ? null : post.title,
         nickname: nicknameOf(post.authorId),
         commentCount: commentCountOf(post),
@@ -309,20 +316,29 @@ registerMockHandlers({
     return { postId }
   },
 
-  // COMM-09 내가 쓴 댓글 — 삭제 댓글·삭제된 글의 댓글은 빼고 최신순. 관리자는 403(/api/members/me/** = ROLE_USER)
+  // COMM-09 내가 쓴 댓글 — 삭제 댓글·삭제된 글의 댓글은 빼고 최신순, 검색은 보이는 댓글 내용이나 보이는 글 제목에서만. 관리자는 403(/api/members/me/** = ROLE_USER)
   'GET /api/members/me/comments': ({ token, query }) => {
     const { loginId, isAdmin } = currentUser(token)
     if (isAdmin) fail(403, 'FORBIDDEN', '권한이 없습니다.')
     const page = Math.max(1, Number(query.get('page')) || 1)
     const size = Math.min(50, Math.max(1, Number(query.get('size')) || 10))
+    const keyword = (query.get('keyword') ?? '').trim()
+    const category = (query.get('category') ?? '').trim()
     const postOf = (comment) => mockPosts.find((post) => post.postId === comment.postId)
     const rows = mockComments
       .filter((comment) => comment.authorId === loginId && comment.status !== DELETED && postOf(comment).status !== DELETED)
+      .filter((comment) => {
+        const post = postOf(comment)
+        return !keyword || (comment.status === VISIBLE && comment.content.includes(keyword)) || (post.status === VISIBLE && post.title.includes(keyword))
+      })
+      .filter((comment) => !category || (postOf(comment).status === VISIBLE && postOf(comment).categoryCode === category))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.commentId - a.commentId)
     const items = rows.slice((page - 1) * size, page * size).map((comment) => {
-      const { commentId, content, nickname, createdAt, hidden } = commentView(comment, loginId)
+      const { commentId, content, createdAt, hidden } = commentView(comment, loginId)
       const post = postOf(comment)
-      return { commentId, postId: post.postId, postTitle: post.status === HIDDEN ? null : post.title, content, nickname, createdAt, hidden }
+      const postHidden = post.status === HIDDEN
+      const shown = postHidden ? { categoryCode: null, postTitle: null, postNickname: null } : { categoryCode: post.categoryCode, postTitle: post.title, postNickname: nicknameOf(post.authorId) }
+      return { commentId, postId: post.postId, ...shown, content, createdAt, hidden }
     })
     return { items, page, size, totalCount: rows.length }
   },

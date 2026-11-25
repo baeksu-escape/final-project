@@ -21,10 +21,11 @@ public class MyCommentController {
         this.boardService = boardService;
     }
 
-    // COMM-09 내가 쓴 댓글 목록 (page는 1부터, 기본 10개). 회원은 토큰에서만 꺼낸다.
+    // COMM-09 내가 쓴 댓글 목록 (page는 1부터, 기본 10개, keyword는 댓글 내용·게시글 제목 검색, category는 글 카테고리). 회원은 토큰에서만 꺼낸다.
     @GetMapping
     public BoardDtos.MyCommentPage list(@AuthenticationPrincipal AuthUser user, @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return boardService.myComments(user.userId(), page, size);
+            @RequestParam(defaultValue = "10") int size, @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String category) {
+        return boardService.myComments(user.userId(), page, size, keyword, category);
     }
 }
