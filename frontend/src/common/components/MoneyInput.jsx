@@ -13,6 +13,7 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
   const inputRef = useRef(null)
   const cursorRef = useRef(null)
   const previousSelection = useRef({ start: 0, end: 0 })
+  const pastedText = useRef(null)
 
   // 컴포넌트가 사라지면 막힌 입력 안내 타이머를 정리한다.
   useEffect(() => () => clearTimeout(timer.current), [])
@@ -46,10 +47,7 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
       showBlocked('15자리까지 입력할 수 있어요.')
       return
     }
-    const digitCount = (text.match(/\d/g) ?? []).length
-    const previousDigitCount = (formatWithComma(value).match(/\d/g) ?? []).length
-    const blockedCharacter = /[^\d,]/.test(text) || (insertedText && /\D/.test(insertedText))
-    if (blockedCharacter && digitCount <= previousDigitCount) {
+    if (insertedText && !/\d/.test(insertedText)) {
       input.value = formatWithComma(value)
       input.setSelectionRange(previousSelection.current.start, previousSelection.current.end)
       cursorRef.current = null
@@ -87,8 +85,17 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
         }}
         onPaste={(event) => {
           previousSelection.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd }
+          pastedText.current = event.clipboardData.getData('text')
         }}
-        onChange={(event) => updateValue(event.target, event.target.value, event.target.selectionStart ?? 0, event.nativeEvent.data)}
+        onChange={(event) => {
+          const input = event.target
+          const previous = formatWithComma(value)
+          const { start, end } = previousSelection.current
+          const insertedText = pastedText.current ?? event.nativeEvent.data
+            ?? input.value.slice(start, input.value.length - (previous.length - end))
+          pastedText.current = null
+          updateValue(input, input.value, input.selectionStart ?? 0, insertedText)
+        }}
         onBlur={clearBlocked}
         onKeyDown={(event) => {
           const input = event.currentTarget
