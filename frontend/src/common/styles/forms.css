@@ -116,11 +116,13 @@ body {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 22%, transparent);
 }
 
+/* 오류 칸은 포커스와 같은 굵기의 빨간 빛 테두리로 표시한다. */
 .text-input__control[aria-invalid='true'],
 .number-input__control[aria-invalid='true'],
 .money-input__control[aria-invalid='true'],
 .select__control[aria-invalid='true'] {
   border-color: var(--bad);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 22%, transparent);
 }
 
 .text-input__control:disabled,
