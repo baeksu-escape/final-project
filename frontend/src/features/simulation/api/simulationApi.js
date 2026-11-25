@@ -4,7 +4,7 @@ import { fetchCreditReport } from '../../credit/api/creditApi.js'
 // mock 모드에서 쓸 응답을 자동 등록한다 (VITE_USE_MOCK=false면 등록돼도 무시됨)
 import '../mocks/simulationMockHandlers.js'
 
-import { INPUT_KEYS, describeSimulationError, fromCreditCareBase, toSimulationChanges, validateInputs } from '../adapters/simulationAdapter.js'
+import { CARD_PAIR_INPUT_MESSAGE, INPUT_KEYS, describeSimulationError, fromCreditCareBase, toSimulationChanges, validateInputs } from '../adapters/simulationAdapter.js'
 
 const beforeOfferCache = new Map()
 
@@ -57,7 +57,8 @@ export async function recalculateSimulation({ userId, currentScore, baseline, va
   if (!hasExactInputKeys(values)) throw new Error('계산 입력은 정해진 10개 항목이어야 합니다(누락·추가 항목 거부).')
   const valuesError = validateInputs(values, baseline)
   if (valuesError) throw new Error(valuesError)
-  if (!hasExactInputKeys(baseline) || validateInputs(baseline, baseline)) throw new Error('저장된 내 현재 값이 비었거나 올바르지 않아 시연 계산을 할 수 없습니다.')
+  const baselineError = hasExactInputKeys(baseline) ? validateInputs(baseline, baseline) : null
+  if (!hasExactInputKeys(baseline) || (baselineError && baselineError !== CARD_PAIR_INPUT_MESSAGE)) throw new Error('저장된 내 현재 값이 비었거나 올바르지 않아 시연 계산을 할 수 없습니다.')
   // N-18-5 SIM-02 재계산과 N-18-7 SIM-04 점수대 참고 금리·한도를 부른다. 서버 오류 코드는 안내 문구로 바꿔 던진다.
   let response, beforeOffer, afterOffer
   try {

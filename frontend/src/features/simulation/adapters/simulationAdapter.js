@@ -122,7 +122,7 @@ export function addDeductionExamples(deductions, baseline, values) {
     const action = Object.hasOwn(DEDUCTION_ACTIONS, item.featureCode) ? DEDUCTION_ACTIONS[item.featureCode] : null
     if (!action) return { ...item, editable: false, hint: '시뮬레이터에서 바꿀 수 없는 항목이에요.' }
     const inputKey = action.key ?? action.inputKey
-    if (inputKey && baseline?.[inputKey] == null) return { ...item, editable: false, hint: '저장된 값이 없어 바꿀 수 없는 항목이에요.' }
+    if (inputKey && baseline?.[inputKey] == null) return { ...item, editable: false, hint: '값을 직접 바꿔 계산해 보세요.' }
     if (!action.key) return { ...item, ...action, editable: false }
     const example = action
     const fallback = { ...item, editable: false, hint: '값을 직접 바꿔 계산해 보세요.' }
@@ -159,10 +159,13 @@ export function describeSimulationError(error) {
   return error?.message ?? '요청을 처리하지 못했습니다.'
 }
 
-// N-18-5 화면의 camelCase 입력 10개를 FastAPI 재계산 changes 키로 바꾼다.
+// N-18-5 입력된 변경값을 재계산 changes 키로 바꾸고 카드 한도·사용액은 함께 보낸다.
 export function toSimulationChanges(values, baseline) {
   if (!values || typeof values !== 'object') throw new Error('시뮬레이션 입력값이 올바르지 않습니다.')
-  const keys = INPUT_KEYS.filter((key) => values[key] !== baseline?.[key])
+  const keys = INPUT_KEYS.filter((key) => values[key] != null && values[key] !== baseline?.[key])
+  if (values.cardLimitAmount == null || values.cardMonthlyUsage == null) {
+    return Object.fromEntries(keys.filter((key) => key !== 'cardLimitAmount' && key !== 'cardMonthlyUsage').map((key) => [API_CHANGE_KEYS[key], values[key]]))
+  }
   if (keys.includes('cardLimitAmount') || keys.includes('cardMonthlyUsage')) {
     for (const key of ['cardLimitAmount', 'cardMonthlyUsage']) if (!keys.includes(key)) keys.push(key)
   }
@@ -175,13 +178,16 @@ export const RANGE_INPUT_MESSAGE = '입력은 화면 범위 안의 0 이상 정�
 
 // 값이 비었을 때 validateInputs가 돌려주는 일반 문구. 칸 옆 "값을 입력해 주세요."가 있어 화면에는 따로 보여 주지 않는다.
 export const MISSING_INPUT_MESSAGE = '입력하지 않은 값이 있습니다. 값이 있는 칸은 모두 채워야 계산할 수 있습니다.'
+// N-18-3 카드 한도와 사용액은 계산할 때 함께 입력해야 한다.
+export const CARD_PAIR_INPUT_MESSAGE = '카드 한도와 월 카드 사용액을 함께 입력해 주세요.'
 // invalid 상태에서 Notice에 보여 주지 않을 일반 문구 목록(항목별 오류가 칸 옆에 표시된다).
-export const HIDDEN_INVALID_MESSAGES = [RANGE_INPUT_MESSAGE, MISSING_INPUT_MESSAGE]
+export const HIDDEN_INVALID_MESSAGES = [RANGE_INPUT_MESSAGE, MISSING_INPUT_MESSAGE, CARD_PAIR_INPUT_MESSAGE]
 
 // 계산 요청 전에 값을 확인한다. 저장된 값이 없던 항목(baseline이 null)은 비어 있어도 되고, 바꾸지 않은 값은 슬라이더 범위 밖이어도 통과한다.
 // 문제가 있으면 안내 문구를, 없으면 빈 문자열을 돌려준다.
 export function validateInputs(values, baseline = null) {
   const absent = (key) => values[key] === null || values[key] === undefined
+  if (absent('cardLimitAmount') !== absent('cardMonthlyUsage')) return CARD_PAIR_INPUT_MESSAGE
   const missing = INPUT_KEYS.filter((key) => absent(key) && !(baseline && baseline[key] == null))
   if (missing.length) return MISSING_INPUT_MESSAGE
   const invalid = INPUT_KEYS.some((key) => !absent(key) && !(baseline && values[key] === baseline[key] && isStoredValue(values[key])) && !isValidValue(key, values[key]))
@@ -200,6 +206,10 @@ export function getInputErrors(values, baseline = null) {
     } else if (!(baseline && value === baseline[key] && isStoredValue(value)) && !isValidValue(key, value)) {
       errors[key] = field.max === undefined ? '0 이상 정수로 입력해 주세요.' : `${field.min}~${field.max}${field.unit} 사이 정수로 입력해 주세요.`
     }
+  }
+  if ((values?.cardLimitAmount == null) !== (values?.cardMonthlyUsage == null)) {
+    if (values?.cardLimitAmount == null) errors.cardLimitAmount = '카드 한도도 입력해 주세요.'
+    else errors.cardMonthlyUsage = '사용액도 입력해 주세요.'
   }
   return errors
 }
