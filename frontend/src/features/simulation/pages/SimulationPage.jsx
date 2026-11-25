@@ -69,7 +69,7 @@ export default function SimulationPage() {
 
       <div className="sim-layout">
         <Card title="조건 바꾸기" className="sim-inputs">
-          <div className="sim-row"><span className="sim-hint">지금 값은 저장된 내 실제 값입니다.</span><Button size="sm" onClick={handleReset}>내 실제 값으로 되돌리기</Button></div>
+          <div className="sim-row"><span className="sim-hint">지금 값은 저장된 내 현재 값입니다.</span><Button size="sm" onClick={handleReset}>내 현재 값으로 되돌리기</Button></div>
           <div className="sim-slider-grid">
             {SLIDER_FIELDS.map((field) => (
               <div key={field.key} id={`sim-field-${field.key}`} className={fieldClass(field.key)}>
@@ -81,7 +81,7 @@ export default function SimulationPage() {
                   formatValue={() => sliderText(values[field.key], field, sim.baseline?.[field.key] == null)} />
                 <NumberInput label={`${field.label} 직접 입력`} min={field.min} max={field.max} step={1} unit={field.unit}
                   value={values[field.key] ?? null} onChange={(v) => sim.setValue(field.key, v)} disabled={sim.baseline?.[field.key] == null} error={inputErrors[field.key]} />
-                <span className="sim-hint">{field.min}{field.unit} ~ {field.max}{field.unit} · 내 실제 값 {sim.baseline?.[field.key] ?? '없음'}{sim.baseline?.[field.key] == null ? '' : field.unit}{sim.baseline?.[field.key] > field.max ? ` (슬라이더 범위 밖 · 실제 값 ${sim.baseline[field.key]}${field.unit})` : ''}</span>
+                <span className="sim-hint">{field.min}{field.unit} ~ {field.max}{field.unit} · 내 현재 값 {sim.baseline?.[field.key] ?? '없음'}{sim.baseline?.[field.key] == null ? '' : field.unit}{sim.baseline?.[field.key] > field.max ? ` (슬라이더 범위 밖 · 현재 값 ${sim.baseline[field.key]}${field.unit})` : ''}</span>
               </div>
             ))}
           </div>
@@ -100,7 +100,7 @@ export default function SimulationPage() {
           </div>
           {sim.calcError && !(sim.status === 'invalid' && HIDDEN_INVALID_MESSAGES.includes(sim.calcError)) && <Notice type="warn">{sim.calcError}{sim.status === 'error' && <> <Button size="sm" onClick={sim.retry}>다시 계산</Button></>}</Notice>}
         </Card>
-        <SimulationResult currentScore={sim.currentScore} result={sim.result} stale={stale} />
+        <SimulationResult currentScore={sim.currentScore} currentGradeCode={sim.currentGradeCode} initialMetrics={sim.initialMetrics} result={sim.result} stale={stale} />
       </div>
 
       <Card title="이 점수로 알아볼 수 있는 대출 상품" className="sim-products">
@@ -124,7 +124,7 @@ function sliderValue(value, field) {
 function sliderText(value, field, missing) {
   if (missing) return '값 없음'
   if (!Number.isInteger(value) || value < field.min) return '—'
-  return value > field.max ? `실제 값 ${value}${field.unit}` : `${value}${field.unit}`
+  return value > field.max ? `현재 값 ${value}${field.unit}` : `${value}${field.unit}`
 }
 
 // N-18-4 버튼 계산 상태 안내 문구.

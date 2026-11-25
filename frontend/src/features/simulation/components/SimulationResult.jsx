@@ -9,12 +9,21 @@ const moneyText = (value) => (value === null ? '—' : `${Math.round(value).toLo
 const probText = (value) => (value === null ? '—' : `${(value * 100).toFixed(value * 100 < 1 ? 2 : 1)}%`)
 
 // N-18-9 현재·예상 점수, 등급 변화, 금융 이력·대안 데이터 영향, 금리·한도·부도 확률을 보여 준다.
-export default function SimulationResult({ currentScore, result, stale }) {
+export default function SimulationResult({ currentScore, currentGradeCode, initialMetrics, result, stale }) {
   if (!result) {
     return (
       <Card title="예상 대안 점수" className="sim-result">
         <p className="sim-big">{currentScore ?? '—'}</p>
         <p className="sim-hint">지금 대안 점수입니다. 조건을 바꾸고 계산하기를 누르면 결과가 나옵니다.</p>
+        <table className="sim-table">
+          <thead><tr><th scope="col"></th><th scope="col">현재 값</th><th scope="col">바뀔 값</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">등급</th><td>{gradeText(currentGradeCode)}</td><td>계산 전</td></tr>
+            <tr><th scope="row">예상 금리</th><td>{rateText(initialMetrics?.interestRatePct ?? null)}</td><td>계산 전</td></tr>
+            <tr><th scope="row">예상 한도</th><td>{moneyText(initialMetrics?.limitAmount ?? null)}</td><td>계산 전</td></tr>
+            <tr><th scope="row">예상 부도 확률</th><td>{probText(initialMetrics?.defaultProbability ?? null)}</td><td>계산 전</td></tr>
+          </tbody>
+        </table>
       </Card>
     )
   }
@@ -22,15 +31,16 @@ export default function SimulationResult({ currentScore, result, stale }) {
   return (
     <Card title="예상 대안 점수" className="sim-result">
       <div className="sim-row sim-row--baseline"><span className="sim-big">{changed.score ?? '—'}</span><span className={result.delta < 0 ? 'sim-mid sim-neg' : 'sim-mid sim-pos'}>{result.delta === null ? '' : formatSigned(result.delta)}</span></div>
-      <p className="sim-hint">실제 값 {current.score ?? '—'}점 → 바뀔 값 {changed.score ?? '—'}점</p>
+      <p className="sim-hint">현재 값 {current.score ?? '—'}점 → 바뀔 값 {changed.score ?? '—'}점</p>
       <div><Chip accent>{current.gradeCode === changed.gradeCode ? `${gradeText(changed.gradeCode)} 등급 유지` : `${gradeText(current.gradeCode)} → ${gradeText(changed.gradeCode)}`}</Chip></div>
       <div className="sim-impacts">
         <div><span className="sim-hint">금융 이력 영향</span><strong>{result.financialImpact === null ? '—' : formatSigned(result.financialImpact)}</strong></div>
         <div><span className="sim-hint">대안 데이터 영향</span><strong>{result.alternativeImpact === null ? '—' : formatSigned(result.alternativeImpact)}</strong></div>
       </div>
       <table className="sim-table">
-        <thead><tr><th scope="col"></th><th scope="col">실제 값</th><th scope="col">바뀔 값</th></tr></thead>
+        <thead><tr><th scope="col"></th><th scope="col">현재 값</th><th scope="col">바뀔 값</th></tr></thead>
         <tbody>
+          <tr><th scope="row">등급</th><td>{gradeText(current.gradeCode)}</td><td>{gradeText(changed.gradeCode)}</td></tr>
           <tr><th scope="row">예상 금리</th><td>{rateText(current.interestRatePct)}</td><td>{rateText(changed.interestRatePct)}</td></tr>
           <tr><th scope="row">예상 한도</th><td>{moneyText(current.limitAmount)}</td><td>{moneyText(changed.limitAmount)}</td></tr>
           <tr><th scope="row">예상 부도 확률</th><td>{probText(current.defaultProbability)}</td><td>{probText(changed.defaultProbability)}</td></tr>

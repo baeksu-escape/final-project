@@ -1,4 +1,6 @@
 import { apiGet, apiPost } from '../../../common/api/client.js'
+import { GRADE_LABELS } from '../../../common/config/grades.js'
+import { fetchCreditReport } from '../../credit/api/creditApi.js'
 // mock 모드에서 쓸 응답을 자동 등록한다 (VITE_USE_MOCK=false면 등록돼도 무시됨)
 import '../mocks/simulationMockHandlers.js'
 
@@ -23,9 +25,27 @@ async function getCachedBeforeOffer(score) {
 export async function getSimulationInputs(userId) {
   if (userId == null) throw new Error('로그인 정보가 없어 값을 불러올 수 없습니다.')
   try {
-    return fromCreditCareBase(await getCreditCareBase())
+    const raw = await getCreditCareBase()
+    return { ...fromCreditCareBase(raw), currentGradeCode: Object.hasOwn(GRADE_LABELS, raw.gradeBandCode) ? raw.gradeBandCode : null }
   } catch (error) {
     throw new Error(describeSimulationError(error), { cause: error })
+  }
+}
+
+// N-18-7·N-18-9 첫 화면의 참고 금리·한도와 리포트 확률을 독립적으로 조회한다. 실패하거나 잘못된 항목은 null로 둔다.
+export async function getInitialSimulationMetrics(score) {
+  const [offerResult, reportResult] = await Promise.allSettled([
+    score === null ? Promise.resolve(null) : getCachedBeforeOffer(score),
+    fetchCreditReport(),
+  ])
+  const offer = offerResult.status === 'fulfilled' ? offerResult.value : null
+  const probability = reportResult.status === 'fulfilled' ? reportResult.value?.alternative?.defaultProb : null
+  const rate = offer?.expectedAvgRate
+  const limit = offer?.expectedLimitAmount
+  return {
+    interestRatePct: Number.isFinite(rate) && rate >= 0 ? rate : null,
+    limitAmount: Number.isSafeInteger(limit) && limit >= 0 ? limit : null,
+    defaultProbability: Number.isFinite(probability) && probability >= 0 && probability <= 1 ? probability : null,
   }
 }
 
@@ -37,7 +57,7 @@ export async function recalculateSimulation({ userId, currentScore, baseline, va
   if (!hasExactInputKeys(values)) throw new Error('계산 입력은 정해진 10개 항목이어야 합니다(누락·추가 항목 거부).')
   const valuesError = validateInputs(values, baseline)
   if (valuesError) throw new Error(valuesError)
-  if (!hasExactInputKeys(baseline) || validateInputs(baseline, baseline)) throw new Error('저장된 내 실제 값이 비었거나 올바르지 않아 시연 계산을 할 수 없습니다.')
+  if (!hasExactInputKeys(baseline) || validateInputs(baseline, baseline)) throw new Error('저장된 내 현재 값이 비었거나 올바르지 않아 시연 계산을 할 수 없습니다.')
   // N-18-5 SIM-02 재계산과 N-18-7 SIM-04 점수대 참고 금리·한도를 부른다. 서버 오류 코드는 안내 문구로 바꿔 던진다.
   let response, beforeOffer, afterOffer
   try {
