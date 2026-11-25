@@ -115,7 +115,7 @@
 | 409 | `ALT_DATA_EMPTY` | DIAG-09: 통신비 또는 공과금 기관 기록이 0건이라 ML-03을 부르지 않음 → "통신비·공과금 기록이 없어 예상 점수를 계산할 수 없어요." (점수 산출 RPT-01의 `NOT_SCORABLE` `ALT_DATA_EMPTY`와 같은 기준, FP-239 리뷰 후속) 🆕 11/23 |
 | 503 | `MODEL_NOT_READY` | SIM-02·DIAG-09: 실제 모델 파일 없음, 연결 실패, 타임아웃, 그 밖의 5xx. 저장하지 않으므로 `MODEL_ERROR` 기록 없음 |
 
-- 커뮤니티(동주, PR #80) 오류 code: 403 `NOT_OWNER`(남의 글 수정·삭제), 404 `POST_NOT_FOUND`·`TARGET_NOT_FOUND`·`REPORT_NOT_FOUND`, 409 `OWN_CONTENT`(본인 글 신고)·`DUPLICATE_REPORT`·`POST_HIDDEN`·`STATUS_CHANGED`·`ALREADY_HANDLED`, 429 `DAILY_LIMIT_EXCEEDED`(하루 3번 초과).
+- 커뮤니티(동주, PR #80) 오류 code: 403 `NOT_OWNER`(남의 글 수정·삭제), 404 `POST_NOT_FOUND`·`TARGET_NOT_FOUND`·`REPORT_NOT_FOUND`·`COMMENT_NOT_FOUND`(없거나 삭제된 댓글, 다른 글의 댓글 🆕 11/25), 409 `OWN_CONTENT`(본인 글 신고)·`DUPLICATE_REPORT`·`POST_HIDDEN`·`COMMENT_HIDDEN`(신고로 숨겨진 댓글 수정·삭제 🆕 11/25)·`STATUS_CHANGED`·`ALREADY_HANDLED`, 429 `DAILY_LIMIT_EXCEEDED`(하루 3번 초과).
 ---
 
 ## 2. API 목록
