@@ -1,15 +1,29 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import FieldError from './FieldError.jsx'
 
-// 숫자 입력(텍스트 칸, 스핀 버튼 없음) — 숫자만 받고, '-'는 min이 음수일 때만, '.'은 step이 소수일 때만 받는다. max를 넘는 입력은 받지 않는다. onChange에는 완성된 숫자를, 비우면 null을 넘긴다.
+// 숫자 입력(텍스트 칸, 스핀 버튼 없음) — 숫자만 받고, '-'는 min이 음수일 때만, '.'은 step이 소수이거나 지금 값이 소수일 때만 받는다. max를 넘는 입력은 받지 않고 칸 테두리를 잠깐 빨갛게 표시한다(이유는 화면 낭독기로 읽음). 휴대폰에서는 숫자 키패드(음수 칸 제외)를 띄우고, 칸을 벗어나면 앞자리 0을 정리한다. onChange에는 완성된 숫자를, 비우면 null을 넘긴다.
 // 사용 예: <NumberInput label="재직 기간" unit="개월" value={months} onChange={setMonths} min={0} max={600} />
 export default function NumberInput({ label, value, onChange, min, max, step, unit, error, name, disabled = false }) {
   const id = useId()
   const errorId = `${id}-error`
+  const blockedId = `${id}-blocked`
   const [text, setText] = useState(() => value == null ? '' : String(value))
+  const [blockedMessage, setBlockedMessage] = useState('')
+  const [blocked, setBlocked] = useState(false)
+  const timer = useRef(null)
   const selection = useRef({ start: 0, end: 0 })
   const incomplete = text === '-' || text === '.' || text === '-.' || text.endsWith('.')
-  if (!incomplete && (text === '' ? value != null : Number(text) !== value)) setText(value == null ? '' : String(value))
+  // 외부 값이 유한한 숫자이거나 비어 있을 때만 입력 표시를 맞춘다.
+  const numericValue = value == null ? null : Number(value)
+  const canSync = numericValue === null || Number.isFinite(numericValue)
+  const syncedText = numericValue === null ? '' : String(numericValue)
+  const negative = Number(min) < 0
+  const decimal = (step != null && Number.isFinite(Number(step)) && !Number.isInteger(Number(step)))
+    || (numericValue !== null && Number.isFinite(numericValue) && !Number.isInteger(numericValue))
+  if (!incomplete && canSync && (numericValue === null ? text !== '' : text === '' || Number(text) !== numericValue)) setText(syncedText)
+
+  // 컴포넌트가 사라질 때 일시적인 테두리 표시 타이머를 정리한다.
+  useEffect(() => () => clearTimeout(timer.current), [])
 
   // 입력 전 선택 위치를 기억해 허용하지 않는 문자를 거부할 때 커서를 복원한다.
   function rememberSelection(event) {
@@ -20,8 +34,6 @@ export default function NumberInput({ label, value, onChange, min, max, step, un
   function handleChange(event) {
     const input = event.target
     const next = input.value
-    const negative = Number(min) < 0
-    const decimal = step != null && Number.isFinite(Number(step)) && !Number.isInteger(Number(step))
     const pattern = new RegExp(`^${negative ? '-?' : ''}\\d*${decimal ? '(?:\\.\\d*)?' : ''}$`)
     const complete = next !== '' && next !== '-' && next !== '.' && next !== '-.' && !next.endsWith('.')
     const number = Number(next)
@@ -29,13 +41,27 @@ export default function NumberInput({ label, value, onChange, min, max, step, un
     if (!pattern.test(next) || outOfRange) {
       input.value = text
       input.setSelectionRange(selection.current.start, selection.current.end)
+      setBlockedMessage(!pattern.test(next) ? '숫자만 입력할 수 있어요.' : max == null
+        ? `${min}${unit ?? ''} 이상 입력할 수 있어요.`
+        : `${min ?? 0}~${max}${unit ?? ''}까지 입력할 수 있어요.`)
+      clearTimeout(timer.current)
+      setBlocked(true)
+      timer.current = setTimeout(() => setBlocked(false), 1500)
       return
     }
+    setBlockedMessage('')
     setText(next)
     if (next === '') onChange(null)
     else if (complete) {
       if (Number.isFinite(number)) onChange(number)
     }
+  }
+
+  // 포커스를 벗어나면 안내를 지우고 미완성 입력이나 앞자리 0을 정리한다.
+  function handleBlur() {
+    setBlockedMessage('')
+    if (incomplete && canSync) setText(syncedText)
+    else if (!incomplete && text !== '' && Number.isFinite(Number(text))) setText(String(Number(text)))
   }
   return (
     <div className="form-field number-input">
@@ -46,6 +72,7 @@ export default function NumberInput({ label, value, onChange, min, max, step, un
         id={id}
         name={name}
         type="text"
+        inputMode={negative ? undefined : decimal ? 'decimal' : 'numeric'}
         autoComplete="off"
         className="number-input__control"
         value={text}
@@ -53,16 +80,17 @@ export default function NumberInput({ label, value, onChange, min, max, step, un
         onBeforeInput={rememberSelection}
         onKeyDown={rememberSelection}
         onPaste={rememberSelection}
-        onBlur={() => { if (incomplete) setText(value == null ? '' : String(value)) }}
+        onBlur={handleBlur}
         min={min}
         max={max}
         step={step}
         disabled={disabled}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
+        aria-invalid={error || blocked ? true : undefined}
+        aria-describedby={[error && errorId, blockedMessage && blockedId].filter(Boolean).join(' ') || undefined}
       />
       {unit && <span className="number-input__unit">{unit}</span>}
       <FieldError id={errorId} message={error} />
+      <span id={blockedId} className="sr-only" aria-live="polite">{blockedMessage}</span>
     </div>
   )
 }
