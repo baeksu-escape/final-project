@@ -48,7 +48,7 @@ public class MemberFinanceController {
         return ResponseEntity.ok(memberFinancialHealthService.load(user.userId()));
     }
 
-    /** N-18-1·N-18-8·N-18-10 SIM-01 입력 10개의 내 실제 값과 출발 평가의 감점 요인 상위 3개. 평가가 없으면 404 ASSESSMENT_NOT_FOUND. */
+    /** N-18-1·N-18-8·N-18-10 SIM-01 입력 10개의 내 현재 값과 출발 평가의 감점 요인 상위 3개. 평가가 없으면 404 ASSESSMENT_NOT_FOUND. */
     @GetMapping("/credit-care-base")
     public ResponseEntity<CreditCareBaseResponse> getCreditCareBase(@AuthenticationPrincipal AuthUser user) {
         return ResponseEntity.ok(creditCareSimulationService.base(user.userId()));
