@@ -37,7 +37,7 @@ public final class RecalculationFrame {
 
     /**
      * 현재 값(current)에 바꾼 값(changes)을 차례로 반영한 새 Map을 돌려준다. 같은 항목을 여러 번 바꾸면 앞의 결과에 이어서 반영한다.
-     * 원래 Map은 바꾸지 않으므로 "내 실제 값으로 되돌리기"(N-18-10)는 current를 다시 쓰면 된다.
+     * 원래 Map은 바꾸지 않으므로 "내 현재 값으로 되돌리기"(N-18-10)는 current를 다시 쓰면 된다.
      * 현재 값에 없는 항목 이름이 오면 오타로 보고 IllegalArgumentException을 던진다.
      */
     public static Map<String, BigDecimal> apply(Map<String, BigDecimal> current, List<ValueChange> changes) {
