@@ -1,15 +1,34 @@
-import { useId, useLayoutEffect, useRef } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { formatWithComma, parseDigits } from '../utils/number.js'
 import FieldError from './FieldError.jsx'
 
-// 금액 입력(원 단위) — 화면에는 천 단위 쉼표로 보이고, onChange에는 숫자(원)를, 비우면 null을 넘긴다. 숫자 외 문자는 무시하고 15자리를 넘는 입력은 받지 않는다.
+// 금액 입력(원 단위) — 화면에는 천 단위 쉼표로 보이고, onChange에는 숫자(원)를, 비우면 null을 넘긴다. 숫자 외 문자는 무시하고 15자리를 넘는 입력은 받지 않는다. 막힌 입력은 칸 테두리를 잠깐 빨갛게 표시한다(이유는 화면 낭독기로 읽음).
 // 사용 예: <MoneyInput label="월 소득" value={income} onChange={setIncome} error={errors.income} />
 export default function MoneyInput({ label, value, onChange, error, name, placeholder, disabled = false }) {
   const id = useId()
   const errorId = `${id}-error`
+  const blockedId = `${id}-blocked`
+  const [blockedMessage, setBlockedMessage] = useState('')
+  const timer = useRef(null)
   const inputRef = useRef(null)
   const cursorRef = useRef(null)
   const previousSelection = useRef({ start: 0, end: 0 })
+
+  // 컴포넌트가 사라지면 막힌 입력 안내 타이머를 정리한다.
+  useEffect(() => () => clearTimeout(timer.current), [])
+
+  // 막힌 이유와 테두리 표시를 지우고 진행 중인 타이머도 취소한다.
+  const clearBlocked = () => {
+    clearTimeout(timer.current)
+    setBlockedMessage('')
+  }
+
+  // 막힌 이유를 화면 낭독기에 알리고 1.5초 뒤 표시를 해제한다.
+  const showBlocked = (message) => {
+    clearTimeout(timer.current)
+    setBlockedMessage(message)
+    timer.current = setTimeout(() => setBlockedMessage(''), 1500)
+  }
 
   // 입력 뒤 숫자 개수를 기준으로 쉼표가 바뀐 문자열에서도 커서를 원래 자리에 둔다.
   useLayoutEffect(() => {
@@ -19,13 +38,25 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
   })
 
   // 숫자만 변환해 기존 숫자·null 계약으로 전달하고, 값이 같아 다시 그려지지 않아도 커서를 복원한다.
-  const updateValue = (input, text, cursor) => {
+  const updateValue = (input, text, cursor, insertedText = null) => {
     if ((text.match(/\d/g) ?? []).length > 15) {
       input.value = formatWithComma(value)
       input.setSelectionRange(previousSelection.current.start, previousSelection.current.end)
       cursorRef.current = null
+      showBlocked('15자리까지 입력할 수 있어요.')
       return
     }
+    const digitCount = (text.match(/\d/g) ?? []).length
+    const previousDigitCount = (formatWithComma(value).match(/\d/g) ?? []).length
+    const blockedCharacter = /[^\d,]/.test(text) || (insertedText && /\D/.test(insertedText))
+    if (blockedCharacter && digitCount <= previousDigitCount) {
+      input.value = formatWithComma(value)
+      input.setSelectionRange(previousSelection.current.start, previousSelection.current.end)
+      cursorRef.current = null
+      showBlocked('숫자만 입력할 수 있어요.')
+      return
+    }
+    clearBlocked()
     const digitsBefore = (text.slice(0, cursor).match(/\d/g) ?? []).length
     const nextValue = parseDigits(text)
     cursorRef.current = digitsBefore
@@ -57,7 +88,8 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
         onPaste={(event) => {
           previousSelection.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd }
         }}
-        onChange={(event) => updateValue(event.target, event.target.value, event.target.selectionStart ?? 0)}
+        onChange={(event) => updateValue(event.target, event.target.value, event.target.selectionStart ?? 0, event.nativeEvent.data)}
+        onBlur={clearBlocked}
         onKeyDown={(event) => {
           const input = event.currentTarget
           const cursor = input.selectionStart
@@ -73,11 +105,12 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
         }}
         placeholder={placeholder}
         disabled={disabled}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
+        aria-invalid={error || blockedMessage ? true : undefined}
+        aria-describedby={[error && errorId, blockedMessage && blockedId].filter(Boolean).join(' ') || undefined}
       />
       <span className="money-input__unit">원</span>
       <FieldError id={errorId} message={error} />
+      <span id={blockedId} className="sr-only" aria-live="polite">{blockedMessage}</span>
     </div>
   )
 }
