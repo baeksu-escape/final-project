@@ -18,9 +18,12 @@ export function adaptAssetDebtData(raw) {
     }
   })
   if (!Object.hasOwn(raw, 'peer') || !Array.isArray(raw.assumptions) || raw.assumptions.some((value) => typeof value !== 'string')) throw new Error('시연 가정 응답이 올바르지 않습니다.')
+  const workerPeer = adaptPeer(raw.peer)
+  // N-15-2 기존 화면이 peer만 전달하므로 직군 평균 필드에 연령대 평균과 조회 상태를 함께 실어 보낸다.
+  const peer = workerPeer === null ? null : { ...workerPeer, agePeer: adaptAgePeer(raw.peer.agePeer), peerFailed: raw.peer.peerFailed ?? false }
   return { totalAssetAmount: raw.totalAssetAmount ?? null, annualIncomeAmount: raw.annualIncomeAmount ?? null,
     totalDebtAmount: raw.totalDebtAmount ?? null, annualPaymentAmount: raw.annualPaymentAmount ?? null, loans,
-    peer: adaptPeer(raw.peer), assumptions: Array.isArray(raw.assumptions) ? raw.assumptions : [],
+    peer, assumptions: Array.isArray(raw.assumptions) ? raw.assumptions : [],
     derived: calculateAssetDebt(raw, {}) }
 }
 
@@ -84,6 +87,11 @@ export function validateForecastConditions(conditions) {
   if (!Number.isSafeInteger(conditions?.fixedExpenseAmount) || conditions.fixedExpenseAmount < 0) return '월 고정 지출은 0 이상의 원 단위 정수여야 합니다.'
   if (!['ON_TIME','DELAYED'].includes(conditions?.paymentStatus)) return '납부 상태를 선택해 주세요.'
   return ''
+}
+
+// N-15-2 연령대 평균만 형식이 틀리면 그 평균을 비우고 나머지 화면은 유지한다.
+function adaptAgePeer(peer) {
+  try { return adaptPeer(peer ?? null) } catch { return null }
 }
 
 function adaptPeer(peer) {

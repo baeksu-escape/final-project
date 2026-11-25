@@ -32,11 +32,13 @@ export default function AssetDebtRatios({ result }) {
       const thresholds = ASSET_DEBT_RISK_THRESHOLDS[metric.key]
       return <section key={metric.key} className={`ad-ratio ad-risk--${risk}`}>
         <div className="ad-ratio__heading"><h3>{metric.label}</h3><span><strong>{available ? `${value.toFixed(1)}%` : '—'}</strong> <Chip>{LABELS[risk] ?? '계산 불가'}</Chip></span></div>
-        {available ? <svg className="ad-ratio__meter" viewBox="0 0 100 14" role="img" aria-label={`${metric.label} ${value.toFixed(1)}%, 위험 기준 ${thresholds.danger}%`}>
-          <rect className="ad-ratio__track" x="0" y="3" width="100" height="8" rx="4" />
-          <rect className="ad-ratio__fill" x="0" y="3" width={Math.min(100, value / metric.max * 100)} height="8" rx="4" />
-          <line className="ad-ratio__threshold" x1={thresholds.danger / metric.max * 100} x2={thresholds.danger / metric.max * 100} y1="0" y2="14" />
-        </svg> : <p className="ad-unavailable">{REASONS[ratio?.unavailableReason] ?? '입력값을 확인해 주세요. 계산할 수 없는 비율은 0%로 표시하지 않습니다.'}</p>}
+        {available ? <><svg className="ad-ratio__meter" role="img" aria-label={`${metric.label} ${value.toFixed(1)}%, 주의 기준 ${thresholds.caution}%, 위험 기준 ${thresholds.danger}%`}>
+          <rect className="ad-ratio__track" x="0%" y="3" width="100%" height="8" rx="4" />
+          <rect className="ad-ratio__fill" x="0%" y="3" width={`${Math.min(100, value / metric.max * 100)}%`} height="8" rx="4" />
+          {/* N-16-2 그래프 범위 안의 주의·위험 기준을 트랙에 표시한다. */}
+          {thresholds.caution <= metric.max && <line className="ad-ratio__threshold" x1={`${thresholds.caution / metric.max * 100}%`} x2={`${thresholds.caution / metric.max * 100}%`} y1="3" y2="11" />}
+          {thresholds.danger <= metric.max && <line className="ad-ratio__threshold" x1={`${thresholds.danger / metric.max * 100}%`} x2={`${thresholds.danger / metric.max * 100}%`} y1="3" y2="11" />}
+        </svg><div className="ad-ratio__scale" aria-hidden="true"><span>0%</span><span>{metric.max}%</span></div></> : <p className="ad-unavailable">{REASONS[ratio?.unavailableReason] ?? '입력값을 확인해 주세요. 계산할 수 없는 비율은 0%로 표시하지 않습니다.'}</p>}
         <p className="ad-hint">{metric.description} 예시 기준: {thresholds.caution}% 주의 · {thresholds.danger}% 위험</p>
       </section>
     })}</div>
