@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { adaptSimulationInputs, adaptSimulationResult, addDeductionExamples, sameInputs, validateInputs } from '../adapters/simulationAdapter.js'
-import { clearScoreBandOfferCache, getSimulationInputs, recalculateSimulation } from './simulationApi.js'
+import { clearScoreBandOfferCache, getSimulationInputs, getInitialSimulationMetrics, recalculateSimulation } from './simulationApi.js'
 
-const EMPTY = { userId: null, revision: -1, loading: true, error: '', currentScore: null, baseline: null, deductions: [] }
+const EMPTY = { userId: null, revision: -1, loading: true, error: '', currentScore: null, currentGradeCode: null, initialMetrics: null, baseline: null, deductions: [] }
 
 const IDLE_FORM = { applied: null, result: null, status: 'idle', calcError: '' }
 
@@ -25,8 +25,14 @@ export function useSimulation(userId) {
     let active = true
     calcSeq.current += 1
     // 응답 변환에서 형식 오류가 나도 같은 오류 처리로 가도록 변환을 then 단계로 분리한다.
-    getSimulationInputs(userId).then(adaptSimulationInputs).then(
-      (model) => { if (active) setLoaded({ userId, revision, loading: false, error: '', ...toLoaded(model) }) },
+    getSimulationInputs(userId).then((raw) => ({ ...adaptSimulationInputs(raw), currentGradeCode: raw.currentGradeCode })).then(
+      (model) => {
+        if (!active) return
+        setLoaded({ userId, revision, loading: false, error: '', ...toLoaded(model) })
+        getInitialSimulationMetrics(model.currentScore).then((initialMetrics) => {
+          if (active) setLoaded((prev) => prev.userId === userId && prev.revision === revision ? { ...prev, initialMetrics } : prev)
+        })
+      },
       (error) => { if (active) setLoaded({ ...EMPTY, userId, revision, loading: false, error: error.message }) },
     )
     return () => { active = false }
@@ -100,6 +106,8 @@ export function useSimulation(userId) {
     loading: !ready || base.loading,
     error: base.error,
     currentScore: base.currentScore,
+    currentGradeCode: base.currentGradeCode,
+    initialMetrics: base.initialMetrics,
     baseline: base.baseline,
     deductions: addDeductionExamples(current.result?.deductions ?? base.deductions, base.baseline, current.values),
     values: current.values,
@@ -111,7 +119,7 @@ export function useSimulation(userId) {
   }
 }
 
-// 불러온 화면 모델을 상태 모양으로 옮긴다.
+// N-18-1 첫 화면에 필요한 점수·등급과 입력 모델을 상태 모양으로 옮긴다.
 function toLoaded(model) {
-  return { currentScore: model.currentScore, baseline: model.inputs, deductions: model.deductions }
+  return { currentScore: model.currentScore, currentGradeCode: model.currentGradeCode, initialMetrics: null, baseline: model.inputs, deductions: model.deductions }
 }

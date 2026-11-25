@@ -20,8 +20,10 @@ export default function DeductionList({ deductions, onFill }) {
                   <span>예시: {item.exampleText}{Number.isInteger(item.exampleScoreChange) && <> → 시연 예시 기준 <strong>{formatSigned(item.exampleScoreChange)}점</strong></>}</span>
                   <div><Button size="sm" variant="primary" onClick={() => onFill(item.example)}>예시 값 넣어 보기</Button></div>
                 </>
-              ) : !Number.isFinite(item.recoverScore) && (
-                <span className="sim-hint">현재 조건에서 채울 수 있는 예시가 없습니다.<br /><Link to={PATHS[item.linkKey] ?? PATHS.REPORT}>{item.linkText ?? '신용 리포트에서 내용을 확인해 보세요.'}</Link></span>
+              ) : item.linkKey ? (
+                <span className="sim-hint"><Link to={PATHS[item.linkKey]}>{item.linkText}</Link></span>
+              ) : (
+                <span className="sim-hint">{item.hint}</span>
               )}
               {Number.isFinite(item.recoverScore) && (
                 <span className="sim-hint">이 항목을 가장 좋은 값으로 바꾸면 모델 계산상 최대 {formatSigned(item.recoverScore)}점이 회복됩니다(참고용 계산).</span>

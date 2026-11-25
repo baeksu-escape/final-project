@@ -92,26 +92,50 @@ export function adaptReductionFactors(list) {
   })
 }
 
-const DEDUCTION_EXAMPLES = {
+// N-18-8·9 감점 피처별 예시와 관련 화면을 정리한다. 목록에 없는 피처는 시뮬레이터에서 바꿀 수 없는 항목으로 안내한다.
+export const DEDUCTION_ACTIONS = {
   DQ1200001: { key: 'delinquencyCount', value: 0, text: '연체 횟수 0회' },
   telecom_on_time_streak: { key: 'telecomOnTimeMonths', value: 12, text: '정시 납부 12개월' },
   CL0631905: { key: 'cardMonthlyUsage', text: '한도의 30%로 쓰기' },
+  L22000900: { key: 'newLoanCount', value: 0, text: '최근 3개월 신규 대출 0건' },
+  CF1231605: { key: 'cashAdvanceMonths', value: 0, text: '현금서비스 이용 기간 0개월' },
+  utility_late_months: { key: 'utilityUnpaidMonths', value: 0, text: '공과금 미납 0개월' },
+  LA0099212: { key: 'privateLenderBalance', value: 0, text: '대부업 대출 잔액 0원' },
+  income_svc_12m_krw: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
+  income_cv_svc_12m: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
+  zero_income_months_svc_12m: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
+  expense_avg_month_krw: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
+  expense_ratio_svc_12m: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
+  deficit_months_svc_12m: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
+  worst_month_net_cash_svc_12m_krw: { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' },
+  debt_service_current_krw: { linkKey: 'ASSET_DEBT', linkText: '자산·부채 화면에서 확인해 보세요.' },
+  dsr_svc_12m: { linkKey: 'ASSET_DEBT', linkText: '자산·부채 화면에서 확인해 보세요.' },
+  L00000001: { linkKey: 'ASSET_DEBT', linkText: '자산·부채 화면에서 확인해 보세요.' },
+  LRZ021201: { linkKey: 'ASSET_DEBT', linkText: '자산·부채 화면에서 확인해 보세요.' },
+  dp_payment_count_12m: { inputKey: 'easyPayMonthlyCount', hint: '값을 직접 바꿔 계산해 보세요.' },
+  debt_balance_krw: { inputKey: 'loanBalance', hint: '값을 직접 바꿔 계산해 보세요.' },
 }
 
-// N-18-8·9 서버 감점 코드를 기존 시연 예시와 연결한다. 저장값이 있고 현재 조건을 개선하는 예시만 제공한다.
+// N-18-8·9 감점 코드에 예시, 관련 화면 또는 안내를 연결한다. 저장값이 있고 그 값보다 나아지는 예시만 제공한다.
 export function addDeductionExamples(deductions, baseline, values) {
   return deductions?.map((item) => {
-    const example = DEDUCTION_EXAMPLES[item.featureCode]
-    if (!example || baseline?.[example.key] == null || !isStoredValue(values?.[example.key])) return item
+    const action = Object.hasOwn(DEDUCTION_ACTIONS, item.featureCode) ? DEDUCTION_ACTIONS[item.featureCode] : null
+    if (!action) return { ...item, editable: false, hint: '시뮬레이터에서 바꿀 수 없는 항목이에요.' }
+    const inputKey = action.key ?? action.inputKey
+    if (inputKey && baseline?.[inputKey] == null) return { ...item, editable: false, hint: '저장된 값이 없어 바꿀 수 없는 항목이에요.' }
+    if (!action.key) return { ...item, ...action, editable: false }
+    const example = action
+    const fallback = { ...item, editable: false, hint: '값을 직접 바꿔 계산해 보세요.' }
+    if (!isStoredValue(values?.[example.key])) return fallback
 
     const { key, text } = example
     let target = example.value
     if (key === 'cardMonthlyUsage') {
-      if (baseline.cardLimitAmount == null || !isStoredValue(values.cardLimitAmount) || values.cardLimitAmount === 0) return item
+      if (!baseline.cardLimitAmount || !isStoredValue(values.cardLimitAmount) || values.cardLimitAmount === 0) return fallback
       target = Math.floor(values.cardLimitAmount * 0.3)
     }
-    const improves = key === 'telecomOnTimeMonths' ? target > values[key] : target < values[key]
-    if (!improves) return item
+    const improves = key === 'telecomOnTimeMonths' ? target > baseline[key] : target < baseline[key]
+    if (!improves) return fallback
 
     const field = [...SLIDER_FIELDS, ...MONEY_FIELDS].find((entry) => entry.key === key)
     return { ...item, editable: true, condition: field.label, example: { [key]: target }, exampleText: text }
