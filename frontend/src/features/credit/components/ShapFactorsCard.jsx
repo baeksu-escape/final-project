@@ -14,7 +14,18 @@ function formatShapValue(value, unitName) {
   return `${value}${unitName ?? ''}`
 }
 
-// N-12 SHAP 감점 항목 설명 — 피처 코드(와 값)가 맞는 감점 행 아래에 작은 안내를 붙인다. 점수·순위로는 조건을 걸지 않는다.
+const GROUP_VALUE_NOTE = '직군·나이는 좋고 나쁨이 아닌 구분 값이에요. 모델이 다른 항목과 함께 계산한 결과라 이 값 때문에 감점됐다는 뜻은 아니에요.'
+const COVERAGE_VALUE_NOTE = '가입 상태·유형은 좋고 나쁨이 아닌 분류 값이에요. 모델이 다른 항목과 함께 계산한 결과라 이 값 때문에 감점됐다는 뜻은 아니에요.'
+const SHAP_NOTES = {
+  segment: GROUP_VALUE_NOTE,
+  age: GROUP_VALUE_NOTE,
+  np_coverage_status: COVERAGE_VALUE_NOTE,
+  np_payer_type: COVERAGE_VALUE_NOTE,
+  hi_coverage_status: COVERAGE_VALUE_NOTE,
+  hi_payer_type: COVERAGE_VALUE_NOTE,
+}
+
+// N-14-4 값으로 확인되는 경우와 구분 값에만 감점 안내를 붙인다.
 function getShapNote(factor) {
   if (!(factor.shapScore < 0)) return null
   if (factor.featureCode === 'debt_balance_krw' && Number(factor.featureValue) === 0 && factor.featureValue != null) {
@@ -23,7 +34,7 @@ function getShapNote(factor) {
   if (factor.featureCode === 'dp_active_months' || factor.featureCode === 'dp_payment_amount_12m_krw') {
     return "간편결제를 꾸준히 쓴 기간이나 금액이 적으면 감점으로 나타날 수 있어요. 합성 데이터에 '꾸준히 쓰는지'를 반영해 만든 방향이에요."
   }
-  return null
+  return SHAP_NOTES[factor.featureCode] ?? null
 }
 
 // N-14-2·N-14-3·N-14-4 항목별 점수 기여도를 정렬해 표시한다.
@@ -61,7 +72,7 @@ export default function ShapFactorsCard({ shap, alternativeScore }) {
             <span><i className="shap-swatch shap-positive" />점수를 올리는 쪽으로 작용</span>
             <span><i className="shap-swatch shap-negative" />점수를 내리는 쪽으로 작용</span>
             <span><b className="shap-tag">대안</b> 대안 데이터 항목</span>
-            <span>모델이 점수를 계산할 때 각 항목이 쓰인 정도이며, 그 항목 때문에 점수가 바뀌었다는 뜻(원인·결과)은 아니에요. 점수는 합성 데이터로 만든 교육용 예시예요.</span>
+            <span className="shap-note">모델이 점수를 계산할 때 각 항목이 쓰인 정도이며, 그 항목 때문에 점수가 바뀌었다는 뜻(원인·결과)은 아니에요.</span>
           </div>
           <div className="l-stack">
             {visibleFactors.map((factor) => {
