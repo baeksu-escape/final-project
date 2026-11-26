@@ -37,5 +37,7 @@
 .cf-summary__item { display: grid; gap: 2px; padding: 14px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; }
 .cf-summary__item--wide { grid-column: 1 / -1; }
 .cf-breakdown { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 4px 12px; }
+/* N-21-5 펼친 월별 항목의 목록 점을 없애고 summary 표시 뒤에 맞춰 들여쓴다. */
+.cf-breakdown details ul { list-style: none; margin: 4px 0 0; padding-left: 1em; }
 .cf-big { font: 700 22px/1.2 var(--f-d); font-variant-numeric: tabular-nums; }
 @media (max-width: 960px) { .cf-layout, .cf-summary { grid-template-columns: 1fr; } }
