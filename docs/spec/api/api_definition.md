@@ -57,7 +57,7 @@
 | 평가 식별자 | 화면과 URL에는 `ASSESSMENT_ID` 대신 **`REQUEST_ID`(소문자 UUID)**만 쓴다. 번호를 추측해 남의 결과를 보는 것을 막기 위해서다 | DDL `ASSESSMENT.REQUEST_ID` 주석 |
 | 형식 | JSON, UTF-8. 필드는 camelCase, 경로는 kebab-case. 코드값은 DB 코드 그대로 쓴다(`SELF_EMPLOYED`, `SCORED` 등) | 기존 코드 |
 | 금액·비율 | 금액은 원 단위 정수, 금리는 연 %(8.9 = 8.9%), 확률은 0~1 | DDL 머리말 |
-| 점수 | **0~1000** 정수. 등급은 `GOOD` / `STANDARD` / `CAUTION`(ACTIVE CUT-0.1: 0~664 / 665~779 / 780~1000, 🟡 임시값. 11/19 `CUT-0.2` 0~659 / 660~730 / 731~1000이 DRAFT로 추가됐고 전환 시점은 팀이 정함, PR #106 🆕 11/20) | DDL v0.3.1 A-1 |
+| 점수 | **0~1000** 정수. 등급은 `GOOD` / `STANDARD` / `CAUTION`(ACTIVE CUT-0.3: 0~653 / 654~726 / 727~1000, 🟡 임시값. 11/23 `CUT-0.1`(0~664 / 665~779 / 780~1000)에서 전환, FP-248 🆕 11/23. `CUT-0.2` 0~659 / 660~730 / 731~1000은 DRAFT) | DDL v0.3.1 A-1 |
 | 날짜 | 월 `"YYYY-MM"`, 날짜 `"YYYY-MM-DD"`, 시각은 ISO-8601 | DDL CHECK |
 | 오류 응답 | HTTP 상태 + `{ "code", "message", "fieldErrors": [{ "field", "message" }] }`. ✅ 전 API 공통(FP-87 `GlobalExceptionHandler`, D-20 확정 🆕 11/20) | 프론트 `serverErrors.js` |
 | 개인정보 | 이름·휴대폰·이메일은 마스킹해서 응답한다. 원문은 로그에 남기지 않는다. 관리자가 회원 신용정보를 열람하면 `ACCESS_AUDIT_LOG`에 남긴다 | AGENTS.md 5장, DDL N-35 |
@@ -76,7 +76,7 @@
 | 400 | `INVALID_INPUT` | 입력 형식 오류(`fieldErrors` 포함) |
 | 400 | `INVALID_PASSWORD` | 비밀번호 확인 실패(MEM-02·MEM-07 등) |
 | 400 | `INVALID_VERIFICATION_CODE`, `VERIFICATION_CODE_EXPIRED`, `VERIFICATION_ATTEMPTS_EXCEEDED` | 인증번호 틀림·만료·5회 초과 |
-| 400 | `EMAIL_VERIFICATION_REQUIRED`, `SAME_EMAIL`, `SAME_PASSWORD` | 이메일 인증 누락, 같은 값으로 변경 |
+| 400 | `EMAIL_VERIFICATION_REQUIRED`, `SAME_EMAIL`, `SAME_PASSWORD`, `SAME_NICKNAME` | 이메일 인증 누락, 같은 값으로 변경(SAME_NICKNAME은 MEM-08, FP-222) 🆕 11/23 |
 | 400 | `ADMIN_CHALLENGE_INVALID`, `PASSWORD_SETUP_INVALID` | 관리자 1회용 토큰 만료·재사용 |
 | 400 | `ACCESS_REASON_REQUIRED` | ADM-08 사유 없음 |
 | 400 | `INVALID_SOCIAL_CODE`, `SOCIAL_LINK_EXPIRED` | 간편 로그인 코드·연결 키 문제 |
@@ -90,7 +90,7 @@
 | 404 | `NOT_FOUND`, `ACCOUNT_NOT_FOUND` | 대상 없음 |
 | 404 | `PRODUCT_NOT_FOUND` | 없는 대출 상품 코드(LOAN-02·04·05, 경환 FP-90) 🆕 11/20 |
 | 409 | `DUPLICATE_LOGIN_ID`, `DUPLICATE_EMAIL`, `DUPLICATE_NICKNAME`, `NICKNAME_UNAVAILABLE` | 중복 |
-| 409 | `JOB_TYPE_REQUIRED`, `JOB_TYPE_ALREADY_SELECTED` | 직군 선택 전 저장 / 직군 재선택 |
+| 409 | `JOB_TYPE_REQUIRED`, `JOB_TYPE_ALREADY_SELECTED`, `JOB_TYPE_LOCKED` | 직군 선택 전 저장 / 직군 재선택 / 입력 저장 뒤 직군 변경(MEM-05) 🆕 11/23 |
 | 409 | `CONSENT_REQUIRED` | 동의 없이 불러오기 |
 | 409 | `CREDIT_PROFILE_IMPORTED` | 같은 기준일에 불러온 신용 정보가 있어 직접 입력 저장 불가 |
 | 409 | `SOCIAL_ALREADY_LINKED` | 이미 연결된 간편 로그인 |
@@ -112,6 +112,7 @@
 | 404 | `ASSESSMENT_NOT_FOUND` | SIM-01·02, DIAG-09: 점수가 나온(SCORED) 평가가 하나도 없음 — 리포트(RPT-02)와 같은 코드 |
 | 409 | `VERSION_MISMATCH` | SIM-02: ML-04가 출발 평가의 모델 버전을 계산할 수 없음 → "점수를 다시 산출한 뒤 이용" 안내 |
 | 409 | `INPUT_INCOMPLETE` | DIAG-09: 입력 기준월·출생연도 없음, 소득이 직군에 필요한 개월 수보다 적거나 같은 달이 겹침(점수 산출과 같은 문구) 🆕 11/20 |
+| 409 | `ALT_DATA_EMPTY` | DIAG-09: 통신비 또는 공과금 기관 기록이 0건이라 ML-03을 부르지 않음 → "통신비·공과금 기록이 없어 예상 점수를 계산할 수 없어요." (점수 산출 RPT-01의 `NOT_SCORABLE` `ALT_DATA_EMPTY`와 같은 기준, FP-239 리뷰 후속) 🆕 11/23 |
 | 503 | `MODEL_NOT_READY` | SIM-02·DIAG-09: 실제 모델 파일 없음, 연결 실패, 타임아웃, 그 밖의 5xx. 저장하지 않으므로 `MODEL_ERROR` 기록 없음 |
 
 - 커뮤니티(동주, PR #80) 오류 code: 403 `NOT_OWNER`(남의 글 수정·삭제), 404 `POST_NOT_FOUND`·`TARGET_NOT_FOUND`·`REPORT_NOT_FOUND`, 409 `OWN_CONTENT`(본인 글 신고)·`DUPLICATE_REPORT`·`POST_HIDDEN`·`STATUS_CHANGED`·`ALREADY_HANDLED`, 429 `DAILY_LIMIT_EXCEEDED`(하루 3번 초과).
@@ -153,6 +154,9 @@
 | MEM-05 | `PATCH /api/members/me/job-type` | N-05-1 직군 선택 (입력 저장 전에는 다시 고를 수 있음. 같은 직군이면 200, 저장한 입력이나 평가가 있으면 409 `JOB_TYPE_LOCKED`, 그사이 다른 요청이 먼저 바꿨으면 409 `JOB_TYPE_ALREADY_SELECTED`) 🆕 11/20 | `APP_USER`, `USER_ASSET_SNAPSHOT`·`ASSESSMENT`(잠금 판단에 읽기만) | USER | ✅ |
 | MEM-06 | `GET /api/members/me/diagnoses` | N-04-6 진단 내역 조회 | `ASSESSMENT` | USER | ✅ **구현됨 (FP-142, 실제 연결 확인 11/16)** (응답 상세: B팀 명세서 3-4) |
 | MEM-07 | `DELETE /api/members/me` | N-04-7 회원 탈퇴 `{ password }` — 상태 `WITHDRAWN`·개인정보 덮어쓰기, 소셜 연결·인증 기록·동의로 불러온 데이터 삭제, 직접 입력·평가는 보관. 간편 로그인 전용 계정은 토큰 발급 10분 이내로 확인(넘으면 403 `RECENT_LOGIN_REQUIRED`) | `APP_USER`, `USER_*`, `SYSTEM_LOG` | USER | ✅ |
+| MEM-08 | `PATCH /api/members/me/nickname` 🆕 11/23 | N-04-3 계정 관리 (닉네임 변경 `{ nickname }`, 규칙은 가입과 같음. 중복 확인은 AUTH-13. 같은 닉네임이면 400 `SAME_NICKNAME`, 다른 회원이 쓰면 409 `DUPLICATE_NICKNAME`) | `APP_USER` | USER | ✅ (FP-222) |
+
+- [게시판관리] 탭은 COMM-08·09(🟡, C팀 확정 대기)가 생기면 연결한다. 🆕 11/23
 
 ### 2-3. 데이터 입력 — 담당 우찬 (FP-75)
 
@@ -188,7 +192,7 @@
 | RPT-02 | `GET /api/report/me` | N-12-1 저장 데이터 조회, N-12-3 점수 차이·등급 변화 계산, N-12-6 점수·등급 비교 표시, N-12-7 부도 확률 표시, N-14 영역별 영향도(SHAP) | `ASSESSMENT`, `ASSESSMENT_FACTOR`, `DIM_FEATURE`, `SCORE_GRADE_BAND` | USER | ✅ **구현됨 (FP-142, 실제 연결 확인 11/16)** 경로 / 🟡 응답 (B팀 명세서 3-2) |
 | RPT-03 | `GET /api/report/{requestId}` | N-04-6 진단 내역 조회 (지난 평가 1건 상세) | 위와 같음 | USER | ✅ **구현됨 (FP-142, 실제 연결 확인 11/16)** (B팀 명세서 3-3) |
 | RPT-04 | `POST /api/report/{requestId}/ai-summary` | N-12-5 AI 결과 요약 요청, N-31-2 AI 요약 생성·저장 | `ASSESSMENT.AI_SUMMARY` | USER | 🟡 담당 광희 (FP-179) |
-| RPT-05 | `GET /api/report/me/percentile` | N-13-2 같은 직군 점수 분포 조회, N-13-3 백분위·중앙값 계산 | `ASSESSMENT` | USER | 🟡 담당 확인 필요 |
+| RPT-05 | `GET /api/members/me/score-percentile` 🆕 11/23 | N-13-1 저장 데이터 조회, N-13-2 같은 직군·연령대·직군+연령대 점수 조회, N-13-3 상위 n%·평균 대비 차이 계산. 집계 기준은 ADM-03과 같음(ACTIVE 모델의 회원별 최근 SCORED 평가, 탈퇴 제외), 5명 미만 집단은 값 숨김. 내 점수가 없으면 404 `ASSESSMENT_NOT_FOUND` 🆕 11/23 | `ASSESSMENT`, `APP_USER` 🆕 11/23 | USER | ✅ 담당 동주 (FP-251, C팀 명세서 N-13) 🆕 11/23 |
 
 ### 2-5. 재무 진단 — 담당 동주·광희
 
@@ -205,7 +209,7 @@
 | DIAG-07-1 | `GET /api/members/me/income-volatility` 🆕 11/20 | N-22-1 저장 데이터 조회 + N-22-3·4·5 (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM` | USER | 광희 (FP-203) | ✅ |
 | DIAG-08 | `POST /api/diagnosis/cash-flow/forecast` | N-21-5 현금흐름 전망 계산, N-21-6 최근 12개월 적자 개월 수 계산, N-21-7 성수기·비수기 소득 격차 계산, N-21-9 과거 월 실적 `months[]`(요청의 `past12MonthsHistory`를 같은 모양으로 돌려줌) (요청 본문으로 계산, DB 안 읽음) | — | USER | 광희 (FP-203) | ✅ |
 | DIAG-08-1 | `GET /api/members/me/cash-flow-forecast` 🆕 11/20 | N-21-1 저장 데이터 조회 + N-21-2 전망 조건(쿼리, `incomeVariationPct`·`fixedExpenseAmount`·`paymentStatus` 추가) + N-21-5·6·7 + N-21-9 과거 월 실적 `months[]`(최대 12개) (로그인 회원 본인, **화면이 쓰는 쪽**) | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM`, `USER_LOAN` | USER | 광희 (FP-203) | ✅ |
-| DIAG-09 | `POST /api/members/me/cash-flow-expected-score` 🆕 11/20 | N-21-8 예상 대안 점수 재계산 (FastAPI ML-03을 ACTIVE 모델로 1번 호출, 저장 안 함 — O-6 확정). 응답 `expectedScore`·`scoreDiff`·`modelVersion`·`baseModelVersion`. 🆕 11/20 밀림 반영: `paymentStatus=DELAYED`면 최근 1년 30일 이상 연체(`DQ1200001`)를 +1로 가정, 응답 `assumedDelinquencyCount`(넣은 건수) 추가, `paymentStatusApplied`는 DELAYED일 때 `true` | 읽기만 (`ASSESSMENT` 최근 SCORED, 입력 표) | USER | 광희 (FP-170, 밀림 FP-239) | ✅ (PR #93) |
+| DIAG-09 | `POST /api/members/me/cash-flow-expected-score` 🆕 11/20 | N-21-8 예상 대안 점수 재계산 (FastAPI ML-03을 ACTIVE 모델로 1번 호출, 저장 안 함 — O-6 확정). 응답 `expectedScore`·`scoreDiff`·`modelVersion`·`baseModelVersion`. 🆕 11/20 밀림 반영: `paymentStatus=DELAYED`면 최근 1년 30일 이상 연체(`DQ1200001`)를 +1로 가정, 응답 `assumedDelinquencyCount`(넣은 건수) 추가, `paymentStatusApplied`는 DELAYED일 때 `true`. 🆕 11/23 통신비·공과금 기관 기록이 없으면 409 `ALT_DATA_EMPTY` | 읽기만 (`ASSESSMENT` 최근 SCORED, 입력 표) | USER | 광희 (FP-170, 밀림 FP-239) | ✅ (PR #93) |
 | ~~DIAG-10~~ | ~~`GET /api/commercial/dongs/{admDongCode}`~~ | N-24-2 소상공인 상권 분석, N-24-3 상권 분석 차트, N-24-5 행정동 상세 창 | — (상권 표 5개는 DDL에서 제거, 11/14) | USER | C조 | ⛔ **API 만들지 않음** — 화면이 정적 JSON(`frontend/public/data/market/`)을 읽는다(N-24 결정) |
 | ~~DIAG-11~~ | ~~`GET /api/commercial/heatmap`~~ | N-24-4 상권 공간 시각화 (지도 히트맵) | 위와 같음 | USER | C조 | ⛔ 위와 같음 |
 
@@ -231,10 +235,10 @@
   1. 점수를 300~900으로 자르던 것 → **0~1000**
   2. 화면이 현재 점수(`currentScore`)를 보내던 것 → **보내지 않는다.** 요청은 `{ changes }`뿐이고, 서버가 저장된 최신 평가의 `FEATURE_SNAPSHOT`·`MODEL_VERSION`을 출발점으로 쓴다.
   3. `altDataBonusDiff` → **삭제.** FastAPI와 같은 `delta.financialEffect`·`delta.alternativeEffect`를 쓴다.
-  4. 바꿀 수 있는 입력은 10개로 확정(공과금 미납 개월 수 `UTILITY_LATE_MONTHS` 포함, 11/17 범영). 통신비 정시 납부 범위는 0~12개월이다(B팀 명세서 4-4).
+  4. 바꿀 수 있는 입력은 10개로 확정(공과금 미납 개월 수 `UTILITY_LATE_MONTHS` 포함, 11/17 범영). 통신비 정시 납부 범위는 0~12개월이다(B팀 명세서 4-4, 11/20 범영·광희 확정).
 - ✅ 11/17 광희 확인: SIM-02는 ML-04 규칙(10개 키, 모르는 키 422, 카드 한도·사용액 함께, 바뀌지 않은 값은 보내지 않음)에 맞춰 처음부터 만든다. ML-04 422의 `fieldErrors`는 공통 `INVALID_INPUT`으로 바꿔 화면에 전달한다.
 - ✅ 11/17 범영 결정: **입력 범위 검사는 Spring SIM-02가 화면 범위로 먼저 한다.** FastAPI ML-04는 지금 범위를 검사하지 않고 그대로 계산한다(소수는 정수로 자름).
-- SIM-02 범위: 10개 키 모두 0 이상 정수, `TELECOM_ON_TIME_MONTHS`·`UTILITY_LATE_MONTHS`는 0~12. 나머지 상한은 화면 슬라이더 범위가 정해지면 추가한다. `EASYPAY_MONTHLY_COUNT`는 **월 횟수 그대로** 보낸다. 🟡 FastAPI ML-04가 지금은 × 12로 12개월 값을 만들지만, 변환 방식은 피처 정의서 9장에서 아직 정하지 않았다(코드 TODO). `null`은 키를 뺀 것과 같다.
+- SIM-02 범위: 10개 키 모두 0 이상 정수, `TELECOM_ON_TIME_MONTHS`·`UTILITY_LATE_MONTHS`는 0~12. ~~나머지 상한은 화면 슬라이더 범위가 정해지면 추가한다.~~ `DELINQ_COUNT_12M` 0~6, `CASH_ADVANCE_MONTHS` 0~10, `NEW_LOAN_COUNT_3M` 0~4, `EASYPAY_MONTHLY_COUNT` 0~60이며 상한 초과는 400 `INVALID_INPUT`(각 필드 "0~N 사이로 입력해 주세요.")이다 🆕 11/25. `EASYPAY_MONTHLY_COUNT`는 **월 횟수 그대로** 보낸다. 🟡 FastAPI ML-04가 지금은 × 12로 12개월 값을 만들지만, 변환 방식은 피처 정의서 9장에서 아직 정하지 않았다(코드 TODO). `null`은 키를 뺀 것과 같다.
 - SIM-02 응답 = ML-04 응답에서 `requestId`·`shap`을 빼고 감점 요인에 `featureName`을 더한다(그 평가의 `FEATURE_SET_VERSION`으로 `DIM_FEATURE` 조회. Mock `FS-DRAFT` 39개 / 실제 `FS-V1` 38개).
 - SIM-02 오류 전달: ML-04 422 → 400 `INVALID_INPUT`, 503 `MODEL_NOT_READY` → 503, 409 `VERSION_MISMATCH` → 409(점수를 다시 산출하라는 안내), 연결 실패·타임아웃·그 밖의 5xx → 503 `MODEL_NOT_READY`. 시뮬레이터는 저장하지 않으므로 NOT_SCORABLE로 저장하지 않는다.
 - SIM-04는 금리·한도·등급만 돌려주는 실제 API다. SIM-03은 만들지 않고, 시뮬레이터의 상품 추천은 화면이 SIM-04와 LOAN-01(대출 상품 목록, 경환 FP-90)을 합쳐 보여 준다. 🆕 11/20
@@ -264,9 +268,12 @@
 | COMM-05 | `DELETE /api/board/posts/{postId}` | N-06-6 내 글 삭제 (`DELETED`, 미처리 신고는 남음) | `BOARD_POST`, `BOARD_POST_LOG` | USER | ✅ (PR #80) |
 | COMM-06 | `GET`·`POST /api/board/posts/{postId}/comments` | N-06-3 댓글 작성·조회 (1000자) | `BOARD_COMMENT` | USER | ✅ (PR #80) |
 | COMM-07 | `POST /api/reports` | N-06-4 신고하기 진입, N-33-1 신고 접수, N-33-2 기준 건수 자동 숨김 (본인 글 불가, 같은 대상 중복 불가, 하루 3번, '기타'만 상세 500자) | `CONTENT_REPORT`, `APP_SETTING` | USER | ✅ (PR #80) |
+| COMM-08 | `GET /api/members/me/posts?page&size` | 마이페이지 [게시판관리] 내가 쓴 글 목록 (N-ID 미정). 본인 글만, 삭제 글 제외, 숨김 글은 `hidden: true`. `page`·기본 개수는 COMM-01 규칙(1부터, 기본 10개). 응답 `{ items: [{ postId, title, createdAt, commentCount, hidden }], page, size, totalCount }` | `BOARD_POST`, `BOARD_COMMENT` | USER | 🟡 제안 (우찬, FP-222 화면에서 사용 예정. 담당·경로는 C팀 확정) 🆕 11/23 |
+| COMM-09 | `GET /api/members/me/comments?page&size` | 마이페이지 [게시판관리] 내가 쓴 댓글 목록 (N-ID 미정). 본인 댓글만, 삭제된 글의 댓글 제외. `page`·기본 개수는 COMM-01 규칙(1부터, 기본 10개). 응답 `{ items: [{ commentId, postId, postTitle, content(앞부분), createdAt }], page, size, totalCount }` | `BOARD_COMMENT`, `BOARD_POST` | USER | 🟡 제안 (우찬, FP-222 화면에서 사용 예정. 담당·경로는 C팀 확정) 🆕 11/23 |
 
 - 게시글 본문은 DDL C9로 `CLOB` → `VARCHAR2(1300 CHAR)`(PR #80). 기존 DB는 `docs/spec/sql/alter_board_post_content_varchar2.sql`. 공용 DB는 11/18 적용 완료(범영). CLOB 상태의 DB에서도 글쓰기·검색·수정·삭제가 동작하는 것을 11/17 로컬에서 확인했다.
 - 탈퇴 회원 글은 그대로 두고 작성자만 "탈퇴한 회원"으로 표시한다. 알림(D-25)은 넣지 않았다.
+- COMM-08·09는 마이페이지 [게시판관리] 탭(FP-222)이 쓸 API 제안이다. 경로는 1장 공통 규칙(본인 데이터는 `/api/members/me/**`)에 맞췄다. 구현 전까지 화면은 '준비 중' 안내만 보여 준다. 🆕 11/23
 
 ### 2-9. 도움말·AI — 담당 광희 (FP-179)
 
@@ -284,8 +291,8 @@
 |---|---|---|---|---|---|
 | ADM-01 | `GET /api/admin/model-performance?group=LEGACY\|THINFILE&label=DELINQ\|NONFIN&cutoff=600~800` 🆕 11/20 | N-25-1 비교 조건 선택, N-25-2 성능 지표 재계산·비교 표, N-25-4 직군별 우량 고객 오거절률 | `MODEL_EVAL_SAMPLE`(평가 표본 3,085건, PR #99 🆕 11/20), `MODEL_ARTIFACT`(같은 라벨 AUC `METRICS_JSON.same_label_comparison`, PR #98 🆕 11/20) | 동주 (FP-184) 🆕 11/20 | ✅ ACTIVE 모델(지금 `LGBM-BASE-0.2`) 기준 🆕 11/20 |
 | ADM-02 | `GET /api/admin/model-performance/roc?group=…&label=…` 🆕 11/20 | N-25-3 ROC 곡선 | 위와 같음 | 동주 (FP-184) 🆕 11/20 | ✅ 🆕 11/20 |
-| ADM-03 | `GET /api/admin/stats` | N-26-1 구분·지표 선택, N-26-2 요약 수치, N-26-3 분포 차트, N-26-4 통계 표·직군별 점수 표 | `ASSESSMENT` | 확인 필요 (Q-10) | 🟡 |
-| ADM-04 | `GET /api/stats/compare` | N-26-5 비교 분석 화면 (사용자), N-26-6 직군 × 연령 격자·선택한 집단, N-26-7 직군별·연령별 비교 | `ASSESSMENT` | 광희 (FP-159) | ⛔ (사용자 쪽은 미정) |
+| ADM-03 | `GET /api/admin/stats?groupBy=WORKER_TYPE\|AGE_BAND` 🆕 11/20 | N-26-1 구분 선택(직군별·연령대별), N-26-2 요약 수치(평가 고객 수·평균 기존·대안 점수·상승폭·Standard 이상 비율 기존·대안·가입 회원 수·오늘 산출), N-26-3 기존·대안 등급 분포, N-26-4 그룹별 통계 표(🆕 11/23 기존 모델 등급 값 추가). 서비스 회원이 ACTIVE 모델로 낸 최근 SCORED 평가(🆕 11/23 ACTIVE가 아닌 모델의 평가 제외), 탈퇴 회원 제외, 값마다 계산 인원 5명 미만이면 숨김(D-26·D-28 담당자 결정) | `ASSESSMENT`, `APP_USER` | 광희 (FP-161) 🆕 11/20 | ✅ 🆕 11/20 |
+| ADM-04 | `GET /api/members/me/group-comparison` 🆕 11/23 | N-26-5 비교 분석 화면 (사용자), N-26-6 직군 × 연령 격자·선택한 집단, N-26-7 직군별·연령별 비교. 전체·직군 3·연령대 4·격자 12칸과 내 평가(`me`)를 한 번에 준다. 집계 기준은 ADM-03과 같다(ACTIVE 모델 최근 SCORED 평가, 탈퇴 제외, 값마다 5명 미만 숨김, 11/23 동주 합의). 일반 회원만(Q-8 경로) | `ASSESSMENT`, `APP_USER` | 광희 (FP-164) 🆕 11/23 | ✅ 🆕 11/23 |
 | ADM-05 | `GET /api/admin/users?q&role&status&page&size` | N-27-1 계정 목록 조회·검색 (size 최대 100) | `APP_USER` | 경환·우찬 (FP-80) | ✅ |
 | ADM-06 | `PATCH /api/admin/users/{userId}/lock` | N-27-3 회원 계정 잠금 `{ locked, reason }` (잠글 때 reason 필수, 본인·탈퇴 409) | `APP_USER` | 경환·우찬 | ✅ |
 | ADM-07 | `POST /api/admin/admins` | N-27-4 관리자 계정 추가 (임시 비밀번호), `X-Step-Up-Token` 필요 | `APP_USER` | 경환·우찬 | ✅ |
@@ -336,7 +343,7 @@
 | N-23 가산점, N-36 비회원 간이 예측 | 삭제된 기능 |
 | N-24 상권 분석 API (DIAG-10·11) | 화면이 정적 JSON(`frontend/public/data/market/`)을 읽는다. 상권 표 5개는 DDL에서 제거(11/14, C조 결정) |
 | (A팀) 관리자 2단계 인증의 이메일 외 수단(TOTP 등), 1회용 토큰 저장소(DB·Redis), `VERIFICATION_CODE.PURPOSE_CODE`에 `ADMIN_STEP_UP` 추가(DDL 제안) | 2차로 넘김 |
-| (A팀) 자산 4칸 개별 저장(DDL 열 필요), 금융(대출) 불러오기, 간편 로그인 재인증 화면, N-01-5 시연 계정 [채우기] | 2차로 넘김 |
+| (A팀) 금융(대출) 불러오기, 간편 로그인 재인증 화면, N-01-5 시연 계정 [채우기] 🆕 11/23 | 2차로 넘김 |
 
 ## 4. 담당 팀이 정해야 할 것
 
@@ -346,9 +353,10 @@
 | ~~Q-2~~ | ~~INP-03에 `utility` 공과금 추가~~ ✅ **해결:** 추가 완료 | — |
 | ~~Q-3~~ | ~~INP-04~06 동의 API 경로~~ ✅ **해결:** 구현 완료 | — |
 | ~~Q-4~~ | ~~SIM-02 mock의 점수 범위, 출발점, 필드 이름~~ ✅ **해결:** PR #78에서 모두 고침(2-6) | — |
-| Q-5 | RPT-05(N-13 백분위) 담당. ~~DIAG-03(N-16 건전성)~~ ✅ 광희(FP-166) | 팀 전체 |
+| ~~Q-5~~ | ~~RPT-05(N-13 백분위) 담당~~ ✅ **해결 🆕 11/23:** 동주(FP-251). ~~DIAG-03(N-16 건전성)~~ ✅ 광희(FP-166) | — |
 | Q-6 | 🟡 경로 전체 확정 (각 담당) | 각 팀 |
 | ~~Q-7~~ | ✅ 해결(🆕 11/20): 오류 응답 형식은 D-20 확정(1장 공통 형식), FastAPI 타임아웃은 설정값으로 분리(D-18, Gemini만 남음) | 팀 전체 |
 | ~~Q-8~~ | ~~DIAG-07-1·08-1 경로~~ ✅ **해결:** `/api/members/me/…`로 이동(광희 PR #103, 우찬 합의, SIM-01·02·DIAG-09 포함) 🆕 11/20 | — |
 | ~~Q-9~~ | ~~SIM-03·대출 상품 담당~~ ✅ **해결:** 대출 상품 LOAN-01~05 경환(FP-90, PR #101), SIM-03은 만들지 않고 SIM-04 + LOAN-01로 대신 🆕 11/20 | — |
-| Q-10 | ADM-03(N-26 관리자 통계) 담당과 Jira 번호. 정의서에 있던 FP-191은 커뮤니티 카드였다. 비교 통계는 FP-159(광희) | 광희·동주 |
+| ~~Q-10~~ | ~~ADM-03(N-26 관리자 통계) 담당과 Jira 번호. 정의서에 있던 FP-191은 커뮤니티 카드였다. 비교 통계는 FP-159(광희)~~ ✅ **해결 🆕 11/20:** 광희, API FP-161·화면 FP-162 | — |
+| Q-11 | COMM-08·09(내가 쓴 글·댓글 목록) 구현 담당·경로·응답 필드 확정, 기능 정의서 N-ID 부여 🆕 11/23 | C팀(동주) |

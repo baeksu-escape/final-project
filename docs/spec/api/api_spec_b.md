@@ -153,11 +153,11 @@
   "alternative": { "scorableYn": "Y", "score": 701, "gradeBandCode": "STANDARD", "defaultProb": 0.092115 },
   "comparison": { "scoreDiff": 89, "gradeChanged": true },
   "gradeBands": {
-    "cutoffVersion": "CUT-0.1",
+    "cutoffVersion": "CUT-0.3",
     "bands": [
-      { "gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 664 },
-      { "gradeBandCode": "STANDARD", "minScore": 665, "maxScore": 779 },
-      { "gradeBandCode": "GOOD", "minScore": 780, "maxScore": 1000 }
+      { "gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 653 },
+      { "gradeBandCode": "STANDARD", "minScore": 654, "maxScore": 726 },
+      { "gradeBandCode": "GOOD", "minScore": 727, "maxScore": 1000 }
     ]
   },
   "shap": {
@@ -234,13 +234,13 @@
 - **모델 선택 (FP-141, PR #74)**
   - ML-03: Spring은 DB `MODEL_REGISTRY`의 **ACTIVE** 모델 버전을 `expectedModelVersion`으로 보낸다. **DB의 ACTIVE가 스위치**다.
   - ML-04: Spring SIM-02는 ACTIVE가 아니라 **출발 평가(최근 SCORED)에 저장된** `MODEL_VERSION`을 `baseAssessment.modelVersion`으로 보낸다. 저장된 피처값과 같은 모델로 다시 계산해야 하기 때문이다(4-4, FP-170 PR #93). 정정
-  - `DEV-DUMMY`(또는 버전 없음) → Mock(`FS-DRAFT` 39개), `LGBM-BASE-0.1` → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`
+  - `DEV-DUMMY`(또는 버전 없음) → Mock(`FS-DRAFT` 39개), **불러온 실제 모델 묶음의 버전**(🆕 11/23 지금 `LGBM-BASE-0.2`, `fastapi_server/artifacts/*.meta.json`의 `model_version`. 모델 파일은 Git에 넣지 않고 팀 파일 공유로 받으며, 공용 DB의 ACTIVE 모델도 같은 버전이다 — FP-237) → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`
   - 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503 `MODEL_NOT_READY`(11/17 범영·재욱 합의)
   - 공용 DB는 11/18 `LGBM-BASE-0.1`(FP-216)에 이어 **11/20 `LGBM-BASE-0.2`로 전환 완료**(FP-237, 🆕 11/20). 학습 데이터·모델 파일 기록은 `docs/spec/sql/register_model_lgbm_base_0_1.sql`(PR #88). 전환은 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`, 되돌리기는 `rollback_model_to_dev_dummy.sql`(PR #77, 절차: `fastapi_server/README.md`). 0.2는 `register_model_lgbm_base_0_2.sql` → `activate_model_lgbm_base_0_2.sql`, 되돌리기 `rollback_model_lgbm_base_0_2_to_0_1.sql`(PR #110·#113)
 
 ### 4-1. ML-01 `GET /v1/health`
 ```json
-{ "status": "UP", "modelLoaded": true, "modelVersion": "LGBM-BASE-0.1", "supportedModelVersions": ["DEV-DUMMY", "LGBM-BASE-0.1"] }
+{ "status": "UP", "modelLoaded": true, "modelVersion": "LGBM-BASE-0.2", "supportedModelVersions": ["DEV-DUMMY", "LGBM-BASE-0.2"] }
 ```
 - `modelLoaded`: **실제 모델 파일**을 불러왔는지. Mock은 파일이 없어도 늘 쓸 수 있다. `false`면 `modelVersion`은 `DEV-DUMMY`다.
 - 서버가 켜져 있으면 늘 200 `"status": "UP"`이다. 공용 DB를 실제 모델로 바꾸기 전에 `modelLoaded: true`를 꼭 확인한다.
@@ -251,14 +251,14 @@ Spring이 시작할 때 한 번 부른다. 세 버전이 DB에 있는지 확인�
 {
   "modelVersion": "DEV-DUMMY",
   "featureSetVersion": "FS-DRAFT",
-  "cutoffVersion": "CUT-0.1",
-  "gradeBands": [ { "gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 664 } ],
-  "supportedModelVersions": ["DEV-DUMMY", "LGBM-BASE-0.1"],
+  "cutoffVersion": "CUT-0.3",
+  "gradeBands": [ { "gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 653 } ],
+  "supportedModelVersions": ["DEV-DUMMY", "LGBM-BASE-0.2"],
   "features": [ { "featureCode": "telecom_on_time_streak", "alternativeYn": "Y", "simulatableYn": "Y" } ]
 }
 ```
 - `gradeBands`와 `features`가 DB(`SCORE_GRADE_BAND`, `DIM_FEATURE`)와 다르면 Spring이 경고 로그를 남긴다.
-- 실제 모델을 불러왔으면 그 묶음의 버전(예: `LGBM-BASE-0.1`) / `FS-V1` / 피처 38개, 아니면 Mock `DEV-DUMMY` / `FS-DRAFT` / 39개를 돌려준다. `supportedModelVersions`는 이 서버가 지금 계산할 수 있는 버전 목록이다: `DEV-DUMMY` + 불러온 묶음의 버전(못 불러왔으면 `DEV-DUMMY`만). 🆕 11/20
+- 실제 모델을 불러왔으면 그 묶음의 버전(예: `LGBM-BASE-0.2` 🆕 11/23) / `FS-V1` / 피처 38개, 아니면 Mock `DEV-DUMMY` / `FS-DRAFT` / 39개를 돌려준다. `supportedModelVersions`는 이 서버가 지금 계산할 수 있는 버전 목록이다: `DEV-DUMMY` + 불러온 묶음의 버전(못 불러왔으면 `DEV-DUMMY`만). 🆕 11/20
 - 🆕 11/20 실제 모델 버전은 코드 상수가 아니라 불러온 묶음의 `meta.json`(`model_version`)에서 정한다(FP-237). 모델을 바꿀 때 코드는 그대로 두고 파일 교체 + DB 등록·전환 SQL만 한다.
 
 ### 4-3. ML-03 `POST /v1/assessments/score` — N-12-2 점수 계산
@@ -299,7 +299,7 @@ Spring이 시작할 때 한 번 부른다. 세 버전이 DB에 있는지 확인�
 
 - 자산(`USER_ASSET_SNAPSHOT`)은 모델 입력이 아니라 보내지 않는다(결정 #2).
 - **이상치 고정 상한 (피처 정의서 C8, 임시):** 12개월 소득 합계 20억 원 초과, 평균 월 지출 2억 원 초과, 월 상환액 0 미만이면 FastAPI가 그 값과 **그 값으로 계산하는 피처를 함께 결측**으로 둔다(11/16 (가)안). 상한은 FastAPI 설정 상수다. 소득 합계 0 이하면 비율 피처도 결측이다.
-- **피처 수:** Mock(`DEV-DUMMY`)은 `FS-DRAFT` 39개, 실제 모델(`LGBM-BASE-0.1`)은 `FS-V1` 38개(피처 정의서 C9로 `LRZ021201` 제외)다. `FS-V1` 시드는 PR #72(재욱)로 추가했고 공용 DB에도 들어 있다(O-17).
+- **피처 수:** Mock(`DEV-DUMMY`)은 `FS-DRAFT` 39개, 실제 모델(`LGBM-BASE-0.1`·`0.2` 🆕 11/23)은 `FS-V1` 38개(피처 정의서 C9로 `LRZ021201` 제외)다. `FS-V1` 시드는 PR #72(재욱)로 추가했고 공용 DB에도 들어 있다(O-17).
 - **1차 모델 구성 (피처 정의서 v1.0, 11/13 임시 결정 · D-29)**
   - **기존 모델 19개:** 소득·지출·상환 9개(`incomeMonths`·`expenses`·`loans`에서 계산) + 프로필 3개(`segment` ← `workerTypeCode`, `age`, `debt_balance_krw` ← 대출 잔액 합) + 신용 이력 7개(`creditProfile` 5개 칸 + 대출 목록에서 `L00000001` 대출 건수, `LRZ021201` 월 상환액 합 × 12)
   - **대안 모델 39개:** 기존 19개 + 대안 데이터 20개(통신·공과금 3, 간편결제 4, 국민연금 6, 건강보험 6, `si_arrears_any` 1). 두 모델의 차이는 **대안 데이터 유무 하나뿐**이다.
@@ -311,7 +311,7 @@ Spring이 시작할 때 한 번 부른다. 세 버전이 DB에 있는지 확인�
 ```json
 {
   "requestId": "3f1c2a9e-8b7d-4c1e-9a2b-1d2e3f4a5b6c",
-  "modelVersion": "DEV-DUMMY", "featureSetVersion": "FS-DRAFT", "cutoffVersion": "CUT-0.1",
+  "modelVersion": "DEV-DUMMY", "featureSetVersion": "FS-DRAFT", "cutoffVersion": "CUT-0.3",
   "traditional": { "scorableYn": "Y", "score": 612, "gradeBandCode": "CAUTION", "defaultProb": 0.183421 },
   "alternative": { "scorableYn": "Y", "score": 701, "gradeBandCode": "STANDARD", "defaultProb": 0.092115 },
   "shap": {
@@ -384,9 +384,9 @@ C팀 SIM-02 `POST /api/members/me/credit-care-recalculate`가 부른다(11/19 �
 ```json
 {
   "requestId": "9b2e4c1a-…",
-  "modelVersion": "DEV-DUMMY", "cutoffVersion": "CUT-0.1",
+  "modelVersion": "DEV-DUMMY", "cutoffVersion": "CUT-0.3",
   "before": { "score": 701, "gradeBandCode": "STANDARD", "defaultProb": 0.092115 },
-  "after":  { "score": 742, "gradeBandCode": "STANDARD", "defaultProb": 0.071530 },
+  "after":  { "score": 742, "gradeBandCode": "GOOD", "defaultProb": 0.071530 },
   "delta":  { "total": 41, "financialEffect": 12, "alternativeEffect": 29 },
   "topReductionFactors": [
     { "rank": 1, "featureCode": "CL0631905", "featureValue": "62", "shapScore": -15, "recoverScore": 10 }
@@ -411,7 +411,7 @@ C팀 SIM-02 `POST /api/members/me/credit-care-recalculate`가 부른다(11/19 �
 
 | 항목 | Mock 동작 |
 |---|---|
-| 버전 | `DEV-DUMMY` / `FS-DRAFT` / `CUT-0.1` (DDL 기준 데이터와 같음) |
+| 버전 | `DEV-DUMMY` / `FS-DRAFT` / `CUT-0.3` (DDL 기준 데이터와 같음, 11/23 CUT-0.1에서 전환 FP-248) |
 | 점수 | 입력에서 정해지는 값이다. 같은 입력이면 같은 점수가 나와서 화면 테스트가 흔들리지 않는다. 범위 0~1000 |
 | SHAP | 점수 합 규칙을 실제와 똑같이 지킨다 |
 | 피처 코드 | ✅ 피처 정의서 v1.0 11장의 39개를 `FS-DRAFT`로 쓴다(정의서가 확정되면 `FS-V1`). 시드 파일 `docs/spec/sql/seed/avenue_seed_dim_feature_fs_draft.sql`(11/13, `avenue_ddl.sql` 다음 실행). 금융 8: `income_cv`, `zero_income_months_12m`, `expense_to_income_pct`, `debt_service_ratio_pct`, `delinq_count_12m`, `max_delinq_days_3m`, `card_util_pct`, `cash_advance_months` / 대안 6: `telecom_on_time_streak`, `telecom_late_months`, `utility_late_months`, `dp_payment_amount_12m_krw`, `np_arrears_months`, `hi_arrears_months`. 시뮬 가능 여부는 임시값 |
@@ -497,7 +497,7 @@ C팀 SIM-02 `POST /api/members/me/credit-care-recalculate`가 부른다(11/19 �
 - **추천:** 신용점수에서 흔히 쓰는 규칙(PDO 방식)을 써요.
   - 기준: "약속을 지킬 사람 20명 : 못 지킬 사람 1명"인 학생을 **700점**으로 정해요.
   - 확률이 반으로 줄어들 때마다 점수를 **40점씩** 올려요.
-  - 이렇게 하면 지금 등급 경계 665점은 못 지킬 확률 약 8.4%, 780점은 약 1.2%예요.
+  - 이렇게 하면 (11/16 당시 CUT-0.1) 등급 경계 665점은 못 지킬 확률 약 8.4%, 780점은 약 1.2%예요. 🆕 11/23 지금 경계는 CUT-0.3(654·727, FP-248)
 
 **O-6. 예상 대안 점수 (N-21-8)** — ✅ 11/16 아래 추천안으로 확정
 - **질문:** "소득이 이렇게 바뀌면 내 점수는?" 하고 **미리 보기**를 할 때, 그 결과를 성적 기록부에 남길지 정해요.

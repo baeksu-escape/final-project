@@ -1,9 +1,9 @@
 import { ApiError } from '../../../common/api/ApiError.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
-import { AUTH_ERROR_CODES, EMAIL_PURPOSES } from '../authConstants.js'
-import { isValidEmail, isValidPassword } from '../validation.js'
+import { AUTH_ERROR_CODES, EMAIL_PURPOSES, SAME_NICKNAME_MESSAGE, SAME_PASSWORD_MESSAGE } from '../authConstants.js'
+import { isValidEmail, isValidPassword, validateNickname } from '../validation.js'
 import { withdrawAllAltDataOfUser } from '../../dataInput/mocks/altDataMockStore.js'
-import { consumeVerification, isMockEmailInUse, requireAccountByToken, withdrawMockAccount } from './authMockHandlers.js'
+import { consumeVerification, isMockEmailInUse, listMockAccounts, requireAccountByToken, withdrawMockAccount } from './authMockHandlers.js'
 import { MY_PAGE_DEMO_PROFILES } from './myPageMockData.js'
 import { deleteMockSocialLinksOfUser } from './socialLoginMockData.js'
 
@@ -82,11 +82,31 @@ registerMockHandlers({
     return {}
   },
 
-  // N-04-3 비밀번호 변경 — 현재 비밀번호를 확인하고 새 비밀번호 규칙을 검사한 뒤 바꾼다.
+  // FP-222 MEM-08 닉네임 변경 — 서버와 같은 순서: 형식(가입과 같은 validateNickname) → 지금 닉네임과 같음 400 → 다른 회원이 씀 409 → 저장.
+  'PATCH /api/members/me/nickname': ({ body, token }) => {
+    const account = requireAccountByToken(token)
+    const nicknameError = validateNickname(body?.nickname)
+    if (nicknameError) throw new ApiError(400, nicknameError, { fieldErrors: [{ field: 'nickname', message: nicknameError }] })
+    const nickname = body.nickname.trim()
+    const current = account.nickname ?? MY_PAGE_DEMO_PROFILES[account.loginId]?.nickname ?? null
+    if (nickname === current) {
+      throw new ApiError(400, SAME_NICKNAME_MESSAGE, { code: AUTH_ERROR_CODES.SAME_NICKNAME, fieldErrors: [{ field: 'nickname', message: SAME_NICKNAME_MESSAGE }] })
+    }
+    if (listMockAccounts().some((item) => item !== account && item.nickname === nickname)) {
+      throw new ApiError(409, '이미 사용 중인 닉네임입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_NICKNAME })
+    }
+    account.nickname = nickname
+    return {}
+  },
+
+  // N-04-3 비밀번호 변경 — 현재 비밀번호를 확인하고 새 비밀번호 규칙을 검사한 뒤 바꾼다. 지금 비밀번호와 같으면 400 SAME_PASSWORD(FP-222, 서버와 같은 순서).
   'PUT /api/members/me/password': ({ body, token }) => {
     const account = requireAccountByToken(token)
     if (!matchesPassword(account, body?.currentPassword)) throw new ApiError(400, '현재 비밀번호가 올바르지 않습니다.')
     if (!isValidPassword(body.newPassword)) throw new ApiError(400, '비밀번호 규칙을 지켜 주세요.')
+    if (matchesPassword(account, body.newPassword)) {
+      throw new ApiError(400, SAME_PASSWORD_MESSAGE, { code: AUTH_ERROR_CODES.SAME_PASSWORD })
+    }
     account.password = body.newPassword
     return {}
   },

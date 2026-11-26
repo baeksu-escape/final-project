@@ -64,6 +64,16 @@
   - mock 직접 호출: 질문 버튼 4개(`presetId`·`question`·`answer`), 비로그인 401
   - 충돌 표시 검사 0건
 
+## 11/26 2차 개발 시작 — 최신 develop(c1d0380, #150~#155) 반영 후 PR
+- 11/23 이후 develop이 138커밋 앞서가 다시 반영했다. 충돌은 없었다(`api_definition.md`·`api_spec_c.md`·`sql/README.md` 자동 병합). 정의서 HELP-02 행은 `✅ FP-181 🆕 11/23`, sql README 경로 표의 질문 버튼 행이 그대로 남은 것을 확인했다.
+- 보안 설정 확인: `/api/chatbot/**`는 임시 개방 목록에 없고 「그 밖의 `/api/**` = 로그인 필요」에 걸린다(코드 변경 없음).
+- 확인
+  - `./mvnw test` 496개 통과(실패 0), `ChatbotServiceTest`·`ChatbotControllerTest` 각 2개 포함
+  - DB 통합 테스트(로컬 Oracle, 키는 일회용 값) 9종 중 `ChatbotMapperIT`·`GlossaryMapperIT` 포함 8종 통과. `ScoreBandOfferMapperIT` 2건 실패는 로컬 DB가 아직 CUT-0.1 등급 구간이라서(기대 CUT-0.3·654, 실제 CUT-0.1·665)이며 이 PR과 무관하다. 로컬에 `activate_cutoff_cut_0_3.sql`을 실행하면 맞춰진다.
+  - `npm run lint`(`features/ai`) 오류 0, `npm run build` 성공
+  - FP-181 파일 공백 오류 0, 충돌 표시 검사 0건
+- AI 제공사: 11/26 OpenAI 키를 받았다는 이야기가 있었으나 `decisions.md` 확정 사항은 Gemini 무료 등급이다. 바꾸려면 팀 결정과 decisions.md 수정이 먼저다. 이 PR은 AI를 부르지 않는다.
+
 ## 다음 사람이 알아야 할 것
 - FP-180(용어 사전, `feature-C/FP-180-glossary`)과 같은 `help` 패키지에 다른 파일을 추가했다. 코드 충돌은 없지만 `api_spec_c.md`의 「최근 변경」 줄과 문서 끝 절이 같은 자리라, 나중에 병합하는 쪽에서 두 쪽 내용을 모두 남긴다.
   - 🆕 11/20 FP-180(#108)이 먼저 병합되어 이 브랜치에서 develop을 반영하며 정리했다. 「최근 변경」 두 줄을 모두 두고, 문서 끝은 N-30-1 절(FP-180) 다음에 N-32-1 절(FP-181)을 두었다. 어느 쪽 내용도 지우지 않았다.

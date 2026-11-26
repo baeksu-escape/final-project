@@ -75,7 +75,7 @@ python -m training.train --monotone --model-version LGBM-BASE-0.2 --out-dir <저
 - **평가 행**: 기존 집단은 VALID 1,800행만 쓴다. 씬파일 집단은 이 모델들이 학습하지 않은 집단이라 TRAIN 행도 평가에 써도 누수가 없어서 TRAIN+VALID 1,285행을 쓴다(VALID만으로는 양성이 연체 22건, 비금융 효과 14건뿐이라 지표가 흔들린다). 씬파일을 학습에 쓰는 모델이 생기면 TRAIN 행이 누수가 되므로 `--thinfile-valid-only`로 바꾼다.
 - **씬파일은 `eval_future_credit_exposure = 1`인 고객만** 넣는다(0인 고객은 라벨이 항상 0이라 제외, 정의서 5장). 라벨 생성 방식이 기존 집단과 달라 집단별로 따로 본다.
 - **점수 환산**은 서비스와 같다(명세서 O-3, `training/explain.py`의 `to_score`). 컷오프는 이 점수에 건다.
-- **TEST는 들어 있지 않다.** 최종 평가(FP-144) 때 같은 스크립트로 TEST용 파일을 따로 만든다.
+- **TEST 행은 표 안에 있지만 이 스크립트들은 읽을 때 버린다.** 최종 평가(FP-144)는 별도 스크립트 `final_test_eval.py`가 한 번만 읽는다(아래 「TEST 최종 평가」).
 - **한계**: 시드 하나(11)의 값이다. 연체 라벨에서 기존 집단의 대안 모델 AUC는 시드 11(0.6183)이 5개 시드 중 가장 높고 평균은 0.5991이라 기존 모델(0.6049)과 구분되지 않는다. AUC는 `METRICS_JSON`의 5개 시드 평균(`same_label_comparison`)을 쓰고 이 파일은 컷오프별 지표·ROC에 쓰는 것을 권한다. 정수 점수 기준이라 확률 기준과 소수 넷째 자리가 다를 수 있다. 연체 라벨에는 대안 데이터 효과를 넣지 않았고(데이터 생성 설계) 비금융 효과 라벨은 설계로 넣은 효과가 반영된 라벨이라, 어느 쪽도 실제 개선의 근거가 아니다. 합성 데이터이며 실제 신용평가 결과가 아니다.
 
 ## 모델 입력·출력 규격 (FP-135)
@@ -161,3 +161,17 @@ legacy = score_one(joblib.load("artifacts/legacy.joblib"), feature_dict, "legacy
 - **기준점**: `TreeExplainer`의 `expected_value`(학습 데이터에서 모델의 평균 log-odds)를 점수로 바꾼 값이다. 모델 0.1 대안 모델은 694점, 지금 서비스 모델 0.2는 689점이다(시연용 Mock은 639점, 🆕 11/20).
 - **등급은 만들지 않는다**: 등급 경계(D-01)는 팀 결정이라 `gradeBandCode`는 서비스가 정한다.
 - **주의**: SHAP 결과는 모델이 쓴 기여도이며 인과관계가 아니다. 화면에는 "작용한 정도"로만 보여 준다. 설명기 생성에 약 0.2초가 걸리고 요청마다 SHAP 계산 비용이 든다(응답 시간은 확인하지 못했다).
+
+## TEST 최종 평가 (FP-144)
+
+`final_test_eval.py`가 서버 모델 파일(모델 0.2)과 같은 설정의 비교용 실험 모델을 정의서 10장 C26 사전 기준으로 평가한다. 학습·내보내기 스크립트는 그대로 TEST를 버린다.
+
+```
+python -m training.final_test_eval                                   # 리허설(VALID). 파일은 만들지 않는다. 알려진 VALID 값과 맞는지 먼저 본다
+python -m training.final_test_eval --split TEST --confirm-test-once  # 최종(TEST). 한 번만 실행한다
+```
+
+- 시작할 때 서버 모델 파일 4개의 해시를 `SHA256SUMS.txt`와 대조하고, 공용 DB에 등록한 모델 0.2의 해시(`docs/spec/sql/register_model_lgbm_base_0_2.sql`)와도 대조하며, `meta.json`이 `LGBM-BASE-0.2`인지 확인한다. 다르거나, 같은 설정으로 다시 학습한 모델과 VALID 점수가 다르면 TEST를 열기 전에 멈춘다.
+- `--confirm-test-once` 없이는 TEST 행을 읽지 않는다. TEST는 추적 중인 파일에 커밋하지 않은 변경이 없을 때(코드를 먼저 커밋한 뒤)만 실행된다. 추적하지 않는 파일은 막지 않고 기록에 이름만 남긴다. TEST 행을 읽기 **전에** 고정 경로 `docs/spec/final_test_eval_run.json`에 실행 기록을 먼저 남기고(`--out-dir`과 무관, 옵션으로 바꿀 수 없음), 끝나면 `finished`, 오류면 `failed`로 바꾼다. 읽는 도중 중단돼 결과 파일이 없어도 이 기록이 있으면 다시 실행되지 않는다. 결과는 `docs/spec/final_test_eval_result.json`·`.md`에 남는다. 기록이나 결과 파일이 있으면 평가 코드 오류를 고친 재실행만 `--rerun-reason "<이유>"`로 같은 모델·코드로 실행할 수 있고, 사유는 실행 기록에 쌓인다. TEST를 실행한 직후 실행 기록과 결과 파일을 바로 커밋한다.
+- 기존 집단은 C26 정상 범위로 판정한다. 씬파일은 평가 표본에 이력이 긴 비교군(`young_established`)이 섞여 있어 참고 값으로만 보여 준다. 직군별·cohort별 AUC는 양성 건수와 함께 나온다.
+- 결과를 본 뒤에 모델·지표·정상 범위·등급 경계를 바꾸지 않는다. 범위를 벗어나도 그대로 보고한다.

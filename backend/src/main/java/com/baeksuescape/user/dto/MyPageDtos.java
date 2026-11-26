@@ -38,6 +38,10 @@ public final class MyPageDtos {
             @NotBlank(message = "새 비밀번호를 입력해 주세요.") String newPassword) {
     }
 
+    // MEM-08 N-04-3 닉네임 변경(FP-222). 규칙은 가입(AUTH-06)과 같다.
+    public record NicknameChange(String nickname) {
+    }
+
     // MEM-05 직군 선택. EMPLOYEE | SELF_EMPLOYED | FREELANCER
     // MEM-07 N-04-7 회원 탈퇴 요청. 간편 로그인 전용 계정(비밀번호 없음)은 값을 확인하지 않는다.
     public record Withdraw(String password) {

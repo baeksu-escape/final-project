@@ -87,22 +87,22 @@ frontend/
    ├─ common/              여러 기능이 함께 쓰는 것
    │  ├─ api/              API 호출(client.js: 토큰·mock 전환·401 처리), 오류 형식
    │  ├─ auth/             로그인 상태, 라우트 가드(역할·직군·점수 여부)
-   │  ├─ components/       공통 컴포넌트(버튼·입력·카드·모달) + 차트 4종(CompareBar·TrendLineChart·BarChart·HeatmapGrid)
-   │  ├─ config/           환경 변수, 메뉴 경로, 역할·직군·등급 코드
-   │  ├─ layout/           화면 틀 — AppLayout(로그인 후)·PublicLayout(로그인 전)·AppHeader·TabMenu·AppFooter
+   │  ├─ components/       공통 컴포넌트(버튼·입력·카드·모달) + 차트 4종(CompareBar·TrendLineChart·BarChart·HeatmapGrid) + 움직이는 시각화 viz.jsx(ScoreRing·TrendArea·FactorBars·CountUp, 훅은 vizHooks.js) 🆕 11/23
+   │  ├─ config/           환경 변수, 메뉴 경로·큰 분류 묶음(NAV_GROUPS), 역할·직군·등급 코드(화면 이름 좋음·보통·주의)
+   │  ├─ layout/           화면 틀 — AppLayout(로그인 후)·PublicLayout(로그인 전)·AppHeader·MegaNav(큰 분류 + 펼침 세부 메뉴)·NavIcon·AppFooter 🆕 11/23 (TabMenu 삭제)
    │  ├─ mocks/            mock 응답 등록·처리, mock 계정
-   │  ├─ pages/            메인(홍보) 페이지·403·404·준비 중 화면
+   │  ├─ pages/            메인(홍보) 페이지(스크롤 무대)·한눈에(HomePage, /home)·분류 화면(GroupHubPage, /my-credit·/finance)·403·404·준비 중 화면 🆕 11/23
    │  ├─ routes/           AppRoutes.jsx — 전체 라우트
-   │  ├─ styles/           tokens.css(색·간격) / forms.css / components.css / layout.css(화면 틀·배치 클래스)
+   │  ├─ styles/           tokens.css(색·간격·장식 색 --c-*) / forms.css / components.css(버튼 단계·text-link) / layout.css(화면 틀·배치 클래스, 내용 폭 1440) / viz.css
    │  └─ utils/            theme.js(화이트·블랙 테마 저장·적용) 등
    └─ features/<기능>/     기능별 폴더: api · components · pages · mocks · config
-      admin · auth · community · dataInput · market (만들어진 기능)
+      admin · ai · auth · community · credit · dataInput · diagnosis · loans · market · scenario · simulation (만들어진 기능)
 ```
 
 ### 새 기능을 붙일 때
 - 화면은 `features/<기능>/pages/`에 만들고, `AppRoutes.jsx`에서 해당 경로의 `element` 한 줄만 바꾼다(가드·경로 구조는 그대로). `AppRoutes.jsx`·`client.js`는 공유 파일이라 고치기 전에 팀에 알린다.
 - API는 `features/<기능>/api/`에서 `common/api/client.js`를 통해 부른다. mock은 같은 기능의 `mocks/`에 실제 응답과 같은 모양으로 만들어 `registerMockHandlers`로 등록한다.
-- 화면 모양은 공통 재료로 맞춘다(기준 UI: 데모 v2). 컴포넌트는 `common/components`(Card·Button·Chip·Notice·Modal·Toast·입력류·차트), 배치는 `layout.css` 클래스를 쓴다.
+- 화면 모양은 공통 재료로 맞춘다(기준 UI: 11/23 UI 리뉴얼 🆕 11/23). 컴포넌트는 `common/components`(Card·Button·Chip·Notice·Modal·Toast·입력류·차트, 움직이는 시각화 `viz.jsx`), 배치는 `layout.css` 클래스, 메뉴는 `navigation.js`의 `NAV_GROUPS`를 쓴다. 자세한 규칙은 `AGENTS.md` 3-2.
   - 제목 줄 `page-head`(`__tag`·`__title`·`__lead`), 2:1 `l-cols`(+`l-cols__main`), 3열 `l-grid3`, 숫자 타일 `l-kpis`, 자동 칸 `l-g2`, 표 `data-table`(+`data-table-wrap`), 안쪽 상자 `panel-sunk`, 글자 `hint`·`num`
   - 색·간격은 `tokens.css` 변수만 쓴다. 이 재료로 안 되는 모양이 필요하면 기능 폴더에 `<기능>.css`를 만들기 전에 프론트 담당에게 알린다. 공통 CSS 4개(`tokens`·`forms`·`components`·`layout.css`)는 프론트 담당만 고친다(AGENTS.md 3-2).
   - 공통으로 올릴 후보: 여러 줄 입력칸(`lounge-textarea`), 쪽 번호(`lounge-pager`), 설명이 붙은 라디오 카드(`report-option`). 지금은 `community.css`에 있으니 필요하면 프론트 담당에게 알린다.

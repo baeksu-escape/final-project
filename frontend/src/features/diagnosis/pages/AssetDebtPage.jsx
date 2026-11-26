@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../../common/auth/useAuth.js'
-import { Button, Card, Notice, NumberInput } from '../../../common/components/index.js'
+import { Button, Card, MoneyInput, Notice } from '../../../common/components/index.js'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { calculateAssetDebtPreview, getAssetDebtData } from '../api/financeApi.js'
 import AssetDebtLoans from '../components/AssetDebtLoans.jsx'
@@ -68,7 +68,7 @@ export default function AssetDebtPage() {
     <header className="ad-heading"><h1>자산·부채 건전성</h1><p>{workerLabel} 기준으로 부채 부담을 살펴봅니다. 숫자를 바꾸면 바로 다시 계산하며 저장된 값에는 반영되지 않습니다.</p></header>
     <div className="ad-top-grid">
       <Card title="내 재무 상태" className="ad-inputs">
-        {FIELDS.map(({ key: field, label }) => <NumberInput key={field} label={label} value={values[field]} min={0} step={1} unit="원" error={errors[field]}
+        {FIELDS.map(({ key: field, label }) => <MoneyInput key={field} label={label} value={values[field]} error={errors[field]}
           onChange={(value) => setDraft({ key, values: { ...values, [field]: value } })} />)}
         {FIELDS.some(({ key: field }) => values[field] == null) && <p className="ad-hint" role="status">미입력: {FIELDS.filter(({ key: field }) => values[field] == null).map(({ label }) => label).join(' · ')}. 관련 값은 0원으로 대체하지 않고 계산 불가로 표시합니다.</p>}
         <p className="ad-summary-values">순자산 <strong>{formatAmount(result?.totalNetAssetAmount)}</strong> · 연 상환액 <strong>{formatAmount(result?.annualPaymentAmount)}</strong>{calculating && <span className="ad-hint" role="status"> · 계산하는 중</span>}</p>

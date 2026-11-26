@@ -7,18 +7,18 @@ export const GRADES = Object.freeze({
   CAUTION: 'CAUTION',
 })
 
-// 등급 코드 → 화면에 보일 이름.
+// 등급 코드 → 화면에 보일 이름. UI 리뉴얼(11/23)부터 한글로 보인다(코드값 GOOD·STANDARD·CAUTION은 그대로).
 export const GRADE_LABELS = Object.freeze({
-  [GRADES.GOOD]: 'Good',
-  [GRADES.STANDARD]: 'Standard',
-  [GRADES.CAUTION]: 'Caution',
+  [GRADES.GOOD]: '좋음',
+  [GRADES.STANDARD]: '보통',
+  [GRADES.CAUTION]: '주의',
 })
 
 // 기존·대안 모델 점수 범위 — DDL v0.3.2 CHECK와 같은 0~1000. TODO(D-01) 모형 학습 후 환산식이 정해지면 다시 맞춘다.
 export const SCORE_RANGE = Object.freeze({ MIN: 0, MAX: 1000 })
 
-// 등급 경계 점수 — Good 780 이상, Standard 665 이상, 그 아래는 Caution. TODO(D-01) 모형 학습 후 다시 정한다.
-export const GRADE_BOUNDARIES = Object.freeze({ GOOD: 780, STANDARD: 665 })
+// 등급 경계 점수 — Good 727 이상, Standard 654 이상, 그 아래는 Caution(등급 구간 CUT-0.3, 11/23 전환 FP-248). TODO(D-01) FP-144 이후 다시 정한다.
+export const GRADE_BOUNDARIES = Object.freeze({ GOOD: 727, STANDARD: 654 })
 
 // 점수로 등급 코드를 정한다. mock과 참고 표시용이며, 실제 등급은 서버 응답을 쓴다.
 export function getGradeByScore(score) {

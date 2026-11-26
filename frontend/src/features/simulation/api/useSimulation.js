@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { adaptSimulationInputs, adaptSimulationResult, addDeductionExamples, sameInputs, validateInputs } from '../adapters/simulationAdapter.js'
-import { clearScoreBandOfferCache, getSimulationInputs, recalculateSimulation } from './simulationApi.js'
+import { clearScoreBandOfferCache, getSimulationInputs, getInitialSimulationMetrics, recalculateSimulation } from './simulationApi.js'
 
-const EMPTY = { userId: null, revision: -1, loading: true, error: '', currentScore: null, baseline: null, deductions: [] }
+const EMPTY = { userId: null, revision: -1, loading: true, error: '', currentScore: null, currentGradeCode: null, initialMetrics: null, baseline: null, deductions: [] }
 
 const IDLE_FORM = { applied: null, result: null, status: 'idle', calcError: '' }
 
@@ -25,8 +25,14 @@ export function useSimulation(userId) {
     let active = true
     calcSeq.current += 1
     // 응답 변환에서 형식 오류가 나도 같은 오류 처리로 가도록 변환을 then 단계로 분리한다.
-    getSimulationInputs(userId).then(adaptSimulationInputs).then(
-      (model) => { if (active) setLoaded({ userId, revision, loading: false, error: '', ...toLoaded(model) }) },
+    getSimulationInputs(userId).then((raw) => ({ ...adaptSimulationInputs(raw), currentGradeCode: raw.currentGradeCode })).then(
+      (model) => {
+        if (!active) return
+        setLoaded({ userId, revision, loading: false, error: '', ...toLoaded(model) })
+        getInitialSimulationMetrics(model.currentScore).then((initialMetrics) => {
+          if (active) setLoaded((prev) => prev.userId === userId && prev.revision === revision ? { ...prev, initialMetrics } : prev)
+        })
+      },
       (error) => { if (active) setLoaded({ ...EMPTY, userId, revision, loading: false, error: error.message }) },
     )
     return () => { active = false }
@@ -39,7 +45,7 @@ export function useSimulation(userId) {
 
   const ready = loaded.userId === userId && loaded.revision === revision
   const base = ready ? loaded : { ...EMPTY, userId }
-  // 불러온 값이 바뀌면 입력 칸을 내 실제 값으로 다시 채운다(다른 회원 값이 남지 않게 key로 구분).
+  // 불러온 값이 바뀌면 입력 칸을 내 현재 값으로 다시 채운다(다른 회원 값이 남지 않게 key로 구분).
   const current = form.key === formKey && ready ? form : { key: formKey, values: base.baseline, ...IDLE_FORM }
 
   // N-18-4·N-18-5 계산 요청 하나를 보낸다. 그사이 입력이 바뀌거나 취소되면(seq 변경) 응답을 버린다.
@@ -85,7 +91,7 @@ export function useSimulation(userId) {
     runCalc({ ...current.values }, calcSeq.current)
   }
 
-  // N-18-10 바꾼 값과 결과를 지우고 내 실제 값으로 돌아간다. 진행 중인 계산을 취소한다.
+  // N-18-10 바꾼 값과 결과를 지우고 내 현재 값으로 돌아간다. 진행 중인 계산을 취소한다.
   const reset = () => {
     cancelPending()
     setForm({ key: formKey, values: base.baseline, ...IDLE_FORM })
@@ -100,6 +106,8 @@ export function useSimulation(userId) {
     loading: !ready || base.loading,
     error: base.error,
     currentScore: base.currentScore,
+    currentGradeCode: base.currentGradeCode,
+    initialMetrics: base.initialMetrics,
     baseline: base.baseline,
     deductions: addDeductionExamples(current.result?.deductions ?? base.deductions, base.baseline, current.values),
     values: current.values,
@@ -111,7 +119,7 @@ export function useSimulation(userId) {
   }
 }
 
-// 불러온 화면 모델을 상태 모양으로 옮긴다.
+// N-18-1 첫 화면에 필요한 점수·등급과 입력 모델을 상태 모양으로 옮긴다.
 function toLoaded(model) {
-  return { currentScore: model.currentScore, baseline: model.inputs, deductions: model.deductions }
+  return { currentScore: model.currentScore, currentGradeCode: model.currentGradeCode, initialMetrics: null, baseline: model.inputs, deductions: model.deductions }
 }

@@ -5,6 +5,7 @@ import csv
 import importlib.util
 import json
 import os
+import re
 import sys
 from pathlib import Path
 import tempfile
@@ -27,6 +28,33 @@ TEST_ENV={'AVENUE_DEV_AES_KEY':base64.b64encode(TEST_AES).decode(),
           'AVENUE_DEMO_PASSWORD':TEST_PASSWORD}
 KEYTOOL_SPEC=importlib.util.spec_from_file_location('gen_dev_keys',SCRIPT.parent/'gen_dev_keys.py')
 keytool=importlib.util.module_from_spec(KEYTOOL_SPEC);KEYTOOL_SPEC.loader.exec_module(keytool)
+
+
+class WorkPeriodTests(unittest.TestCase):
+    """N-05 시드 회원의 근무기간은 필수 입력값이므로 비어 있으면 안 되고, 나이·직군에 맞게 회원마다 달라야 한다."""
+
+    def test_work_period_is_deterministic_and_within_limits(self):
+        for job in ['EMPLOYEE','SELF_EMPLOYED','FREELANCER']:
+            for uid,birth in [(1,1967),(50,1985),(400,2006)]:
+                with self.subTest(job=job,uid=uid):
+                    months=db.work_period_months(uid,birth,job)
+                    self.assertEqual(months,db.work_period_months(uid,birth,job))
+                    floor=3 if job=='EMPLOYEE' else 12   # 자영업자·프리랜서는 월 소득 12개월치보다 짧지 않게
+                    self.assertTrue(floor<=months<=600)
+                    self.assertLessEqual(months,max(floor,6,(2026-birth-20)*12))
+
+    def test_seed_file_has_varied_work_period_for_every_member(self):
+        seed=(SCRIPT.parents[1]/'10_seed_app_user.sql').read_text(encoding='utf8')
+        rows=[l for l in seed.splitlines() if l.startswith('INSERT INTO APP_USER') and "'ROLE_USER'" in l]
+        values=[]
+        for line in rows:
+            m=re.search(r", (\d{4}), '(EMPLOYEE|SELF_EMPLOYED|FREELANCER)', (\w+), 'ROLE_USER'",line)
+            self.assertIsNotNone(m); self.assertNotEqual(m.group(3),'NULL')
+            uid=int(line.split('VALUES (',1)[1].split(',',1)[0])
+            self.assertEqual(int(m.group(3)),db.work_period_months(uid,int(m.group(1)),m.group(2)))
+            values.append(int(m.group(3)))
+        self.assertEqual(len(values),400)
+        self.assertGreater(len(set(values)),100)
 
 
 class AssetLoanTests(unittest.TestCase):
@@ -345,7 +373,7 @@ class SchemaTests(unittest.TestCase):
     def test_active_unique_indexes(self):
         """ACTIVE 상태는 한 개만 가능하고 비활성 행들은 조건부 UNIQUE에서 제외된다."""
         for table,key in [('SCORE_CUTOFF_VERSION','CUTOFF_VERSION'),('MODEL_REGISTRY','MODEL_VERSION')]:
-            rows=copy.deepcopy(self.base);extra=dict(rows[table][0]);extra[key]='OTHER';rows[table].append(extra)
+            rows=copy.deepcopy(self.base);extra=dict(next(r for r in rows[table] if r['STATUS_CODE']=='ACTIVE'));extra[key]='OTHER';rows[table].append(extra)   # 첫 행이 아니라 ACTIVE 행을 복사한다(CUT-0.3 전환 뒤 첫 행 CUT-0.1은 RETIRED)
             with self.assertRaises(ValueError):db.validate_rows(self.tables,rows)
             extra['STATUS_CODE']='RETIRED';db.validate_rows(self.tables,rows)
 

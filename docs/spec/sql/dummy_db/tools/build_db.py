@@ -18,8 +18,19 @@ import tempfile
 
 BASE_MONTH = '2026-08'  # TODO(D-16): 급여소득자 기준월은 팀 합의 전 원천 마지막 달로 고정한다.
 JOB_MAP = {'wage': 'EMPLOYEE', 'selfemp': 'SELF_EMPLOYED', 'freelance': 'FREELANCER'}
+# 근무기간(개월): 20세부터 일했다고 볼 때의 최대 개월 안에서 회원마다 다르게 정한다(합성 값). 같은 입력이면 항상 같은 값이다.
+# 직군별 (a, b) 단위는 1/100: 값 = 상한 × (a + b × r), r = MOD(회원ID×7919 + 출생연도×31, 1000)/1000. update_seed_user_work_period.sql과 같은 식이다.
+WORK_PERIOD_REF_YEAR = 2026
+WORK_PERIOD_RANGE = {'EMPLOYEE': (15, 70), 'SELF_EMPLOYED': (5, 90), 'FREELANCER': (5, 45)}
+# 자영업자·프리랜서는 월 소득 12개월치를 갖고 있으므로 최소 12개월(소득 기록보다 짧지 않게). 2006년생은 이 때문에 20세 전 시작이 된다.
+WORK_PERIOD_MIN = {'EMPLOYEE': 3, 'SELF_EMPLOYED': 12, 'FREELANCER': 12}
+def work_period_months(user_id, birth_year, worker_type):
+    cap = max(6, min(600, (WORK_PERIOD_REF_YEAR - birth_year - 20) * 12))
+    a, b = WORK_PERIOD_RANGE[worker_type]
+    r = (user_id * 7919 + birth_year * 31) % 1000
+    return max(WORK_PERIOD_MIN[worker_type], cap * (a * 1000 + b * r) // 100000)
 # N-37 시연용 최소점수 가정이다. 실제 금융기관의 심사 조건이 아니다.
-PRODUCT_MIN_SCORES = {'0': 780, '5': 665, '1': 0, '2': 0, '3': 0}
+PRODUCT_MIN_SCORES = {'0': 727, '5': 654, '1': 0, '2': 0, '3': 0}   # 서비스 등급 구간 CUT-0.3의 우수·보통 하한(FP-248, 이전 780·665)
 # N-37-1·2 상품 코드별 시연용 문구(상품명, 한 줄 소개, 설명, 제출 서류, 특징 1~3개). 가상 기관의 시연 상품이며 실제 상품·약속이 아니다.
 # 서류 이름에는 '·'를 쓰지 않는다(REQUIRED_DOCUMENTS는 '·'로 이어 한 칸에 저장).
 LOAN_COPY = {
@@ -623,7 +634,8 @@ def build_seed_rows(source, tables, base_rows, keys, demo_password=None):
             PASSWORD_HASH=bcrypt_hash(demo_password) if code in demo else None, NICKNAME=member['nickname'],
             NAME_ENC=encrypt_text(name,aes_key), PHONE_ENC=encrypt_text(phone,aes_key), PHONE_HMAC=search_hmac(phone,'phone',hmac_key),
             EMAIL_ENC=encrypt_text(member['email'],aes_key), EMAIL_HMAC=search_hmac(member['email'],'email',hmac_key),
-            BIRTH_YEAR=int(member['birth_year']), WORKER_TYPE_CODE=JOB_MAP[member['segment']], WORK_PERIOD_MONTHS=None,
+            BIRTH_YEAR=int(member['birth_year']), WORKER_TYPE_CODE=JOB_MAP[member['segment']],
+            WORK_PERIOD_MONTHS=work_period_months(uid,int(member['birth_year']),JOB_MAP[member['segment']]),
             ROLE_CODE='ROLE_USER', ACCOUNT_STATUS_CODE='ACTIVE', DUMMY_YN='Y', CREATED_AT=signup))
         for kind, required, agreed in [('TERMS_OF_SERVICE','Y','Y'),('PRIVACY_COLLECTION','Y','Y'),('NOTIFICATION_MARKETING','N','N')]:
             add('USER_CONSENT', dict(USER_ID=uid, CONSENT_TYPE_CODE=kind, REQUIRED_YN=required, AGREED_YN=agreed,

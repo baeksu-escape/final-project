@@ -2,7 +2,8 @@ import { GRADE_LABELS } from '../../../common/config/grades.js'
 
 // N-18 서버(또는 mock) 응답을 화면 모델로 바꾸고, 입력을 검증한다. 화면 상태와 API 호출은 여기서 다루지 않는다.
 
-// N-18-2·N-18-3 입력 10개와 화면 범위. 슬라이더 범위는 11/20 범영 확정 학습 데이터 최댓값 기준이며 금액은 원 단위 0 이상이다.
+// N-18-2·N-18-3 입력 10개와 화면 범위. 슬라이더 범위는 11/20 범영·광희 확정 학습 데이터 최댓값 기준이며 금액은 원 단위 0 이상이다.
+// 서버 CreditCareSimulationService의 SLIDER_MAX_VALUES·MAX_MONTHS와 상한을 같이 맞춘다.
 export const SLIDER_FIELDS = [
   { key: 'telecomOnTimeMonths', label: '통신비 정시 납부 기간', min: 0, max: 12, unit: '개월' },
   { key: 'delinquencyCount', label: '최근 1년 연체 횟수', min: 0, max: 6, unit: '회' },
@@ -38,7 +39,7 @@ export function formatSigned(value) {
   return `${value > 0 ? '+' : '−'}${Math.abs(value).toLocaleString('ko-KR')}`
 }
 
-// N-18-1 서버가 준 실제 값이 0 이상 안전한 정수인지만 본다. 슬라이더 범위 밖 값도 실제 값이므로 오류로 보지 않는다(NULL은 따로 처리).
+// N-18-1 서버가 준 현재 값이 0 이상 안전한 정수인지만 본다. 슬라이더 범위 밖 값도 현재 값이므로 오류로 보지 않는다(NULL은 따로 처리).
 const isStoredValue = (value) => Number.isSafeInteger(value) && value >= 0
 
 // 값 하나가 화면 범위 안의 0 이상 안전한 정수인지 본다. NULL(미입력)은 통과시키지 않는다.
@@ -92,26 +93,60 @@ export function adaptReductionFactors(list) {
   })
 }
 
-const DEDUCTION_EXAMPLES = {
+// N-18-8 감점 요인에 공통으로 연결할 화면과 직접 입력 안내 문구다.
+const CASH_FLOW_LINK = { linkKey: 'CASH_FLOW', linkText: '현금흐름 화면에서 확인해 보세요.' }
+const ASSET_DEBT_LINK = { linkKey: 'ASSET_DEBT', linkText: '자산·부채 화면에서 확인해 보세요.' }
+const DIRECT_INPUT_HINT = '값을 직접 바꿔 계산해 보세요.'
+const UNEDITABLE_HINT = '시뮬레이터에서 바꿀 수 없는 항목이에요.'
+
+// N-18-8·9 감점 피처별 예시와 관련 화면을 정리한다. 목록에 없는 피처는 시뮬레이터에서 바꿀 수 없는 항목으로 안내한다.
+export const DEDUCTION_ACTIONS = {
   DQ1200001: { key: 'delinquencyCount', value: 0, text: '연체 횟수 0회' },
   telecom_on_time_streak: { key: 'telecomOnTimeMonths', value: 12, text: '정시 납부 12개월' },
   CL0631905: { key: 'cardMonthlyUsage', text: '한도의 30%로 쓰기' },
+  L22000900: { key: 'newLoanCount', value: 0, text: '최근 3개월 신규 대출 0건' },
+  CF1231605: { key: 'cashAdvanceMonths', value: 0, text: '현금서비스 이용 기간 0개월' },
+  utility_late_months: { key: 'utilityUnpaidMonths', value: 0, text: '공과금 미납 0개월' },
+  LA0099212: { key: 'privateLenderBalance', value: 0, text: '대부업 대출 잔액 0원' },
+  income_svc_12m_krw: CASH_FLOW_LINK,
+  income_cv_svc_12m: CASH_FLOW_LINK,
+  zero_income_months_svc_12m: CASH_FLOW_LINK,
+  expense_avg_month_krw: CASH_FLOW_LINK,
+  expense_ratio_svc_12m: CASH_FLOW_LINK,
+  deficit_months_svc_12m: CASH_FLOW_LINK,
+  worst_month_net_cash_svc_12m_krw: CASH_FLOW_LINK,
+  debt_service_current_krw: ASSET_DEBT_LINK,
+  dsr_svc_12m: ASSET_DEBT_LINK,
+  L00000001: ASSET_DEBT_LINK,
+  LRZ021201: ASSET_DEBT_LINK,
+  dp_payment_count_12m: { inputKey: 'easyPayMonthlyCount', hint: DIRECT_INPUT_HINT },
+  debt_balance_krw: { inputKey: 'loanBalance', hint: DIRECT_INPUT_HINT },
 }
 
-// N-18-8·9 서버 감점 코드를 기존 시연 예시와 연결한다. 저장값이 있고 현재 조건을 개선하는 예시만 제공한다.
+// N-18-8·9 감점 코드에 예시, 관련 화면 또는 안내를 연결한다. 저장값이 있고 그 값보다 나아지는 예시만 제공한다.
 export function addDeductionExamples(deductions, baseline, values) {
   return deductions?.map((item) => {
-    const example = DEDUCTION_EXAMPLES[item.featureCode]
-    if (!example || baseline?.[example.key] == null || !isStoredValue(values?.[example.key])) return item
+    const action = Object.hasOwn(DEDUCTION_ACTIONS, item.featureCode) ? DEDUCTION_ACTIONS[item.featureCode] : null
+    // 목록에 없는 요인은 변경할 수 없다고 안내한다.
+    if (!action) return { ...item, editable: false, hint: UNEDITABLE_HINT }
+    // 관련 화면이 있는 요인은 링크로 안내한다.
+    if (action.linkKey) return { ...item, ...action, editable: false }
+    // 직접 입력 항목은 저장값이 있을 때만 입력 키도 전달한다.
+    if (action.inputKey) return baseline?.[action.inputKey] == null
+      ? { ...item, editable: false, hint: DIRECT_INPUT_HINT }
+      : { ...item, ...action, editable: false }
+    // 예시는 저장값과 현재 입력을 확인하고 개선되는 경우에만 제공한다.
+    const fallback = { ...item, editable: false, hint: DIRECT_INPUT_HINT }
+    if (baseline?.[action.key] == null || !isStoredValue(values?.[action.key])) return fallback
 
-    const { key, text } = example
-    let target = example.value
+    const { key, text } = action
+    let target = action.value
     if (key === 'cardMonthlyUsage') {
-      if (baseline.cardLimitAmount == null || !isStoredValue(values.cardLimitAmount) || values.cardLimitAmount === 0) return item
+      if (!baseline.cardLimitAmount || !isStoredValue(values.cardLimitAmount) || values.cardLimitAmount === 0) return fallback
       target = Math.floor(values.cardLimitAmount * 0.3)
     }
-    const improves = key === 'telecomOnTimeMonths' ? target > values[key] : target < values[key]
-    if (!improves) return item
+    const improves = key === 'telecomOnTimeMonths' ? target > baseline[key] : target < baseline[key]
+    if (!improves) return fallback
 
     const field = [...SLIDER_FIELDS, ...MONEY_FIELDS].find((entry) => entry.key === key)
     return { ...item, editable: true, condition: field.label, example: { [key]: target }, exampleText: text }
@@ -135,10 +170,13 @@ export function describeSimulationError(error) {
   return error?.message ?? '요청을 처리하지 못했습니다.'
 }
 
-// N-18-5 화면의 camelCase 입력 10개를 FastAPI 재계산 changes 키로 바꾼다.
+// N-18-5 입력된 변경값을 재계산 changes 키로 바꾸고 카드 한도·사용액은 함께 보낸다.
 export function toSimulationChanges(values, baseline) {
   if (!values || typeof values !== 'object') throw new Error('시뮬레이션 입력값이 올바르지 않습니다.')
-  const keys = INPUT_KEYS.filter((key) => values[key] !== baseline?.[key])
+  const keys = INPUT_KEYS.filter((key) => values[key] != null && values[key] !== baseline?.[key])
+  if (values.cardLimitAmount == null || values.cardMonthlyUsage == null) {
+    return Object.fromEntries(keys.filter((key) => key !== 'cardLimitAmount' && key !== 'cardMonthlyUsage').map((key) => [API_CHANGE_KEYS[key], values[key]]))
+  }
   if (keys.includes('cardLimitAmount') || keys.includes('cardMonthlyUsage')) {
     for (const key of ['cardLimitAmount', 'cardMonthlyUsage']) if (!keys.includes(key)) keys.push(key)
   }
@@ -151,13 +189,16 @@ export const RANGE_INPUT_MESSAGE = '입력은 화면 범위 안의 0 이상 정�
 
 // 값이 비었을 때 validateInputs가 돌려주는 일반 문구. 칸 옆 "값을 입력해 주세요."가 있어 화면에는 따로 보여 주지 않는다.
 export const MISSING_INPUT_MESSAGE = '입력하지 않은 값이 있습니다. 값이 있는 칸은 모두 채워야 계산할 수 있습니다.'
+// N-18-3 카드 한도와 사용액은 계산할 때 함께 입력해야 한다.
+export const CARD_PAIR_INPUT_MESSAGE = '카드 한도와 월 카드 사용액을 함께 입력해 주세요.'
 // invalid 상태에서 Notice에 보여 주지 않을 일반 문구 목록(항목별 오류가 칸 옆에 표시된다).
-export const HIDDEN_INVALID_MESSAGES = [RANGE_INPUT_MESSAGE, MISSING_INPUT_MESSAGE]
+export const HIDDEN_INVALID_MESSAGES = [RANGE_INPUT_MESSAGE, MISSING_INPUT_MESSAGE, CARD_PAIR_INPUT_MESSAGE]
 
 // 계산 요청 전에 값을 확인한다. 저장된 값이 없던 항목(baseline이 null)은 비어 있어도 되고, 바꾸지 않은 값은 슬라이더 범위 밖이어도 통과한다.
 // 문제가 있으면 안내 문구를, 없으면 빈 문자열을 돌려준다.
 export function validateInputs(values, baseline = null) {
   const absent = (key) => values[key] === null || values[key] === undefined
+  if (absent('cardLimitAmount') !== absent('cardMonthlyUsage')) return CARD_PAIR_INPUT_MESSAGE
   const missing = INPUT_KEYS.filter((key) => absent(key) && !(baseline && baseline[key] == null))
   if (missing.length) return MISSING_INPUT_MESSAGE
   const invalid = INPUT_KEYS.some((key) => !absent(key) && !(baseline && values[key] === baseline[key] && isStoredValue(values[key])) && !isValidValue(key, values[key]))
@@ -176,6 +217,10 @@ export function getInputErrors(values, baseline = null) {
     } else if (!(baseline && value === baseline[key] && isStoredValue(value)) && !isValidValue(key, value)) {
       errors[key] = field.max === undefined ? '0 이상 정수로 입력해 주세요.' : `${field.min}~${field.max}${field.unit} 사이 정수로 입력해 주세요.`
     }
+  }
+  if ((values?.cardLimitAmount == null) !== (values?.cardMonthlyUsage == null)) {
+    if (values?.cardLimitAmount == null) errors.cardLimitAmount = '카드 한도도 입력해 주세요.'
+    else errors.cardMonthlyUsage = '사용액도 입력해 주세요.'
   }
   return errors
 }

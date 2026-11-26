@@ -120,7 +120,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 **점수대별 참고 범위(시연 가정, N-12·N-37):** 새 DB 상품의 `MIN_ALT_SCORE`는 은행(업권 0) 780, 상호금융(5) 665, 카드·저축은행·캐피탈(1·2·3) 0으로 둔다. 이는 실제 상품 심사 기준이 아니며 기존 상품 CSV 값은 바꾸지 않는다. 각 등급의 최저점 `MIN_SCORE`가 이 조건을 만족하는 상품만 모아 `SCORE_BAND_OFFER`의 최저/최고 금리와 최대 한도를 계산한다. 따라서 등급 내 모든 점수에서 해당 조건을 만족하는 범위다. 평균 금리는 그 최저·최고의 중간값으로 실제 고객 통계 평균이 아니다. 직군·소득 등 개별 신청 자격이나 승인 결과를 뜻하지 않는다.
 
-저장소 시드의 신용 프로필 318행에 카드 한도가 채워져 있다. `CARD_LIMIT_AMT`는 `(KC1000001 - L00000002) × 1000`원으로 계산하며 반올림하지 않는다. 원천 생성기의 총신용공여는 대출잔액·보증금액·카드 한도의 합이고 현재 보증 건수는 전원 0이다. 두 값 중 하나가 없거나 차이가 음수면 NULL이다. 보증금액이 생기면 이를 함께 빼야 한다. 이는 기존 시드의 가상 신용평가사 응답 매핑이며 프로필은 동의 회원의 `IMPORTED` 행이다. 1차 서비스에서는 신용평가사 API를 쓰지 않고 회원이 카드·신용 정보를 직접 입력하므로 `MANUAL`, `CONSENT_ID`는 NULL이다. 생성 보고서의 `card_spend_over_limit`는 월 사용액이 계산 한도를 초과한 행 수다. 재직/활동 기간 `WORK_PERIOD_MONTHS`는 NULL이다. `PASSWORD_HASH`는 시연 계정 4개(사용자 3·관리자 1)만 BCrypt 해시가 있고 나머지는 NULL이다.
+저장소 시드의 신용 프로필 318행에 카드 한도가 채워져 있다. `CARD_LIMIT_AMT`는 `(KC1000001 - L00000002) × 1000`원으로 계산하며 반올림하지 않는다. 원천 생성기의 총신용공여는 대출잔액·보증금액·카드 한도의 합이고 현재 보증 건수는 전원 0이다. 두 값 중 하나가 없거나 차이가 음수면 NULL이다. 보증금액이 생기면 이를 함께 빼야 한다. 이는 기존 시드의 가상 신용평가사 응답 매핑이며 프로필은 동의 회원의 `IMPORTED` 행이다. 1차 서비스에서는 신용평가사 API를 쓰지 않고 회원이 카드·신용 정보를 직접 입력하므로 `MANUAL`, `CONSENT_ID`는 NULL이다. 생성 보고서의 `card_spend_over_limit`는 월 사용액이 계산 한도를 초과한 행 수다. 재직/활동 기간 `WORK_PERIOD_MONTHS`는 시드 회원 400명 모두 나이·직군에 맞는 회원별 합성 값(3~371개월, 자영업자·프리랜서는 소득 12개월치에 맞춰 최소 12개월)이다(🆕 11/24, 계산식은 `build_db.py`의 `work_period_months`, 기존 DB는 `update_seed_user_work_period.sql`). 관리자 행은 NULL이다. `PASSWORD_HASH`는 시연 계정 4개(사용자 3·관리자 1)만 BCrypt 해시가 있고 나머지는 NULL이다.
 
 현재 더미 원천에서 0원은 카드가 없는 회원이며, NULL은 원천 값이 없거나 계산이 음수인 경우다.
 
@@ -138,7 +138,7 @@ python -I -X utf8 docs/spec/sql/dummy_db/tools/build_db.py <service_dummy 폴더
 
 `00_drop_all.sql`은 첫 DROP 전에 USER_TABLES에서 옛 DB 표식(APP_MEMBER·MEMBER_MONTHLY_INPUT·MEMBER_LOAN·EXTERNAL_API_RESPONSE)을 확인하고 하나라도 있으면 오류로 종료한다. 단독 실행에도 WHENEVER SQLERROR EXIT가 적용된다. 표식이 없는 스키마의 공유 테이블까지 자동 식별하는 가드는 아니므로 별도 스키마 원칙은 유지한다.
 
-`99_check.sql`은 현재 개정 DDL 기준 테이블 48개·테이블별 기대 행 수(DIM_FEATURE 77개 = FS-DRAFT 39 + FS-V1 38, 등급 구간 버전 3개 CUT-0.1 ACTIVE·CUT-0.2·CUT-0.3 DRAFT와 구간 9개 포함)·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·CRLF를 LF로 정규화한 DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
+`99_check.sql`은 현재 개정 DDL 기준 테이블 48개·테이블별 기대 행 수(DIM_FEATURE 77개 = FS-DRAFT 39 + FS-V1 38, 등급 구간 버전 3개 CUT-0.3 ACTIVE·CUT-0.1 RETIRED·CUT-0.2 DRAFT와 구간 9개 포함)·COMMENT 누락을 출력한다. COMMENT 결과는 원본 DDL을 임의 수정하지 않고 DB 담당에게 전달한다. `seed_report.json`에는 행 수·CRLF를 LF로 정규화한 DDL 해시·누락 선택 필드만 있으며 개인정보·키는 없다.
 
 테스트(저장소 루트, cryptography가 설치된 Python):
 

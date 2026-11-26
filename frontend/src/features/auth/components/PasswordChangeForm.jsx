@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { TextInput } from '../../../common/components/index.js'
 import { requestPasswordChange } from '../api/myPageApi.js'
+import { AUTH_ERROR_CODES, SAME_PASSWORD_MESSAGE } from '../authConstants.js'
 import { validateNewPassword } from '../validation.js'
 import PasswordRuleList from './PasswordRuleList.jsx'
 
@@ -16,10 +17,12 @@ export default function PasswordChangeForm({ onSaved, onCancel }) {
   const update = (field) => (value) => setForm((prev) => ({ ...prev, [field]: value }))
 
   // 입력을 검사한 뒤 저장을 요청한다. 현재 비밀번호가 틀리면 서버 안내를 그대로 보여 준다.
+  // FP-222 새 비밀번호가 현재 비밀번호 칸과 같으면 보내지 않고, 서버가 SAME_PASSWORD로 막아도 같은 문구를 새 비밀번호 칸 아래에 보여 준다.
   const handleSubmit = async (event) => {
     event.preventDefault()
     const nextErrors = validateNewPassword(form.password, form.passwordConfirm)
     if (!form.currentPassword) nextErrors.currentPassword = '현재 비밀번호를 입력해 주세요.'
+    else if (!nextErrors.password && form.password === form.currentPassword) nextErrors.password = SAME_PASSWORD_MESSAGE
     setErrors(nextErrors)
     setFormError('')
     if (Object.keys(nextErrors).length > 0) return
@@ -29,7 +32,8 @@ export default function PasswordChangeForm({ onSaved, onCancel }) {
       await requestPasswordChange({ currentPassword: form.currentPassword, newPassword: form.password })
       onSaved('비밀번호를 바꿨습니다.')
     } catch (saveError) {
-      setFormError(saveError.message)
+      if (saveError.data?.code === AUTH_ERROR_CODES.SAME_PASSWORD) setErrors({ password: SAME_PASSWORD_MESSAGE })
+      else setFormError(saveError.message)
       setPending(false)
     }
   }

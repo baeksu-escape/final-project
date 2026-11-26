@@ -1,6 +1,7 @@
 // N-18 신용케어 시뮬레이터 mock 핸들러 — 한도·금리 추천 및 점수 재계산
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { ApiError } from '../../../common/api/ApiError.js'
+import { requireAccountByToken } from '../../auth/mocks/authMockHandlers.js'
 import {
   SCORE_BAND_OFFER_BASE_DATE,
   SCORE_BAND_OFFER_ROWS,
@@ -18,7 +19,7 @@ const SIMULATION_CHANGE_KEYS = new Set([
   SIMULATION_CARD.spendKey,
 ])
 
-// 점수가 속한 등급(CUT-0.1)과 부도 확률 예시를 ML-04 before·after 모양으로 만든다.
+// 점수가 속한 등급(CUT-0.3)과 부도 확률 예시를 ML-04 before·after 모양으로 만든다.
 function summarizeScore(score) {
   const gradeBandCode = SCORE_BAND_OFFER_ROWS.find((row) => score >= row.minScore && score <= row.maxScore).gradeBand
   return { score, gradeBandCode, defaultProb: SIMULATION_DEFAULT_PROB[gradeBandCode] }
@@ -61,7 +62,8 @@ function cardUtilization(limit, spend) {
 
 // N-18-5·8 시뮬레이터 점수 재계산 mock (SIM-02) — 응답은 ML-04 모양(requestId·shap 제외, featureName 추가)이다.
 // 출발 평가 예시(588점)에 바꾼 값을 덮어써 간단한 규칙으로 점수를 다시 낸다. 진짜 모델 점수가 아니다.
-function handleCreditCareRecalculate({ body }) {
+function handleCreditCareRecalculate({ body, token }) {
+  requireSimulationAssessment(token)
   const changes = body?.changes ?? {}
   const fieldErrors =
     typeof changes === 'object' && !Array.isArray(changes)
@@ -138,9 +140,10 @@ function handleCreditCareRecalculate({ body }) {
   }
 }
 
-// N-18-1·10 SIM-01 입력 10개의 내 실제 값 mock — 재계산 mock의 출발 값(base)과 같은 숫자를 돌려준다.
+// N-18-1·10 SIM-01 입력 10개의 내 현재 값 mock — 재계산 mock의 출발 값(base)과 같은 숫자를 돌려준다.
 // 실제 서버는 점수가 나온 최근 평가의 피처값과 그 기준월 카드 직접 입력에서 꺼낸다. 값이 없으면 null이다.
-function handleCreditCareBase() {
+function handleCreditCareBase({ token }) {
+  requireSimulationAssessment(token)
   const values = {}
   SIMULATION_FEATURES.forEach((feature) => {
     values[feature.key] = feature.base
@@ -155,6 +158,14 @@ function handleCreditCareBase() {
     gradeBandCode,
     values,
     topReductionFactors: baseReductionFactors(),
+  }
+}
+
+// N-18-1·5 평가가 없는 회원은 실제 API처럼 평가 없음 오류를 돌려준다.
+function requireSimulationAssessment(token) {
+  if (requireAccountByToken(token).user.hasScore === false) {
+    const message = '저장된 대안 점수가 없습니다.'
+    throw new ApiError(404, message, { code: 'ASSESSMENT_NOT_FOUND', message })
   }
 }
 
@@ -203,7 +214,7 @@ function handleScoreBandOffer({ query }) {
   return {
     score,
     gradeBand: band.gradeBand,
-    cutoffVersion: 'CUT-0.1',
+    cutoffVersion: 'CUT-0.3',
     bandMinScore: band.minScore,
     bandMaxScore: band.maxScore,
     expectedMinRate: band.rateMin,

@@ -5,9 +5,10 @@ import { ROLES } from '../config/roles.js'
 import AppLayout from '../layout/AppLayout.jsx'
 import PublicLayout from '../layout/PublicLayout.jsx'
 import ForbiddenPage from '../pages/ForbiddenPage.jsx'
+import GroupHubPage from '../pages/GroupHubPage.jsx'
+import HomePage from '../pages/HomePage.jsx'
 import LandingPage from '../pages/LandingPage.jsx'
 import NotFoundPage from '../pages/NotFoundPage.jsx'
-import PlaceholderPage from '../pages/PlaceholderPage.jsx'
 import { ADMIN_PATHS } from '../../features/admin/adminConstants.js'
 import AdminAccountsPage from '../../features/admin/pages/AdminAccountsPage.jsx'
 import AdminAuditLogsPage from '../../features/admin/pages/AdminAuditLogsPage.jsx'
@@ -33,7 +34,9 @@ import CashFlowPage from '../../features/diagnosis/pages/CashFlowPage.jsx'
 import ScenarioPage from '../../features/scenario/pages/ScenarioPage.jsx'
 import AdminReportsPage from '../../features/admin/pages/AdminReportsPage.jsx'
 import ModelPerformancePage from '../../features/admin/pages/ModelPerformancePage.jsx'
+import AdminStatsPage from '../../features/admin/pages/AdminStatsPage.jsx'
 import LoungePage from '../../features/community/pages/LoungePage.jsx'
+import ComparisonPage from '../../features/comparison/pages/ComparisonPage.jsx'
 import LoanProductsPage from '../../features/loans/pages/LoanProductsPage.jsx'
 import LoanProductDetailPage from '../../features/loans/pages/LoanProductDetailPage.jsx'
 
@@ -41,12 +44,12 @@ import LoanProductDetailPage from '../../features/loans/pages/LoanProductDetailP
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* 로그인 전 (FP-87 N-01~N-03) — 이미 로그인했으면 첫 화면으로 보낸다 */}
-      <Route element={<GuestOnlyRoute />}>
-        {/* 로그인 전 공통 틀(로고·로그인/회원가입 링크·푸터) — FP-156 공통 레이아웃 */}
-        <Route element={<PublicLayout />}>
-          {/* N-10 메인(홍보) 첫 화면 — 로그인한 사람은 GuestOnlyRoute가 자기 첫 화면(신용 리포트 등)으로 보낸다 */}
-          <Route path={PATHS.HOME} element={<LandingPage />} />
+      {/* 로그인 전 공통 틀(로고·서비스 메뉴·푸터) — FP-156 공통 레이아웃 */}
+      <Route element={<PublicLayout />}>
+        {/* N-10 메인(홍보) 첫 화면 — UI 리뉴얼: 로그인한 뒤에도 로고·[메인]으로 다시 볼 수 있다 */}
+        <Route path={PATHS.HOME} element={<LandingPage />} />
+        {/* 로그인 전 (FP-87 N-01~N-03) — 이미 로그인했으면 첫 화면으로 보낸다 */}
+        <Route element={<GuestOnlyRoute />}>
           <Route path={AUTH_PATHS.LOGIN} element={<LoginPage />} />
           <Route path={AUTH_PATHS.SIGNUP} element={<SignupPage />} />
           <Route path={AUTH_PATHS.FIND_ID} element={<FindIdPage />} />
@@ -64,10 +67,14 @@ export default function AppRoutes() {
           {/* 직군 선택 (FP-85 N-05-1) — 직군이 없는 사용자만 머문다 */}
           <Route path={PATHS.SELECT_JOB} element={<JobSelectPage />} />
 
-          {/* 일반 사용자 전용 + 직군 선택 완료 — N-08-1 주 메뉴 9개 */}
+          {/* 일반 사용자 전용 + 직군 선택 완료 — N-08-1 기능 9개(위쪽 메뉴는 큰 분류 5개로 묶음) */}
           <Route element={<RouteGuard requiredRole={ROLES.USER} requireJobType />}>
             {/* 점수가 있어야 보는 화면 — 점수가 없으면 데이터 입력으로 보낸다(11/06 확정 UI) */}
             <Route element={<RouteGuard requireScore />}>
+              {/* UI 리뉴얼: 홈과 큰 분류 화면 */}
+              <Route path={PATHS.DASHBOARD} element={<HomePage />} />
+              <Route path={PATHS.MY_CREDIT} element={<GroupHubPage groupKey="credit" />} />
+              <Route path={PATHS.FINANCE} element={<GroupHubPage groupKey="finance" />} />
               <Route path={PATHS.REPORT} element={<CreditReportPage />} />
               <Route path={PATHS.ASSET_DEBT} element={<AssetDebtPage />} />
               <Route path={PATHS.SCENARIO} element={<ScenarioPage />} />
@@ -78,7 +85,7 @@ export default function AppRoutes() {
             {/* 점수 없이도 여는 화면 */}
             <Route path={PATHS.LOANS} element={<LoanProductsPage />} />
             <Route path={PATHS.LOAN_DETAIL} element={<LoanProductDetailPage />} />
-            <Route path={PATHS.COMPARISON} element={<PlaceholderPage title="비교 분석" nId="N-13·N-26" />} />
+            <Route path={PATHS.COMPARISON} element={<ComparisonPage />} />
             <Route path={PATHS.LOUNGE} element={<LoungePage />} />
             <Route path={DATA_INPUT_PATHS.DATA_INPUT} element={<DataInputPage />} />
           </Route>
@@ -91,7 +98,7 @@ export default function AppRoutes() {
           {/* 관리자 전용 — N-08-1 관리자 탭 5개 */}
           <Route element={<RouteGuard requiredRole={ROLES.ADMIN} />}>
             <Route path={PATHS.ADMIN_MODEL} element={<ModelPerformancePage />} />
-            <Route path={PATHS.ADMIN_STATS} element={<PlaceholderPage title="직군·연령별 통계" nId="N-26" />} />
+            <Route path={PATHS.ADMIN_STATS} element={<AdminStatsPage />} />
             <Route path={PATHS.ADMIN_ACCOUNTS} element={<AdminAccountsPage />} />
             <Route path={PATHS.ADMIN_REPORTS} element={<AdminReportsPage />} />
             <Route path={PATHS.ADMIN_AUDIT} element={<AdminAuditLogsPage />} />

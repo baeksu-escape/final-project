@@ -12,18 +12,18 @@ export const PROMO_BEFORE = Object.freeze({
 export const PROMO_AFTER = Object.freeze({
   title: '대안 모델',
   description: '금융 이력 + 비금융 납부 이력',
-  score: 778,
+  score: 690,
   gradeBandCode: 'STANDARD',
   areas: Object.freeze(['소득·현금흐름', '대출', '카드·현금서비스', '연체', '직군·연령']),
   // 대안 모델에서 새로 더한 비금융 영역(보라색 태그)
   alternativeAreas: Object.freeze(['통신비', '공과금', '간편결제', '국민연금', '건강보험']),
 })
 
-// DB 기준 데이터 SCORE_GRADE_BAND(CUT-0.1)·신용 리포트 mock과 같은 등급 경계 — 광고용 고정 값이며 서버에서 받지 않는다.
+// DB 기준 데이터 SCORE_GRADE_BAND(CUT-0.3)·신용 리포트 mock과 같은 등급 경계 — 광고용 고정 값이며 서버에서 받지 않는다.
 export const PROMO_GRADE_BANDS = Object.freeze([
-  { gradeBandCode: 'CAUTION', minScore: 0, maxScore: 664 },
-  { gradeBandCode: 'STANDARD', minScore: 665, maxScore: 779 },
-  { gradeBandCode: 'GOOD', minScore: 780, maxScore: 1000 },
+  { gradeBandCode: 'CAUTION', minScore: 0, maxScore: 653 },
+  { gradeBandCode: 'STANDARD', minScore: 654, maxScore: 726 },
+  { gradeBandCode: 'GOOD', minScore: 727, maxScore: 1000 },
 ])
 
 // 주요 기능 소개 카드 3개

@@ -237,6 +237,30 @@ class CreditCareSimulationServiceTest {
         assertTrue(CreditCareSimulationService.validateChanges(null).isEmpty());
     }
 
+    /** N-18-2 슬라이더별 상한과 음수 검사가 같은 오류 형식으로 적용되는지 확인한다. */
+    @Test
+    @DisplayName("SIM-02 검사: 슬라이더별 상한·초과·음수 경계")
+    void validateSliderBounds() {
+        Map<String, Integer> limits = Map.of(
+                "DELINQ_COUNT_12M", 6, "CASH_ADVANCE_MONTHS", 10,
+                "NEW_LOAN_COUNT_3M", 4, "EASYPAY_MONTHLY_COUNT", 60,
+                "TELECOM_ON_TIME_MONTHS", 12, "UTILITY_LATE_MONTHS", 12);
+        for (Map.Entry<String, Integer> entry : limits.entrySet()) {
+            String key = entry.getKey();
+            int limit = entry.getValue();
+            assertEquals((long) limit, CreditCareSimulationService.validateChanges(Map.of(key, limit)).get(key));
+            assertEquals(0L, CreditCareSimulationService.validateChanges(Map.of(key, 0)).get(key));
+            ApiException above = assertThrows(ApiException.class,
+                    () -> CreditCareSimulationService.validateChanges(Map.of(key, limit + 1)));
+            assertEquals(HttpStatus.BAD_REQUEST, above.getStatus());
+            assertEquals("INVALID_INPUT", above.getCode());
+            assertEquals(List.of(new FieldErrorItem("changes." + key, "0~" + limit + " 사이로 입력해 주세요.")), above.getFieldErrors());
+            ApiException negative = assertThrows(ApiException.class,
+                    () -> CreditCareSimulationService.validateChanges(Map.of(key, -1)));
+            assertEquals(List.of(new FieldErrorItem("changes." + key, "0 이상의 정수를 입력해 주세요.")), negative.getFieldErrors());
+        }
+    }
+
     @Test
     @DisplayName("SIM-02: 저장된 평가의 버전·피처값으로 ML-04 요청을 만들고 requestId는 매번 새로, shap은 빼고 featureName을 붙인다")
     @SuppressWarnings("unchecked")
