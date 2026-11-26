@@ -287,6 +287,56 @@ class IncomeVolatilityServiceTest {
     }
 
     @Test
+    @DisplayName("N-21-3·5 항목별 내역: 기타 지출·대출 목록의 합이 기준값과 같고, 정렬은 매퍼가 준 순서 그대로다")
+    void testForecastSavedCashFlow_baseItems() {
+        when(mapper.selectRecentIncomeMonths(2L)).thenReturn(freelancerRows());
+        when(mapper.selectLatestTotalExpense(2L)).thenReturn(1500000L);
+        when(mapper.selectLatestFixedExpense(2L)).thenReturn(1000000L);
+        when(mapper.selectLatestLoanMonthlyPayment(2L)).thenReturn(300000L);
+        when(mapper.selectLatestOtherExpenseItems(2L)).thenReturn(List.of(
+                CashFlowForecastResponse.BaseOtherExpenseItem.builder().expenseGroupCode("INSTALLMENT").expenseCategory("가전").description("노트북").monthlyAmount(300000L).build(),
+                CashFlowForecastResponse.BaseOtherExpenseItem.builder().expenseGroupCode("SUBSCRIPTION").expenseCategory("구독").description("영상").monthlyAmount(200000L).build()));
+        when(mapper.selectLatestLoanItems(2L)).thenReturn(List.of(
+                CashFlowForecastResponse.BaseLoanItem.builder().loanId(1L).loanTypeName("신용대출").monthlyPaymentAmount(200000L).build(),
+                CashFlowForecastResponse.BaseLoanItem.builder().loanId(2L).loanTypeName("카드론").monthlyPaymentAmount(100000L).build()));
+
+        CashFlowForecastResponse response = service.forecastSavedCashFlow(2L, null);
+
+        assertEquals(2, response.getBaseOtherExpenseItems().size());
+        assertEquals(response.getBaseOtherExpenseAmount(),
+                response.getBaseOtherExpenseItems().stream().mapToLong(CashFlowForecastResponse.BaseOtherExpenseItem::getMonthlyAmount).sum());
+        assertEquals("노트북", response.getBaseOtherExpenseItems().get(0).getDescription());
+        assertEquals(response.getBaseMonthlyLoanPayment(),
+                response.getBaseLoanItems().stream().mapToLong(CashFlowForecastResponse.BaseLoanItem::getMonthlyPaymentAmount).sum());
+        assertEquals("신용대출", response.getBaseLoanItems().get(0).getLoanTypeName());
+    }
+
+    @Test
+    @DisplayName("N-21-3·5 항목별 내역: 항목이 없으면(매퍼가 빈 리스트·null) 빈 리스트로 내려간다")
+    void testForecastSavedCashFlow_baseItemsEmpty() {
+        when(mapper.selectRecentIncomeMonths(2L)).thenReturn(freelancerRows());
+        when(mapper.selectLatestOtherExpenseItems(2L)).thenReturn(List.of());
+        when(mapper.selectLatestLoanItems(2L)).thenReturn(null);
+
+        CashFlowForecastResponse response = service.forecastSavedCashFlow(2L, null);
+
+        assertNotNull(response.getBaseOtherExpenseItems());
+        assertTrue(response.getBaseOtherExpenseItems().isEmpty());
+        assertNotNull(response.getBaseLoanItems());
+        assertTrue(response.getBaseLoanItems().isEmpty());
+    }
+
+    @Test
+    @DisplayName("N-21-3·5 항목별 내역: POST 전망(DIAG-08)은 다른 기준값처럼 null이다")
+    void testForecastCashFlow_baseItemsNullOnPost() {
+        CashFlowForecastResponse response = service.forecastCashFlow(forecastRequest(3));
+
+        assertNull(response.getBaseOtherExpenseItems());
+        assertNull(response.getBaseLoanItems());
+        assertNull(response.getBaseFixedExpenseAmount());
+    }
+
+    @Test
     @DisplayName("N-21-2 화면 조건 범위 밖이면 400 INVALID_INPUT이고 DB를 읽기 전에 막는다")
     void testForecastSavedCashFlow_invalidScreenConditions() {
         assertInvalid(() -> service.forecastSavedCashFlow(2L,

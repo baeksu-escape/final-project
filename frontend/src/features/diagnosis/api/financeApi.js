@@ -34,6 +34,9 @@ export async function getCashFlowData(userId) {
     fixedExpenseAmount: server?.baseFixedExpenseAmount ?? null,
     otherExpenseAmount: server?.baseOtherExpenseAmount ?? null,
     monthlyPaymentAmount: server?.baseMonthlyLoanPayment ?? null,
+    // N-21-3 월 지출 구성 목록(서버가 추가할 필드). 없으면 어댑터가 빈 목록으로 처리한다.
+    baseOtherExpenseItems: server?.baseOtherExpenseItems,
+    baseLoanItems: server?.baseLoanItems,
   })
 }
 

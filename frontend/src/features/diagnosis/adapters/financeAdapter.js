@@ -33,6 +33,20 @@ export function adaptAssetDebtData(raw) {
     derived: calculateAssetDebt(raw, {}) }
 }
 
+// N-21-3 월 지출 구성 목록(서버 baseOtherExpenseItems·baseLoanItems)을 화면 모양으로 옮긴다.
+// 배열이 아니거나(필드가 아직 없는 서버 포함) 항목 금액이 0 이상 정수가 아니면 화면 오류로 만들지 않고 빈 목록으로 둔다.
+const isAmount = (value) => Number.isSafeInteger(value) && value >= 0
+// 문자열이 아닌 값은 null로 바꿔 넘긴다(화면이 문자열 함수를 쓰다 깨지지 않게).
+const textOrNull = (value) => (typeof value === 'string' ? value : null)
+function adaptOtherExpenseItems(list) {
+  if (!Array.isArray(list) || !list.every((item) => item && isAmount(item.monthlyAmount))) return []
+  return list.map((item) => ({ groupCode: textOrNull(item.expenseGroupCode), category: textOrNull(item.expenseCategory), description: textOrNull(item.description), monthlyAmount: item.monthlyAmount }))
+}
+function adaptLoanPaymentItems(list) {
+  if (!Array.isArray(list) || !list.every((item) => item && isAmount(item.monthlyPaymentAmount))) return []
+  return list.map((item) => ({ loanId: Number.isFinite(item.loanId) ? item.loanId : null, loanTypeName: textOrNull(item.loanTypeName), monthlyPaymentAmount: item.monthlyPaymentAmount }))
+}
+
 // N-21 현금흐름 월별 기준 자료는 정확히 12개월 연속이어야 하며 NULL 소득은 그대로 둔다.
 export function adaptCashFlowData(raw) {
   // 소득은 12개월 입력으로 확정(decisions.md 1-4)이라 정상 경로에서는 12개월이 온다. 그보다 짧으면 안전장치로 예측을 막고 0으로 채우지 않는다.
@@ -48,7 +62,8 @@ export function adaptCashFlowData(raw) {
   if (raw.currentScore != null && (!Number.isInteger(raw.currentScore) || raw.currentScore < 0 || raw.currentScore > 1000)) throw new Error('currentScore가 올바르지 않습니다.')
   // N-21-6 최근 12개월 중 적자 달 수(서버 pastDeficitMonthsCount). 없거나 올바르지 않으면 null이라 화면이 "—"로 보여 준다.
   const pastDeficitMonthsCount = Number.isSafeInteger(raw.pastDeficitMonthsCount) && raw.pastDeficitMonthsCount >= 0 ? raw.pastDeficitMonthsCount : null
-  return { months, pastDeficitMonthsCount, fixedExpenseAmount: raw.fixedExpenseAmount ?? null, otherExpenseAmount: raw.otherExpenseAmount ?? null,
+  return { months, pastDeficitMonthsCount,
+    otherExpenseItems: adaptOtherExpenseItems(raw.baseOtherExpenseItems), loanPaymentItems: adaptLoanPaymentItems(raw.baseLoanItems), fixedExpenseAmount: raw.fixedExpenseAmount ?? null, otherExpenseAmount: raw.otherExpenseAmount ?? null,
     monthlyPaymentAmount: raw.monthlyPaymentAmount ?? null, currentScore: raw.currentScore ?? null,
     assumptions: Array.isArray(raw.assumptions) && raw.assumptions.every((value) => typeof value === 'string') ? raw.assumptions : [] }
 }
