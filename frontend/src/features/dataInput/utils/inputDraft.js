@@ -20,7 +20,12 @@ export function loadDraft(userId, jobType, sections, serverSavedAt = null) {
       clearDraft(userId, jobType)
       return null
     }
-    const hasAllSections = sections.every((section) => draft.values?.[section.key] !== undefined)
+    // FP-260 칸 섹션은 칸 이름까지 지금 설정과 맞아야 한다. 예전 모양(기간 periodMonths 한 칸)의 임시저장본을 쓰면 기간이 비어 저장되므로 버린다.
+    const hasAllSections = sections.every((section) => {
+      const saved = draft.values?.[section.key]
+      if (saved === undefined) return false
+      return section.kind !== 'fields' || section.fields.every((field) => saved !== null && field.key in saved)
+    })
     // 임시저장은 입력 단계(1~5단계)에서만 하므로 그 밖의 단계 번호는 맞지 않는 저장본으로 본다.
     const isStepValid = Number.isInteger(draft.step) && draft.step >= 0 && draft.step <= LAST_INPUT_STEP
     if (!hasAllSections || !isStepValid) return null

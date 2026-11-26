@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { PATHS } from '../../../common/config/navigation.js'
@@ -495,15 +495,16 @@ export default function DataInputPage() {
               {calculateError}
             </p>
           )}
-          {/* 7단계 버튼 줄 — [이전] 왼쪽 끝, [신용 리포트로 이동]·[점수 산출하기](주 버튼)는 오른쪽 끝. */}
+          {/* 7단계 버튼 줄 — [이전] 왼쪽 끝, [처음으로 돌아가기]·[점수 산출하기](주 버튼)는 오른쪽 끝. */}
+          {/* FP-260 멘토링 13 [신용 리포트로 이동] 대신 1단계로 돌아가는 보조 버튼을 둔다(직군 선택 화면으로는 보내지 않는다). */}
           <div className="data-input-form__actions">
             <div className="data-input-form__actions-start">
               <Button onClick={handlePrev}>이전</Button>
             </div>
             <div className="data-input-form__actions-end">
-              <Link to={PATHS.REPORT} className="data-input-page__next-link">
-                신용 리포트로 이동
-              </Link>
+              <Button variant="weak" onClick={() => goToStep(0)}>
+                처음으로 돌아가기
+              </Button>
               <button
                 type="button"
                 className="data-input-page__calculate"

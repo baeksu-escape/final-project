@@ -107,6 +107,9 @@ export function toValues(input, sections) {
     } else if (section.kind === 'list') {
       values[section.key] = withItemIds(saved.items ?? [])
       if (section.noItemsLabel) values.noItems[section.key] = saved.noItems === true
+    } else if (section.restore) {
+      // FP-260 저장 모양과 화면 칸이 다른 섹션(기간: periodMonths → 년·개월 두 칸)은 섹션 설정의 restore로 되돌린다.
+      Object.assign(values[section.key], section.restore(saved))
     } else {
       for (const field of section.fields) values[section.key][field.key] = saved[field.key] ?? values[section.key][field.key]
     }
@@ -135,6 +138,8 @@ export function buildPayload(values, sections, jobType) {
     } else {
       // FP-86 체크 칸은 true/false로, 비활성 칸(disabledWhen)은 null로 보낸다.
       for (const field of section.fields) {
+        // FP-260 화면 전용 칸(localOnly)은 본문에 넣지 않는다. 보낼 값은 아래 derive가 만든다.
+        if (field.localOnly) continue
         if (field.input === 'checkbox') body[field.key] = value[field.key] === true
         else body[field.key] = field.disabledWhen?.(value) ? null : value[field.key]
       }

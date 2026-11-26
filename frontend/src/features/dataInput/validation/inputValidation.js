@@ -43,8 +43,10 @@ export function errorKeyOf(sectionKey, fieldKey, rowId) {
 
 // 칸 하나를 검사해 오류가 있으면 errors에 넣는다 — 필수 검사를 먼저 하고, 값이 있을 때만 칸의 validate를 부른다.
 // checkRequired가 false면 필수 검사는 건너뛴다(첫 저장 전에는 빈 칸 오류를 보여 주지 않기 위해서).
+// FP-260 칸 설정에 requiredWhen(칸 섹션 값)이 있으면 required 대신 그 결과로 필수 여부를 정한다(기간: 개월 칸이 비었을 때만 년 칸 필수).
 function checkField(field, value, context, errors, key, checkRequired) {
-  if (field.required && isEmptyValue(value)) {
+  const required = field.requiredWhen ? field.requiredWhen(context.row) : field.required
+  if (required && isEmptyValue(value)) {
     if (checkRequired) errors[key] = field.requiredMessage ?? REQUIRED_MESSAGE
     return
   }

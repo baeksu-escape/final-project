@@ -26,6 +26,8 @@ const balanceAmountRule = amountRule(VALIDATION_LIMITS.BALANCE_AMOUNT_MAX)
 //     규칙 함수는 validation/inputRules.js에 있다.
 //   input: 'checkbox'는 체크 칸(값은 true/false)이다.
 //   disabledWhen(sectionValue): 칸 섹션 전용 — true면 칸을 비활성화하고, 검사하지 않으며, 요청 본문에 null로 보낸다.
+//   FP-260 requiredWhen(sectionValue): 주면 required 대신 이 결과로 빈 칸 오류를 낸다(라벨의 '(필수)'는 required로 붙는다).
+//   FP-260 localOnly: true면 화면 전용 칸이라 요청 본문에 넣지 않는다(보낼 값은 섹션의 derive가 만든다).
 //
 // 섹션(section) 설정
 //   kind: 'fields'(칸 묶음) | 'list'(줄 추가·삭제)   fields | itemFields: 칸 목록
@@ -35,6 +37,8 @@ const balanceAmountRule = amountRule(VALIDATION_LIMITS.BALANCE_AMOUNT_MAX)
 //     uniqueField·duplicateMessage: 이 칸 값이 앞줄과 같으면 오류   notice(rows): 입력 완료 현황의 같은 key 항목 옆에 보여 줄 안내 문구(없으면 null, 오류 아님)
 //   N-05-2 list 전용 — fixedMonths: 기준월로 끝나는 이 개월 수만큼 줄을 미리 채운다(줄 추가·삭제 없음). readOnly 칸은 입력 칸을 그리지 않는다.
 //   isComplete(saved): 입력 완료 현황에서 이 섹션의 완료 조건이 따로 있을 때 쓴다.
+//   FP-260 fields 전용 — restore(saved): 저장된 본문을 화면 칸 값으로 되돌릴 때 쓴다(없으면 칸 이름 그대로 꺼낸다).
+//     fieldsClassName: 칸들을 감쌀 기존 배치 클래스(예: 'l-g2' 자동 칸으로 나란히).
 //   N-05-8 list 전용 — noItemsLabel: 줄이 없어도 완료로 볼 수 있게 하는 체크 문구(대출이 없는 사용자용)
 //     체크하면 줄은 지우지 않고 잠근다(FP-227). 잠긴 줄은 검사하지 않고, 요청 본문에는 줄 없이(items: []) noItems: true로 보낸다.
 //   FP-227 list 전용 — minRows: "없음" 체크가 풀려 있으면 늘 보일 최소 줄 수. 줄이 모자라면 빈 줄을 채운다(inputValues.js withMinimumRows).
@@ -91,24 +95,71 @@ export const INCOME_SECTION_BY_JOB = Object.freeze({
 
 // N-05-2 소득과 함께 받는 기간 섹션을 만든다. 직군마다 이름만 다르다.
 // TODO(D-24) 기간의 단위를 팀이 정하지 않아 개월 수로 받는다.
+// FP-260 멘토링 9 화면은 [ ]년 [ ]개월 두 칸으로 받고, 요청 본문은 지금처럼 periodMonths(년×12+개월) 하나로 보낸다(서버·요청 모양 그대로).
+//   두 칸은 화면 전용(localOnly)이라 본문에 넣지 않고, derive가 합친 값을 넣는다. 불러올 때는 restore가 다시 나눈다.
+//   개월 칸은 0~11, 비우면 0으로 본다. 년 칸은 개월 칸이 비었을 때만 필수다. 합계 상한은 WORK_PERIOD_MONTHS_MAX(600개월) 그대로다.
+const PERIOD_YEARS_MAX = Math.floor(VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX / 12)
+const isBlank = (value) => value === null || value === undefined || value === ''
+
+// 년·개월 두 칸을 개월 수 하나로 합친다. 둘 다 비면 null.
+export function toPeriodMonths(value) {
+  if (isBlank(value?.periodYears) && isBlank(value?.periodMonthPart)) return null
+  return (Number(value?.periodYears) || 0) * 12 + (Number(value?.periodMonthPart) || 0)
+}
+
+// 저장된 개월 수를 년·개월 두 칸으로 나눈다. 없으면 둘 다 null.
+export function splitPeriodMonths(periodMonths) {
+  if (isBlank(periodMonths)) return { periodYears: null, periodMonthPart: null }
+  const months = Number(periodMonths)
+  return { periodYears: Math.floor(months / 12), periodMonthPart: months % 12 }
+}
+
+const periodYearsRule = numberRule({ max: PERIOD_YEARS_MAX, integer: true, unit: '년' })
+const periodMonthPartRule = numberRule({ max: 11, integer: true, unit: '개월' })
+// 년 칸 규칙 — 정수·범위를 본 뒤 년·개월 합계가 상한을 넘는지 본다(합계 오류는 년 칸 아래에 보인다).
+function periodTotalRule(value, { row } = {}) {
+  const message = periodYearsRule(value)
+  if (message) return message
+  return toPeriodMonths(row) > VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX
+    ? `기간은 최대 ${VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX}개월(${PERIOD_YEARS_MAX}년)까지 입력할 수 있습니다.`
+    : null
+}
+
 function createPeriodSection(label) {
   return {
     key: 'workPeriod',
     title: label,
     kind: 'fields',
+    fieldsClassName: 'l-g2',
     fields: [
       {
-        key: 'periodMonths',
-        label,
+        key: 'periodYears',
+        label: `${label}(년)`,
+        input: 'number',
+        unit: '년',
+        min: 0,
+        max: PERIOD_YEARS_MAX,
+        step: 1,
+        required: true,
+        requiredWhen: (row) => isBlank(row?.periodMonthPart),
+        localOnly: true,
+        validate: periodTotalRule,
+      },
+      {
+        key: 'periodMonthPart',
+        label: `${label}(개월)`,
         input: 'number',
         unit: '개월',
         min: 0,
-        max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX,
+        max: 11,
         step: 1,
-        required: true,
-        validate: numberRule({ max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX, integer: true, unit: '개월' }),
+        localOnly: true,
+        validate: periodMonthPartRule,
       },
     ],
+    derive: (value) => ({ periodMonths: toPeriodMonths(value) }),
+    restore: (saved) => splitPeriodMonths(saved?.periodMonths),
+    isComplete: (saved) => !isBlank(saved?.periodMonths),
   }
 }
 
