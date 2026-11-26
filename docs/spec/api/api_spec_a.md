@@ -118,7 +118,7 @@
 
 | ID | 메서드 · 경로 | 요청 | 응답 | 추가 조건 | 상태 |
 |---|---|---|---|---|---|
-| ADM-05 | `GET /api/admin/users?q&role&status&page&size` | — | `{ items: [{ userId, loginId, maskedName, role, workerTypeCode, latestAltScore, status, reportedPostCount, createdAt, lastLoginAt }], page, size, totalCount }` | `size` 최대 100 | ✅ |
+| ADM-05 | `GET /api/admin/users?q&role&status&workerType&page&size` 🆕 11/26 | — | `{ items: [{ userId, loginId, maskedName, role, workerTypeCode, latestAltScore, status, reportedPostCount, createdAt, lastLoginAt, nickname }], page, size, totalCount }` 🆕 11/26 `nickname` 추가(탈퇴 회원은 '탈퇴'+회원 번호 표시값) | `size` 최대 100. 🆕 11/26 `workerType`은 직군 코드 3개 중 하나(선택), 틀리면 400 `INVALID_INPUT`(FP-273) | ✅ |
 | ADM-06 | `PATCH /api/admin/users/{userId}/lock` | `{ locked, reason }` | 바뀐 행(ADM-05 `items` 한 줄) | 잠글 때 `reason` 필수. 본인 409, 탈퇴 409 | ✅ |
 | ADM-07 | `POST /api/admin/admins` | `{ loginId, name, workEmail }` | `{ userId, loginId, temporaryPassword }` | `X-Step-Up-Token` 필요 | ✅ |
 | ADM-07-1 🟡 | `POST /api/admin/admins/{userId}/temporary-password` | — | ADM-07과 같음 | `X-Step-Up-Token` 필요, 본인 불가 | ✅ (화면 버튼은 없음) |

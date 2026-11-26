@@ -1,3 +1,4 @@
+import { JOB_TYPE_OPTIONS } from '../../common/config/jobTypes.js'
 import { ROLES } from '../../common/config/roles.js'
 
 // FP-80 관리자 화면 경로 — 관리자 탭 5개(PATHS.ADMIN_*)는 공통 navigation.js에 있고, 탭에 없는 화면만 여기에 둔다.
@@ -80,6 +81,8 @@ export const STATUS_FILTER_OPTIONS = Object.freeze([
   { value: '', label: '전체' },
   ...Object.values(ACCOUNT_STATUS).map((value) => ({ value, label: ACCOUNT_STATUS_LABELS[value] })),
 ])
+// FP-273 ACCT-03 직군 필터(ADM-05 workerType). 값은 공통 직군 코드 3개, ''은 전체.
+export const WORKER_TYPE_FILTER_OPTIONS = Object.freeze([{ value: '', label: '전체' }, ...JOB_TYPE_OPTIONS])
 
 // N-28 시스템 로그 구분(DDL SYSTEM_LOG.LOG_TYPE_CODE). value ''은 전체.
 export const SYSTEM_LOG_TYPE_OPTIONS = Object.freeze([

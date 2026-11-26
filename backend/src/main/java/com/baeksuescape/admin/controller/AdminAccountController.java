@@ -31,12 +31,12 @@ public class AdminAccountController {
         this.members = members;
     }
 
-    // ADM-05 N-27-1 계정 목록·검색 → { items, page, size, totalCount }
+    // ADM-05 N-27-1 계정 목록·검색 → { items, page, size, totalCount }. FP-273 직군 조건 workerType(선택) 추가.
     @GetMapping("/users")
     public AdminDtos.PageResponse<AdminDtos.UserRow> users(@RequestParam(required = false) String q, @RequestParam(required = false) String role,
-            @RequestParam(required = false) String status, @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size) {
-        return accounts.list(q, role, status, page, size);
+            @RequestParam(required = false) String status, @RequestParam(required = false) String workerType,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return accounts.list(q, role, status, workerType, page, size);
     }
 
     // ADM-06 N-27-3 잠금·해제 { locked, reason } → 바뀐 행

@@ -148,12 +148,15 @@ class AdminApiTest {
         row.setAccountStatusCode("ACTIVE");
         row.setReportedPostCount(0);
         row.setCreatedAt(LocalDateTime.of(2026, 10, 1, 9, 30));
-        given(adminAccountMapper.selectUsers(any(), any(), any(), anyBoolean(), anyInt(), anyInt())).willReturn(List.of(row));
-        given(adminAccountMapper.countUsers(any(), any(), any(), anyBoolean())).willReturn(1L);
+        row.setNickname("데모직장인");
+        given(adminAccountMapper.selectUsers(any(), any(), any(), any(), anyBoolean(), anyInt(), anyInt())).willReturn(List.of(row));
+        given(adminAccountMapper.countUsers(any(), any(), any(), any(), anyBoolean())).willReturn(1L);
 
-        mvc.perform(as(get("/api/admin/users").param("q", "emp"), tokenProvider.issue(1L, "ROLE_ADMIN")))
+        // FP-273 직군 조건(workerType)을 함께 보내고, 응답 한 줄에 닉네임이 실린다.
+        mvc.perform(as(get("/api/admin/users").param("q", "emp").param("workerType", "FREELANCER"), tokenProvider.issue(1L, "ROLE_ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].userId").value(7))
+                .andExpect(jsonPath("$.items[0].nickname").value("데모직장인"))
                 .andExpect(jsonPath("$.items[0].maskedName").value("홍*동"))
                 .andExpect(jsonPath("$.items[0].role").value("ROLE_USER"))
                 .andExpect(jsonPath("$.items[0].latestAltScore").isEmpty())
@@ -163,6 +166,15 @@ class AdminApiTest {
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(20))
                 .andExpect(jsonPath("$.totalCount").value(1));
+    }
+
+    // FP-273 직군 코드 3개 밖의 값은 role·status와 같은 400 INVALID_INPUT(칸 workerType).
+    @Test
+    void userListRejectsUnknownWorkerType() throws Exception {
+        mvc.perform(as(get("/api/admin/users").param("workerType", "WRONG"), tokenProvider.issue(1L, "ROLE_ADMIN")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("workerType"));
     }
 
     @Test

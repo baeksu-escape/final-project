@@ -23,11 +23,12 @@ function toQuery(params) {
   return text ? `?${text}` : ''
 }
 
-// N-27-1 계정 목록 조회·검색(ADM-05) — { q, role, status, page(0부터), size } →
-//   { items: [{ userId, loginId, maskedName, role, workerTypeCode, latestAltScore, status, reportedPostCount, createdAt, lastLoginAt }], page, size, totalCount }
+// N-27-1 계정 목록 조회·검색(ADM-05) — { q, role, status, workerType, page(0부터), size } →
+//   { items: [{ userId, loginId, maskedName, role, workerTypeCode, latestAltScore, status, reportedPostCount, createdAt, lastLoginAt, nickname }], page, size, totalCount }
+//   FP-273 workerType(직군 코드, 선택)·nickname(탈퇴 회원은 '탈퇴'+회원 번호 표시값) 추가. 틀린 직군 값은 400 INVALID_INPUT.
 //   maskedName은 "(복호화 불가)"일 수 있다.
-export function fetchAdminUsers({ q, role, status, page, size }) {
-  return apiGet(`${ADMIN_API.USERS}${toQuery({ q, role, status, page, size })}`)
+export function fetchAdminUsers({ q, role, status, workerType, page, size }) {
+  return apiGet(`${ADMIN_API.USERS}${toQuery({ q, role, status, workerType, page, size })}`)
 }
 
 // N-27-3 회원 계정 잠금·해제(ADM-06) — { locked, reason } → 바뀐 행(목록 items 한 줄 모양). 본인·탈퇴 계정은 409.

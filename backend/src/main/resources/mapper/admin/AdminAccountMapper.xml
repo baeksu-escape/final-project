@@ -12,7 +12,8 @@
         (SELECT COUNT(*) FROM CONTENT_REPORT r
           WHERE r.POST_ID IN (SELECT p.POST_ID FROM BOARD_POST p WHERE p.USER_ID = u.USER_ID)
              OR r.COMMENT_ID IN (SELECT c.COMMENT_ID FROM BOARD_COMMENT c WHERE c.USER_ID = u.USER_ID)) AS reportedPostCount,
-        u.CREATED_AT AS createdAt, u.LAST_LOGIN_AT AS lastLoginAt
+        u.CREATED_AT AS createdAt, u.LAST_LOGIN_AT AS lastLoginAt,
+        u.NICKNAME AS nickname
     </sql>
 
     <sql id="userFilter">
@@ -22,6 +23,8 @@
             </if>
             <if test="role != null">AND u.ROLE_CODE = #{role}</if>
             <if test="status != null">AND u.ACCOUNT_STATUS_CODE = #{status}</if>
+            <!-- FP-273 ACCT-03 직군 조건(서비스가 코드 3개 중 하나인지 먼저 본다) -->
+            <if test="workerType != null">AND u.WORKER_TYPE_CODE = #{workerType}</if>
             <if test="status == null and !includeWithdrawn">AND u.ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'</if>
         </where>
     </sql>

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useAuth } from '../../../common/auth/useAuth.js'
-import { Button, Card, Chip, Notice, Select, TextInput, Toast } from '../../../common/components/index.js'
+import { Button, Card, Chip, Select, TextInput, Toast } from '../../../common/components/index.js'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { ROLES } from '../../../common/config/roles.js'
 import { fetchAdminUsers, openMemberCreditData, setUserLock } from '../api/adminApi.js'
@@ -11,27 +11,29 @@ import {
   ADMIN_PAGE_SIZE,
   ROLE_FILTER_OPTIONS,
   STATUS_FILTER_OPTIONS,
+  WORKER_TYPE_FILTER_OPTIONS,
   adminErrorMessage,
 } from '../adminConstants.js'
 import { EMPTY_TEXT, formatDate } from '../adminFormat.js'
 import AccessReasonForm from '../components/AccessReasonForm.jsx'
-import AddAdminForm from '../components/AddAdminForm.jsx'
 import AdminPagination from '../components/AdminPagination.jsx'
 import LockReasonModal from '../components/LockReasonModal.jsx'
 import MemberDetailPanel from '../components/MemberDetailPanel.jsx'
 import { useAdminErrorHandler } from '../useAdminErrorHandler.js'
 
-// 표의 열 수 — 열람 사유 줄이 표 전체 너비를 차지하게 할 때 쓴다.
-const COLUMN_COUNT = 9
+// 표의 열 수 — 열람 사유 줄이 표 전체 너비를 차지하게 할 때 쓴다. FP-273 [닉네임] 열을 더해 10열.
+const COLUMN_COUNT = 10
 
-// N-27·N-35-1 계정·권한 관리(/admin/accounts) — 회원 목록 검색·필터·쪽 넘기기, 사유를 남기고 회원 상세 열람, 계정 잠금·해제, 관리자 계정 추가.
+// N-27·N-35-1 계정·권한 관리(/admin/accounts) — 회원 목록 검색·필터(권한·상태·직군)·쪽 넘기기, 사유를 남기고 회원 상세 열람, 계정 잠금·해제.
 // 회원 정보는 서버가 가린 값만 보여 준다. 회원을 관리자로 바꾸는 기능은 두지 않는다(N-27-2).
+// FP-273 ACCT-04 통합 관리자로 운영하기로 해(11/26) 관리자 계정 추가(N-27-4) 카드는 화면에서 감췄다.
+// AddAdminForm.jsx·createAdminAccount(ADM-07)·서버 코드는 그대로 남겨 두었다.
 export default function AdminAccountsPage() {
   const { user } = useAuth()
   const handleAdminError = useAdminErrorHandler()
   const [searchText, setSearchText] = useState('')
-  // 서버에 보낼 조건. reloadKey는 관리자 추가 뒤 같은 조건으로 다시 부를 때 올린다.
-  const [query, setQuery] = useState({ q: '', role: '', status: '', page: ADMIN_FIRST_PAGE, reloadKey: 0 })
+  // 서버에 보낼 조건. reloadKey는 같은 조건으로 다시 부를 때 올린다.
+  const [query, setQuery] = useState({ q: '', role: '', status: '', workerType: '', page: ADMIN_FIRST_PAGE, reloadKey: 0 })
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [reasonFor, setReasonFor] = useState(null) // 열람 사유를 고르는 중인 회원 userId
@@ -46,7 +48,14 @@ export default function AdminAccountsPage() {
   // 조건이 바뀔 때마다 목록을 부른다.
   useEffect(() => {
     let cancelled = false
-    fetchAdminUsers({ q: query.q, role: query.role, status: query.status, page: query.page, size: ADMIN_PAGE_SIZE })
+    fetchAdminUsers({
+      q: query.q,
+      role: query.role,
+      status: query.status,
+      workerType: query.workerType,
+      page: query.page,
+      size: ADMIN_PAGE_SIZE,
+    })
       .then((result) => {
         if (cancelled) return
         setData(result)
@@ -157,6 +166,12 @@ export default function AdminAccountsPage() {
         </form>
         <Select label="권한" options={ROLE_FILTER_OPTIONS} value={query.role} onChange={(value) => changeQuery({ role: value ?? '' })} />
         <Select label="상태" options={STATUS_FILTER_OPTIONS} value={query.status} onChange={(value) => changeQuery({ status: value ?? '' })} />
+        <Select
+          label="직군"
+          options={WORKER_TYPE_FILTER_OPTIONS}
+          value={query.workerType}
+          onChange={(value) => changeQuery({ workerType: value ?? '' })}
+        />
         {data && <Chip>{data.totalCount}명</Chip>}
       </Card>
 
@@ -171,6 +186,7 @@ export default function AdminAccountsPage() {
                 <tr>
                   <th scope="col">아이디</th>
                   <th scope="col">이름</th>
+                  <th scope="col">닉네임</th>
                   <th scope="col">권한</th>
                   <th scope="col">직군</th>
                   <th scope="col">최근 대안 점수</th>
@@ -186,6 +202,8 @@ export default function AdminAccountsPage() {
                     <tr>
                       <td>{row.loginId}</td>
                       <td>{row.maskedName}</td>
+                      {/* FP-273 닉네임 — 탈퇴 회원은 서버가 준 표시값('탈퇴'+회원 번호) 그대로 */}
+                      <td>{row.nickname ?? EMPTY_TEXT}</td>
                       <td>{row.role === ROLES.ADMIN ? <Chip accent>관리자</Chip> : '일반'}</td>
                       <td>{JOB_TYPE_LABELS[row.workerTypeCode] ?? EMPTY_TEXT}</td>
                       <td>{row.latestAltScore ?? EMPTY_TEXT}</td>
@@ -224,14 +242,6 @@ export default function AdminAccountsPage() {
       </Card>
 
       {detail && <MemberDetailPanel detail={detail} onClose={() => setDetail(null)} />}
-
-      <Card title="관리자 계정 추가">
-        <Notice type="info">
-          관리자는 회원 가입이 아니라 이 화면에서만 만듭니다. 임시 비밀번호가 발급되고, 첫 로그인 때 2단계 인증 뒤 비밀번호를 새로 정합니다. 일반
-          회원을 관리자로 바꾸는 기능은 두지 않습니다.
-        </Notice>
-        <AddAdminForm onCreated={() => setQuery((prev) => ({ ...prev, reloadKey: prev.reloadKey + 1 }))} />
-      </Card>
 
       <LockReasonModal
         target={lockTarget}

@@ -1,5 +1,6 @@
 import { ApiError } from '../../../common/api/ApiError.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
+import { JOB_TYPES } from '../../../common/config/jobTypes.js'
 import { ROLES } from '../../../common/config/roles.js'
 import { addMockAccount, listMockAccounts } from '../../auth/mocks/authMockHandlers.js'
 import { isValidEmail } from '../../auth/validation.js'
@@ -97,10 +98,15 @@ registerMockHandlers({
     const q = (query.get('q') ?? '').trim().toLowerCase()
     const role = query.get('role') ?? ''
     const status = query.get('status') ?? ''
+    // FP-273 직군 조건 — 백엔드처럼 빈 값은 거르지 않고, 코드 3개 밖의 값은 400 INVALID_INPUT.
+    const rawWorkerType = query.get('workerType') ?? ''
+    const workerType = rawWorkerType.trim() ? rawWorkerType : ''
+    if (workerType && !Object.values(JOB_TYPES).includes(workerType)) throw invalidInput('workerType', '직군 값을 확인해 주세요.')
     const rows = listMockAccounts()
       .filter((account) => !q || account.loginId.toLowerCase().includes(q) || String(account.nickname ?? '').toLowerCase().includes(q))
       .map(toAdminRow)
       .filter((row) => (!role || row.role === role) && (!status || row.status === status))
+      .filter((row) => !workerType || row.workerTypeCode === workerType)
       .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))
     rows.forEach((row) => registerUserHandlers(row.userId))
     return paginate(rows, query)

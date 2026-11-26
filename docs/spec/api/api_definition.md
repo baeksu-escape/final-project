@@ -296,7 +296,7 @@
 | ADM-02 | `GET /api/admin/model-performance/roc?group=…&label=…` 🆕 11/20 | N-25-3 ROC 곡선 | 위와 같음 | 동주 (FP-184) 🆕 11/20 | ✅ 🆕 11/20 |
 | ADM-03 | `GET /api/admin/stats?groupBy=WORKER_TYPE\|AGE_BAND` 🆕 11/20 | N-26-1 구분 선택(직군별·연령대별), N-26-2 요약 수치(평가 고객 수·평균 기존·대안 점수·상승폭·Standard 이상 비율 기존·대안·가입 회원 수·오늘 산출), N-26-3 기존·대안 등급 분포, N-26-4 그룹별 통계 표(🆕 11/23 기존 모델 등급 값 추가). 서비스 회원이 ACTIVE 모델로 낸 최근 SCORED 평가(🆕 11/23 ACTIVE가 아닌 모델의 평가 제외), 탈퇴 회원 제외, 값마다 계산 인원 5명 미만이면 숨김(D-26·D-28 담당자 결정) | `ASSESSMENT`, `APP_USER` | 광희 (FP-161) 🆕 11/20 | ✅ 🆕 11/20 |
 | ADM-04 | `GET /api/members/me/group-comparison` 🆕 11/23 | N-26-5 비교 분석 화면 (사용자), N-26-6 직군 × 연령 격자·선택한 집단, N-26-7 직군별·연령별 비교. 전체·직군 3·연령대 4·격자 12칸과 내 평가(`me`)를 한 번에 준다. 집계 기준은 ADM-03과 같다(ACTIVE 모델 최근 SCORED 평가, 탈퇴 제외, 값마다 5명 미만 숨김, 11/23 동주 합의). 일반 회원만(Q-8 경로) | `ASSESSMENT`, `APP_USER` | 광희 (FP-164) 🆕 11/23 | ✅ 🆕 11/23 |
-| ADM-05 | `GET /api/admin/users?q&role&status&page&size` | N-27-1 계정 목록 조회·검색 (size 최대 100) | `APP_USER` | 경환·우찬 (FP-80) | ✅ |
+| ADM-05 | `GET /api/admin/users?q&role&status&workerType&page&size` 🆕 11/26 | N-27-1 계정 목록 조회·검색 (size 최대 100). 🆕 11/26 직군 조건 `workerType`(EMPLOYEE·SELF_EMPLOYED·FREELANCER, 선택, 틀리면 role·status와 같은 400 `INVALID_INPUT`), 응답 한 줄에 `nickname`(탈퇴 회원은 '탈퇴'+회원 번호 표시값) 추가 (FP-273) | `APP_USER` | 경환·우찬 (FP-80, FP-273) | ✅ |
 | ADM-06 | `PATCH /api/admin/users/{userId}/lock` | N-27-3 회원 계정 잠금 `{ locked, reason }` (잠글 때 reason 필수, 본인·탈퇴 409) | `APP_USER` | 경환·우찬 | ✅ |
 | ADM-07 | `POST /api/admin/admins` | N-27-4 관리자 계정 추가 (임시 비밀번호), `X-Step-Up-Token` 필요 | `APP_USER` | 경환·우찬 | ✅ |
 | ADM-07-1 | `POST /api/admin/admins/{userId}/temporary-password` | 관리자 임시 비밀번호 재발급 (`X-Step-Up-Token`, 본인 불가, 화면 버튼 없음) | `APP_USER` | 경환·우찬 | ✅ (새 경로) |

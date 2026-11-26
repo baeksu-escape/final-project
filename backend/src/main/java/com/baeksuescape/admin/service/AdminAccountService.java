@@ -73,18 +73,23 @@ public class AdminAccountService {
     }
 
     // ADM-05 계정 목록·검색. q는 아이디·닉네임 부분 일치(이름은 암호문이라 검색하지 않는다). 상태를 고르지 않으면 탈퇴 계정은 뺀다.
-    public AdminDtos.PageResponse<AdminDtos.UserRow> list(String q, String role, String status, Integer page, Integer size) {
+    // FP-273 ACCT-03 workerType(직군 코드 3개 중 하나)으로도 거른다. 틀린 값은 role·status와 같은 400.
+    public AdminDtos.PageResponse<AdminDtos.UserRow> list(String q, String role, String status, String workerType, Integer page, Integer size) {
         if (role != null && !role.isBlank() && !ROLES.contains(role)) throw invalid("role", "권한 값을 확인해 주세요.");
         if (status != null && !status.isBlank() && !STATUSES.contains(status)) throw invalid("status", "상태 값을 확인해 주세요.");
+        if (workerType != null && !workerType.isBlank() && !AdminStatsService.WORKER_TYPE_CODES.contains(workerType)) {
+            throw invalid("workerType", "직군 값을 확인해 주세요.");
+        }
         String roleFilter = blankToNull(role);
         String statusFilter = blankToNull(status);
+        String workerTypeFilter = blankToNull(workerType);
         String qLike = q == null || q.isBlank() ? null : "%" + escapeLike(q.strip()) + "%";
         int pageNo = page == null || page < 0 ? 0 : page;
         int pageSize = size == null || size < 1 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
 
-        List<AdminDtos.UserRow> items = adminMapper.selectUsers(qLike, roleFilter, statusFilter, false, pageNo * pageSize, pageSize)
+        List<AdminDtos.UserRow> items = adminMapper.selectUsers(qLike, roleFilter, statusFilter, workerTypeFilter, false, pageNo * pageSize, pageSize)
                 .stream().map(this::toRow).toList();
-        long total = adminMapper.countUsers(qLike, roleFilter, statusFilter, false);
+        long total = adminMapper.countUsers(qLike, roleFilter, statusFilter, workerTypeFilter, false);
         return new AdminDtos.PageResponse<>(items, pageNo, pageSize, total);
     }
 
@@ -203,7 +208,8 @@ public class AdminAccountService {
     AdminDtos.UserRow toRow(AdminRows.UserData data) {
         return new AdminDtos.UserRow(data.getUserId(), data.getLoginId(), pii.maskedName(data.getUserId(), data.getNameEnc()), data.getRoleCode(),
                 data.getWorkerTypeCode(), data.getLatestAltScore(), data.getAccountStatusCode(),
-                data.getReportedPostCount() == null ? 0 : data.getReportedPostCount(), offset(data.getCreatedAt()), offset(data.getLastLoginAt()));
+                data.getReportedPostCount() == null ? 0 : data.getReportedPostCount(), offset(data.getCreatedAt()), offset(data.getLastLoginAt()),
+                data.getNickname());
     }
 
     private OffsetDateTime offset(LocalDateTime time) {

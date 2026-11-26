@@ -109,6 +109,8 @@ export function toAdminRow(account) {
     reportedPostCount: extras.reportedPostCount ?? 0,
     createdAt: account.createdAt ?? extras.createdAt ?? null,
     lastLoginAt: extras.lastLoginAt ?? null,
+    // FP-273 닉네임(맨 끝 필드, 백엔드 UserRow와 같은 순서). 탈퇴 계정은 저장된 표시값('탈퇴'+…) 그대로.
+    nickname: account.nickname ?? null,
   }
 }
 

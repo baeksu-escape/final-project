@@ -47,9 +47,9 @@ public final class AdminDtos {
 
     // ── ADM-05·06 계정 목록·잠금 ──
 
-    // 계정 한 줄. 이름은 가린 값, 최근 대안 점수·작성 글 신고 건수는 요약 값.
+    // 계정 한 줄. 이름은 가린 값, 최근 대안 점수·작성 글 신고 건수는 요약 값. FP-273 닉네임(nickname)을 맨 끝에 더했다.
     public record UserRow(Long userId, String loginId, String maskedName, String role, String workerTypeCode, Integer latestAltScore,
-            String status, int reportedPostCount, OffsetDateTime createdAt, OffsetDateTime lastLoginAt) {
+            String status, int reportedPostCount, OffsetDateTime createdAt, OffsetDateTime lastLoginAt, String nickname) {
     }
 
     public record PageResponse<T>(List<T> items, int page, int size, long totalCount) {

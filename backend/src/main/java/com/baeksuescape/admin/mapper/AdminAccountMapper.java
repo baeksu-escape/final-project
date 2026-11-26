@@ -14,12 +14,13 @@ import com.baeksuescape.user.dto.UserAccount;
 public interface AdminAccountMapper {
 
     // ADM-05 계정 목록. qLike는 '%검색어%'(LIKE 특수문자는 서비스가 \로 막는다), role·status가 null이면 거르지 않는다.
-    // includeWithdrawn이 false면 탈퇴 계정을 뺀다(상태를 고르지 않았을 때의 기본).
+    // includeWithdrawn이 false면 탈퇴 계정을 뺀다(상태를 고르지 않았을 때의 기본). FP-273 workerType(직군 코드)이 null이면 거르지 않는다.
     List<AdminRows.UserData> selectUsers(@Param("qLike") String qLike, @Param("role") String role, @Param("status") String status,
-            @Param("includeWithdrawn") boolean includeWithdrawn, @Param("offset") int offset, @Param("size") int size);
+            @Param("workerType") String workerType, @Param("includeWithdrawn") boolean includeWithdrawn, @Param("offset") int offset,
+            @Param("size") int size);
 
     long countUsers(@Param("qLike") String qLike, @Param("role") String role, @Param("status") String status,
-            @Param("includeWithdrawn") boolean includeWithdrawn);
+            @Param("workerType") String workerType, @Param("includeWithdrawn") boolean includeWithdrawn);
 
     // 계정 한 줄(목록과 같은 모양). 없으면 null.
     AdminRows.UserData selectUser(@Param("userId") long userId);

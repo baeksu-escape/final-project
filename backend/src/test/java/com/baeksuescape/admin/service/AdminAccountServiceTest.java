@@ -84,6 +84,8 @@ class AdminAccountServiceTest {
         row.setAccountStatusCode(status);
         row.setReportedPostCount(2);
         row.setCreatedAt(LocalDateTime.of(2026, 10, 1, 9, 30));
+        // FP-273 탈퇴 회원 닉네임은 DB 표시값('탈퇴'+회원 번호) 그대로다.
+        row.setNickname(UserAccount.WITHDRAWN.equals(status) ? "탈퇴" + userId : "닉네임" + userId);
         return row;
     }
 
@@ -102,12 +104,12 @@ class AdminAccountServiceTest {
     void listMasksNamesAndSurvivesUndecryptableRows() {
         // 다른 키로 만든 암호문(팀 키로 암호화한 시드 회원 흉내)
         String otherKeyName = new PiiCrypto(new byte[32]).encrypt("홍길동");
-        given(adminMapper.selectUsers(any(), any(), any(), anyBoolean(), anyInt(), anyInt())).willReturn(List.of(
+        given(adminMapper.selectUsers(any(), any(), any(), any(), anyBoolean(), anyInt(), anyInt())).willReturn(List.of(
                 row(7L, "employee", CRYPTO.encrypt("홍길동"), "ACTIVE"),
                 row(8L, "seeduser", otherKeyName, "ACTIVE")));
-        given(adminMapper.countUsers(any(), any(), any(), anyBoolean())).willReturn(2L);
+        given(adminMapper.countUsers(any(), any(), any(), any(), anyBoolean())).willReturn(2L);
 
-        AdminDtos.PageResponse<AdminDtos.UserRow> page = service.list(null, null, null, null, null);
+        AdminDtos.PageResponse<AdminDtos.UserRow> page = service.list(null, null, null, null, null, null);
 
         assertThat(page.items()).extracting(AdminDtos.UserRow::maskedName).containsExactly("홍*동", "(복호화 불가)");
         assertThat(page.items().get(0).latestAltScore()).isEqualTo(712);
@@ -116,15 +118,35 @@ class AdminAccountServiceTest {
         assertThat(page.size()).isEqualTo(20);
         assertThat(page.totalCount()).isEqualTo(2);
         // 상태를 고르지 않으면 탈퇴 계정은 뺀다(includeWithdrawn=false)
-        verify(adminMapper).selectUsers(isNull(), isNull(), isNull(), eq(false), eq(0), eq(20));
+        verify(adminMapper).selectUsers(isNull(), isNull(), isNull(), isNull(), eq(false), eq(0), eq(20));
     }
 
     @Test
     void listEscapesLikeCharactersClampsSizeAndChecksFilters() {
-        service.list("ad_1%", "ROLE_ADMIN", "LOCKED", 2, 500);
-        verify(adminMapper).selectUsers(eq("%ad\\_1\\%%"), eq("ROLE_ADMIN"), eq("LOCKED"), eq(false), eq(200), eq(100));
-        assertThat(codeOf(() -> service.list(null, "ROLE_ROOT", null, 0, 20))).isEqualTo("400 INVALID_INPUT");
-        assertThat(codeOf(() -> service.list(null, null, "DELETED", 0, 20))).isEqualTo("400 INVALID_INPUT");
+        service.list("ad_1%", "ROLE_ADMIN", "LOCKED", null, 2, 500);
+        verify(adminMapper).selectUsers(eq("%ad\\_1\\%%"), eq("ROLE_ADMIN"), eq("LOCKED"), isNull(), eq(false), eq(200), eq(100));
+        assertThat(codeOf(() -> service.list(null, "ROLE_ROOT", null, null, 0, 20))).isEqualTo("400 INVALID_INPUT");
+        assertThat(codeOf(() -> service.list(null, null, "DELETED", null, 0, 20))).isEqualTo("400 INVALID_INPUT");
+    }
+
+    // FP-273 ACCT-03 닉네임 열·직군 필터
+    @Test
+    void listCarriesNicknameAndFiltersByWorkerType() {
+        given(adminMapper.selectUsers(any(), any(), any(), any(), anyBoolean(), anyInt(), anyInt())).willReturn(List.of(
+                row(7L, "employee", CRYPTO.encrypt("홍길동"), "ACTIVE"),
+                row(9L, "wd_9", "WITHDRAWN", "WITHDRAWN")));
+
+        AdminDtos.PageResponse<AdminDtos.UserRow> page = service.list(null, null, null, "SELF_EMPLOYED", 0, 20);
+
+        // 탈퇴 회원 닉네임은 DB 표시값 그대로 내보낸다.
+        assertThat(page.items()).extracting(AdminDtos.UserRow::nickname).containsExactly("닉네임7", "탈퇴9");
+        verify(adminMapper).selectUsers(isNull(), isNull(), isNull(), eq("SELF_EMPLOYED"), eq(false), eq(0), eq(20));
+        verify(adminMapper).countUsers(isNull(), isNull(), isNull(), eq("SELF_EMPLOYED"), eq(false));
+        // 빈 값은 거르지 않고, 코드 3개 밖의 값은 role·status와 같은 400이다.
+        service.list(null, null, null, " ", 0, 20);
+        verify(adminMapper).selectUsers(isNull(), isNull(), isNull(), isNull(), eq(false), eq(0), eq(20));
+        assertThat(codeOf(() -> service.list(null, null, null, "STUDENT", 0, 20))).isEqualTo("400 INVALID_INPUT");
+        assertThat(codeOf(() -> service.list(null, null, null, "employee", 0, 20))).isEqualTo("400 INVALID_INPUT");
     }
 
     // ── ADM-06 ──
