@@ -87,27 +87,6 @@ export const SAMPLE_MEMBER_FINANCIAL_HEALTH = Object.freeze({
     Object.freeze({ loanId: 101, loanTypeCode: 'CREDIT', loanTypeName: '신용대출', balanceAmount: 12000000, annualRatePct: 5, rateTypeCode: 'VARIABLE', remainingMonths: 36, monthlyPaymentAmount: 200000 }),
     Object.freeze({ loanId: 102, loanTypeCode: 'CARD_LOAN', loanTypeName: '카드론', balanceAmount: 3000000, annualRatePct: 7.2, rateTypeCode: 'FIXED', remainingMonths: 24, monthlyPaymentAmount: 150000 }),
   ]),
-  // N-20-1·N-20-5 공과금 12개월 중 11개월을 기한 내에 납부한 저장 기록 예시다.
-  utilityPayment: Object.freeze({
-    recordedMonthCount: 12,
-    onTimeMonthCount: 11,
-    lateMonthCount: 1,
-    onTimeRatePct: 91.67,
-    months: Object.freeze([
-      Object.freeze({ billMonth: '2026-08', paymentStatusCode: 'ON_TIME' }),
-      Object.freeze({ billMonth: '2026-07', paymentStatusCode: 'ON_TIME' }),
-      Object.freeze({ billMonth: '2026-06', paymentStatusCode: 'LATE' }),
-      Object.freeze({ billMonth: '2026-05', paymentStatusCode: 'ON_TIME' }),
-      Object.freeze({ billMonth: '2026-04', paymentStatusCode: 'ON_TIME' }),
-      Object.freeze({ billMonth: '2026-03', paymentStatusCode: 'ON_TIME' }),
-      Object.freeze({ billMonth: '2026-02', paymentStatusCode: 'ON_TIME' }),
-      Object.freeze({ billMonth: '2026-01', paymentStatusCode: 'ON_TIME' }),
-      Object.freeze({ billMonth: '2025-12', paymentStatusCode: 'ON_TIME' }),
-      Object.freeze({ billMonth: '2025-11', paymentStatusCode: 'ON_TIME' }),
-      Object.freeze({ billMonth: '2025-10', paymentStatusCode: 'ON_TIME' }),
-      Object.freeze({ billMonth: '2025-09', paymentStatusCode: 'ON_TIME' }),
-    ]),
-  }),
 })
 
 // N-17-1 DIAG-04 시나리오 기준값 mock. 소득·지출은 위 현금흐름 예시(시드 회원 2번)와 같고,

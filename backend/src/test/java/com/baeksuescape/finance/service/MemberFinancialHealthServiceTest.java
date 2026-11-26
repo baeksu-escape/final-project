@@ -10,8 +10,6 @@ import static org.mockito.Mockito.when;
 
 import com.baeksuescape.finance.dto.cashflow.MonthlyIncomeItem;
 import com.baeksuescape.finance.dto.health.FinancialHealthBaseResponse;
-import com.baeksuescape.finance.dto.health.FinancialHealthBaseResponse.UtilityPayment;
-import com.baeksuescape.finance.dto.health.FinancialHealthBaseResponse.UtilityPaymentMonth;
 import com.baeksuescape.finance.dto.health.HealthAssetRow;
 import com.baeksuescape.finance.dto.health.HealthLoanRow;
 import com.baeksuescape.finance.mapper.FinancialHealthMapper;
@@ -98,66 +96,6 @@ class MemberFinancialHealthServiceTest {
         assertEquals(0, new BigDecimal("5.4").compareTo(first.annualRatePct()));
         assertEquals(36, first.remainingMonths());
         assertEquals(460_000L, first.monthlyPaymentAmount());
-    }
-
-    /** N-20-5 기관에서 받은 공과금을 모두 제때 냈으면 납부율은 100%다. */
-    @Test
-    @DisplayName("모든 공과금 기록이 기한 내 납부이면 납부율은 100.00%")
-    void allUtilityPaymentsOnTime() {
-        when(incomeVolatilityService.loadIncomeHistory(USER_ID, 0L)).thenReturn(months(12, 2_000_000L));
-        List<UtilityPaymentMonth> payments = List.of(
-                new UtilityPaymentMonth("2026-07", "ON_TIME"),
-                new UtilityPaymentMonth("2026-08", "ON_TIME"));
-        when(mapper.selectRecentUtilityPayments(USER_ID)).thenReturn(payments);
-
-        UtilityPayment utilityPayment = service.load(USER_ID).utilityPayment();
-
-        assertEquals(new UtilityPayment(2, 2, 0, new BigDecimal("100.00"), payments), utilityPayment);
-    }
-
-    /** N-20-5 지연 납부와 미납을 함께 세고, 기록이 있는 달만 분모에 넣는다. */
-    @Test
-    @DisplayName("기록 6개월 중 정시 4개월, 지연·미납 2개월이면 납부율은 66.67%")
-    void countsLateAndUnpaidAndRoundsByRecordedMonths() {
-        when(incomeVolatilityService.loadIncomeHistory(USER_ID, 0L)).thenReturn(months(12, 2_000_000L));
-        List<UtilityPaymentMonth> payments = List.of(
-                new UtilityPaymentMonth("2026-01", "ON_TIME"),
-                new UtilityPaymentMonth("2026-02", "LATE"),
-                new UtilityPaymentMonth("2026-04", "ON_TIME"),
-                new UtilityPaymentMonth("2026-05", "ON_TIME"),
-                new UtilityPaymentMonth("2026-07", "UNPAID"),
-                new UtilityPaymentMonth("2026-08", "ON_TIME"));
-        when(mapper.selectRecentUtilityPayments(USER_ID)).thenReturn(payments);
-
-        UtilityPayment utilityPayment = service.load(USER_ID).utilityPayment();
-
-        assertEquals(new UtilityPayment(6, 4, 2, new BigDecimal("66.67"), payments), utilityPayment);
-    }
-
-    /** N-20-5 빈 상태와 정의되지 않은 상태도 납부 기록이 있는 달로 센다. */
-    @Test
-    @DisplayName("null과 미정의 납부 상태는 기록 개월 수에만 포함한다")
-    void countsUnknownUtilityStatusesOnlyAsRecordedMonths() {
-        when(incomeVolatilityService.loadIncomeHistory(USER_ID, 0L)).thenReturn(months(12, 2_000_000L));
-        List<UtilityPaymentMonth> payments = List.of(
-                new UtilityPaymentMonth("2026-05", "ON_TIME"),
-                new UtilityPaymentMonth("2026-06", "LATE"),
-                new UtilityPaymentMonth("2026-07", null),
-                new UtilityPaymentMonth("2026-08", "UNKNOWN"));
-        when(mapper.selectRecentUtilityPayments(USER_ID)).thenReturn(payments);
-
-        assertEquals(new UtilityPayment(4, 1, 1, new BigDecimal("25.00"), payments),
-                service.load(USER_ID).utilityPayment());
-    }
-
-    /** N-20-5 기관 연동 공과금 기록이 없을 때는 요약 전체를 null로 돌려준다. */
-    @Test
-    @DisplayName("기관 연동 공과금 기록이 없으면 utilityPayment는 null")
-    void noUtilityPaymentsAreNull() {
-        when(incomeVolatilityService.loadIncomeHistory(USER_ID, 0L)).thenReturn(months(12, 2_000_000L));
-        when(mapper.selectRecentUtilityPayments(USER_ID)).thenReturn(List.of());
-
-        assertNull(service.load(USER_ID).utilityPayment());
     }
 
     @Test

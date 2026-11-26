@@ -1,4 +1,3 @@
-import { PAYMENT_STATUS_LABELS } from '../../dataInput/config/altDataSources.js'
 import { calculateAssetDebt } from '../utils/financeCalculations.js'
 
 const validAmount = (value) => value === null || (Number.isSafeInteger(value) && value >= 0)
@@ -22,37 +21,10 @@ export function adaptAssetDebtData(raw) {
   const workerPeer = adaptPeer(raw.peer)
   // N-15-2 기존 화면이 peer만 전달하므로 직군 평균 필드에 연령대 평균과 조회 상태를 함께 실어 보낸다.
   const peer = workerPeer === null ? null : { ...workerPeer, agePeer: adaptAgePeer(raw.peer.agePeer), peerFailed: raw.peer.peerFailed ?? false }
-  // N-20-1 공과금 값이 있고 검증에 실패한 경우를 기록이 없는 경우와 구분한다.
-  const utilityPayment = adaptUtilityPayment(raw.utilityPayment)
   return { totalAssetAmount: raw.totalAssetAmount ?? null, annualIncomeAmount: raw.annualIncomeAmount ?? null,
     totalDebtAmount: raw.totalDebtAmount ?? null, annualPaymentAmount: raw.annualPaymentAmount ?? null, loans,
     peer, assumptions: Array.isArray(raw.assumptions) ? raw.assumptions : [],
-    utilityPayment, utilityPaymentInvalid: raw.utilityPayment != null && utilityPayment === null,
     derived: calculateAssetDebt(raw, {}) }
-}
-
-// N-20-1 공과금 기록의 개월 수·비율·월별 상태를 검증하고 최근 월부터 정렬한다. 형식이 틀리면 공과금 기록만 비운다.
-function adaptUtilityPayment(raw) {
-  if (!raw || typeof raw !== 'object') return null
-  const { recordedMonthCount, onTimeMonthCount, lateMonthCount, onTimeRatePct, months } = raw
-  const counts = [recordedMonthCount, onTimeMonthCount, lateMonthCount]
-  if (counts.some((count) => !Number.isSafeInteger(count) || count < 0)
-    || recordedMonthCount === 0 || recordedMonthCount > 12
-    || onTimeMonthCount + lateMonthCount > recordedMonthCount) return null
-  if (onTimeRatePct !== null && (!Number.isFinite(onTimeRatePct) || onTimeRatePct < 0 || onTimeRatePct > 100)) return null
-  if (!Array.isArray(months) || months.length !== recordedMonthCount) return null
-
-  const monthKeys = new Set()
-  const records = []
-  for (const month of months) {
-    const { billMonth, paymentStatusCode } = month ?? {}
-    if (typeof billMonth !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(billMonth) || monthKeys.has(billMonth)
-      || typeof paymentStatusCode !== 'string' || !Object.hasOwn(PAYMENT_STATUS_LABELS, paymentStatusCode)) return null
-    monthKeys.add(billMonth)
-    records.push({ billMonth, paymentStatusCode })
-  }
-  records.sort((a, b) => b.billMonth.localeCompare(a.billMonth))
-  return { recordedMonthCount, onTimeMonthCount, lateMonthCount, onTimeRatePct, months: records }
 }
 
 // N-21 현금흐름 월별 기준 자료는 정확히 12개월 연속이어야 하며 NULL 소득은 그대로 둔다.

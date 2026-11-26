@@ -1,6 +1,5 @@
 package com.baeksuescape.finance.mapper;
 
-import com.baeksuescape.finance.dto.health.FinancialHealthBaseResponse.UtilityPaymentMonth;
 import com.baeksuescape.finance.dto.health.HealthAssetRow;
 import com.baeksuescape.finance.dto.health.HealthLoanRow;
 import java.util.List;
@@ -19,7 +18,4 @@ public interface FinancialHealthMapper {
 
     /** 기준월 보유 대출(종류 이름 포함), 대출 번호 순. 없으면 빈 목록 */
     List<HealthLoanRow> selectLatestLoans(@Param("userId") long userId);
-
-    /** N-20-1 회원의 최신 기관 연동 청구월을 포함한 달력 12개월의 기록을 청구월 오름차순으로 읽는다. */
-    List<UtilityPaymentMonth> selectRecentUtilityPayments(@Param("userId") long userId);
 }
