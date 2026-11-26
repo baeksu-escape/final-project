@@ -38,7 +38,7 @@ export default function SectionFields({ section, value, onFieldChange, errors, h
           </div>
         </>
       ) : section.fieldsClassName ? (
-        // FP-260 설정에 fieldsClassName이 있으면 칸들을 그 기존 배치 클래스로 감싼다(기간: [ ]년 [ ]개월을 l-g2로 나란히).
+        // FP-260 fieldsClassName이 있으면 칸들을 그 배치 클래스로 감싼다(기간 년·개월을 l-g2로 나란히).
         <div className={section.fieldsClassName}>{section.fields.map(renderField)}</div>
       ) : (
         section.fields.map(renderField)

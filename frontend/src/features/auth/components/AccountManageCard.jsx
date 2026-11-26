@@ -11,7 +11,7 @@ import WithdrawalCard from './WithdrawalCard.jsx'
 const FORMS = Object.freeze({ NICKNAME: 'nickname', EMAIL: 'email', PASSWORD: 'password', WITHDRAWAL: 'withdrawal' })
 
 // N-04-3 계정 관리 카드 — 닉네임·이메일·비밀번호 변경 폼을 한 번에 하나만 열고, [데이터 다시 입력]은 데이터 입력 화면(N-05)으로 보낸다.
-// FP-259 N-04-7 회원 탈퇴도 이 카드 맨 아래 [회원 탈퇴]로 옮겼다. 탈퇴 확인 폼도 같은 "한 번에 하나" 상태라 다른 버튼을 누르면 접힌다.
+// FP-259 N-04-7 맨 아래 [회원 탈퇴]도 같은 "한 번에 하나" 폼이라 다른 버튼을 누르면 접힌다.
 // 바꿀 수 있는 정보는 닉네임(FP-222 MEM-08)·이메일·비밀번호다. 저장이 끝나면 결과를 안내하고 onSaved로 내 정보를 다시 불러오게 한다.
 // N-04-8 [직군 바꾸기]는 우선순위 미정(decisions.md D-27)이라 만들지 않는다. 직군은 처음 직군 선택(N-05-1)에서만 정한다.
 export default function AccountManageCard({ currentNickname, onSaved }) {

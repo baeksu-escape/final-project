@@ -20,8 +20,7 @@ export const SCORE_ERROR_CODES = Object.freeze({
   REQUEST_ID_CONFLICT: 'REQUEST_ID_CONFLICT',
 })
 
-// FP-260 서버 필드 경로와 화면 칸 이름이 다른 경우 — 서버는 기간을 개월 수(periodMonths) 하나로 검사하고, 화면은 [ ]년 [ ]개월 두 칸이라
-// 그 오류를 년 칸 아래에 보여 준다.
+// FP-260 서버 경로와 화면 칸 이름이 다른 경우 — 서버는 기간을 periodMonths 하나로 검사하므로 그 오류를 년 칸 아래에 보여 준다.
 const SERVER_FIELD_ALIASES = Object.freeze({ 'workPeriod.periodMonths': 'workPeriod.periodYears' })
 
 const ROW_FIELD_PATH = /^(\w+)\.items\[(\d+)\]\.(\w+)$/

@@ -13,7 +13,6 @@ const GRADE_TIP = {
 
 // UI 리뉴얼(FP-252) — 마이페이지 [진단내역] 탭의 "신용 기록 요약": 최근 대안 점수(링)와 숫자 타일(진단 횟수·최고 점수·첫 진단 대비).
 // 진단 내역(MEM-06) 응답만 쓴다. 점수가 없는 평가는 빼고 계산한다. 점수 변화 그래프는 아래 진단 내역 카드(FP-222)에 있다.
-// FP-259 인사말(○○님의 신용 기록)은 탭 위에 남기려고 MyPage로 옮겼다.
 export default function MyCreditSummary() {
   const [items, setItems] = useState(null)
 

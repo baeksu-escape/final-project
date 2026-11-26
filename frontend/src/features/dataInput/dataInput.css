@@ -52,8 +52,7 @@
 }
 
 /* 보조 버튼·링크(데모 .btn) */
-.alt-data-source__disconnect,
-.data-input-page__next-link {
+.alt-data-source__disconnect {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -71,8 +70,7 @@
   cursor: pointer;
 }
 
-.alt-data-source__disconnect:hover,
-.data-input-page__next-link:hover {
+.alt-data-source__disconnect:hover {
   border-color: var(--acc);
   color: var(--fg);
 }
@@ -174,8 +172,7 @@
   top: 12px;
 }
 
-.data-input-page__calculate,
-.data-input-page__next-link {
+.data-input-page__calculate {
   justify-self: start;
 }
 

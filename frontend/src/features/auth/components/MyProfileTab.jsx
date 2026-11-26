@@ -5,9 +5,7 @@ import MyProfileCard from './MyProfileCard.jsx'
 import ProfileUnlockCard from './ProfileUnlockCard.jsx'
 
 // FP-222 v2 마이 페이지 [내정보] 탭 — 먼저 비밀번호를 확인하고(기존 MEM-02 가림 해제), 맞으면 내 정보(N-04-1·N-04-2)·계정 관리(N-04-3, 회원 탈퇴 N-04-7 포함)를 연다.
-// FP-259 4차 확인 상태(unlocked)와 원래 값(unmasked)은 MyPage가 들고 있어, 마이페이지 안에서 탭을 오가도 다시 묻지 않는다.
-// 다른 페이지·새로고침·로그아웃으로 MyPage가 사라지면 함께 지워져 다시 묻는다.
-// 내 정보(넓게)·계정 관리(좁게)는 탭 안의 격자(.my-profile-tab)에 나란히 두고 윗선·높이를 맞춘다.
+// FP-259 확인 상태(unlocked)와 원래 값(unmasked)은 MyPage가 들고 있어, 마이페이지 안에서 탭을 오가도 다시 묻지 않는다.
 export default function MyProfileTab({ unlocked, onUnlock, unmasked, onUnmaskedChange }) {
   const [profile, setProfile] = useState(null)
   const [loadError, setLoadError] = useState('')
@@ -38,7 +36,7 @@ export default function MyProfileTab({ unlocked, onUnlock, unmasked, onUnmaskedC
     onUnmaskedChange(original)
   }
 
-  // 탭 잠금 해제 — 가림 해제와 같은 확인이다. FP-259 4차 확인 뒤에도 가린 값부터 보여 주고, 원래 값은 [표시]를 눌러야 보인다.
+  // 탭 잠금 해제 — 가림 해제와 같은 확인이다.
   const handleUnlock = async (password) => {
     await handleUnmask(password)
     onUnlock()
@@ -64,7 +62,7 @@ export default function MyProfileTab({ unlocked, onUnlock, unmasked, onUnmaskedC
       )}
       <div className="my-profile-tab">
         <MyProfileCard profile={profile} unmasked={unmasked} onUnmask={handleUnmask} />
-        {/* N-04-7 회원 탈퇴는 계정 관리 카드 맨 아래로 옮겼다(FP-259). */}
+        {/* N-04-7 회원 탈퇴는 계정 관리 카드 안에 있다(FP-259). */}
         <AccountManageCard currentNickname={profile.nickname} onSaved={() => setReloadKey((key) => key + 1)} />
       </div>
     </>

@@ -95,9 +95,8 @@ export const INCOME_SECTION_BY_JOB = Object.freeze({
 
 // N-05-2 소득과 함께 받는 기간 섹션을 만든다. 직군마다 이름만 다르다.
 // TODO(D-24) 기간의 단위를 팀이 정하지 않아 개월 수로 받는다.
-// FP-260 멘토링 9 화면은 [ ]년 [ ]개월 두 칸으로 받고, 요청 본문은 지금처럼 periodMonths(년×12+개월) 하나로 보낸다(서버·요청 모양 그대로).
-//   두 칸은 화면 전용(localOnly)이라 본문에 넣지 않고, derive가 합친 값을 넣는다. 불러올 때는 restore가 다시 나눈다.
-//   개월 칸은 0~11, 비우면 0으로 본다. 년 칸은 개월 칸이 비었을 때만 필수다. 합계 상한은 WORK_PERIOD_MONTHS_MAX(600개월) 그대로다.
+// FP-260 멘토링 9 화면은 [ ]년 [ ]개월 두 칸(localOnly)으로 받고, 본문은 지금처럼 periodMonths(년×12+개월) 하나로 보낸다(derive로 합치고 restore로 나눈다).
+//   개월 칸은 0~11(비우면 0), 년 칸은 개월 칸이 비었을 때만 필수, 합계 상한은 WORK_PERIOD_MONTHS_MAX(600개월)다.
 const PERIOD_YEARS_MAX = Math.floor(VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX / 12)
 const isBlank = (value) => value === null || value === undefined || value === ''
 

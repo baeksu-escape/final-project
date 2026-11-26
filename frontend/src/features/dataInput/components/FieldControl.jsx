@@ -22,7 +22,7 @@ export default function FieldControl({ field, value, onChange, error, disabled =
   }
   switch (field.input) {
     case 'money':
-      // FP-260 멘토링 8 빈 칸에 "0"을 안내 글자로만 보여 준다. 값은 채우지 않는다(빈 칸 = null) — 0을 채우면 자산 완료(TOTAL_ASSET_AMT IS NOT NULL)가 먼저 켜진다.
+      // FP-260 멘토링 8 "0"은 안내 글자일 뿐 값은 비워 둔다(0을 채우면 자산 완료 TOTAL_ASSET_AMT IS NOT NULL이 먼저 켜진다).
       return <MoneyInput label={label} value={value} onChange={onChange} error={error} placeholder="0" disabled={disabled} />
     case 'number':
       return (

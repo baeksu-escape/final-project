@@ -23,7 +23,7 @@ const stepIndexOf = (key) => INPUT_STEPS.findIndex((step) => step.key === key)
 export const LAST_INPUT_STEP = stepIndexOf('expenses')
 // 대안 데이터 불러오기 단계 — 저장한 뒤에만 갈 수 있다.
 export const ALT_DATA_STEP = stepIndexOf('altData')
-// 점수 산출 단계([점수 산출하기]·[신용 리포트로 이동]) — 저장한 뒤에만 갈 수 있다.
+// 점수 산출 단계([점수 산출하기]·[처음으로 돌아가기]) — 저장한 뒤에만 갈 수 있다.
 export const SCORE_STEP = stepIndexOf('score')
 
 // FP-227 입력 완료 현황(단계 리모컨)에서 누를 수 없는 줄에 보여 줄 이유.

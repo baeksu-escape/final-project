@@ -18,7 +18,7 @@ export default function MyProfileCard({ profile, unmasked, onUnmask }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
-  // FP-259 4차 비밀번호 확인 뒤에도, [내정보] 탭에 다시 들어와도 가린 값부터 보여 준다. 원래 값은 [표시]를 눌러야 보인다(비밀번호는 다시 묻지 않음).
+  // FP-259 비밀번호 확인 뒤에도, 탭에 다시 들어와도 가린 값부터 보여 준다. 원래 값은 [표시]를 눌러야 보인다(비밀번호는 다시 묻지 않음).
   const [revealed, setRevealed] = useState(false)
 
   const shown = unmasked && revealed ? unmasked : profile
@@ -60,8 +60,7 @@ export default function MyProfileCard({ profile, unmasked, onUnmask }) {
     }
   }
 
-  // FP-259 6차 [표시]·[숨기기]·[가림 해제]와 원래 값 안내는 제목 줄 오른쪽에 둔다. 원래 값을 펼치거나 가려도 카드 높이가 변하지 않게 하려는 것이다.
-  // 공통 Card의 title은 글자만 받으므로, 제목은 같은 제목 클래스(card__title)로 이 카드 안에서 그린다.
+  // FP-259 제목 줄 — 버튼·안내를 제목 옆에 둬 값을 펼치거나 가려도 카드 높이가 그대로다. 공통 Card title은 글자만 받아 card__title로 직접 그린다.
   const head = (
     <div className="my-profile-card__head">
       <h2 className="card__title">내 정보</h2>
