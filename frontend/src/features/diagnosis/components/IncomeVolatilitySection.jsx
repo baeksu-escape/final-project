@@ -30,19 +30,25 @@ function getIncomeUnavailableMessage(reason) {
 }
 
 // N-22-6 월별 소득 표는 기준 자료가 있으면 표시하고, 최고는 표에서 계산하며 최저·부족 표시는 변동성 응답이 있을 때 붙인다.
+// 급여소득자는 월급 1건이 같은 금액 12개월로 내려오므로, 금액이 모두 같으면 최고·최저 배지와 제목의 최고·최저를 숨기고 "매달 ○○원"으로 보여 준다.
 function MonthlyIncomeCard({ months, lowestBaseMonth, deficitMonths }) {
   const rows = Array.isArray(months) ? months : []
   const incomes = rows.filter((row) => Number.isFinite(row.incomeAmount))
-  const highest = incomes.length ? incomes.reduce((top, row) => (row.incomeAmount > top.incomeAmount ? row : top)) : null
-  const lowest = rows.find((row) => row.baseMonth === lowestBaseMonth) ?? null
+  const varies = incomes.some((row) => row.incomeAmount !== incomes[0].incomeAmount)
+  const highest = varies ? incomes.reduce((top, row) => (row.incomeAmount > top.incomeAmount ? row : top)) : null
+  const lowest = varies ? rows.find((row) => row.baseMonth === lowestBaseMonth) ?? null : null
+  // 접힌 제목 요약: 이어 읽히지 않게 괄호로 묶는다.
+  const summaryParts = []
+  if (highest) summaryParts.push(`최고 ${formatMonth(highest.baseMonth)} ${formatWon(highest.incomeAmount)}`)
+  if (lowest && Number.isFinite(lowest.incomeAmount)) summaryParts.push(`최저 ${formatMonth(lowest.baseMonth)} ${formatWon(lowest.incomeAmount)}`)
+  if (incomes.length && !varies) summaryParts.push(`매달 ${formatWon(incomes[0].incomeAmount)}`)
+  const hasDeficit = Boolean(deficitMonths) && rows.some((row) => deficitMonths.includes(row.baseMonth))
   return (
     <Card title="최근 12개월 소득">
       {rows.length === 0 ? <p>소득 기록이 없어요.</p> : (
         <details>
           <summary>
-            월별 소득 12개월 보기
-            {highest && ` 최고 ${formatMonth(highest.baseMonth)} ${formatWon(highest.incomeAmount)}`}
-            {lowestBaseMonth && lowest && Number.isFinite(lowest.incomeAmount) && `, 최저 ${formatMonth(lowest.baseMonth)} ${formatWon(lowest.incomeAmount)}`}
+            {`월별 소득 12개월 보기${summaryParts.length ? ` (${summaryParts.join(', ')})` : ''}`}
           </summary>
           <div className="data-table-wrap">
           <table className="data-table">
@@ -63,6 +69,7 @@ function MonthlyIncomeCard({ months, lowestBaseMonth, deficitMonths }) {
             </tbody>
           </table>
           </div>
+          {hasDeficit && <p className="hint">부족: 소득이 월 고정지출보다 적은 달</p>}
         </details>
       )}
     </Card>
