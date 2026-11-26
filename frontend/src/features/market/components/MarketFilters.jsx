@@ -38,7 +38,7 @@ export default function MarketFilters({ metrics, metricKey, onMetric, categories
             <button
               key={metric.key}
               type="button"
-              className="market-metric-chip"
+              className={`market-metric-chip market-metric--${metric.key}`}
               aria-pressed={metric.key === metricKey}
               title={metric.desc}
               onClick={() => onMetric(metric.key)}
