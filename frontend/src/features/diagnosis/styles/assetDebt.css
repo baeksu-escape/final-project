@@ -8,11 +8,16 @@
 .ad-summary-values { font-size: 14px; line-height: 1.8; }
 .ad-summary { display: flex; justify-content: flex-end; margin-bottom: 16px; }
 .ad-ratios, .ad-peer__items { display: grid; gap: 24px; }
-/* N-16-1 CompareBar의 마지막 행은 직군 평균이다. 이 행의 막대·범례·수치만 테마별 보라색 토큰으로 구분한다. */
-.ad-peer__items .compare-bar-group > div:last-child {
+/* N-15-3 직군 평균은 파랑 계열(--vio2), 연령대 평균은 노랑(--warn)으로 구분한다. */
+.ad-peer__items .compare-bar-group > [data-avg-index="0"] {
   --line2: var(--vio2);
   --mut: var(--vio2);
   --mut2: var(--vio2);
+}
+.ad-peer__items .compare-bar-group > [data-avg-index="1"] {
+  --line2: var(--warn);
+  --mut: var(--warn);
+  --mut2: var(--warn);
 }
 .ad-ratio__heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
 .ad-ratio__heading h3 { margin: 0; font-size: 15px; color: var(--fg); }
@@ -21,6 +26,8 @@
 .ad-ratio__track { fill: var(--line); }
 .ad-ratio__fill { fill: currentColor; }
 .ad-ratio__threshold { stroke: var(--fg2); stroke-width: 1; }
+/* N-16-2 그래프 양 끝에 범위를 표시한다. */
+.ad-ratio__scale { display: flex; justify-content: space-between; margin-top: 2px; font-size: 11px; color: var(--mut2); }
 .ad-risk--safe { color: var(--mint); }
 .ad-risk--caution { color: var(--warn); }
 .ad-risk--danger { color: var(--bad); }
@@ -31,5 +38,5 @@
 .ad-table { border-collapse: collapse; width: 100%; font-size: 13px; white-space: nowrap; }
 .ad-table caption { text-align: left; color: var(--mut); margin-bottom: 10px; }
 .ad-table th, .ad-table td { text-align: left; padding: 12px 8px; border-bottom: 1px solid var(--line); }
-.ad-table th:nth-child(2), .ad-table th:nth-child(3), .ad-table th:nth-child(5), .ad-table td:nth-child(2), .ad-table td:nth-child(3), .ad-table td:nth-child(5) { text-align: right; }
+.ad-table th:nth-child(2), .ad-table th:nth-child(3), .ad-table th:nth-child(5), .ad-table th:nth-child(6), .ad-table td:nth-child(2), .ad-table td:nth-child(3), .ad-table td:nth-child(5), .ad-table td:nth-child(6) { text-align: right; }
 @media (max-width: 1000px) { .ad-top-grid, .ad-bottom-grid { grid-template-columns: 1fr; } }
