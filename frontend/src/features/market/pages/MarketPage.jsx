@@ -10,7 +10,7 @@ import MarketFilters from '../components/MarketFilters.jsx'
 import MarketLegend from '../components/MarketLegend.jsx'
 import MarketMap from '../components/MarketMap.jsx'
 import MarketSummary from '../components/MarketSummary.jsx'
-import { dongRows, dongValue, getMetric, guAverages, metricStats } from '../utils/marketStats.js'
+import { dongRows, dongValue, getMetric, guAverages, guHeatRows, guHeatStats, metricStats } from '../utils/marketStats.js'
 import '../market.css'
 
 // N-24-3 상권 분석 — 서울 행정동별 상권 지표를 업종·지표·구로 골라 요약·구별 평균·분포·상하위 동으로 보여 주고,
@@ -23,6 +23,8 @@ export default function MarketPage() {
   const [metricKey, setMetricKey] = useState(DEFAULT_METRIC)
   const [gu, setGu] = useState(ALL_GU)
   const [openCode, setOpenCode] = useState(null)
+  // 지도가 지금 구 색('gu', 멀리서 볼 때)인지 동 색('dong', 확대했을 때)인지 — 범례 문장을 맞추는 데 쓴다
+  const [mapLevel, setMapLevel] = useState('gu')
   // [다시 시도]를 누를 때마다 1씩 올려 파일을 다시 읽게 한다(실패한 요청은 캐시에서 지워져 있다)
   const [attempt, setAttempt] = useState(0)
 
@@ -86,18 +88,14 @@ export default function MarketPage() {
   const rows = dongRows(dongs, categoryData, quarter, stats, metric)
   const scopeRows = gu === ALL_GU ? rows : rows.filter((row) => row.dong.gu === gu)
   const guRows = guAverages(categoryData, quarter, stats, metric)
+  const guStats = guHeatStats(categoryData, quarter, metricKey)
+  const guHeat = guHeatRows(categoryData, quarter, metricKey, guStats)
   const storeTotal = scopeDongs.reduce((sum, dong) => sum + (dongValue(categoryData, quarter, dong.code, 'storeCount') ?? 0), 0)
   const guOptions = [{ value: ALL_GU, label: '서울 전체' }, ...[...new Set(dongs.map((dong) => dong.gu))].sort().map((name) => ({ value: name, label: name }))]
 
-  // 상세 창의 이전·다음: 고른 구 안(전체면 서울 전체)에서 순서대로 돈다.
-  const moveDong = (step) => {
-    const list = scopeDongs.some((dong) => dong.code === openCode) ? scopeDongs : dongs
-    const index = list.findIndex((dong) => dong.code === openCode)
-    setOpenCode(list[(index + step + list.length) % list.length].code)
-  }
-
   return (
-    <div className="market-page">
+    // FP-278 고른 지표 색(지도·범례·아래 비교 차트·상세 창 배지)을 화면 전체에 준다
+    <div className={`market-page market-metric--${metricKey}`}>
       <header className="market-page__head">
         <span className="market-tag">상권 분석 · 서울특별시</span>
         <h2 className="market-page__title">서울 상권 히트맵</h2>
@@ -133,16 +131,19 @@ export default function MarketPage() {
           <MarketMap
             geo={geo}
             rows={rows}
+            guHeat={guHeat}
             metric={metric}
             category={category}
             gu={gu}
             openCode={openCode}
             onOpen={setOpenCode}
+            onPickGu={setGu}
+            onLevel={setMapLevel}
             onReset={() => setGu(ALL_GU)}
           />
-          <MarketLegend metric={metric} stats={stats} />
+          <MarketLegend metric={metric} stats={mapLevel === 'gu' ? guStats : stats} level={mapLevel} seoul={stats.seoul} />
           <p className="market-hint">
-            단순화한 모식도입니다. 행정동 중심점으로 나눈 칸이라 실제 동 경계와 다릅니다. 동을 누르면 상세가 열리고, 끌어서 옮기거나 휠로 확대할 수 있습니다.
+            단순화한 모식도입니다. 행정동 중심점으로 나눈 칸이라 실제 동 경계와 다릅니다. 서울 전체는 구 단위로 칠하고, 구를 누르거나 확대하면 행정동 단위로 바뀝니다. 동을 누르면 상세가 열리고, 끌어서 옮기거나 휠로 확대할 수 있습니다.
           </p>
         </Card>
         {/* 1차 시연 후속: 정보가 많아 읽기 어렵다는 의견에 따라 지역 비교 카드 4개는 기본으로 접어 둔다(브라우저 기본 details) */}
@@ -162,7 +163,13 @@ export default function MarketPage() {
               gu={gu}
               storeTotal={storeTotal}
             />
-            <GuAverageChart metric={metric} rows={guRows} gu={gu} onSelectGu={(name) => setGu(name ?? ALL_GU)} />
+            {/* FP-278 막대 색은 지도와 같은 구끼리 5단계(guHeat)를 쓴다 */}
+            <GuAverageChart
+              metric={metric}
+              rows={guRows.map((row) => ({ ...row, heat: guHeat[row.gu]?.heat ?? 'none' }))}
+              gu={gu}
+              onSelectGu={(name) => setGu(name ?? ALL_GU)}
+            />
             <DongDistribution metric={metric} stats={stats} rows={scopeRows} />
             <DongRankList metric={metric} rows={scopeRows} onOpen={setOpenCode} />
           </div>
@@ -189,7 +196,6 @@ export default function MarketPage() {
         metrics={metrics}
         dongCategories={dongCategories}
         onClose={() => setOpenCode(null)}
-        onMove={moveDong}
         onCategory={setCategoryKey}
       />
     </div>

@@ -9,7 +9,8 @@ const DONG_LABEL_WIDTH = 700
 const MIN_WIDTH = 120
 // 화면에 보이는 글자 크기(px). 확대해도 같은 크기로 보이게 viewBox 단위로 바꿔 쓴다
 const GU_FONT_PX = 13
-const DONG_FONT_PX = 10.5
+// 동 이름이 잘 안 보인다는 의견(11/26)으로 10.5 → 13px, 글자 둘레에 바탕색 테두리(market.css)
+const DONG_FONT_PX = 13
 
 // 영역(x, y, w, h)이 가운데 오도록 지도 비율에 맞춘 viewBox를 만든다.
 function fitBox([x, y, w, h], pad) {
@@ -27,10 +28,11 @@ function fitGu(geo, gu) {
   return found ? fitBox(found.box, 30) : fitBox([0, 0, geo.w, geo.h], 10)
 }
 
-// N-24-4 상권 공간 시각화 — 미리 계산한 행정동 보로노이 다각형(geo.json)을 지표 값 크기(빨강 5단계)로 칠한다. 지도 API는 쓰지 않는다.
-// 동을 누르면 상세 창(onOpen), 드래그로 이동, 휠·버튼으로 확대한다. 고른 구 밖의 동은 흐리게 보인다.
-// rows: 서울 전체 동 { dong, value, score, storeCount }
-export default function MarketMap({ geo, rows, metric, category, gu, openCode, onOpen, onReset }) {
+// N-24-4 상권 공간 시각화 — 미리 계산한 행정동 보로노이 다각형(geo.json)을 지표 값 크기(지표 색 5단계)로 칠한다. 지도 API는 쓰지 않는다.
+// 멀리서 볼 때는 구 단위 색(누르면 그 구로 확대), 동 이름이 뜰 만큼 확대하면 동 단위 색(누르면 상세 창 onOpen)으로 바뀐다(FP-278 11/26).
+// 드래그로 이동, 휠·버튼으로 확대한다. 고른 구 밖의 동은 흐리게 보인다.
+// rows: 서울 전체 동 { dong, value, score, storeCount }, guHeat: 구 이름 → { value, heat }, onLevel: 'gu'|'dong' 바뀔 때 알림
+export default function MarketMap({ geo, rows, guHeat, metric, category, gu, openCode, onOpen, onPickGu, onLevel, onReset }) {
   const svgRef = useRef(null)
   const dragRef = useRef(null)
   const [view, setView] = useState(() => ({ gu, box: fitGu(geo, gu) }))
@@ -96,33 +98,52 @@ export default function MarketMap({ geo, rows, metric, category, gu, openCode, o
         return
       }
     }
+    // 동 칸은 data-code, 구 칸(구 색일 때)은 data-gu를 단다
     const code = event.target.dataset?.code
-    if (!code) {
+    const guName = event.target.dataset?.gu
+    if (!code && !guName) {
       setTip(null)
       return
     }
     const wrap = svgRef.current.parentElement.getBoundingClientRect()
-    setTip({ code, left: event.clientX - wrap.left + 14, top: event.clientY - wrap.top + 14, flip: event.clientX - wrap.left > wrap.width - 220 })
+    setTip({ code, gu: guName, left: event.clientX - wrap.left + 14, top: event.clientY - wrap.top + 14, flip: event.clientX - wrap.left > wrap.width - 220 })
   }
 
   const handlePointerUp = (event) => {
     const drag = dragRef.current
     dragRef.current = null
     if (drag?.moved) return
-    const code = event.target.dataset?.code
-    if (code) onOpen(code)
+    // 구 색일 때는 누른 구를 골라 확대하고, 동 색일 때는 동 상세 창을 연다.
+    // 구를 고른 상태에서 다른 구의 동(흐린 회색)을 누르면 상세 창 대신 그 구로 옮겨 간다(11/26).
+    const { code, gu: guName } = event.target.dataset ?? {}
+    if (guName) onPickGu(guName)
+    else if (code && isOtherGu(code)) onPickGu(byCode[code].dong.gu)
+    else if (code) onOpen(code)
   }
 
+  // 구를 골랐을 때 그 구 밖의 동인지
+  const isOtherGu = (code) => gu !== ALL_GU && byCode[code] != null && byCode[code].dong.gu !== gu
+
   const showDongLabels = box[2] < DONG_LABEL_WIDTH
+  // 동 이름이 뜨는 확대 정도부터 동 색, 그보다 멀면 구 색
+  const isGuLevel = !showDongLabels
+  const level = isGuLevel ? 'gu' : 'dong'
+  useEffect(() => {
+    onLevel(level)
+  }, [level, onLevel])
   // 화면 1px이 viewBox 몇 단위인지
   const unitPerPx = box[2] / svgWidth
-  const tipRow = tip && byCode[tip.code]
+  const tipRow = !isGuLevel && tip?.code && !isOtherGu(tip.code) ? byCode[tip.code] : null
+  // 다른 구 동에 올렸을 때는 구 이름만 보여 준다
+  const tipOther = !isGuLevel && tip?.code && isOtherGu(tip.code) ? byCode[tip.code].dong.gu : null
+  const tipGu = isGuLevel ? tip?.gu : null
+  const guDongCount = (name) => rows.filter((row) => row.dong.gu === name).length
 
   return (
     <div className="market-map__wrap">
       <svg
         ref={svgRef}
-        className="market-map__svg"
+        className={`market-map__svg market-map__svg--${level}`}
         viewBox={box.map((v) => v.toFixed(1)).join(' ')}
         role="img"
         aria-label={`서울 행정동 ${category.name} ${metric.name} 지도`}
@@ -132,19 +153,35 @@ export default function MarketMap({ geo, rows, metric, category, gu, openCode, o
         onPointerLeave={() => setTip(null)}
       >
         <path d={geo.outline} className="market-map__land" />
-        <g>
-          {Object.entries(geo.dongs).map(([code, shape]) => {
-            const row = byCode[code]
-            // 1차 시연 후속: 칸 색은 값의 크기(빨강 5단계). 좋고 나쁨은 툴팁·상세 창 글자로 알려 준다.
-            const classes = ['market-map__dong', `market-heat--${row?.heat ?? 'none'}`]
-            if (gu !== ALL_GU && row?.dong.gu !== gu) classes.push('market-map__dong--dim')
-            if (code === openCode) classes.push('market-map__dong--on')
-            return <path key={code} d={shape.path} data-code={code} className={classes.join(' ')} vectorEffect="non-scaling-stroke" />
-          })}
-        </g>
+        {/* 구 색일 때는 구 경계 모양을 그대로 칠한다. 동 칸(모식도)은 구 경계와 모양이 달라 색이 경계선 밖으로 삐져나오기 때문이다(11/26) */}
+        {isGuLevel ? (
+          <g>
+            {geo.gu.map((g) => {
+              const classes = ['market-map__gu-fill', `market-heat--${guHeat[g.name]?.heat ?? 'none'}`]
+              if (gu !== ALL_GU && g.name !== gu) classes.push('market-map__dong--dim')
+              return <path key={g.name} d={g.path} data-gu={g.name} className={classes.join(' ')} />
+            })}
+          </g>
+        ) : (
+          <g>
+            {Object.entries(geo.dongs).map(([code, shape]) => {
+              const row = byCode[code]
+              // 1차 시연 후속: 칸 색은 값의 크기(지표 색 5단계). 좋고 나쁨은 툴팁·상세 창 글자로 알려 준다.
+              const classes = ['market-map__dong', `market-heat--${row?.heat ?? 'none'}`]
+              if (gu !== ALL_GU && row?.dong.gu !== gu) classes.push('market-map__dong--dim')
+              if (code === openCode) classes.push('market-map__dong--on')
+              return <path key={code} d={shape.path} data-code={code} className={classes.join(' ')} vectorEffect="non-scaling-stroke" />
+            })}
+          </g>
+        )}
         <g pointerEvents="none">
           {geo.gu.map((g) => (
-            <path key={g.name} d={g.path} className="market-map__gu" vectorEffect="non-scaling-stroke" />
+            <path
+              key={g.name}
+              d={g.path}
+              className={g.name === tipGu ? 'market-map__gu market-map__gu--on' : 'market-map__gu'}
+              vectorEffect="non-scaling-stroke"
+            />
           ))}
           <path d={geo.outline} className="market-map__outline" vectorEffect="non-scaling-stroke" />
           {showDongLabels
@@ -186,7 +223,25 @@ export default function MarketMap({ geo, rows, metric, category, gu, openCode, o
         </button>
       </div>
 
-      {tipRow && (
+      {tipGu && (
+        <div className={tip.flip ? 'market-map__tip market-map__tip--flip' : 'market-map__tip'} style={{ left: tip.left, top: tip.top }}>
+          <b>{tipGu}</b>
+          <br />
+          {category.name} {metric.name} <b className="market-num">{formatMetric(metric, guHeat[tipGu]?.value ?? null)}</b>
+          <br />
+          <span className="market-hint">행정동 {guDongCount(tipGu)}곳 · 누르면 확대</span>
+        </div>
+      )}
+
+      {tipOther && (
+        <div className={tip.flip ? 'market-map__tip market-map__tip--flip' : 'market-map__tip'} style={{ left: tip.left, top: tip.top }}>
+          <b>{tipOther}</b>
+          <br />
+          <span className="market-hint">누르면 이 구로 이동</span>
+        </div>
+      )}
+
+      {tipRow && !tipGu && (
         <div className={tip.flip ? 'market-map__tip market-map__tip--flip' : 'market-map__tip'} style={{ left: tip.left, top: tip.top }}>
           <b>{tipRow.dong.name}</b> <span className="market-hint">{tipRow.dong.gu}</span>
           <br />

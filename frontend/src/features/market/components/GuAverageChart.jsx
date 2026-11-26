@@ -2,15 +2,16 @@ import { Card } from '../../../common/components/index.js'
 import { formatMetric } from '../utils/marketStats.js'
 
 const WIDTH = 300
-const ROW_H = 19
+// 그래프가 카드 폭에 맞춰 줄어들어 글자가 작게 보인다는 의견(11/26)으로 줄·글자를 키웠다
+const ROW_H = 24
 
 // N-24-3 구별 평균 가로 막대 — 25개 구를 좋은 구가 위로 오게 그린다. 막대를 누르면 그 구를 고른다.
-// rows: 구별 평균(나쁜 순) { gu, value, score, heat }. 막대 색은 지도와 같은 빨강 5단계(값이 클수록 진함).
+// rows: 구별 평균(나쁜 순) { gu, value, score, heat }. 막대 색은 지도와 같은 지표 색 5단계(값이 클수록 진함).
 export default function GuAverageChart({ metric, rows, gu, onSelectGu }) {
   const height = rows.length * ROW_H + 6
-  const mid = metric.signed ? 170 : 66
+  const mid = metric.signed ? 170 : 74
   const vmax = Math.max(...rows.map((row) => Math.abs(row.value)), 0.1)
-  const scale = (v) => (v / vmax) * (WIDTH - mid - 40)
+  const scale = (v) => (v / vmax) * (WIDTH - mid - 52)
   const pick = (name) => onSelectGu(name === gu ? null : name)
 
   return (
@@ -37,18 +38,18 @@ export default function GuAverageChart({ metric, rows, gu, onSelectGu }) {
                 }
               }}
             >
-              <text x="4" y={y + 12} fontSize="12" className={selected ? 'market-chart__label market-chart__label--on' : 'market-chart__label'}>
+              <text x="4" y={y + 15} fontSize="14" className={selected ? 'market-chart__label market-chart__label--on' : 'market-chart__label'}>
                 {row.gu}
               </text>
               <rect
                 x={x0}
-                y={y + 2}
+                y={y + 3}
                 width={Math.max(1, Math.abs(len))}
-                height="13"
+                height="16"
                 rx="2"
                 className={`market-chart__bar market-heat--${row.heat}${selected ? ' market-chart__bar--on' : ''}`}
               />
-              <text x={(metric.signed ? Math.max(mid, mid + len) : mid + len) + 4} y={y + 12} fontSize="11" className="market-chart__value">
+              <text x={(metric.signed ? Math.max(mid, mid + len) : mid + len) + 4} y={y + 15} fontSize="13" className="market-chart__value">
                 {formatMetric(metric, row.value)}
               </text>
             </g>
