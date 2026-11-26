@@ -37,9 +37,12 @@
 /* (시안·쉬운 화면 11/26 광희) 상황 칩 한 줄, 항목 한 줄(슬라이더 + 숫자 칸), 답 문장, 큰 숫자 2칸, 작은 줄, 자세히 보기 접기 */
 .sc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .sc-chips .sc-preset { min-height: 34px; padding: 4px 14px; border-radius: 999px; text-align: center; }
-.sc-row-field { display: grid; grid-template-columns: minmax(0, 1fr) 168px; gap: 4px 12px; align-items: end; padding-top: 8px; }
+.sc-row-field { display: grid; gap: 6px; padding-top: 10px; }
 .sc-row-field .number-input .form-field__label, .sc-row-field .money-input .form-field__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.sc-row-field__help { grid-column: 1 / -1; }
+.sc-row-field__help { margin-top: -2px; }
+.sc-detail { margin-top: 18px; }
+.sc-detail__title { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--fg2); }
+.sc-detail > .sc-hint { margin-top: 14px; }
 .sc-answer { margin: 0 0 14px; padding: 16px 18px; border-radius: 12px; border: 1px solid var(--line2); font-size: 17px; line-height: 1.55; }
 .sc-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .sc-big--xl { font-size: 32px; }
@@ -47,8 +50,6 @@
 .sc-lines > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 2px; border-bottom: 1px solid var(--line); font-size: 14px; }
 .sc-lines dt { color: var(--mut); }
 .sc-lines dd { margin: 0; font-variant-numeric: tabular-nums; }
-.sc-more { margin-top: 14px; }
-.sc-more > summary { cursor: pointer; color: var(--acc); font-weight: 600; font-size: 14px; padding: 6px 0; }
 @media (max-width: 960px) { .sc-layout, .sc-kpis { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .sc-pair { grid-template-columns: 1fr; } .sc-big--xl { font-size: 26px; } }
 @media (max-width: 480px) { .sc-preset-groups { grid-template-columns: 1fr; } }

@@ -78,9 +78,11 @@ export default function ScenarioControls({ values, presetId, inputError, calcErr
       })}
       {/* 입력 안내는 늘 같은 자리·높이에 둔다. */}
       <p className={inputError ? 'sc-status sc-status--warn' : 'sc-status'} role="status" aria-live="polite">
-        {inputError || (Number.isSafeInteger(variableLoanBalanceAmount)
-          ? `금리 변화는 변동금리 대출 ${variableLoanBalanceAmount.toLocaleString('ko-KR')}원에만 적용돼요.`
-          : '변동금리 대출 정보가 없어 대출 갚는 돈과 남는 돈은 계산하지 않아요.')}
+        {inputError || (!Number.isSafeInteger(variableLoanBalanceAmount)
+          ? '변동금리 대출 정보가 없어 대출 갚는 돈과 남는 돈은 계산하지 않아요.'
+          : variableLoanBalanceAmount === 0
+            ? '금리는 변동금리 대출에만 적용돼요. 지금 대출은 모두 고정금리라 금리를 바꿔도 결과는 그대로예요.'
+            : `금리 변화는 변동금리 대출 ${variableLoanBalanceAmount.toLocaleString('ko-KR')}원에만 적용돼요.`)}
         {calcError && <> <Button size="sm" onClick={onRetry}>다시 시도</Button></>}
       </p>
     </Card>

@@ -16,7 +16,7 @@ const ROWS = [
   { key: 'monthlySurplusAmount', label: '한 달에 남는 돈', surplus: true },
 ]
 
-// N-17-5 (시안·쉬운 화면) 답 한 문장 → 큰 숫자 2개 → 작은 줄 2개 순서로 보여 주고, 막대 비교와 계산 가정은 '자세히 보기'에 접는다.
+// N-17-5 (시안·쉬운 화면) 답 한 문장 → 큰 숫자 2개 → 작은 줄 2개 → 지금과 이 상황 비교(막대)·계산 가정 순서로 모두 펼쳐 보여 준다.
 // 숫자와 계산은 바꾸지 않고 보여 주는 순서와 말만 바꾼다.
 export default function ScenarioResult({ result, assumptions, stale, calcError }) {
   const { current, changed } = result
@@ -50,8 +50,8 @@ export default function ScenarioResult({ result, assumptions, stale, calcError }
           <dd className={interest > 0 ? 'sc-neg' : interest < 0 ? 'sc-pos' : ''}>월 <strong>{signedWon(interest)}</strong></dd>
         </div>
       </dl>
-      <details className="sc-more">
-        <summary>자세히 보기 (지금과 이 상황 비교 · 계산 방법)</summary>
+      <section className="sc-detail" aria-label="지금과 이 상황 비교">
+        <p className="sc-detail__title">지금과 이 상황 비교</p>
         <div className="sc-bars">
           {ROWS.map((row) => (
             <div key={row.key} className="sc-bar-row">
@@ -67,7 +67,7 @@ export default function ScenarioResult({ result, assumptions, stale, calcError }
         </div>
         <p className="sc-hint">단위 원 · 대출 갚는 돈은 입력한 대출 기준이에요. 시연용 계산이며 실제 심사 결과가 아니에요.</p>
         {assumptions.length > 0 && <ul className="sc-hint">{assumptions.map((item, index) => <li key={index}>{item}</li>)}</ul>}
-      </details>
+      </section>
     </Card>
   )
 }
