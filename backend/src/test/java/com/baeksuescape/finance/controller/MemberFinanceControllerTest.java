@@ -204,7 +204,7 @@ class MemberFinanceControllerTest {
         ScenarioRecalculateResponse.Side now = new ScenarioRecalculateResponse.Side(3_000_000L, 1_800_000L, 500_000L, 700_000L, new BigDecimal("16.67"));
         ScenarioRecalculateResponse.Side after = new ScenarioRecalculateResponse.Side(2_400_000L, 1_980_000L, 525_000L, -105_000L, new BigDecimal("21.88"));
         when(scenarioService.recalculate(eq(2L), any())).thenReturn(new ScenarioRecalculateResponse(now, after,
-                25_000L, -805_000L, 95L, "SHORTFALL", List.of("가정 1")));
+                25_000L, -805_000L, 95L, "SHORTFALL", List.of("가정 1"), List.of()));
 
         mockMvc.perform(loggedIn(post(SCENARIO_RECALCULATE).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ratePctPoint\":1,\"incomePct\":-20,\"expensePct\":10}"), 2L))

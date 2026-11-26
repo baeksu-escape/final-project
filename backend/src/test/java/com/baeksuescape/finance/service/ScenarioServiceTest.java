@@ -64,11 +64,9 @@ class ScenarioServiceTest {
         when(incomeVolatilityService.loadIncomeHistory(USER_ID, 0L))
                 .thenReturn(List.of(month("2026-07", 2_800_000L), month("2026-08", 3_200_000L)));
         when(incomeMapper.selectLatestTotalExpense(USER_ID)).thenReturn(1_800_000L);
-        when(incomeMapper.selectLatestLoanMonthlyPayment(USER_ID)).thenReturn(500_000L);
         when(scenarioMapper.selectLatestLoanItems(USER_ID)).thenReturn(List.of(
-                new ScenarioLoanItem(1L, "신용대출", new BigDecimal("5.0"), "VARIABLE", 200_000L),
-                new ScenarioLoanItem(2L, "주택담보대출", new BigDecimal("4.2"), "FIXED", 300_000L)));
-        when(scenarioMapper.selectLatestVariableLoans(USER_ID)).thenReturn(List.of(loan(30_000_000L, "5", 200_000L)));
+                new ScenarioLoanItem(1L, "신용대출", new BigDecimal("5.0"), "VARIABLE", 200_000L, 30_000_000L),
+                new ScenarioLoanItem(2L, "주택담보대출", new BigDecimal("4.2"), "UNKNOWN", 300_000L, 10_000_000L)));
         when(scenarioMapper.selectLatestTotalAsset(USER_ID)).thenReturn(totalAsset);
     }
 
@@ -134,6 +132,10 @@ class ScenarioServiceTest {
 
         assertEquals(25_000L, r.monthlyInterestChangeAmount());
         assertEquals(500_000L, r.current().monthlyPaymentAmount());
+        assertEquals(2, r.loanItems().size());
+        assertEquals(500_000L, r.loanItems().stream().mapToLong(ScenarioLoanItem::monthlyPaymentAmount).sum());
+        assertEquals(30_000_000L, r.loanItems().stream().filter(item -> "VARIABLE".equals(item.rateTypeCode()))
+                .mapToLong(ScenarioLoanItem::balanceAmount).sum());
         assertEquals(525_000L, r.changed().monthlyPaymentAmount());
         assertEquals(700_000L, r.current().monthlySurplusAmount());
         assertEquals(675_000L, r.changed().monthlySurplusAmount());
@@ -240,6 +242,20 @@ class ScenarioServiceTest {
         assertEquals(r.current(), r.changed());
         assertEquals(0L, r.surplusDiffAmount());
         assertEquals(ScenarioService.STILL_POSITIVE, r.verdict());
+        assertEquals(2, r.loanItems().size());
+    }
+
+    @Test
+    @DisplayName("N-17-5: 대출이 없으면 재계산 응답에 빈 목록과 0원 현재 상환액을 반환한다")
+    void recalculateWithoutLoans() {
+        givenStored(40_000_000L);
+        when(scenarioMapper.selectLatestLoanItems(USER_ID)).thenReturn(List.of());
+
+        ScenarioRecalculateResponse response = service.recalculate(USER_ID, null);
+
+        assertEquals(List.of(), response.loanItems());
+        assertEquals(0L, response.current().monthlyPaymentAmount());
+        assertEquals(0L, response.changed().monthlyPaymentAmount());
     }
 
     @Test

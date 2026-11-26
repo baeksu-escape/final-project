@@ -23,7 +23,7 @@ function loanItemLabels(items) {
     const name = names[index]
     seen[name] = (seen[name] ?? 0) + 1
     const numberedName = counts[name] > 1 ? `${name} ${seen[name]}` : name
-    const rate = Number.isFinite(item.annualRatePct) ? `${item.annualRatePct.toFixed(1)}%` : '—'
+    const rate = Number.isFinite(item.annualRatePct) ? `${item.annualRatePct}%` : '—'
     const rateType = item.rateTypeCode === 'FIXED' ? '고정' : item.rateTypeCode === 'VARIABLE' ? '변동' : '미확인'
     return { key: item.loanId ?? index, text: `${numberedName} ${rate} ${rateType} ${won(item.monthlyPaymentAmount)}` }
   })
@@ -32,6 +32,7 @@ function loanItemLabels(items) {
 // N-17-5 현재와 시나리오 결과 및 서버 계산 가정을 함께 보여 준다.
 export default function ScenarioResult({ result, baseline, assumptions, stale, calcError }) {
   const { current, changed } = result
+  const loanItems = result.loanItems ?? baseline?.loanItems ?? []
   const max = Math.max(1, ...ROWS.flatMap((row) => [current[row.key], changed[row.key]]).filter(Number.isFinite).map(Math.abs))
   const width = (value) => `${Number.isFinite(value) ? Math.min(100, (Math.abs(value) / max) * 100) : 0}%`
   return (
@@ -58,8 +59,8 @@ export default function ScenarioResult({ result, baseline, assumptions, stale, c
         {ROWS.map((row) => (
           <div key={row.key} className="sc-bar-row">
             <span className="sc-bar-row__title">
-              {row.key === 'monthlyPaymentAmount' && baseline?.loanItems?.length ? (
-                <details><summary>{row.label} (보유 대출 {baseline.loanItems.length}건)</summary><ul>{loanItemLabels(baseline.loanItems).map((item) => <li key={item.key}>{item.text}</li>)}</ul></details>
+              {row.key === 'monthlyPaymentAmount' && loanItems.length ? (
+                <details><summary>{row.label} (보유 대출 {loanItems.length}건)</summary><ul>{loanItemLabels(loanItems).map((item) => <li key={item.key}>{item.text}</li>)}</ul></details>
               ) : row.label}
             </span>
             <span className="sc-hint">현재</span>
