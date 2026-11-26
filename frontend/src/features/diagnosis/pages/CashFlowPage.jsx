@@ -26,7 +26,7 @@ export default function CashFlowPage() {
         <Card title="월별 소득과 지출" className="cf-result">
           <p className="cf-legend">
             <span><i className="cf-swatch cf-swatch--act" /> 실제 소득</span>
-            <span><i className="cf-swatch cf-swatch--deficit" /> 지출보다 적은 달</span>
+            <span><i className="cf-swatch cf-swatch--deficit" /> 월 지출(원리금 포함)보다 적은 달</span>
             <span><i className="cf-swatch cf-swatch--forecast" /> 예측 소득(연한 색)</span>
             <span><i className="cf-swatch cf-swatch--expense" /> 월 지출</span>
           </p>
