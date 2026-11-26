@@ -85,7 +85,7 @@
 ### 바뀐 파일
 | 파일 | 변경 내용 (1줄) |
 |------|-----------------|
-| `backend/.../help/client/OpenAiProperties.java` | 새 파일. `avenue.ai.openai.*`(키·모델 기본 `gpt-4o-mini`·주소·연결 2초/응답 15초) |
+| `backend/.../help/client/OpenAiProperties.java` | 새 파일. `avenue.ai.openai.*`(키·모델 기본 `gpt-5.6-luna`·주소·연결 2초/응답 15초) |
 | `backend/.../help/client/OpenAiClient.java` | 새 파일. `POST /chat/completions`, 키 없음 503, 실패·시간 초과·빈 답 502 `AI_FAILED`, 로그에 글·키 없음 |
 | `backend/.../help/controller/ChatbotController.java` | HELP-02에 로그인 사용자 번호, `POST /api/chatbot/questions` 추가 |
 | `backend/.../help/service/ChatbotService.java` | 남은 횟수 계산, `ask()`: 한도 429, 성공 Y·실패 N 기록(시각은 서버 Clock) |
@@ -121,7 +121,15 @@
   - `npm run lint` 오류 0, `npm run build` 성공, mock 직접 호출(남은 횟수 10 → 질문 후 9, 빈 질문 400, 요약 generated true → false)
 - 확인 못 함 / 남은 것
   - 실제 OpenAI 호출: 광희 님이 자기 `application.properties`에 키를 넣은 뒤 확인한다(아래 「실제 호출 확인」에 결과를 적는다).
-  - 기본 모델 `gpt-4o-mini`가 강사 키에서 쓸 수 있는지는 실제 호출로 확인한다. 안 되면 `avenue.ai.openai.model`만 바꾼다.
+  - 기본 모델: 처음 `gpt-4o-mini`로 했으나 강사 키의 프로젝트는 이 모델 권한이 없어 403(`model_not_found`)이었다. 키로 쓸 수 있는 대화 모델은 `gpt-5.6-luna`·`sol`·`terra` 셋이라(11/26 모델 목록 조회), 짧은 질문 한 번씩 비교해 답이 짧고 추론 토큰을 쓰지 않은 `gpt-5.6-luna`를 기본값으로 바꿨다(`avenue.ai.openai.model`로 바꿀 수 있음).
+  - 세 모델 모두 답에 `**굵게**` 같은 마크다운을 넣어서, 두 지시 문장에 "마크다운을 쓰지 않는다"를 더했다.
+- 🆕 11/26 실제 호출 확인(로컬 DB, 8092 임시 서버, 키는 사용자 환경변수에서 바로 넘기고 출력하지 않음, 회원 2)
+  - HELP-03 "신용점수와 DSR은 어떤 관계가 있나요?" → 200, 3.8초, 마크다운 없는 5문장, 남은 횟수 10 → 9
+  - HELP-03 금융과 무관한 질문("저녁 메뉴 추천") → 200, "금융 용어만 설명할 수 있어요" 안내. AI를 부른 성공 호출이라 횟수는 줄었다(8). 지금 규칙대로다
+  - HELP-02 남은 횟수 8/10 확인
+  - RPT-04 첫 요청 → 200, 1.8초, `generated: true`, 3문장(점수·점수 차이·작용 점수 3개·시연용 안내), 원인 표현 없음. 두 번째 → `generated: false`(AI 호출 없음), RPT-02 `aiSummary`에 저장된 것 확인
+  - RPT-04 남의 평가(회원 3이 회원 2의 requestId) → 404
+  - 로컬 DB에 남은 것: 회원 2의 최신 평가 `AI_SUMMARY` 1건, `CHATBOT_QUESTION_LOG` 성공 2줄(공용 DB는 건드리지 않음)
 
 ## 다음 사람이 알아야 할 것
 - FP-180(용어 사전, `feature-C/FP-180-glossary`)과 같은 `help` 패키지에 다른 파일을 추가했다. 코드 충돌은 없지만 `api_spec_c.md`의 「최근 변경」 줄과 문서 끝 절이 같은 자리라, 나중에 병합하는 쪽에서 두 쪽 내용을 모두 남긴다.

@@ -87,7 +87,7 @@ class OpenAiClientTest {
         assertEquals("DSR은 소득 중 빚 갚는 비율입니다.", result);
         assertEquals("/v1/chat/completions", receivedPath.get());
         assertEquals("Bearer " + TEST_KEY, receivedAuth.get());
-        assertTrue(receivedBody.get().contains("\"model\":\"gpt-4o-mini\""), receivedBody.get());
+        assertTrue(receivedBody.get().contains("\"model\":\"gpt-5.6-luna\""), receivedBody.get());
         assertTrue(receivedBody.get().contains("\"max_completion_tokens\":400"), receivedBody.get());
         assertTrue(receivedBody.get().contains("DSR이 뭐예요?"));
         assertTrue(receivedBody.get().contains("지시 문장"));
@@ -145,7 +145,7 @@ class OpenAiClientTest {
         OpenAiProperties properties = new OpenAiProperties();
         assertNull(properties.getApiKey());
         assertEquals("https://api.openai.com/v1", properties.resolvedBaseUrl());
-        assertEquals("gpt-4o-mini", properties.resolvedModel());
+        assertEquals("gpt-5.6-luna", properties.resolvedModel());
         properties.setBaseUrl("http://x/v1/");
         properties.setModel(" gpt-test ");
         assertEquals("http://x/v1", properties.resolvedBaseUrl());

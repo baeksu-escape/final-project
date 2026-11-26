@@ -19,7 +19,8 @@ import org.springframework.util.StringUtils;
 public class OpenAiProperties {
 
     private static final String DEFAULT_BASE_URL = "https://api.openai.com/v1";
-    private static final String DEFAULT_MODEL = "gpt-4o-mini";
+    // 강사 제공 키의 프로젝트가 쓸 수 있는 모델(11/26 확인: gpt-5.6-luna·sol·terra) 중 답이 짧고 추론 토큰을 쓰지 않은 luna
+    private static final String DEFAULT_MODEL = "gpt-5.6-luna";
 
     private String apiKey;
     private String model;
