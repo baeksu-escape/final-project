@@ -17,7 +17,7 @@ const changeText = (pct) => {
 // 월 소득·월 지출: 슬라이더 + 금액(원) 직접 입력 — 금액을 넣으면 지금 금액 대비 퍼센트로 바꿔 서버에 보낸다(서버는 퍼센트를 받는다).
 // 대출 금리: 슬라이더 + %p 칸, 아래에 이자가 한 달에 얼마 바뀌는지 미리보기(정확한 값은 결과 카드의 서버 계산).
 // 슬라이더를 움직이면 상황 선택이 풀린다.
-// (시안 5차) 위쪽 상황 칩 대신 제목 줄 오른쪽 [초기화], 계산 버튼 위 [베스트 케이스]·[워스트 케이스].
+// (시안 5차) 위쪽 상황 칩 대신 제목 줄 오른쪽 [초기화], 계산 버튼 위 [베스트 시나리오]·[워스트 시나리오].
 // (시안 4차) 자동 계산 대신 카드 맨 아래 [예상 시나리오 계산하기]를 눌러 계산한다. 입력칸은 공통 컴포넌트 모양(라벨 위·칸 전체 너비) 그대로 쓴다.
 export default function ScenarioControls({ values, presetId, inputError, calcError, variableLoanBalanceAmount, baseline, stale, calculating, onChange, onSelect, onRetry, onCalculate }) {
   return (
@@ -83,7 +83,7 @@ export default function ScenarioControls({ values, presetId, inputError, calcErr
         {calcError && <> <Button size="sm" onClick={onRetry}>다시 시도</Button></>}
       </p>
       <div className="sc-calc">
-        {/* (시안 5차) 베스트·워스트 케이스 버튼은 계산 버튼 바로 위에 둔다. */}
+        {/* (시안 5차) 베스트·워스트 시나리오 버튼은 계산 버튼 바로 위에 둔다. */}
         <div className="sc-chips" role="group" aria-label="상황 고르기">
           {EASY_PRESETS.map((preset) => (
             <button key={preset.id} type="button" className="sc-preset" aria-pressed={presetId === preset.id} onClick={() => onSelect(preset)}>
