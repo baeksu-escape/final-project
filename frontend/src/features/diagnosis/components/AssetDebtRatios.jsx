@@ -48,15 +48,14 @@ export default function AssetDebtRatios({ result, utilityPayment, utilityPayment
   </Card>
 }
 
-// N-20-5 공과금 납부율과 월별 상태를 보여 준다. 기록 없음과 응답 형식 오류는 각각 안내한다.
+// N-20-5 공과금 납부율을 요약하고, 펼치면 월별 상태와 안내를 보여 준다.
 function UtilityPaymentSummary({ utilityPayment, utilityPaymentInvalid }) {
   const rate = utilityPayment?.onTimeRatePct
+  const unavailableLabel = utilityPayment || utilityPaymentInvalid ? '확인 불가' : '기록 없음'
+  const rateLabel = rate == null ? unavailableLabel : `${rate.toFixed(1)}%`
   const emptyMessage = utilityPaymentInvalid ? '공과금 납부 정보를 확인할 수 없어요.' : '공과금 납부 기록이 없어요.'
-  return <section>
-    <div className="ad-ratio__heading">
-      <h3>공과금 기한 내 납부율 (참고)</h3>
-      <strong>{rate == null ? '—' : `${rate.toFixed(1)}%`}</strong>
-    </div>
+  return <details>
+    <summary>공과금 기한 내 납부율 (참고) · <strong>{rateLabel}</strong></summary>
     {utilityPayment ? <>
       <p className="ad-hint">
         최근 {utilityPayment.recordedMonthCount}개월 중 기한 내 {utilityPayment.onTimeMonthCount}개월
@@ -69,5 +68,5 @@ function UtilityPaymentSummary({ utilityPayment, utilityPaymentInvalid }) {
       </ul>
     </> : <p className="ad-hint">{emptyMessage}</p>}
     <p className="ad-hint">공과금 납부율은 DSR 계산과 위험 단계에 반영되지 않아요.</p>
-  </section>
+  </details>
 }
