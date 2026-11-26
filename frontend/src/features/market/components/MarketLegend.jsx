@@ -1,8 +1,10 @@
 import { HEAT_STEPS } from '../config/marketConfig.js'
 import { formatMetric, josa } from '../utils/marketStats.js'
 
-// N-24-4 색 범례 — 지도 빨강 5단계(값이 클수록 진함)와 구간 경계값, 이 지표는 높을수록 좋은지 나쁜지를 글로 알려 준다(1차 시연 후속).
-export default function MarketLegend({ metric, stats }) {
+// N-24-4 색 범례 — 지도 지표 색 5단계(값이 클수록 진함)와 구간 경계값, 이 지표는 높을수록 좋은지 나쁜지를 글로 알려 준다(1차 시연 후속).
+// level: 지도가 구 색('gu')이면 stats는 구 경계, 동 색('dong')이면 동 경계다(FP-278 11/26). seoul: 서울 평균.
+export default function MarketLegend({ metric, stats, level, seoul }) {
+  const unit = level === 'gu' ? '구' : '동'
   const steps = Array.from({ length: HEAT_STEPS }, (_, i) => i + 1)
   // 칸마다 마우스를 올리면 그 칸의 값 범위가 보인다
   const range = (step) => {
@@ -13,7 +15,7 @@ export default function MarketLegend({ metric, stats }) {
   const hasValues = stats.cuts.length > 0
 
   return (
-    <div className="market-legend">
+    <div className={`market-legend market-legend--${level}`}>
       <span className="market-legend__ramp">
         <span className="market-hint">낮음</span>
         <span className="market-ramp" aria-hidden="true">
@@ -29,12 +31,13 @@ export default function MarketLegend({ metric, stats }) {
       </span>
       {hasValues && (
         <p className="market-hint market-legend__desc">
-          색이 진할수록 {josa(metric.name, '이', '가')} 높은 동입니다. 행정동을 값 순서로 5등분했고, 구간 경계는{' '}
+          색이 진할수록 {josa(metric.name, '이', '가')} 높은 {unit}입니다.{' '}
+          {level === 'gu' ? '서울 25개 구를 값 순서로 5등분했고(확대하면 행정동 단위로 바뀝니다)' : '행정동을 값 순서로 5등분했고'}, 구간 경계는{' '}
           <span className="market-num">{stats.cuts.map((cut) => formatMetric(metric, cut)).join(' · ')}</span>입니다.{' '}
           <b>
             {josa(metric.name, '은', '는')} {metric.dir < 0 ? '낮을수록' : '높을수록'} 좋습니다.
           </b>
-          {stats.seoul != null && <> 서울 평균은 <span className="market-num">{formatMetric(metric, stats.seoul)}</span>입니다.</>}
+          {seoul != null && <> 서울 평균은 <span className="market-num">{formatMetric(metric, seoul)}</span>입니다.</>}
         </p>
       )}
     </div>
