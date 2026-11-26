@@ -11,7 +11,10 @@ import '../api/authFeatureApi.js'
 import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, LOGIN_FAILED_MESSAGE } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
+import PasswordField from '../components/PasswordField.jsx'
 import SocialLoginButtons from '../components/SocialLoginButtons.jsx'
+import usePasswordReveal from '../usePasswordReveal.js'
+import { filterLoginId } from '../validation.js'
 import '../auth.css'
 
 // 로그인 실패 원인을 화면 문구로 바꾼다. 아이디·비밀번호 중 무엇이 틀렸는지는 알려 주지 않는다.
@@ -45,6 +48,8 @@ export default function LoginPage() {
   const [challenge, setChallenge] = useState(null)
   // FP-80 첫 비밀번호 설정 토큰. 있으면 비밀번호 설정 단계다.
   const [passwordSetupToken, setPasswordSetupToken] = useState(null)
+  // FP-258 2차 비밀번호 [보기] 상태. 로그인 요청 직전에 가린다.
+  const { reveal, hideAll } = usePasswordReveal()
 
   // 맡아 둔 알림은 한 번만 쓴다. 꺼낸 뒤 바로 비워서 다음 로그아웃 때 다시 뜨지 않게 한다.
   useEffect(() => {
@@ -61,6 +66,7 @@ export default function LoginPage() {
     if (Object.keys(errors).length > 0) return
 
     setPending(true)
+    hideAll()
     try {
       const result = await requestLogin(loginId.trim(), password)
       if (result.twoFactorRequired) {
@@ -143,14 +149,20 @@ export default function LoginPage() {
         </p>
       )}
       <form className="auth-form login-form" onSubmit={handleSubmit} noValidate>
-        <TextInput label="아이디" value={loginId} onChange={setLoginId} error={fieldErrors.loginId} autoComplete="username" />
         <TextInput
+          label="아이디"
+          value={loginId}
+          onChange={(value) => setLoginId(filterLoginId(value))}
+          error={fieldErrors.loginId}
+          autoComplete="username"
+        />
+        <PasswordField
           label="비밀번호"
-          type="password"
           value={password}
           onChange={setPassword}
           error={fieldErrors.password}
           autoComplete="current-password"
+          {...reveal('password')}
         />
         {formError && (
           <p className="auth-form__error" role="alert">

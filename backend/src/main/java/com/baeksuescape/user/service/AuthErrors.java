@@ -1,8 +1,11 @@
 package com.baeksuescape.user.service;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
 
 // FP-87 인증·회원 API가 함께 쓰는 오류. 문구와 code는 프론트 authConstants.js·socialLoginConfig.js·mock과 같다.
 public final class AuthErrors {
@@ -33,6 +36,15 @@ public final class AuthErrors {
 
     public static ApiException accountNotFound() {
         return new ApiException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", NO_MATCH_MESSAGE);
+    }
+
+    // FP-258 2차 아이디·비밀번호 찾기의 이름 형식 검사 — 가입과 같은 규칙(AccountRules.nameError)이고, 틀리면 400 INVALID_INPUT(name 칸).
+    // 형식이 맞는데 계정이 없으면 지금처럼 accountNotFound(404)다.
+    public static void requireValidName(String name) {
+        String error = AccountRules.nameError(name);
+        if (error != null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", error, List.of(new FieldErrorItem("name", error)));
+        }
     }
 
     public static ApiException duplicateLoginId() {

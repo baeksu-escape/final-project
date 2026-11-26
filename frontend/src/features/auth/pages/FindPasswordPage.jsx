@@ -5,10 +5,12 @@ import { requestPasswordReset } from '../api/authFeatureApi.js'
 import { EMAIL_PURPOSES } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
+import PasswordField from '../components/PasswordField.jsx'
 import PasswordRuleList from '../components/PasswordRuleList.jsx'
 import SplitEmailField from '../components/SplitEmailField.jsx'
 import { resolveEmailDomain } from '../emailParts.js'
-import { joinEmail, validateNewPassword } from '../validation.js'
+import usePasswordReveal from '../usePasswordReveal.js'
+import { filterLoginId, filterName, joinEmail, validateNewPassword } from '../validation.js'
 import '../auth.css'
 
 // N-03 비밀번호 찾기 화면 — ① 아이디·이메일 인증 → ② 새 비밀번호 재설정 → ③ 완료 순서로 진행한다.
@@ -26,6 +28,8 @@ export default function FindPasswordPage() {
   const [passwordErrors, setPasswordErrors] = useState({})
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
+  // FP-258 2차 새 비밀번호·확인 칸 [보기] 상태. 재설정 요청 직전에 가린다.
+  const { reveal, hideAll } = usePasswordReveal()
 
   const email = joinEmail(emailParts.emailLocal, resolveEmailDomain(emailParts.emailDomainChoice, emailParts.emailCustomDomain))
   // 인증받은 뒤 아이디·이름·이메일을 바꾸면 인증이 풀린 것으로 본다.
@@ -41,6 +45,7 @@ export default function FindPasswordPage() {
     if (Object.keys(errors).length > 0) return
 
     setPending(true)
+    hideAll()
     try {
       await requestPasswordReset({
         loginId: verification.loginId,
@@ -76,22 +81,22 @@ export default function FindPasswordPage() {
       <section className="auth-page find-password-page">
         <h1 className="auth-page__title">비밀번호 재설정</h1>
         <form className="auth-form reset-password-form" onSubmit={handleReset} noValidate>
-          <TextInput
+          <PasswordField
             label="새 비밀번호"
-            type="password"
             value={password}
             onChange={setPassword}
             error={passwordErrors.password}
             autoComplete="new-password"
+            {...reveal('password')}
           />
           <PasswordRuleList password={password} />
-          <TextInput
+          <PasswordField
             label="새 비밀번호 확인"
-            type="password"
             value={passwordConfirm}
             onChange={setPasswordConfirm}
             error={passwordErrors.passwordConfirm}
             autoComplete="new-password"
+            {...reveal('passwordConfirm')}
           />
           {formError && (
             <p className="auth-form__error" role="alert">
@@ -110,8 +115,14 @@ export default function FindPasswordPage() {
     <section className="auth-page find-password-page">
       <h1 className="auth-page__title">비밀번호 찾기</h1>
       <div className="auth-form find-password-form">
-        <TextInput label="아이디" value={loginId} onChange={setLoginId} autoComplete="username" />
-        <TextInput label="이름" value={name} onChange={setName} autoComplete="name" hint="가입할 때 입력한 이름" />
+        <TextInput label="아이디" value={loginId} onChange={(value) => setLoginId(filterLoginId(value))} autoComplete="username" />
+        <TextInput
+          label="이름"
+          value={name}
+          onChange={(value) => setName(filterName(value))}
+          autoComplete="name"
+          hint="가입할 때 입력한 이름"
+        />
         <SplitEmailField
           local={emailParts.emailLocal}
           domainChoice={emailParts.emailDomainChoice}

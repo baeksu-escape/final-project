@@ -5,8 +5,10 @@ import static com.baeksuescape.user.service.UserFixtures.CRYPTO;
 import static com.baeksuescape.user.service.UserFixtures.ENCODER;
 import static com.baeksuescape.user.service.UserFixtures.HMAC;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
@@ -115,6 +117,45 @@ class EmailVerificationServiceTest {
         assertThat(codeOf(() -> service.send(new AuthRequests.EmailSend("not-an-email", "SIGNUP", null)))).isEqualTo("400 INVALID_INPUT");
     }
 
+    // FP-258 2차 이메일 규칙 — 한글·점 연속·처음/끝 점·허용하지 않는 기호·밑줄 도메인·짧은 최상위 도메인은 보내지 않고 400.
+    @Test
+    void 규칙에_맞지_않는_이메일은_발송하지_않고_400() {
+        for (String email : new String[] { "홍길동@example.com", "newbie@예시.com", "a..b@example.com", ".ab@example.com", "ab.@example.com",
+                "a+b@example.com", "ab@ex_ample.com", "ab@example-.com", "ab@example.c", "ab@@example.com" }) {
+            assertThat(codeOf(() -> service.send(new AuthRequests.EmailSend(email, "SIGNUP", null)))).as(email).isEqualTo("400 INVALID_INPUT");
+        }
+        verify(codeMapper, never()).insertCode(any());
+        assertThat(sentCodes).isEmpty();
+    }
+
+    // FP-258 2차 대문자·앞뒤 공백이 있는 이메일은 소문자로 바꿔 판정하고, 그 주소로 보낸다(HMAC도 같은 값).
+    @Test
+    void 대문자_이메일은_소문자로_바꿔_보낸다() {
+        List<String> sentTo = new ArrayList<>();
+        EmailVerificationService capturing = new EmailVerificationService(codeMapper, userMapper, tokenService,
+                (email, code, purpose) -> sentTo.add(email), ENCODER, HMAC, CRYPTO, properties, CLOCK);
+        capturing.send(new AuthRequests.EmailSend(" NewBie@Example.COM ", "SIGNUP", null));
+        assertThat(sentTo).containsExactly(EMAIL);
+        ArgumentCaptor<VerificationCode> saved = ArgumentCaptor.forClass(VerificationCode.class);
+        verify(codeMapper).insertCode(saved.capture());
+        assertThat(saved.getValue().getTargetHmac()).isEqualTo(HMAC.email(EMAIL));
+    }
+
+    // FP-258 2차 재설정 목적의 이름 형식이 틀리면 코드를 보기 전에 400 name 칸이고, 시도 횟수를 올리지 않는다.
+    @Test
+    void 재설정_확인의_이름_형식이_틀리면_400_name_칸() {
+        for (String name : new String[] { "hong", "홍 길동", "ㄱㄴ", "" }) {
+            assertThatThrownBy(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "000000", "RESET_PASSWORD", "newbie01", name)))
+                    .as(name)
+                    .isInstanceOfSatisfying(ApiException.class, e -> {
+                        assertThat(e.getCode()).isEqualTo("INVALID_INPUT");
+                        assertThat(e.getFieldErrors().get(0).field()).isEqualTo("name");
+                    });
+        }
+        verify(codeMapper, never()).selectLatest(anyString(), anyString());
+        verify(codeMapper, never()).increaseAttempt(anyLong());
+    }
+
     @Test
     void FIXED_모드는_고정_코드를_쓴다() {
         properties.getAuth().getEmail().setMode(AvenueProperties.EmailMode.FIXED);
@@ -163,12 +204,14 @@ class EmailVerificationServiceTest {
         assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "RESET_PASSWORD", "nobody", "홍길동")))).isEqualTo("404 ACCOUNT_NOT_FOUND");
 
         given(userMapper.selectUserByLoginIdAndEmailHmac("newbie01", HMAC.email(EMAIL))).willReturn(UserFixtures.user(42L, "newbie01"));
-        // FP-258 이름이 다르거나 비면 아이디·이메일이 맞아도 같은 404이고, 코드는 확인 처리되지 않는다.
+        // FP-258 이름이 다르면 아이디·이메일이 맞아도 같은 404이고, 코드는 확인 처리되지 않는다.
+        // FP-258 2차 이름이 비었거나 형식이 틀리면(가입과 같은 규칙) 코드를 보기 전에 400 INVALID_INPUT(name 칸)이다.
         assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "RESET_PASSWORD", "newbie01", "김철수")))).isEqualTo("404 ACCOUNT_NOT_FOUND");
-        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "RESET_PASSWORD", "newbie01", null)))).isEqualTo("404 ACCOUNT_NOT_FOUND");
+        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "RESET_PASSWORD", "newbie01", null)))).isEqualTo("400 INVALID_INPUT");
         verify(codeMapper, never()).markVerified(anyLong(), any(), any(), any());
 
-        service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "RESET_PASSWORD", "newbie01", " 홍길동 "));
+        // FP-258 2차 아이디·이메일은 소문자로 바꿔 찾는다.
+        service.verify(new AuthRequests.EmailVerify(" NewBie@Example.com ", "123456", "RESET_PASSWORD", " NEWBIE01 ", "홍길동"));
         verify(codeMapper).markVerified(eq(5L), eq(42L), any(), any());
     }
 

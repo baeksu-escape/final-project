@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
-import { Card, TextInput } from '../../../common/components/index.js'
+import { Card } from '../../../common/components/index.js'
 import { requestWithdrawal } from '../api/myPageApi.js'
 import { AUTH_PATHS } from '../authPaths.js'
+import usePasswordReveal from '../usePasswordReveal.js'
+import PasswordField from './PasswordField.jsx'
 
 // N-04-7 탈퇴 확인 폼의 안내문.
 const WITHDRAWAL_NOTICE =
@@ -21,6 +23,8 @@ export default function WithdrawalCard() {
   const [passwordError, setPasswordError] = useState('')
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
+  // FP-258 2차 비밀번호 [보기] 상태. 탈퇴 요청 직전에 가린다.
+  const { reveal, hideAll } = usePasswordReveal()
 
   // 폼을 닫고 입력·오류를 비운다.
   const close = () => {
@@ -40,6 +44,7 @@ export default function WithdrawalCard() {
     }
     setPasswordError('')
     setPending(true)
+    hideAll()
     try {
       await requestWithdrawal(password)
     } catch (error) {
@@ -64,9 +69,8 @@ export default function WithdrawalCard() {
       {open && (
         <form className="account-form withdrawal-form" onSubmit={handleSubmit} noValidate>
           <p className="withdrawal-form__notice">{WITHDRAWAL_NOTICE}</p>
-          <TextInput
+          <PasswordField
             label="비밀번호 확인"
-            type="password"
             value={password}
             onChange={(value) => {
               setPassword(value)
@@ -74,6 +78,7 @@ export default function WithdrawalCard() {
             }}
             error={passwordError}
             autoComplete="current-password"
+            {...reveal('password')}
           />
           {formError && (
             <p className="account-form__error" role="alert">

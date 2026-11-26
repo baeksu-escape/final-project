@@ -92,7 +92,8 @@ public class AuthService {
     //   5회째 실패하면 그때부터 5분 동안 비밀번호와 상관없이 429(제한 중에는 횟수를 올리지 않음). 10회째면 잠그고 423.
     @Transactional(noRollbackFor = ApiException.class)
     public UserAccount authenticate(String loginId, String password) {
-        UserAccount account = userMapper.selectByLoginId(loginId.strip());
+        // FP-258 2차 아이디는 앞뒤 공백을 빼고 소문자로 바꿔 조회한다(가입 아이디는 소문자만 받는다).
+        UserAccount account = userMapper.selectByLoginId(AccountRules.normalizeLoginId(loginId));
         if (account == null || account.isWithdrawn() || account.getPasswordHash() == null) throw AuthErrors.loginFailed();
         boolean passwordMatches = passwordEncoder.matches(password, account.getPasswordHash());
         if (account.isLocked()) {
@@ -165,7 +166,8 @@ public class AuthService {
         validateSignup(request, now.getYear());
 
         String loginId = request.loginId();
-        String email = request.email().strip();
+        // FP-258 2차 이메일은 소문자로 바꿔 HMAC·암호문(EMAIL_ENC) 모두 같은 값으로 저장한다.
+        String email = AccountRules.normalizeEmail(request.email());
         String nickname = request.nickname().strip();
         String phone = AccountRules.normalizePhone(request.phone());
         String emailHmac = hmac.email(email);
@@ -256,6 +258,8 @@ public class AuthService {
     // 일치하는 계정이 없으면 404이고 트랜잭션이 되돌아가 토큰은 다시 쓸 수 있다. 탈퇴·관리자 계정은 찾지 않는다.
     @Transactional
     public AuthResponses.FoundId findId(AuthRequests.FindId request) {
+        // FP-258 2차 이름은 가입과 같은 규칙으로 먼저 본다(틀리면 400 name 칸, 토큰은 쓰지 않음).
+        AuthErrors.requireValidName(request.name());
         String method = request.method() == null ? "" : request.method().strip();
         if (!FIND_ID_PHONE.equals(method) && !FIND_ID_EMAIL.equals(method)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "아이디를 찾을 방법을 골라 주세요.",
@@ -271,7 +275,7 @@ public class AuthService {
             phoneVerification.consume(request.verificationToken(), PhonePurpose.FIND_ID, phone);
             candidates = userMapper.selectUsersByPhoneHmac(hmac.phone(phone));
         } else {
-            String email = request.email() == null ? "" : request.email().strip();
+            String email = AccountRules.normalizeEmail(request.email());
             emailVerification.consume(request.verificationToken(), EmailPurpose.FIND_ID, email, null);
             UserAccount account = userMapper.selectUserByEmailHmac(hmac.email(email));
             candidates = account == null ? List.of() : List.of(account);
@@ -288,12 +292,14 @@ public class AuthService {
     // FP-80 관리자는 쓸 수 없다: 조회가 일반 회원만 찾으므로(selectUserByLoginIdAndEmailHmac) 관리자 아이디는 "없는 계정"과 같은 404가 된다.
     @Transactional
     public void resetPassword(AuthRequests.PasswordReset request) {
+        // FP-258 2차 이름 형식(가입과 같은 규칙)을 먼저 본다. 아이디·이메일은 소문자로 바꿔 찾는다.
+        AuthErrors.requireValidName(request.name());
         if (!AccountRules.isValidPassword(request.newPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "비밀번호 규칙을 지켜 주세요.",
                     List.of(new FieldErrorItem("newPassword", "비밀번호 규칙을 지켜 주세요.")));
         }
-        String email = request.email().strip();
-        UserAccount account = userMapper.selectUserByLoginIdAndEmailHmac(request.loginId().strip(), hmac.email(email));
+        String email = AccountRules.normalizeEmail(request.email());
+        UserAccount account = userMapper.selectUserByLoginIdAndEmailHmac(AccountRules.normalizeLoginId(request.loginId()), hmac.email(email));
         if (account == null || !AccountRules.nameMatches(request.name(), crypto.decrypt(account.getNameEnc()))) throw AuthErrors.accountNotFound();
         emailVerification.consume(request.emailVerificationToken(), EmailPurpose.RESET_PASSWORD, email, account.getUserId());
         userMapper.updatePasswordAndUnlock(account.getUserId(), passwordEncoder.encode(request.newPassword()), LocalDateTime.now(clock));

@@ -1,7 +1,7 @@
 import { ApiError } from '../../../common/api/ApiError.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { AUTH_ERROR_CODES, EMAIL_PURPOSES, SAME_NICKNAME_MESSAGE, SAME_PASSWORD_MESSAGE } from '../authConstants.js'
-import { isValidEmail, isValidPassword, validateNickname } from '../validation.js'
+import { isValidEmail, isValidPassword, normalizeEmail, validateNickname } from '../validation.js'
 import { withdrawAllAltDataOfUser } from '../../dataInput/mocks/altDataMockStore.js'
 import { consumeVerification, isMockEmailInUse, listMockAccounts, requireAccountByToken, withdrawMockAccount } from './authMockHandlers.js'
 import { MY_PAGE_DEMO_PROFILES } from './myPageMockData.js'
@@ -70,15 +70,17 @@ registerMockHandlers({
   },
 
   // N-04-3 이메일 변경 — 새 이메일의 인증 토큰(목적 CHANGE_EMAIL)을 한 번 쓰고 저장한다.
+  // FP-258 2차 서버처럼 앞뒤 공백을 빼고 소문자로 바꾼 이메일로 판정·저장한다.
   'PUT /api/members/me/email': ({ body, token }) => {
     const account = requireAccountByToken(token)
-    if (!isValidEmail(body?.email)) throw new ApiError(400, '이메일 형식이 올바르지 않습니다.')
-    if (body.email === account.email) throw new ApiError(400, '지금 쓰는 이메일과 같습니다.')
-    if (isMockEmailInUse(body.email)) {
+    const email = normalizeEmail(body?.email)
+    if (!isValidEmail(email)) throw new ApiError(400, '이메일 형식이 올바르지 않습니다.')
+    if (email === account.email) throw new ApiError(400, '지금 쓰는 이메일과 같습니다.')
+    if (isMockEmailInUse(email)) {
       throw new ApiError(409, '이미 가입된 이메일입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_EMAIL })
     }
-    consumeVerification(body.emailVerificationToken, { purpose: EMAIL_PURPOSES.CHANGE_EMAIL, email: body.email })
-    account.email = body.email
+    consumeVerification(body.emailVerificationToken, { purpose: EMAIL_PURPOSES.CHANGE_EMAIL, email })
+    account.email = email
     return {}
   },
 

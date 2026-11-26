@@ -4,7 +4,7 @@ import { USE_MOCK } from '../../../common/config/env.js'
 import { requestEmailCode, verifyEmailCode } from '../api/authFeatureApi.js'
 import { CUSTOM_EMAIL_DOMAIN, EMAIL_DOMAIN_OPTIONS, resolveEmailDomain } from '../emailParts.js'
 import { MOCK_EMAIL_CODE } from '../mocks/authMockData.js'
-import { joinEmail, validateEmailParts } from '../validation.js'
+import { filterEmailDomain, filterEmailLocal, joinEmail, validateEmailParts } from '../validation.js'
 
 // 발송·확인 흐름의 처음 상태. target은 이 상태가 가리키는 이메일이고, status는 'idle'(발송 전)·'sent'(코드 보냄)·'error'(실패) 중 하나다.
 // codeOpen은 코드를 한 번 보내서 코드 칸이 열려 있는지다(실패해도 다시 입력할 수 있게 남긴다).
@@ -23,6 +23,7 @@ const IDLE_FLOW = { target: null, status: 'idle', message: '', codeOpen: false }
 //     onVerified={setVerification}                                // { email, verificationToken }
 //     error={errors.email}
 //   />
+//   FP-258 2차: 앞부분·직접 입력 도메인은 입력·붙여넣기 모두 filterEmailLocal·filterEmailDomain(소문자·허용 문자만)을 거친다.
 //   문구는 한 번에 하나만 보인다: 완료 / (실패 > 부모 오류 > 발송 안내). 이메일을 고치면 발송·코드·오류·안내를 모두 비운다.
 export default function SplitEmailField({
   local,
@@ -115,9 +116,12 @@ export default function SplitEmailField({
           id={`${id}-local`}
           className="text-input__control signup-form__grow"
           value={local}
-          onChange={(event) => handleEmailChange({ emailLocal: event.target.value })}
+          onChange={(event) => handleEmailChange({ emailLocal: filterEmailLocal(event.target.value) })}
           placeholder="이메일"
           autoComplete="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          inputMode="email"
           aria-invalid={invalid}
         />
         <span className="signup-form__fixed">@</span>
@@ -125,8 +129,11 @@ export default function SplitEmailField({
           <input
             className="text-input__control signup-form__grow"
             value={customDomain}
-            onChange={(event) => handleEmailChange({ emailCustomDomain: event.target.value })}
+            onChange={(event) => handleEmailChange({ emailCustomDomain: filterEmailDomain(event.target.value) })}
             placeholder="example.com"
+            autoCapitalize="none"
+            spellCheck={false}
+            inputMode="email"
             aria-label="이메일 도메인 직접 입력"
             aria-invalid={invalid}
           />

@@ -66,7 +66,8 @@ public class EmailVerificationService {
     @Transactional
     public AuthResponses.EmailSent send(AuthRequests.EmailSend request) {
         EmailPurpose purpose = purposeOf(request.purpose());
-        String email = request.email().strip();
+        // FP-258 2차 이메일은 앞뒤 공백을 빼고 소문자로 바꾼 값으로 판정·발송한다.
+        String email = AccountRules.normalizeEmail(request.email());
         if (!AccountRules.isValidEmail(email)) throw invalidEmail();
         String target = hmac.email(email);
         if (purpose.blocksUsedEmail() && userMapper.countByEmailHmac(target) > 0) throw AuthErrors.duplicateEmail();
@@ -91,7 +92,9 @@ public class EmailVerificationService {
     @Transactional(noRollbackFor = ApiException.class)
     public AuthResponses.EmailVerified verify(AuthRequests.EmailVerify request) {
         EmailPurpose purpose = purposeOf(request.purpose());
-        String email = request.email().strip();
+        // FP-258 2차 재설정 목적은 이름 형식(가입과 같은 규칙)을 코드보다 먼저 본다. 틀리면 400 name 칸이고 시도 횟수는 늘지 않는다.
+        if (purpose == EmailPurpose.RESET_PASSWORD) AuthErrors.requireValidName(request.name());
+        String email = AccountRules.normalizeEmail(request.email());
         String target = hmac.email(email);
         LocalDateTime now = LocalDateTime.now(clock);
 
@@ -105,7 +108,8 @@ public class EmailVerificationService {
 
         Long userId = null;
         if (purpose == EmailPurpose.RESET_PASSWORD) {
-            UserAccount account = request.loginId() == null ? null : userMapper.selectUserByLoginIdAndEmailHmac(request.loginId().strip(), target);
+            UserAccount account = request.loginId() == null ? null
+                    : userMapper.selectUserByLoginIdAndEmailHmac(AccountRules.normalizeLoginId(request.loginId()), target);
             if (account == null || !AccountRules.nameMatches(request.name(), crypto.decrypt(account.getNameEnc()))) throw AuthErrors.accountNotFound();
             userId = account.getUserId();
         }
@@ -117,7 +121,7 @@ public class EmailVerificationService {
     // 호출하는 쪽의 트랜잭션 안에서 부른다(가입이 실패하면 사용 처리도 되돌아간다).
     public void consume(String token, EmailPurpose purpose, String email, Long expectedUserId) {
         VerificationTokenService.Claim claim = tokenService.parse(token).orElseThrow(EmailVerificationService::verificationRequired);
-        String target = hmac.email(email == null ? "" : email.strip());
+        String target = hmac.email(AccountRules.normalizeEmail(email));
         if (!claim.purposeCode().equals(purpose.dbCode()) || !claim.targetHmac().equals(target)) throw verificationRequired();
         VerificationCode row = codeMapper.selectById(claim.verificationId());
         if (row == null || !purpose.dbCode().equals(row.getPurposeCode()) || !target.equals(row.getTargetHmac())) throw verificationRequired();

@@ -70,6 +70,65 @@
   - 5분 제한의 시작 시각으로 쓰는 `UPDATED_AT`은 다른 변경(예: 다른 곳에서 로그인한 상태로 닉네임 변경)에도 바뀐다. 제한 중에 그런 변경이 있으면 제한이 그만큼 늦게 끝난다.
   - 비밀번호 재설정은 원래부터 사유와 상관없이 잠금을 푼다(관리자가 수동으로 잠근 계정 포함). 새 안내 문구가 이를 사용자에게 알린다.
 
+## 2차 — 입력 규칙 통일·비밀번호 보기 (2026-11-26, b505caf 위에서 이어서)
+- **관련 N-ID:** N-01-1, N-02-1, N-03-1, N-03-2, N-04-3
+
+### 무엇을, 왜 바꿨나
+- **입력 규칙:** 칸마다 허용 글자가 화면마다 달랐고, 대문자·한글 이메일이 통과·저장됐다.
+  - `validation.js`에 칸별 걸러내기 함수를 두고, 가입·로그인·찾기·마이페이지가 입력과 붙여넣기 모두 같은 함수를 거친다.
+  - 판정(`isValidLoginId`·`NAME_PATTERN`·`NICKNAME_PATTERN`)은 그대로다.
+- **이메일 규칙**
+  - 앞부분: `a-z0-9._-`, 처음·끝은 영문·숫자, 점 연속 불가, 64자.
+  - 도메인: 덩어리마다 영문·숫자로 시작·끝, 마지막은 영문 2자 이상.
+  - 서버 `AccountRules.isValidEmail`(이름 유지)도 같은 규칙이다. 소문자로 바꾼 값으로 판정하므로 대문자 때문에 거절하지는 않는다.
+  - 가입·이메일 변경·인증코드 발송·확인·아이디 찾기·재설정은 이메일을 strip + 소문자로 바꿔 쓰고, `EMAIL_ENC`도 소문자로 저장한다. HMAC은 원래부터 소문자 기준이었다.
+- **이름 확인:** 아이디 찾기·비밀번호 찾기(코드 확인·재설정)의 이름은 가입과 같은 규칙으로 먼저 검사한다(`AuthErrors.requireValidName`).
+  - 틀리면 400 `INVALID_INPUT`(`name` 칸). 형식은 맞는데 계정이 없으면 지금처럼 같은 404다.
+- **로그인 아이디:** strip + 소문자로 바꿔 조회한다(`AccountRules.normalizeLoginId`, 재설정 조회도 같음).
+- **비밀번호 보기:** Edge 기본 눈 모양은 값을 고치면 사라졌다.
+  - 새 `PasswordField`([보기]/[숨기기], `aria-pressed`)와 `usePasswordReveal`(요청 직전 `hideAll`)을 만들었다.
+  - `auth.css`에는 `.password-field`의 `::-ms-reveal` 숨김 한 줄만 넣었다.
+
+### 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `backend/.../user/service/AccountRules.java` | 이메일 앞부분·도메인 규칙, `normalizeEmail`·`normalizeLoginId` |
+| `backend/.../user/service/AuthErrors.java` | `requireValidName`(400 `name` 칸) |
+| `backend/.../user/service/AuthService.java` | 로그인 아이디 소문자 조회, 가입·찾기·재설정 이메일 소문자, 찾기·재설정 이름 형식 검사 |
+| `backend/.../user/service/EmailVerificationService.java` | 발송·확인·토큰 사용 이메일 소문자, 재설정 확인 이름 형식 검사·아이디 소문자 |
+| `backend/.../user/service/MyPageService.java` | 이메일 변경 소문자 판정·저장 |
+| `backend/src/test/.../AuthServiceTest.java`, `EmailVerificationServiceTest.java`, `SocialAndMyPageServiceTest.java` | 시험 8건 추가, 가입 이메일 소문자·이름 없음 400으로 기대값 수정 |
+| `frontend/src/features/auth/validation.js` | 걸러내기 함수 7개, 이메일 판정(`isValidEmailLocal`·`isValidEmailDomain`), mock용 `normalizeEmail`·`normalizeLoginId` |
+| `frontend/src/features/auth/components/PasswordField.jsx`, `usePasswordReveal.js` (새 파일) | 비밀번호 보기 칸과 상태 |
+| `frontend/src/features/auth/pages/LoginPage.jsx`·`SignupPage.jsx`·`FindIdPage.jsx`·`FindPasswordPage.jsx` | 걸러내기 적용, 비밀번호 칸 교체, 요청 직전 가림. 아이디 찾기는 이름 검사와 서버 `name` 칸 오류 표시 |
+| `frontend/src/features/auth/components/SplitEmailField.jsx`·`EmailChangeForm.jsx`·`NicknameChangeForm.jsx` | 이메일·닉네임 걸러내기, 이메일 칸 `autoCapitalize`·`spellCheck`·`inputMode` |
+| `frontend/src/features/auth/components/PasswordChangeForm.jsx`·`ProfileUnlockCard.jsx`·`WithdrawalCard.jsx` | 비밀번호 칸 교체, 요청 직전 가림 |
+| `frontend/src/features/auth/auth.css` | `.password-field input::-ms-reveal` 숨김 |
+| `frontend/src/features/auth/mocks/authMockHandlers.js`·`myPageMockHandlers.js` | 서버와 같은 정리(소문자)·이름 형식 400 순서 |
+| `docs/ai/features.md`, `docs/spec/api/api_spec_a.md` | 해당 줄 `🆕 11/26` |
+
+### DB·API 변경
+- **DB:** 없음(DDL 그대로). 기존 행의 `EMAIL_ENC`는 대소문자가 섞여 있을 수 있지만 그대로 둔다. 조회는 HMAC이라 영향이 없다.
+- **API:** 필드는 그대로다. 바뀐 동작은 아래와 같다(`api_spec_a.md` 반영, 정의서는 고치지 않음).
+  - 이메일은 소문자로 저장한다.
+  - 규칙에 맞지 않는 이메일은 400이다.
+  - AUTH-08(재설정)·09·10은 이름 형식이 틀리면 400 `name` 칸이다.
+  - AUTH-01은 아이디를 소문자로 조회한다.
+- **영향을 받는 기능·팀원:** 관리자 계정 만들기(`AdminAccountService`, 프론트 `AddAdminForm`)도 같은 `isValidEmail`을 써서, 업무 이메일에 `+` 같은 기호를 쓸 수 없게 됐다(코드는 고치지 않음).
+
+### 확인
+- 확인함
+  - `mvnw clean test`(이 PC 옵션) 533건 통과, 실패·오류 0.
+  - `npm run lint` 오류 0, `npm run build` 성공.
+  - 걸러내기·이메일 판정 함수는 node로 예시 값을 넣어 확인했다.
+- 확인 못 함
+  - 화면을 직접 열어 보지 않았다(한글 조합 유지, 보기 버튼, Edge 눈 모양).
+  - 공통 `TextInput`이 `autoCapitalize`·`spellCheck`를 받지 못해 아이디 칸과 마이페이지 이메일 칸에는 넣지 못했다(공통 컴포넌트는 고치지 않음).
+- 팀 확인 필요
+  - 공통 `TextInput`에 `autoCapitalize`·`spellCheck` 속성 추가(프론트 공통 담당).
+  - 관리자 업무 이메일 규칙을 일반 회원과 같게 둘지.
+  - [보기] 버튼 모양·위치(UI 담당).
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

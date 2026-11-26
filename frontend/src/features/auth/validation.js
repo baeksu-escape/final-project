@@ -11,9 +11,65 @@ export function isValidPassword(value) {
   return PASSWORD_RULES.every((rule) => rule.test(value ?? ''))
 }
 
-// 이메일 형식(아이디@도메인.최상위) 검사.
+// FP-258 2차 이메일 형식 — 소문자로 바꾼 값을 '앞부분@도메인'으로 나눠 판정한다(서버 AccountRules.isValidEmail과 같은 규칙, 전체 100자 이하).
+// 앞부분: a-z0-9 . _ - 만, 처음·끝은 a-z0-9, 점 연속 불가. 도메인: 점으로 나눈 덩어리마다 a-z0-9로 시작·끝(가운데 - 가능), 마지막은 영문 2자 이상.
+export const EMAIL_MAX = 100
+export const EMAIL_LOCAL_MAX = 64
+export function isValidEmailLocal(local) {
+  const text = String(local ?? '')
+  return /^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$/.test(text) && !text.includes('..')
+}
+export function isValidEmailDomain(domain) {
+  const labels = String(domain ?? '').split('.')
+  return (
+    labels.length >= 2 &&
+    labels.every((label) => /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(label)) &&
+    /^[a-z]{2,}$/.test(labels[labels.length - 1])
+  )
+}
 export function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value ?? '')
+  const text = String(value ?? '').toLowerCase()
+  const parts = text.split('@')
+  return text.length <= EMAIL_MAX && parts.length === 2 && isValidEmailLocal(parts[0]) && isValidEmailDomain(parts[1])
+}
+
+// FP-258 2차 서버(AccountRules.normalizeEmail·normalizeLoginId)와 같이 앞뒤 공백을 빼고 소문자로 바꾼다. mock이 요청 값을 이 함수로 정리한 뒤 쓴다.
+export function normalizeEmail(value) {
+  return String(value ?? '').trim().toLowerCase()
+}
+export function normalizeLoginId(value) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+// ===== FP-258 2차 칸별 걸러내기 — 입력·붙여넣기 모두 onChange에서 이 함수를 거친다. 판정(isValid…·validate…)은 따로 한다. =====
+// 한글 칸은 조합 중인 자모(ㄱ-ㅎ, ㅏ-ㅣ)를 남기므로 값이 바뀌지 않아 한글 조합이 끊기지 않는다.
+
+// 가입 아이디: 소문자로 바꾸고 a-z0-9만, 20자.
+export function filterSignupLoginId(value) {
+  return String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)
+}
+// 로그인·비밀번호 찾기 아이디: 시드(demo_employee)·관리자 아이디에 밑줄이 있어 _도 남긴다. 20자.
+export function filterLoginId(value) {
+  return String(value ?? '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20)
+}
+// 이름: 한글 완성형과 조합 중 자모만, 20자. 판정은 NAME_PATTERN(완성형 2~20자).
+export function filterName(value) {
+  return String(value ?? '').replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ]/g, '').slice(0, 20)
+}
+// 이메일 앞부분: 소문자로 바꾸고 a-z0-9 . _ - 만, 64자.
+export function filterEmailLocal(value) {
+  return String(value ?? '').toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, EMAIL_LOCAL_MAX)
+}
+// 이메일 도메인(직접 입력): 소문자로 바꾸고 a-z0-9 . - 만.
+export function filterEmailDomain(value) {
+  return String(value ?? '').toLowerCase().replace(/[^a-z0-9.-]/g, '')
+}
+// 한 칸 이메일(마이페이지 이메일 변경): 첫 @ 앞뒤를 따로 거르고 @는 하나만 남긴다.
+export function filterEmail(value) {
+  const text = String(value ?? '')
+  const at = text.indexOf('@')
+  if (at < 0) return filterEmailLocal(text)
+  return `${filterEmailLocal(text.slice(0, at))}@${filterEmailDomain(text.slice(at + 1))}`
 }
 
 // 휴대폰 번호에서 숫자만 남긴다. 하이픈을 넣거나 빼고 입력해도 같은 값이 된다.
@@ -67,6 +123,11 @@ export const NICKNAME_PATTERN = /^[A-Za-z0-9가-힣]{2,7}$/
 export const NICKNAME_RULE_MESSAGE = '닉네임은 한글·영문·숫자 2~7자로 입력해 주세요.'
 export const WITHDRAWN_NICKNAME_PREFIX = '탈퇴'
 
+// FP-258 2차 닉네임 걸러내기: 한글(조합 중 자모 포함)·영문·숫자만, 7자. 판정은 validateNickname.
+export function filterNickname(value) {
+  return String(value ?? '').replace(/[^가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9]/g, '').slice(0, NICKNAME_MAX)
+}
+
 // 닉네임을 앞뒤 공백을 뺀 값으로 검사해 오류 문구를 돌려준다. 문제가 없으면 ''. 가입 화면과 가입·닉네임 확인 mock이 같은 규칙을 쓴다.
 // 공백·기호·자음/모음만(ㄱ, ㅏ)은 거절한다.
 export function validateNickname(value) {
@@ -88,7 +149,7 @@ export function validateLoginId(value) {
 }
 
 // N-02 이름 — 완성형 한글 2~20자만 받는다(숫자·영문·기호·공백·자음만 입력은 오류). 서버 AccountRules.nameError와 같은 규칙·문구.
-// 한글 조합 중 글자가 끊기지 않게 값을 고치지 않고 문구로만 알린다.
+// 입력 칸은 filterName으로 한글(조합 중 자모 포함) 외를 지우고, 규칙에 맞지 않는 값(자모만 등)은 문구로 알린다.
 export const NAME_PATTERN = /^[가-힣]{2,20}$/
 export const NAME_RULE_MESSAGE = '이름은 한글 2~20자로 입력해 주세요. (숫자·영문·기호 불가)'
 export function validateName(value) {

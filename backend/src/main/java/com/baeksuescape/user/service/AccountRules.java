@@ -1,5 +1,6 @@
 package com.baeksuescape.user.service;
 
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 // FP-87 N-02 회원 입력 규칙 — 프론트 features/auth/validation.js와 같은 규칙·문구. 가입·찾기·마이페이지가 함께 쓴다.
@@ -24,7 +25,11 @@ public final class AccountRules {
     private static final Pattern NICKNAME = Pattern.compile("^[A-Za-z0-9가-힣]{" + NICKNAME_MIN + "," + NICKNAME_MAX + "}$");
     public static final String NICKNAME_RULE_MESSAGE = "닉네임은 한글·영문·숫자 2~7자로 입력해 주세요.";
     public static final String NAME_RULE_MESSAGE = "이름은 한글 2~20자로 입력해 주세요. (숫자·영문·기호 불가)";
-    private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
+    // FP-258 2차 이메일 규칙(프론트 validation.js isValidEmailLocal·isValidEmailDomain과 같음).
+    // 앞부분: a-z0-9 . _ - 만, 처음·끝은 a-z0-9, 점 연속 불가(64자). 도메인: 점으로 나눈 덩어리마다 a-z0-9로 시작·끝, 마지막은 영문 2자 이상.
+    private static final Pattern EMAIL_LOCAL = Pattern.compile("^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$");
+    private static final Pattern DOMAIN_LABEL = Pattern.compile("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$");
+    private static final Pattern TOP_LEVEL_DOMAIN = Pattern.compile("^[a-z]{2,}$");
     private static final Pattern PHONE = Pattern.compile("^01[016-9]\\d{7,8}$");
     private static final Pattern LETTER = Pattern.compile("[A-Za-z]");
     private static final Pattern DIGIT = Pattern.compile("\\d");
@@ -37,8 +42,31 @@ public final class AccountRules {
         return value != null && LOGIN_ID.matcher(value).matches();
     }
 
+    // 이메일 형식 — 소문자로 바꾼 값을 '앞부분@도메인'으로 나눠 위 규칙으로 본다(100자 이하). 대소문자 때문에 거절하지는 않는다.
     public static boolean isValidEmail(String value) {
-        return value != null && value.length() <= EMAIL_MAX && EMAIL.matcher(value).matches();
+        if (value == null) return false;
+        String text = value.toLowerCase(Locale.ROOT);
+        if (text.length() > EMAIL_MAX) return false;
+        String[] parts = text.split("@", -1);
+        if (parts.length != 2) return false;
+        String local = parts[0];
+        if (!EMAIL_LOCAL.matcher(local).matches() || local.contains("..")) return false;
+        String[] labels = parts[1].split("\\.", -1);
+        if (labels.length < 2) return false;
+        for (String label : labels) {
+            if (!DOMAIN_LABEL.matcher(label).matches()) return false;
+        }
+        return TOP_LEVEL_DOMAIN.matcher(labels[labels.length - 1]).matches();
+    }
+
+    // FP-258 2차 이메일 정리 — 앞뒤 공백을 빼고 소문자로 바꾼다. 가입·이메일 변경·인증코드·아이디 찾기·재설정이 이 값으로 판정·저장한다. null이면 빈 문자열.
+    public static String normalizeEmail(String value) {
+        return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
+    }
+
+    // FP-258 2차 로그인 아이디 정리 — 앞뒤 공백을 빼고 소문자로 바꾼다(로그인·비밀번호 찾기 조회). null이면 빈 문자열.
+    public static String normalizeLoginId(String value) {
+        return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
     }
 
     // 비밀번호: 영문과 숫자를 섞어 8자 이상(decisions.md 1-2). 기호는 요구하지 않는다.
@@ -77,7 +105,8 @@ public final class AccountRules {
         return null;
     }
 
-    // 가입 이름 오류 문구. 숫자·영문·기호·공백·자음만 입력은 거절한다. 문제없으면 null. 아이디 찾기·관리자 계정 만들기는 이 규칙을 쓰지 않는다.
+    // 가입 이름 오류 문구. 숫자·영문·기호·공백·자음만 입력은 거절한다. 문제없으면 null.
+    // FP-258 2차부터 아이디 찾기·비밀번호 찾기도 이 규칙을 쓴다(AuthErrors.requireValidName). 관리자 계정 만들기는 쓰지 않는다.
     public static String nameError(String name) {
         if (name == null || name.isBlank()) return "이름을 입력해 주세요.";
         if (!NAME.matcher(name).matches()) return NAME_RULE_MESSAGE;

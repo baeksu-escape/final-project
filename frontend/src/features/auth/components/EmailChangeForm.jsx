@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { TextInput } from '../../../common/components/index.js'
 import { requestEmailChange } from '../api/myPageApi.js'
 import { EMAIL_PURPOSES } from '../authConstants.js'
+import { filterEmail } from '../validation.js'
 import EmailVerification from './EmailVerification.jsx'
 
 // N-04-3 이메일 바꾸기 폼 — 새 이메일을 FP-87 이메일 인증(N-02-3)으로 확인한 경우에만 저장을 요청한다.
@@ -36,7 +37,8 @@ export default function EmailChangeForm({ onSaved, onCancel }) {
 
   return (
     <form className="account-form email-change-form" onSubmit={handleSubmit} noValidate>
-      <TextInput label="새 이메일" type="email" value={email} onChange={setEmail} autoComplete="email" />
+      {/* FP-258 2차 입력·붙여넣기를 가입과 같은 이메일 규칙으로 거른다(소문자, 앞부분 a-z0-9._- · 도메인 a-z0-9.-). */}
+      <TextInput label="새 이메일" type="email" value={email} onChange={(value) => setEmail(filterEmail(value))} autoComplete="email" />
       <EmailVerification
         email={email}
         purpose={EMAIL_PURPOSES.CHANGE_EMAIL}

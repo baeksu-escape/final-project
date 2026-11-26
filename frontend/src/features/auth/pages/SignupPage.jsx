@@ -5,13 +5,18 @@ import { checkNicknameAvailability, requestSignup } from '../api/authFeatureApi.
 import { AUTH_ERROR_CODES, CREDIT_INFO_AGREEMENT_LABEL, EMAIL_PURPOSES, PHONE_PURPOSES, toAgeGroup } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
+import PasswordField from '../components/PasswordField.jsx'
 import PasswordRuleList from '../components/PasswordRuleList.jsx'
 import PhoneVerification from '../components/PhoneVerification.jsx'
 import SplitEmailField from '../components/SplitEmailField.jsx'
 import { resolveEmailDomain, splitEmail } from '../emailParts.js'
+import usePasswordReveal from '../usePasswordReveal.js'
 import {
   NICKNAME_MAX,
   SIGNUP_PENDING_MESSAGES,
+  filterName,
+  filterNickname,
+  filterSignupLoginId,
   getBirthDateRange,
   joinEmail,
   joinPhone,
@@ -86,6 +91,8 @@ export default function SignupPage() {
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
   const [completed, setCompleted] = useState(false)
+  // FP-258 2차 비밀번호·확인 칸 [보기] 상태. 가입 요청 직전에 가린다.
+  const { reveal, hideAll } = usePasswordReveal()
 
   const email = joinEmail(form.emailLocal, resolveEmailDomain(form.emailDomainChoice, form.emailCustomDomain))
   const phone = joinPhone(form.phoneMiddle, form.phoneLast)
@@ -127,6 +134,8 @@ export default function SignupPage() {
     })
   }
   const update = (field) => (value) => patchForm({ [field]: value })
+  // FP-258 2차 입력·붙여넣기를 칸별 걸러내기 함수(validation.js)에 통과시킨 뒤 넣는다.
+  const updateFiltered = (field, filter) => (value) => patchForm({ [field]: filter(value) })
 
   // 칸을 감싼 요소. 안쪽 입력에서 포커스가 빠져나가면(blur는 감싼 요소까지 올라온다) 손댄 칸으로 표시한다.
   const fieldProps = (key) => ({ id: fieldWrapperId(key), onBlur: () => markTouched(key) })
@@ -157,6 +166,7 @@ export default function SignupPage() {
 
     const birthYear = Number(form.birthDate.slice(0, 4))
     setPending(true)
+    hideAll()
     try {
       await requestSignup({
         loginId: form.loginId,
@@ -222,7 +232,7 @@ export default function SignupPage() {
           <TextInput
             label="아이디"
             value={form.loginId}
-            onChange={update('loginId')}
+            onChange={updateFiltered('loginId', filterSignupLoginId)}
             error={errorOf('loginId')}
             placeholder="영문 소문자로 시작, 4~20자"
             autoComplete="username"
@@ -233,7 +243,7 @@ export default function SignupPage() {
           <TextInput
             label="이름"
             value={form.name}
-            onChange={update('name')}
+            onChange={updateFiltered('name', filterName)}
             error={errorOf('name')}
             placeholder="한글 이름"
             autoComplete="name"
@@ -247,7 +257,7 @@ export default function SignupPage() {
             <TextInput
               label="닉네임"
               value={form.nickname}
-              onChange={update('nickname')}
+              onChange={updateFiltered('nickname', filterNickname)}
               placeholder={`2~${NICKNAME_MAX}자`}
               autoComplete="nickname"
               maxLength={NICKNAME_MAX}
@@ -294,26 +304,26 @@ export default function SignupPage() {
           />
         </div>
         <div {...fieldProps('password')}>
-          <TextInput
+          <PasswordField
             label="비밀번호"
-            type="password"
             value={form.password}
             onChange={update('password')}
             error={errorOf('password')}
             placeholder="비밀번호"
             autoComplete="new-password"
+            {...reveal('password')}
           />
         </div>
         <PasswordRuleList password={form.password} />
         <div {...fieldProps('passwordConfirm')} className="auth-field">
-          <TextInput
+          <PasswordField
             label="비밀번호 확인"
-            type="password"
             value={form.passwordConfirm}
             onChange={update('passwordConfirm')}
             error={errorOf('passwordConfirm')}
             placeholder="비밀번호 다시 입력"
             autoComplete="new-password"
+            {...reveal('passwordConfirm')}
           />
           {form.passwordConfirm && form.password === form.passwordConfirm && (
             <p className="auth-message auth-message--success" role="status">

@@ -3,7 +3,7 @@ import { Button, TextInput } from '../../../common/components/index.js'
 import { checkNicknameAvailability } from '../api/authFeatureApi.js'
 import { requestNicknameChange } from '../api/myPageApi.js'
 import { AUTH_ERROR_CODES, SAME_NICKNAME_MESSAGE } from '../authConstants.js'
-import { NICKNAME_MAX, validateNickname } from '../validation.js'
+import { NICKNAME_MAX, filterNickname, validateNickname } from '../validation.js'
 
 // FP-222 N-04-3 닉네임 바꾸기 폼 — 규칙은 가입과 같고(validateNickname), [중복 확인](AUTH-13)에서 쓸 수 있다고 나온 닉네임만 저장한다(MEM-08).
 // 저장에 성공하면 onSaved(안내 문구)를 부르고, [취소]는 onCancel을 부른다. 서버가 같은 값·중복으로 막으면 칸 아래에 보여 준다.
@@ -20,8 +20,9 @@ export default function NicknameChangeForm({ currentNickname, onSaved, onCancel 
   const checked = check?.nickname === text && check.available
 
   // 칸 값을 바꾸면 지난 안내를 지운다.
+  // FP-258 2차 입력·붙여넣기는 가입과 같은 걸러내기(filterNickname: 한글·영문·숫자 7자)를 거친다.
   const handleChange = (value) => {
-    setNickname(value)
+    setNickname(filterNickname(value))
     setError('')
   }
 

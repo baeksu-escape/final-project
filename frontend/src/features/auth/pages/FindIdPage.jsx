@@ -8,7 +8,7 @@ import AuthLinks from '../components/AuthLinks.jsx'
 import PhoneVerification from '../components/PhoneVerification.jsx'
 import SplitEmailField from '../components/SplitEmailField.jsx'
 import { resolveEmailDomain } from '../emailParts.js'
-import { joinEmail, joinPhone, normalizePhone } from '../validation.js'
+import { filterName, joinEmail, joinPhone, normalizePhone, validateName } from '../validation.js'
 import '../auth.css'
 
 // 아이디 찾기 방법 선택지(공통 SegmentedControl).
@@ -46,7 +46,9 @@ export default function FindIdPage() {
   const handleSubmit = async (event) => {
     event.preventDefault()
     const errors = {}
-    if (!name.trim()) errors.name = '이름을 입력해 주세요.'
+    // FP-258 2차 이름은 가입과 같은 규칙(완성형 한글 2~20자)으로 본다. 서버도 같은 규칙으로 400(name 칸)을 준다.
+    const nameError = validateName(name)
+    if (nameError) errors.name = nameError
     setFieldErrors(errors)
     setFormError('')
     setLoginId(null)
@@ -66,7 +68,9 @@ export default function FindIdPage() {
       })
       setLoginId(result.loginId)
     } catch (error) {
-      setFormError(error.message)
+      const nameError = error?.data?.fieldErrors?.find((item) => item.field === 'name')
+      if (nameError) setFieldErrors({ name: nameError.message })
+      else setFormError(error.message)
     } finally {
       setPending(false)
     }
@@ -77,7 +81,14 @@ export default function FindIdPage() {
       <h1 className="auth-page__title">아이디 찾기</h1>
       <form className="auth-form find-id-form" onSubmit={handleSubmit} noValidate>
         <SegmentedControl label="아이디 찾기 방법" options={METHOD_OPTIONS} value={method} onChange={changeMethod} />
-        <TextInput label="이름" value={name} onChange={setName} error={fieldErrors.name} autoComplete="name" hint="가입할 때 입력한 이름" />
+        <TextInput
+          label="이름"
+          value={name}
+          onChange={(value) => setName(filterName(value))}
+          error={fieldErrors.name}
+          autoComplete="name"
+          hint="가입할 때 입력한 이름"
+        />
         {method === FIND_ID_METHODS.PHONE ? (
           <PhoneVerification
             middle={phoneParts.middle}

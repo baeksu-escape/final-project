@@ -214,6 +214,11 @@
   font-size: 13px;
 }
 
+/* FP-258 2차 비밀번호 칸(PasswordField) — [보기] 버튼을 따로 두므로 Edge 기본 눈 모양만 숨긴다. */
+.password-field input::-ms-reveal {
+  display: none;
+}
+
 /* 비밀번호 규칙 — 지킨 규칙은 초록 */
 .password-rules {
   display: flex;

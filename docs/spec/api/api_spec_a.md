@@ -3,7 +3,7 @@
 > A팀(우찬·경환) API의 요청·응답 상세다. 관리: A팀. 작성 규칙은 [README](README.md) 3장, 전체 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > - **원본:** 우찬 님 「A팀 API 명세 — 반영 요청(11/16)」. develop `bfe6b94`(PR #50·#52·#53 병합 후)의 실제 Spring Controller·DTO에서 뽑은 내용이다. 🆕 11/18 이 파일로 옮겼다(그 전에는 정의서에 요약만 있었다). 그 뒤 코드가 바뀌면 A팀이 이 파일을 고친다.
-> - 🆕 최근 변경 (11/26, FP-258): AUTH-01 단계적 로그인 제한(429 `LOGIN_TEMPORARILY_BLOCKED`, 10회 잠금), AUTH-09 휴대폰·이메일 인증 필수와 `loginId` 응답, AUTH-08·10 `name` 추가, 인증 목적 `FIND_ID`(DDL C16)
+> - 🆕 최근 변경 (11/26, FP-258): AUTH-01 단계적 로그인 제한(429 `LOGIN_TEMPORARILY_BLOCKED`, 10회 잠금), AUTH-09 휴대폰·이메일 인증 필수와 `loginId` 응답, AUTH-08·10 `name` 추가, 인증 목적 `FIND_ID`(DDL C16). 2차: 이메일 규칙 통일·소문자 저장(AUTH-06·07·08·09·10, MEM-03), AUTH-08(재설정)·09·10 이름 형식 400 `name` 칸, AUTH-01 아이디 소문자 조회
 > - 최근 변경 (11/23, FP-222): MEM-08 닉네임 변경 추가(`SAME_NICKNAME` 추가), MEM-04가 400 `SAME_PASSWORD`를 실제로 돌려줌
 > - 최근 변경 (11/19, FP-227): 자산 4종 저장(DDL C13). INP-02 요청 본문 모양은 바뀌지 않고, INP-01이 저장된 4종을 그대로 돌려준다
 > - 최근 변경 (11/19, FP-227): MEM-05 저장 전 직군 변경 허용(`JOB_TYPE_LOCKED` 추가)
@@ -42,9 +42,9 @@
 | AUTH-05 | `POST /api/auth/social/link` | `{ linkKey, loginId, password }` | `{ accessToken, user }` | 없음 | ✅ |
 | AUTH-06 | `POST /api/auth/signup` | `{ loginId, name, nickname, phone, email, password, birthYear, ageGroup, agreeCreditInfo, agreeMarketing, emailVerificationToken, socialLinkKey, phoneVerificationToken }` 🆕 11/18 | `{ userId }` | 없음 | ✅ (🆕 11/18 `phoneVerificationToken` 필수, 아래 설명) |
 | AUTH-07 | `POST /api/auth/email/send` | `{ email, purpose, loginId }` | `{ expiresInSeconds }` | 없음 | ✅ 🆕 11/26 `purpose`에 `FIND_ID`(가입 여부와 상관없이 보냄) |
-| AUTH-08 | `POST /api/auth/email/verify` | `{ email, code, purpose, loginId, name }` 🆕 11/26 | `{ verificationToken }` | 없음 | ✅ 🆕 11/26 `RESET_PASSWORD`는 아이디·이메일·이름이 같은 계정만(아니면 404), `FIND_ID`는 계정을 보지 않음 |
-| AUTH-09 | `POST /api/auth/find-id` | `{ method, name, phone, email, verificationToken }` 🆕 11/26 | `{ maskedLoginId, loginId }` 🆕 11/26 | 없음 | ✅ (관리자 계정은 찾지 않음) 🆕 11/26 FP-258 `method` `PHONE`이면 `phone` + AUTH-15 토큰, `EMAIL`이면 `email` + AUTH-08 토큰(둘 다 목적 `FIND_ID`). 방법이 틀리면 400 `INVALID_INPUT`(`method` 칸), 토큰이 없으면 가입과 같은 400(휴대폰 `phone` 칸·이메일 `EMAIL_VERIFICATION_REQUIRED`). 이름이 같은 일반 회원이 없으면 404(토큰은 쓰지 않은 채 남음) |
-| AUTH-10 | `POST /api/auth/password/reset` | `{ loginId, name, email, emailVerificationToken, newPassword }` 🆕 11/26 | `{}` | 없음 | ✅ (관리자 아이디는 "없는 계정"과 같은 404) 🆕 11/26 아이디·이메일·이름이 같은 계정만, 아니면 같은 404 |
+| AUTH-08 | `POST /api/auth/email/verify` | `{ email, code, purpose, loginId, name }` 🆕 11/26 | `{ verificationToken }` | 없음 | ✅ 🆕 11/26 `RESET_PASSWORD`는 아이디·이메일·이름이 같은 계정만(아니면 404), `FIND_ID`는 계정을 보지 않음. 🆕 11/26 2차 `RESET_PASSWORD`는 이름 형식(가입과 같은 규칙)을 코드보다 먼저 보고 틀리면 400 `INVALID_INPUT`(`name` 칸) |
+| AUTH-09 | `POST /api/auth/find-id` | `{ method, name, phone, email, verificationToken }` 🆕 11/26 | `{ maskedLoginId, loginId }` 🆕 11/26 | 없음 | ✅ (관리자 계정은 찾지 않음) 🆕 11/26 FP-258 `method` `PHONE`이면 `phone` + AUTH-15 토큰, `EMAIL`이면 `email` + AUTH-08 토큰(둘 다 목적 `FIND_ID`). 방법이 틀리면 400 `INVALID_INPUT`(`method` 칸), 토큰이 없으면 가입과 같은 400(휴대폰 `phone` 칸·이메일 `EMAIL_VERIFICATION_REQUIRED`). 이름이 같은 일반 회원이 없으면 404(토큰은 쓰지 않은 채 남음). 🆕 11/26 2차 이름 형식이 틀리면 맨 먼저 400 `INVALID_INPUT`(`name` 칸) |
+| AUTH-10 | `POST /api/auth/password/reset` | `{ loginId, name, email, emailVerificationToken, newPassword }` 🆕 11/26 | `{}` | 없음 | ✅ (관리자 아이디는 "없는 계정"과 같은 404) 🆕 11/26 아이디·이메일·이름이 같은 계정만, 아니면 같은 404. 2차 이름 형식이 틀리면 맨 먼저 400 `INVALID_INPUT`(`name` 칸) |
 | AUTH-11 | `POST /api/auth/admin/verify-code` | `{ challengeToken, code }` | 통과: `{ token, user, passwordChangeRequired: false }`<br>임시 비밀번호: `{ passwordChangeRequired: true, passwordSetupToken }` | 없음(challengeToken) | ✅ |
 | AUTH-12 🟡 | `POST /api/auth/admin/password-setup` | `{ passwordSetupToken, newPassword }` | `{ token, user }` | 없음(setup 토큰) | ✅ |
 | AUTH-13 | `POST /api/auth/nickname/check` | `{ nickname }` | `{ available }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) |
@@ -60,6 +60,11 @@
   - `phone`: 필수. 비면 `휴대폰 번호를 입력해 주세요.`, 형식이 틀리면 형식 오류 문구가 온다. `phoneVerificationToken`이 없거나 다른 번호·다른 목적·이메일용 토큰이거나 이미 쓴 토큰이면 `phone` 칸 `휴대폰 인증을 완료해 주세요.`
   - `birthYear`: 화면에서 고른 생일의 연도다. 생일(월·일)은 보내지도 저장하지도 않는다.
 - 🆕 11/18 **AUTH-13 닉네임 중복 확인**: 닉네임을 주소에 남기지 않으려고 POST로 받는다. 형식이 틀리면 400 `INVALID_INPUT`(`nickname` 칸). 결과는 안내용이고, 가입 때 서버가 다시 막는다(409 `DUPLICATE_NICKNAME`).
+- 🆕 11/26 **FP-258 2차 이메일 규칙**(AUTH-06·07·08·09·10, MEM-03 공통): 앞뒤 공백을 빼고 소문자로 바꾼 뒤 판정·저장한다(`EMAIL_ENC`도 소문자).
+  - 앞부분은 영문 소문자·숫자·`.`·`_`·`-`(64자)이고, 처음·끝은 영문·숫자, 점 연속은 안 된다.
+  - 도메인은 점으로 나눈 덩어리마다 영문·숫자로 시작·끝(가운데 `-` 가능)하고, 마지막은 영문 2자 이상이다. 전체는 100자 이하.
+  - 틀리면 지금처럼 400이다.
+  - AUTH-01·08·10의 `loginId`는 앞뒤 공백을 빼고 소문자로 바꿔 조회한다.
 - 🆕 11/18 **AUTH-14·15 휴대폰 인증번호**: 이메일 인증(AUTH-07·08)과 같은 모양이다.
   - `purpose`는 `SIGNUP`만 받는다(다르면 400 `INVALID_INPUT`, `purpose` 칸). 번호 형식이 틀리면 400 `INVALID_INPUT`(`phone` 칸).
   - 6자리 번호, 유효 300초, 5회 틀리면 그 번호는 쓸 수 없다. 틀림·만료·5회 초과는 모두 400 `INVALID_VERIFICATION_CODE`(`인증번호가 올바르지 않거나 만료되었습니다.`).
@@ -72,7 +77,7 @@
 |---|---|---|---|---|
 | MEM-01 | `GET /api/members/me/profile` | — | `{ profile: { loginId, nickname, name, phone, email, joinedAt, jobType } }` (마스킹) | ✅ |
 | MEM-02 | `POST /api/members/me/profile/unmask` | `{ password }` | `{ profile: { name, phone, email } }` | ✅ |
-| MEM-03 | `PUT /api/members/me/email` | `{ email, emailVerificationToken }` | `{}` | ✅ |
+| MEM-03 | `PUT /api/members/me/email` | `{ email, emailVerificationToken }` | `{}` | ✅ 🆕 11/26 FP-258 2차 이메일은 앞뒤 공백을 빼고 소문자로 바꿔 판정·저장(규칙은 AUTH-06과 같음) |
 | MEM-04 | `PUT /api/members/me/password` | `{ currentPassword, newPassword }` | `{}` | ✅ (ROLE_USER 전용) |
 | MEM-05 | `PATCH /api/members/me/job-type` | `{ jobType }` | `{ user }` | ✅ 🆕 11/19 FP-227 입력 저장 전에는 다시 고를 수 있다. 비어 있으면 저장 · 같은 직군이면 바꾸지 않고 200 · 다른 직군이면 저장한 데이터 입력(`USER_ASSET_SNAPSHOT`, 기준월 무관)도 평가(`ASSESSMENT`)도 없을 때만 바꾼다. 하나라도 있으면 409 `JOB_TYPE_LOCKED`. 동시에 바뀌어 반영하지 못하면 409 `JOB_TYPE_ALREADY_SELECTED` |
 | MEM-06 | `GET /api/members/me/diagnoses` | — | [B팀 명세서](api_spec_b.md) 3-4 | ↗ B팀(범영) 구현 완료(FP-142), A팀 화면 연결됨 🆕 11/18 |

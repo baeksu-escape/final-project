@@ -102,6 +102,15 @@ class AuthServiceTest {
         verify(userMapper).updateLoginSuccess(eq(7L), any());
     }
 
+    // FP-258 2차 로그인 아이디는 앞뒤 공백을 빼고 소문자로 바꿔 조회한다(시드 demo_employee처럼 밑줄이 있는 아이디 포함).
+    @Test
+    void 로그인_아이디는_대문자로_입력해도_소문자로_조회한다() {
+        given(userMapper.selectByLoginId("demo_employee")).willReturn(UserFixtures.user(7L, "demo_employee"));
+        AuthResponses.Login result = (AuthResponses.Login) service.login(new AuthRequests.Login(" Demo_Employee ", PASSWORD));
+        assertThat(tokenProvider.parse(result.accessToken())).isPresent();
+        verify(userMapper).selectByLoginId("demo_employee");
+    }
+
     @Test
     void 비밀번호가_틀리면_401이고_실패_횟수를_올린다() {
         given(userMapper.selectByLoginId("employee")).willReturn(UserFixtures.user(7L, "employee"));
@@ -268,11 +277,12 @@ class AuthServiceTest {
         UserAccount account = saved.getValue();
         assertThat(account.getNickname()).isEqualTo("새닉네임");
         assertThat(account.getNameEnc()).startsWith("v1:").doesNotContain("홍길동");
-        assertThat(CRYPTO.decrypt(account.getEmailEnc())).isEqualTo("Newbie@Example.com");
+        // FP-258 2차 대문자로 보낸 이메일(Newbie@Example.com)은 소문자로 바꿔 암호문·HMAC·토큰 확인에 쓴다.
+        assertThat(CRYPTO.decrypt(account.getEmailEnc())).isEqualTo("newbie@example.com");
         assertThat(account.getEmailHmac()).isEqualTo(HMAC.email("newbie@example.com"));
         assertThat(account.getPhoneHmac()).isEqualTo(HMAC.phone("01012345678"));
         assertThat(ENCODER.matches("abcd1234", account.getPasswordHash())).isTrue();
-        verify(emailVerification).consume("token", EmailPurpose.SIGNUP, "Newbie@Example.com", null);
+        verify(emailVerification).consume("token", EmailPurpose.SIGNUP, "newbie@example.com", null);
         verify(phoneVerification).consume(PHONE_TOKEN, PhonePurpose.SIGNUP, "01012345678");
         verify(consentMapper).insertSignupConsent(eq(100L), eq("TERMS_OF_SERVICE"), eq("Y"), eq("Y"), any(), any());
         verify(consentMapper).insertSignupConsent(eq(100L), eq("PRIVACY_COLLECTION"), eq("Y"), eq("Y"), any(), any());
@@ -394,6 +404,18 @@ class AuthServiceTest {
                 .when(phoneVerification).consume(any(), any(), any());
     }
 
+    // FP-258 2차 이메일 규칙 — 한글·기호·점 연속·처음/끝 점·밑줄 도메인·숫자 최상위 도메인은 email 칸 400이고 가입하지 않는다.
+    @Test
+    void 한글이나_규칙에_맞지_않는_이메일은_가입_email_칸_오류() {
+        for (String email : new String[] { "홍길동@example.com", "a..b@example.com", ".ab@example.com", "ab.@example.com", "a+b@example.com",
+                "ab@ex_ample.com", "ab@-example.com", "ab@example.c", "ab@example.c1", "ab@example" }) {
+            AuthRequests.Signup request = new AuthRequests.Signup("newbie01", "홍길동", "새닉네임", PHONE, email, "abcd1234", 1990, "AGE_30S",
+                    true, null, "token", null, PHONE_TOKEN);
+            assertThat(fieldOf(() -> service.signup(request))).as(email).isEqualTo("email");
+        }
+        verify(userMapper, never()).insertUser(any());
+    }
+
     @Test
     void 이름은_완성형_한글_2에서_20자만_통과한다() {
         givenInsertReturnsId(100L);
@@ -486,16 +508,43 @@ class AuthServiceTest {
                 .isInstanceOf(ApiException.class);
     }
 
-    // FP-258 아이디·이메일이 맞아도 이름이 다르거나 없으면 같은 404이고, 인증 토큰을 쓰지 않는다.
+    // FP-258 아이디·이메일이 맞아도 이름이 다르면 같은 404이고, 인증 토큰을 쓰지 않는다(이름이 없거나 형식이 틀리면 2차부터 400, 아래 시험).
     @Test
     void 재설정은_이름까지_같아야_하고_다르면_404() {
         given(userMapper.selectUserByLoginIdAndEmailHmac("employee", HMAC.email("employee@example.com"))).willReturn(UserFixtures.user(7L, "employee"));
         assertThat(codeOf(() -> service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "newpass99", "김철수"))))
                 .isEqualTo("404 ACCOUNT_NOT_FOUND");
-        assertThat(codeOf(() -> service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "newpass99", null))))
-                .isEqualTo("404 ACCOUNT_NOT_FOUND");
         verify(emailVerification, never()).consume(anyString(), any(), anyString(), anyLong());
         verify(userMapper, never()).updatePasswordAndUnlock(anyLong(), anyString(), any());
+    }
+
+    // FP-258 2차 찾기 화면의 이름은 가입과 같은 규칙 — 형식이 틀리거나 없으면 400 name 칸이고, 계정을 찾거나 토큰을 쓰지 않는다.
+    @Test
+    void 아이디_찾기와_재설정의_이름_형식이_틀리면_400_name_칸() {
+        for (String name : new String[] { "hong", "홍길동1", "홍 길동", "ㄱㄴ", "홍", "" }) {
+            assertThat(fieldOf(() -> service.findId(new AuthRequests.FindId(name, "010-1234-5678", "PHONE", null, "phone-token")))).as(name)
+                    .isEqualTo("name");
+            assertThat(fieldOf(() -> service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "newpass99", name))))
+                    .as(name).isEqualTo("name");
+        }
+        assertThat(fieldOf(() -> service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "newpass99", null))))
+                .isEqualTo("name");
+        verify(phoneVerification, never()).consume(anyString(), any(), anyString());
+        verify(userMapper, never()).selectUsersByPhoneHmac(anyString());
+        verify(userMapper, never()).selectUserByLoginIdAndEmailHmac(anyString(), anyString());
+        verify(emailVerification, never()).consume(anyString(), any(), anyString(), anyLong());
+    }
+
+    // FP-258 2차 아이디 찾기·재설정의 이메일과 재설정 아이디는 앞뒤 공백을 빼고 소문자로 바꿔 찾는다.
+    @Test
+    void 찾기와_재설정은_대문자_이메일과_아이디를_소문자로_바꿔_찾는다() {
+        given(userMapper.selectUserByEmailHmac(HMAC.email("jwc1226@example.com"))).willReturn(UserFixtures.user(7L, "jwc1226"));
+        service.findId(new AuthRequests.FindId("홍길동", null, "EMAIL", " JWC1226@Example.COM ", "email-token"));
+        verify(emailVerification).consume("email-token", EmailPurpose.FIND_ID, "jwc1226@example.com", null);
+
+        given(userMapper.selectUserByLoginIdAndEmailHmac("employee", HMAC.email("employee@example.com"))).willReturn(UserFixtures.user(7L, "employee"));
+        service.resetPassword(new AuthRequests.PasswordReset(" Employee ", "Employee@Example.com", "token", "newpass99", "홍길동"));
+        verify(emailVerification).consume("token", EmailPurpose.RESET_PASSWORD, "employee@example.com", 7L);
     }
 
     // FP-80 관리자는 공개 비밀번호 찾기(AUTH-10)·아이디 찾기(AUTH-09)를 쓸 수 없다 — 조회가 일반 회원만 찾으므로 "없는 계정"과 같은 응답이다.
