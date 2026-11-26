@@ -6,6 +6,8 @@ import com.baeksuescape.finance.util.IncomeVolatilityCalculator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
 
@@ -96,7 +98,9 @@ public class IncomeVolatilityService {
     /**
      * N-21-1·N-21-5~7 저장된 소득·월 지출 합계·월 원리금에 전망 조건을 적용해 현금흐름을 전망한다.
      * 기준 소득은 최근 12개월 평균이고, 전망은 마지막 입력월 다음 달부터 시작한다.
+     * 합계와 항목 목록을 따로 조회하므로, 다른 기기에서 동시에 저장해도 모든 조회가 같은 시점의 데이터를 보게 SERIALIZABLE 읽기 전용 트랜잭션으로 묶는다(읽기만 해서 쓰기 충돌은 없다).
      */
+    @Transactional(readOnly = true, isolation = Isolation.SERIALIZABLE)
     public CashFlowForecastResponse forecastSavedCashFlow(long userId, CashFlowConditionRequest condition) {
         // 1) 조건을 하나도 안 보내면 모든 변화율 0, 기간 6개월로 본다.
         CashFlowConditionRequest cond = condition != null ? condition : new CashFlowConditionRequest();
@@ -137,6 +141,9 @@ public class IncomeVolatilityService {
         response.setBaseFixedExpenseAmount(storedFixedExpense);
         response.setBaseOtherExpenseAmount(monthlyTotalExpense - storedFixedExpense);
         response.setBaseMonthlyLoanPayment(monthlyLoanPayment);
+        // N-21-3·5 기타 지출·대출의 항목별 내역(합이 위 두 기준값과 같다). 항목이 없으면 빈 리스트다.
+        response.setBaseOtherExpenseItems(orEmpty(incomeVolatilityMapper.selectLatestOtherExpenseItems(userId)));
+        response.setBaseLoanItems(orEmpty(incomeVolatilityMapper.selectLatestLoanItems(userId)));
         return response;
     }
 
@@ -185,6 +192,11 @@ public class IncomeVolatilityService {
             history.add(toItem(row.getYearMonth(), row.getIncome(), monthlyExpense));
         }
         return history;
+    }
+
+    /** 조회 결과가 null이면 빈 리스트로 바꾼다(항목 목록은 항상 배열로 내려간다). */
+    private static <T> List<T> orEmpty(List<T> items) {
+        return items == null ? List.of() : items;
     }
 
     /** 기준월·소득·지출 값을 계산 입력 단위(MonthlyIncomeItem) 하나로 만든다. */

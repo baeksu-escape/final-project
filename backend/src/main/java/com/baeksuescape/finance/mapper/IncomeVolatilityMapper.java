@@ -1,5 +1,6 @@
 package com.baeksuescape.finance.mapper;
 
+import com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse;
 import com.baeksuescape.finance.dto.cashflow.IncomeMonthRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -24,4 +25,10 @@ public interface IncomeVolatilityMapper {
 
     /** 최신 기준월의 월 원리금 합계. 대출이 없으면 0 */
     long selectLatestLoanMonthlyPayment(@Param("userId") long userId);
+
+    /** N-21-3 소득 기준월의 기타 지출(FIXED 제외) 항목. 금액 큰 순, 같으면 저장 순. 없으면 빈 리스트 */
+    List<CashFlowForecastResponse.BaseOtherExpenseItem> selectLatestOtherExpenseItems(@Param("userId") long userId);
+
+    /** N-21-5 소득 기준월의 대출별 월 원리금(종류 이름 포함), 대출 번호 순. 없으면 빈 리스트 */
+    List<CashFlowForecastResponse.BaseLoanItem> selectLatestLoanItems(@Param("userId") long userId);
 }

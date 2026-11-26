@@ -15,6 +15,15 @@ import {
   SAMPLE_MEMBER_FINANCIAL_HEALTH,
 } from './diagnosisMockData.js'
 
+// N-21-3 월 지출 구성 mock 예시 — 할부·정기결제에는 분류가 빈 항목 1개를 넣어 화면의 이름 규칙이 보이게 한다.
+const MOCK_OTHER_EXPENSE_ITEMS = [
+  { expenseGroupCode: 'INSTALLMENT', expenseCategory: 'INSTALLMENT', description: '노트북', monthlyAmount: 150000 },
+  { expenseGroupCode: 'SUBSCRIPTION', expenseCategory: 'SUBSCRIPTION', description: '넷플릭스', monthlyAmount: 15000 },
+  { expenseGroupCode: 'SUBSCRIPTION', expenseCategory: null, description: '', monthlyAmount: 9000 },
+]
+// 대출 목록은 같은 mock 회원의 자산·부채·시나리오 mock 대출(SAMPLE_MEMBER_FINANCIAL_HEALTH)과 같은 종류·월 상환액·순서다(월 35만 원).
+const MOCK_LOAN_ITEMS = SAMPLE_MEMBER_FINANCIAL_HEALTH.loans.map(({ loanId, loanTypeName, monthlyPaymentAmount }) => ({ loanId, loanTypeName, monthlyPaymentAmount }))
+
 // N-20-4 DSR(연소득 대비 연원리금 상환비율) 및 위험 단계 계산
 function handleDsrCalculate({ body }) {
   const annualIncome = Number(body?.annualIncome ?? 0)
@@ -169,7 +178,11 @@ function handleCashFlowForecast({ query, token }) {
     throw invalid('paymentStatus', '납부 상태를 선택해 주세요.')
   }
 
-  const { baseMonthlyIncome, monthlyTotalExpense, monthlyFixedExpense, monthlyLoanPayment } = SAMPLE_CASH_FLOW_BASE
+  // N-21-3 월 지출 구성 예시(서버 정렬 규칙대로: 할부·정기결제는 금액 큰 순, 대출은 LOAN_ID 순). 기타 지출·월 원리금은 이 목록의 합이다.
+  const { baseMonthlyIncome, monthlyFixedExpense } = SAMPLE_CASH_FLOW_BASE
+  const monthlyOtherExpense = MOCK_OTHER_EXPENSE_ITEMS.reduce((sum, item) => sum + item.monthlyAmount, 0)
+  const monthlyLoanPayment = MOCK_LOAN_ITEMS.reduce((sum, item) => sum + item.monthlyPaymentAmount, 0)
+  const monthlyTotalExpense = monthlyFixedExpense + monthlyOtherExpense
   // 고정지출을 보내면 저장된 고정지출(FIXED) 자리만 그 값으로 바꾼다.
   const baseExpense = fixedExpenseAmount === null ? monthlyTotalExpense : fixedExpenseAmount + (monthlyTotalExpense - monthlyFixedExpense)
   const forecastExpense = Math.round(baseExpense * (1 + expenseChangePercent / 100))
@@ -227,6 +240,9 @@ function handleCashFlowForecast({ query, token }) {
     baseFixedExpenseAmount: monthlyFixedExpense,
     baseOtherExpenseAmount: monthlyTotalExpense - monthlyFixedExpense,
     baseMonthlyLoanPayment: monthlyLoanPayment,
+    // N-21-3 월 지출 구성 목록 — 실제 응답처럼 항목 합이 위 기타 지출·월 원리금과 같다.
+    baseOtherExpenseItems: MOCK_OTHER_EXPENSE_ITEMS,
+    baseLoanItems: MOCK_LOAN_ITEMS,
   }
 }
 
