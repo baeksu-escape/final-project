@@ -8,9 +8,9 @@
 .sc-warn { color: var(--warn); }
 .sc-num { font-variant-numeric: tabular-nums; text-align: right; }
 .sc-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 18px; align-items: stretch; }
-/* (시안 5차) 카드 제목 줄 오른쪽 [초기화] — 카드 안쪽 여백(28px)에 맞춰 둔다. */
-.sc-controls { position: relative; }
-.sc-reset { position: absolute; top: 28px; right: 28px; padding: 2px 4px; border: 0; background: transparent; color: var(--fg2); font: inherit; font-size: 13.5px; cursor: pointer; }
+/* (시안 6차) 카드 안쪽 여백을 공통 28px보다 줄이고, 제목 줄 오른쪽 [초기화]도 같은 여백(20px)에 맞춘다. */
+.sc-controls { position: relative; padding: 20px; }
+.sc-reset { position: absolute; top: 20px; right: 20px; padding: 2px 4px; border: 0; background: transparent; color: var(--fg2); font: inherit; font-size: 13.5px; cursor: pointer; }
 .sc-reset:hover { color: var(--acc); }
 .sc-controls .card__body { display: grid; gap: 10px; }
 .sc-group { display: grid; gap: 6px; }
@@ -43,6 +43,8 @@
 .sc-chips .sc-preset { min-height: 34px; padding: 4px 14px; border-radius: 999px; text-align: center; }
 .sc-row-field { display: grid; gap: 6px; padding-top: 10px; }
 .sc-calc { display: grid; gap: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+/* (시안 6차) 최악·최적 버튼은 카드 너비를 반씩 나눠 쓴다. */
+.sc-calc .sc-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sc-row-field__help { margin-top: -2px; }
 .sc-detail { margin-top: 18px; }
 .sc-detail__title { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--fg2); }
