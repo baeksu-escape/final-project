@@ -26,7 +26,7 @@ export default function ScenarioResult({ result, assumptions, stale, calcError }
   return (
     <Card title="결과" className="sc-result">
       {/* 안내가 나타나도 화면이 밀리지 않게 자리를 둔다. */}
-      <p className="sc-warn" aria-live="polite">{calcError ? '계산하지 못해 이전 조건 결과를 보여 주고 있어요.' : stale ? '위 결과는 이전 조건 기준이에요. 계산이 끝나면 바뀌어요.' : ' '}</p>
+      <p className="sc-warn" aria-live="polite">{calcError ? '계산하지 못해 이전 조건 결과를 보여 주고 있어요.' : stale ? '아래 결과는 이전 조건 기준이에요. 왼쪽 [예상 시나리오 계산하기]를 누르면 바뀌어요.' : ' '}</p>
       <Answer result={result} />
       <div className="sc-pair">
         <div className="sc-kpi">

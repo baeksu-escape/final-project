@@ -38,7 +38,7 @@
 .sc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .sc-chips .sc-preset { min-height: 34px; padding: 4px 14px; border-radius: 999px; text-align: center; }
 .sc-row-field { display: grid; gap: 6px; padding-top: 10px; }
-.sc-row-field .number-input .form-field__label, .sc-row-field .money-input .form-field__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sc-calc { display: grid; gap: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
 .sc-row-field__help { margin-top: -2px; }
 .sc-detail { margin-top: 18px; }
 .sc-detail__title { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--fg2); }

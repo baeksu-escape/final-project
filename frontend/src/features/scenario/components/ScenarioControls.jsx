@@ -17,7 +17,8 @@ const changeText = (pct) => {
 // 월 소득·월 지출: 슬라이더 + 금액(원) 직접 입력 — 금액을 넣으면 지금 금액 대비 퍼센트로 바꿔 서버에 보낸다(서버는 퍼센트를 받는다).
 // 대출 금리: 슬라이더 + %p 칸, 아래에 이자가 한 달에 얼마 바뀌는지 미리보기(정확한 값은 결과 카드의 서버 계산).
 // 슬라이더를 움직이면 상황 선택이 풀린다.
-export default function ScenarioControls({ values, presetId, inputError, calcError, variableLoanBalanceAmount, baseline, onChange, onSelect, onRetry }) {
+// (시안 4차) 자동 계산 대신 카드 맨 아래 [예상 시나리오 계산하기]를 눌러 계산한다. 입력칸은 공통 컴포넌트 모양(라벨 위·칸 전체 너비) 그대로 쓴다.
+export default function ScenarioControls({ values, presetId, inputError, calcError, variableLoanBalanceAmount, baseline, stale, calculating, onChange, onSelect, onRetry, onCalculate }) {
   return (
     <Card title="예상 시나리오" className="sc-controls">
       <div className="sc-chips" role="group" aria-label="상황 고르기">
@@ -45,7 +46,7 @@ export default function ScenarioControls({ values, presetId, inputError, calcErr
           return (
             <div key={field.key} className="sc-row-field">
               {slider}
-              <MoneyInput label={`${field.label} 금액으로 입력`} value={amount}
+              <MoneyInput label="금액 직접 입력" value={amount}
                 error={outOfRange ? `${won(min)}~${won(max)}` : undefined}
                 onChange={(v) => onChange(field.key, v === null ? null : pctFromAmount(base, v))} />
               <span className="sc-hint sc-row-field__help">
@@ -61,7 +62,7 @@ export default function ScenarioControls({ values, presetId, inputError, calcErr
           <div key={field.key} className="sc-row-field">
             {/* 직접 입력 값이 슬라이더 범위를 넘으면 슬라이더는 끝에 두고 실제 값은 숫자 칸에 그대로 둔다. */}
             {slider}
-            <NumberInput label={`${field.label} 숫자로 입력 (${field.inputMin}~${field.inputMax}${field.unit})`} min={field.inputMin} max={field.inputMax} step={field.step} unit={field.unit}
+            <NumberInput label={`직접 입력 (${field.inputMin}~${field.inputMax}${field.unit})`} min={field.inputMin} max={field.inputMax} step={field.step} unit={field.unit}
               value={value} onChange={(v) => {
                 // N-17-2 직접 입력이 범위를 넘으면 경계값으로 맞추고, 빈칸은 다시 입력할 수 있도록 허용한다.
                 if (v === null) onChange(field.key, null)
@@ -85,6 +86,14 @@ export default function ScenarioControls({ values, presetId, inputError, calcErr
             : `금리 변화는 변동금리 대출 ${variableLoanBalanceAmount.toLocaleString('ko-KR')}원에만 적용돼요.`)}
         {calcError && <> <Button size="sm" onClick={onRetry}>다시 시도</Button></>}
       </p>
+      <div className="sc-calc">
+        <Button variant="primary" onClick={onCalculate} disabled={Boolean(inputError) || calculating}>
+          {calculating ? '계산하는 중…' : '예상 시나리오 계산하기'}
+        </Button>
+        <span className={stale ? 'sc-hint sc-warn' : 'sc-hint'} role="status" aria-live="polite">
+          {inputError ? '입력값을 고치면 계산할 수 있어요.' : stale ? '조건이 바뀌었어요. 버튼을 눌러 계산해 보세요.' : '지금 조건으로 계산한 결과예요.'}
+        </span>
+      </div>
     </Card>
   )
 }

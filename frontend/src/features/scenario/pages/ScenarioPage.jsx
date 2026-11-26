@@ -17,11 +17,12 @@ export default function ScenarioPage() {
     <div className="sc-page">
       <header className="sc-heading">
         <h1>시나리오 테스트</h1>
-        <p>금리가 오르거나 소득이 줄면 한 달에 얼마가 남을까요? 상황을 고르거나 값을 움직이면 바로 계산해요.</p>
+        <p>금리가 오르거나 소득이 줄면 한 달에 얼마가 남을까요? 상황을 고르거나 값을 바꾼 뒤 [예상 시나리오 계산하기]를 눌러 보세요.</p>
       </header>
       <div className="sc-layout">
         <ScenarioControls values={sc.values} presetId={sc.presetId} inputError={sc.inputError || sc.calcError} calcError={sc.inputError ? '' : sc.calcError} variableLoanBalanceAmount={sc.baseline?.variableLoanBalanceAmount ?? null}
-          baseline={sc.baseline} onChange={sc.setValue} onSelect={sc.selectPreset} onRetry={sc.retry} />
+          baseline={sc.baseline} stale={sc.stale} calculating={sc.calculating}
+          onChange={sc.setValue} onSelect={sc.selectPreset} onRetry={sc.retry} onCalculate={sc.calculate} />
         {sc.result ? <ScenarioResult result={sc.result} assumptions={sc.result.assumptions ?? sc.baseline?.assumptions ?? []} stale={sc.stale} calcError={sc.calcError} />
           : <Card title="결과" className="sc-result"><Notice type="warn">{sc.calcError || '시나리오를 계산하고 있습니다.'}</Notice></Card>}
       </div>
