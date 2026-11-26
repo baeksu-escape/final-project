@@ -388,5 +388,132 @@ class EvaluationSmokeTests(unittest.TestCase):
         self.assertIn("CUT-0.3", text)
 
 
+C34_ROW = next(line for line in DEFINITION.splitlines() if line.startswith("| C34 |"))
+C35_ROW = next(line for line in DEFINITION.splitlines() if line.startswith("| C35 |"))
+
+
+class Plan03CriteriaTests(unittest.TestCase):
+    def test_ranges_match_c35_text_and_reference_values_match_c34(self):
+        for pair, (reference, low, high) in fte.C35_CRITERIA.items():
+            with self.subTest(pair=pair):
+                self.assertIn(f"{reference:.4f}이면 {low:.4f}~{high:.4f}", C35_ROW)
+                self.assertIn(f"{reference:.4f}", C34_ROW)
+                self.assertAlmostEqual(high - reference, 0.02)
+                self.assertAlmostEqual(reference - low, 0.02)
+
+    def test_plan_settings(self):
+        self.assertEqual(fte.PLAN_03.version, "LGBM-BASE-0.3")
+        self.assertEqual(fte.PLAN_03.diff_limit, 0.02)
+        self.assertIn("−0.02에서 +0.02", C35_ROW)
+        self.assertEqual(fte.PLAN_03.monotone, config.MONOTONE_CONSTRAINTS_V03)
+        self.assertEqual(fte.PLAN_02.monotone, config.MONOTONE_CONSTRAINTS)
+        self.assertEqual(fte.PLAN_02.criteria, fte.C26_CRITERIA)
+        self.assertNotEqual(fte.PLAN_03.stem, fte.PLAN_02.stem)
+        self.assertEqual(fte.PLAN_03.record_name, "final_test_eval_run_v03.json")
+        self.assertIsNone(fte.PLAN_02.record_name)
+        for name in (fte.PLAN_03.record_name, f"{fte.PLAN_03.stem}.json", f"{fte.PLAN_03.stem}.md"):
+            self.assertIn(f"docs/spec/{name}", fte.RUN_OUTPUT_PATHS)
+
+    def test_cut_0_4_candidate_matches_c34_and_covers_all_scores(self):
+        self.assertIn("CAUTION ≤645, GOOD ≥711", C34_ROW)
+        bands = fte.CUT_0_4_BANDS
+        self.assertEqual((bands[0]["minScore"], bands[0]["maxScore"], bands[2]["minScore"], bands[2]["maxScore"]), (0, 645, 711, 1000))
+        self.assertTrue(all(a["maxScore"] + 1 == b["minScore"] for a, b in zip(bands, bands[1:])))
+        ratio = fte.grade_ratio([0, 645, 646, 710, 711, 1000], bands)
+        self.assertEqual([ratio[code]["count"] for code in ("CAUTION", "STANDARD", "GOOD")], [2, 2, 2])
+
+    def test_judgement_uses_the_plan(self):
+        pair = ("legacy", "delinq")
+        self.assertEqual(fte.judge_range(pair, 0.6549, fte.PLAN_03), "범위 안")
+        self.assertEqual(fte.judge_range(pair, 0.6950, fte.PLAN_03), "범위 밖(높음)")
+        self.assertEqual(fte.judge_range(pair, 0.6548, fte.PLAN_03), "범위 밖(낮음)")
+        self.assertEqual(fte.judge_diff("delinq", -0.02, fte.PLAN_03), "차이 없음(±0.02 안)")
+        self.assertEqual(fte.judge_diff("delinq", 0.021, fte.PLAN_03), "대안 높음(+0.02 초과)")
+
+    def test_reference_check(self):
+        group = {"five_seed_auc": {fte.pair_key(pair): {"mean": values[0]} for pair, values in fte.C35_CRITERIA.items()}}
+        self.assertEqual(set(fte.reference_check(group, fte.PLAN_03).values()), {"같음"})
+        group["five_seed_auc"]["legacy_delinq"] = {"mean": 0.6700}
+        self.assertEqual(fte.reference_check(group, fte.PLAN_03)["legacy_delinq"], "다름(0.67)")
+
+
+class VerifyRecordedTests(unittest.TestCase):
+    """모델 0.3 파일을 정의서 C34에 적은 해시와 비교하는 검사. 가짜 파일·가짜 정의서로 확인한다."""
+
+    def build(self, folder: Path, version: str = "LGBM-BASE-0.3", wrong_file: bool = False, wrong_table: bool = False, wrong_meta_table: bool = False):
+        table = folder / "table.csv"
+        table.write_bytes(b"a,b\n1,2\n")
+        table_sha = hashlib.sha256(table.read_bytes()).hexdigest()
+        parts = []
+        for name in fte.SHIPPED_FILES:
+            meta = {"model_version": version, "data": {"table_sha256": "0" * 64 if wrong_meta_table else table_sha}}
+            body = json.dumps(meta).encode() if name.endswith(".meta.json") else name.encode()
+            (folder / name).write_bytes(body)
+            digest = hashlib.sha256(body).hexdigest()
+            parts.append(f"`{name}` `{'f' * 64 if wrong_file and name == 'legacy.joblib' else digest}`")
+        definition = folder / "definition.md"
+        definition.write_text(f"| C34 | 표 SHA `{'0' * 8 if wrong_table else table_sha[:8]}` " + ", ".join(parts) + " |\n", encoding="utf-8")
+        return table, definition
+
+    def test_matching_files_pass(self):
+        with tempfile.TemporaryDirectory() as folder:
+            table, definition = self.build(Path(folder))
+            hashes = fte.verify_recorded(Path(folder), table, fte.PLAN_03, definition)
+        self.assertEqual(set(hashes), set(fte.SHIPPED_FILES))
+
+    def test_any_mismatch_stops(self):
+        for change in (dict(wrong_file=True), dict(wrong_table=True), dict(wrong_meta_table=True), dict(version="LGBM-BASE-0.2")):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as folder:
+                table, definition = self.build(Path(folder), **change)
+                with self.assertRaises(SystemExit):
+                    fte.verify_recorded(Path(folder), table, fte.PLAN_03, definition)
+
+    def test_real_definition_has_four_hashes_and_table_sha(self):
+        recorded = {match["file"] for match in fte.RECORDED_HASH.finditer(C34_ROW)}
+        self.assertEqual(recorded, set(fte.SHIPPED_FILES))
+        self.assertIsNotNone(fte.RECORDED_TABLE.search(C34_ROW))
+
+
+class Plan03MainTests(unittest.TestCase):
+    def run_test_split(self, folder: Path) -> str:
+        """0.3 TEST 실행을 시도하고 멈춘 이유를 돌려준다. 데이터 폴더가 없어 TEST 행은 읽을 수 없다."""
+        argv = ["final_test_eval", "--version", "0.3", "--split", "TEST", "--confirm-test-once", "--data-dir", str(folder / "없는폴더"), "--model-dir", str(folder)]
+        clean = {"commit": "abc", "working_tree_clean": True, "untracked_files_count": 0, "untracked_files": []}
+        with mock.patch.object(fte, "RUN_RECORD_PATH", folder / "final_test_eval_run.json"), mock.patch.object(fte, "DEFAULT_RESULT_DIR", folder), \
+                mock.patch.object(fte, "git_state", return_value=clean), mock.patch.object(sys, "argv", argv), self.assertRaises(SystemExit) as caught:
+            fte.main()
+        return str(caught.exception)
+
+    def test_record_of_0_2_does_not_block_but_record_of_0_3_does(self):
+        with tempfile.TemporaryDirectory() as folder:
+            folder = Path(folder)
+            (folder / "final_test_eval_run.json").write_text('{"runs": []}', encoding="utf-8")        # 0.2의 실행 기록
+            (folder / "final_test_eval_result.json").write_text("{}", encoding="utf-8")                # 0.2의 결과
+            self.assertIn("학습 표가 없다", self.run_test_split(folder))
+            (folder / "final_test_eval_run_v03.json").write_text('{"runs": []}', encoding="utf-8")
+            self.assertIn("이미 시작했거나", self.run_test_split(folder))
+
+    def test_without_confirm_reads_nothing(self):
+        argv = ["final_test_eval", "--version", "0.3", "--split", "TEST", "--data-dir", "없는폴더", "--model-dir", "없는폴더"]
+        output = io.StringIO()
+        with mock.patch.object(sys, "argv", argv), contextlib.redirect_stdout(output):
+            fte.main()
+        self.assertIn("C35", output.getvalue())
+        self.assertIn("읽지 않고 끝낸다", output.getvalue())
+
+    def test_report_names_the_plan(self):
+        frame = make_frame(200, 5)
+        models = fte.train_models(make_frame(300, 4), fte.PLAN_03)
+        shipped = {pair: models[(*pair, fte.SHIPPED_SEED)] for pair in fte.SHIPPED}
+        result = {"split": "VALID", "model_version": fte.PLAN_03.version, "generated_at": "t", "provenance": {"commit": "abc", "working_tree_clean": True},
+                  "legacy_group": fte.legacy_group_report(frame, models, shipped, fte.PLAN_03),
+                  "thinfile": fte.thinfile_report(frame, models, shipped, fte.PLAN_03),
+                  "reproduction_on_valid": {"legacy_delinq": "같음", "alt_nonfin": "같음"}}
+        text = fte.render_markdown(result, fte.PLAN_03)
+        for expected in ("LGBM-BASE-0.3", "C35", "CUT-0.4 후보", "0~645 / 646~710 / 711~1000", "이전에 본 고객"):
+            self.assertIn(expected, text)
+        self.assertNotIn("C26", text)
+
+
 if __name__ == "__main__":
     unittest.main()

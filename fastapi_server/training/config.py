@@ -93,3 +93,17 @@ MONOTONE_CONSTRAINTS = {
     "income_svc_12m_krw": -1,
     "expense_avg_month_krw": 1,
 }
+
+# 모델 0.3의 단조 제약(정의서 C33, 데이터 v3.7.0). 0.2의 8개에, 새 연체 라벨에 효과를 넣은 방향(모두 +1) 7개를 더한다.
+# --monotone-set v03 옵션으로만 켠다. 0.2를 다시 만들 수 있게 위 목록은 바꾸지 않는다.
+MONOTONE_CONSTRAINTS_V03 = {
+    **MONOTONE_CONSTRAINTS,
+    "debt_balance_krw": 1,
+    "debt_service_current_krw": 1,
+    "L00000001": 1,
+    "L22000900": 1,
+    "LA0099212": 1,
+    "CF1231605": 1,
+    "zero_income_months_svc_12m": 1,
+}
+MONOTONE_SETS = {"v02": MONOTONE_CONSTRAINTS, "v03": MONOTONE_CONSTRAINTS_V03}
