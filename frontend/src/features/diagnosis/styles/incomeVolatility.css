@@ -15,7 +15,7 @@
 .iv-details__grid dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
 .iv-details__grid span { display: block; margin-top: 5px; color: var(--mut2); font-size: 12px; }
 .iv-deficits .card__body { display: grid; gap: 12px; }
-/* N-22-2 부족한 달 카드 배치 — 넓으면 최대 4칸, 좁아지면 3·2·1칸이며 카드가 하나여도 칸 폭을 유지한다. */
+/* N-22-6 부족한 달 카드 배치 — 넓으면 최대 4칸, 좁아지면 3·2·1칸이며 카드가 하나여도 칸 폭을 유지한다. */
 .iv-deficits__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(220px, calc((100% - 30px) / 4)), 1fr)); gap: 10px; margin: 0; padding-left: 0; list-style: none; }
 /* 항목 안쪽 여백은 공통 panel-sunk가 정한다(여기서 padding을 주면 우선순위가 높아 덮어쓴다). */
 .iv-deficits__list li { display: grid; gap: 4px; align-content: start; overflow-wrap: anywhere; }
