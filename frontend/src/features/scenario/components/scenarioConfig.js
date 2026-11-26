@@ -30,8 +30,8 @@ const KEYS = SCENARIO_FIELDS.map((field) => field.key)
 // 워스트: 금리·지출은 가장 많이 오르고 소득은 가장 많이 줄어든 값, 베스트: 그 반대.
 const isCost = (field) => field.key !== 'incomePct'
 export const EASY_PRESETS = [
-  { id: 'best', label: '베스트 시나리오 (Best Case)', ...Object.fromEntries(SCENARIO_FIELDS.map((f) => [f.key, isCost(f) ? f.sliderMin : f.sliderMax])) },
-  { id: 'worst', label: '워스트 시나리오 (Worst Case)', ...Object.fromEntries(SCENARIO_FIELDS.map((f) => [f.key, isCost(f) ? f.sliderMax : f.sliderMin])) },
+  { id: 'best', label: '베스트 시나리오 (Best Scenario)', ...Object.fromEntries(SCENARIO_FIELDS.map((f) => [f.key, isCost(f) ? f.sliderMin : f.sliderMax])) },
+  { id: 'worst', label: '워스트 시나리오 (Worst Scenario)', ...Object.fromEntries(SCENARIO_FIELDS.map((f) => [f.key, isCost(f) ? f.sliderMax : f.sliderMin])) },
 ]
 
 // (시안 2차) 금액 칸을 쓸 수 있는 항목이면 지금 금액(원), 아니면 null.
