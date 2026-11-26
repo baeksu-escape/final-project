@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Modal, SegmentedControl } from '../../../common/components/index.js'
+import { Modal, SegmentedControl } from '../../../common/components/index.js'
 import { CATEGORY_RANK_OPTIONS, DETAIL_TABS } from '../config/marketConfig.js'
 import {
   categoryRanking,
@@ -23,9 +23,10 @@ function rankBarClass(key, value) {
 }
 
 // N-24-5 행정동 상세 창 — 고른 동·업종의 지표 6개(서울·구 비교)와 요약 문장, 최근 4분기 추이와 서울·구 순위, 동 안 업종 순위표를 보여 준다.
-// 1차 시연 후속: 한 화면에 다 보이면 읽기 어려워 [요약]·[추이·순위]·[업종 순위] 탭으로 나눴다. [이전]·[다음]으로 동을 바꿔도 탭은 그대로다.
+// 1차 시연 후속: 한 화면에 다 보이면 읽기 어려워 [요약]·[추이·순위]·[업종 순위] 탭으로 나눴다.
+// [이전]·[다음] 동 이동 버튼은 필요 없다는 의견으로 뺐다(11/26 동주) — 다른 동은 창을 닫고 지도에서 고른다.
 // metrics: 지도 지표 5개의 [{ metric, stats }], metric: 지금 고른 지표
-export default function DongDetailModal({ dong, meta, categoryData, category, metric, metrics, dongCategories, onClose, onMove, onCategory }) {
+export default function DongDetailModal({ dong, meta, categoryData, category, metric, metrics, dongCategories, onClose, onCategory }) {
   const [rankKey, setRankKey] = useState(CATEGORY_RANK_OPTIONS[0].value)
   const [tab, setTab] = useState(DETAIL_TABS[0].value)
   if (!dong) return null
@@ -41,7 +42,7 @@ export default function DongDetailModal({ dong, meta, categoryData, category, me
   const current = metrics.find((m) => m.metric.key === metric.key)
   const currentValue = dongValue(categoryData, quarter, dong.code, metric.key)
   const verdict = verdictOf(scoreOf(currentValue, current.stats, metric))
-  // 배지·순위 칸 색은 지도와 같은 빨강 5단계(값의 크기). 좋고 나쁨은 verdict 글자로 알려 준다.
+  // 배지·순위 칸 색은 지도와 같은 지표 색 5단계(값의 크기), 지표 카드는 카드마다 그 지표 색(FP-278). 좋고 나쁨은 verdict 글자로 알려 준다.
   const currentHeat = heatOf(currentValue, current.stats)
 
   // 지표별 값·점수 (요약 문장의 가장 좋은·약한 지표에 쓴다)
@@ -81,14 +82,6 @@ export default function DongDetailModal({ dong, meta, categoryData, category, me
             {metric.name} {formatMetric(metric, currentValue)} · {verdict.text}
           </span>
         </div>
-        <div className="market-detail__nav">
-          <Button size="sm" onClick={() => onMove(-1)}>
-            ‹ 이전
-          </Button>
-          <Button size="sm" onClick={() => onMove(1)}>
-            다음 ›
-          </Button>
-        </div>
       </div>
 
       <SegmentedControl label="상세 보기" options={DETAIL_TABS} value={tab} onChange={setTab} />
@@ -107,7 +100,7 @@ export default function DongDetailModal({ dong, meta, categoryData, category, me
               </span>
             </div>
             {scored.map(({ m, value, score, stats }) => (
-              <div key={m.key} className={`market-kpi market-heat--${heatOf(value, stats)}`} aria-current={m.key === metric.key ? 'true' : undefined}>
+              <div key={m.key} className={`market-kpi market-metric--${m.key} market-heat--${heatOf(value, stats)}`} aria-current={m.key === metric.key ? 'true' : undefined}>
                 <span className="market-hint">{m.name}</span>
                 <span className="market-kpi__desc">{m.desc}</span>
                 <span className="market-kpi__value">{formatMetric(m, value)}</span>
