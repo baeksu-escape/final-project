@@ -3,9 +3,8 @@ import { fetchMyProfile, requestUnmaskProfile } from '../api/myPageApi.js'
 import AccountManageCard from './AccountManageCard.jsx'
 import MyProfileCard from './MyProfileCard.jsx'
 import ProfileUnlockCard from './ProfileUnlockCard.jsx'
-import WithdrawalCard from './WithdrawalCard.jsx'
 
-// FP-222 v2 마이 페이지 [내정보] 탭 — 먼저 비밀번호를 확인하고(기존 MEM-02 가림 해제), 맞으면 내 정보(N-04-1·N-04-2)·계정 관리(N-04-3)·회원 탈퇴(N-04-7)를 연다.
+// FP-222 v2 마이 페이지 [내정보] 탭 — 먼저 비밀번호를 확인하고(기존 MEM-02 가림 해제), 맞으면 내 정보(N-04-1·N-04-2)·계정 관리(N-04-3, 회원 탈퇴 N-04-7 포함)를 연다.
 // 잠금 상태와 원래 값은 이 컴포넌트 상태에만 있어서, 다른 탭이나 화면으로 가면(컴포넌트가 사라지면) 함께 지워지고 다시 들어오면 잠겨 있다.
 // 카드들은 Fragment로 돌려줘 .my-page 격자의 바로 아래 칸이 되게 한다(내 정보 2칸 + 계정 관리 1칸 배치를 그대로 쓴다).
 export default function MyProfileTab() {
@@ -65,9 +64,8 @@ export default function MyProfileTab() {
         </p>
       )}
       <MyProfileCard profile={profile} unmasked={unmasked} onUnmask={handleUnmask} />
+      {/* N-04-7 회원 탈퇴는 계정 관리 카드 맨 아래로 옮겼다(FP-259). */}
       <AccountManageCard currentNickname={profile.nickname} onSaved={() => setReloadKey((key) => key + 1)} />
-      {/* N-04-7 회원 탈퇴 — 상태 변경 방식(FP-93), 비밀번호를 한 번 더 받는다. */}
-      <WithdrawalCard />
     </>
   )
 }

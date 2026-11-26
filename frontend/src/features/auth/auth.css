@@ -445,12 +445,19 @@
   text-align: center;
 }
 
-/* 내 정보 — 항목을 칸으로 나열(데모 dl.g2) */
+/* 내 정보 — 항목을 칸으로 나열(데모 dl.g2).
+   FP-259 넓은 화면은 3열로 고정한다(자동 칸이면 4열이 되어 휴대폰 번호 같은 긴 값이 좁아졌다). 좁은 화면은 2열. */
 .my-profile-card__list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
+}
+
+@media (max-width: 560px) {
+  .my-profile-card__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .my-profile-card__item {
@@ -549,9 +556,10 @@
   cursor: not-allowed;
 }
 
+/* FP-259 계정 관리 버튼 4개는 화면 폭과 상관없이 2×2로 둔다. */
 .account-manage-card__actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
