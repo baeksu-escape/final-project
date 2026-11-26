@@ -1,5 +1,6 @@
 # FP-135 모델 입력 규격 검사 — 서비스 피처 dict가 학습한 모델의 입력 규격(열 순서·범주 부호·결측)으로 바뀌는지 확인한다.
 # 실행: fastapi_server 폴더에서 `python -m unittest discover tests -v`
+import csv
 import re
 import unittest
 
@@ -10,7 +11,7 @@ from pipeline.feature_builder import build_features
 from schemas.assessment import ScoreRequest
 from test_mock_scorer import sample_request
 from training import config
-from training.interface import to_model_input
+from training.interface import SERVICE_TO_MODEL_DIVISOR, to_model_input
 
 MODEL_FILES = {name: config.DEFAULT_OUT_DIR / f"{name}.joblib" for name in config.MODELS}
 
@@ -46,6 +47,26 @@ class ToModelInputTests(unittest.TestCase):
         self.assertTrue(np.isnan(frame.loc[0, "income_svc_12m_krw"]))
         self.assertTrue(np.isnan(frame.loc[0, "np_on_time_rate"]))
 
+    def test_private_lender_balance_is_converted_to_thousand_won(self):
+        """학습 표가 천원이라 서비스의 원 값을 1,000으로 나눠 넣는다. 받은 dict는 원 그대로 둔다."""
+        features = service_features()
+        for won, expected in ((5_000_000, 5000.0), (2_174_500, 2174.5), (0, 0.0)):
+            features["LA0099212"] = won
+            for name in config.MODELS:
+                self.assertEqual(to_model_input(features, name).loc[0, "LA0099212"], expected, name)
+            self.assertEqual(features["LA0099212"], won)
+
+    def test_missing_private_lender_balance_stays_nan(self):
+        features = service_features()
+        features["LA0099212"] = None
+        self.assertTrue(np.isnan(to_model_input(features, "legacy").loc[0, "LA0099212"]))
+
+    def test_other_money_columns_are_not_converted(self):
+        features = service_features()
+        frame = to_model_input(features, "alternative")
+        for column in ("debt_balance_krw", "income_svc_12m_krw", "expense_avg_month_krw", "dp_payment_amount_12m_krw"):
+            self.assertEqual(frame.loc[0, column], features[column], column)
+
     def test_unknown_category_becomes_minus_one(self):
         """학습에 없는 값(voluntary)은 -1(결측). 처리 방식은 정의서 9장 미정이라 임시 동작이다."""
         features = service_features()
@@ -69,6 +90,20 @@ class ToModelInputTests(unittest.TestCase):
         features["age"] = "서른"
         with self.assertRaises(ValueError):
             to_model_input(features, "legacy")
+
+
+COLUMN_TABLE = config.DEFAULT_DATA_DIR / "1_model" / "model_table_columns.csv"
+
+
+@unittest.skipUnless(COLUMN_TABLE.exists(), "학습 데이터의 열 설명 표가 없다")
+class UnitTests(unittest.TestCase):
+    """모델 피처 가운데 학습 단위가 천원인 것은 모두 변환 목록에 있어야 한다(원을 그대로 넣는 실수를 막는다)."""
+
+    def test_thousand_won_features_are_converted(self):
+        with COLUMN_TABLE.open(encoding="utf-8-sig", newline="") as file:
+            rows = list(csv.reader(file))
+        thousand_won = {row[0] for row in rows if row and row[0] in config.ALTERNATIVE_FEATURES and "천원" in row}
+        self.assertEqual(thousand_won, set(SERVICE_TO_MODEL_DIVISOR))
 
 
 class ReadmeSpecTests(unittest.TestCase):
