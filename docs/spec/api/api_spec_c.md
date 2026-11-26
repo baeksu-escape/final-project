@@ -955,3 +955,37 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 - `GLOSSARY_TERM.TERM_ID`는 화면이 쓰지 않아 보내지 않는다.
 - SHAP 용어 풀이는 "점수에 어떻게 반영됐는지"만 설명하고 원인처럼 쓰지 않는다(AGENTS.md 5장).
 - 프론트: `features/ai/api/glossaryApi.js`의 `getGlossary()`. mock은 시드 문구 5개를 같은 모양으로 돌려준다(로그인하지 않았으면 401).
+
+## N-32-1 용어 도우미 질문 버튼 (HELP-02, FP-181, 담당 광희) 🆕 11/19
+
+| 메서드 | 경로 | 설명 | 데이터 출처 |
+|---|---|---|---|
+| GET | `/api/chatbot/presets` | 용어 도우미(오른쪽 아래 [? 용어 도우미])의 질문 버튼 4개와 등록된 답 | DB `CHATBOT_PRESET_QUESTION` |
+
+- 인증: 로그인 필요(보안 설정 "그 밖의 `/api/**`"). 토큰이 없으면 `401 UNAUTHORIZED`다.
+- 요청 값은 없다. 질문 버튼 전체를 **표시 순서**(`ORDER BY DISPLAY_ORDER, PRESET_ID`)로 돌려준다.
+- **AI를 부르지 않고 질문 횟수도 줄지 않는다**(N-32-1). 호출 기록(`CHATBOT_QUESTION_LOG`)을 남기지 않는다. 화면은 한 번 받아 두고 버튼을 누를 때 받아 둔 `answer`를 보여 주면 된다.
+- 등록된 버튼이 없으면 오류가 아니라 `{ "presets": [] }`다.
+- 기준 데이터: [`docs/spec/sql/add_chatbot_preset_question.sql`](../sql/add_chatbot_preset_question.sql)(합성 교육용 문구 4개, 표시 순서 1~4 기준으로 다시 실행해도 됨). dummy_db 생성기에는 들어 있지 않아 DDL·시드 다음에 따로 실행한다. 공용 DB 실행은 병합 후 DB 담당(범영)이 한다.
+- 자유 질문(HELP-03 `POST /api/chatbot/questions`, N-32-2, 하루 10회)은 아직 없다. Gemini 키·타임아웃(D-18)·넘길 정보(D-21)를 정한 뒤 FP-181 2부에서 만든다.
+
+응답 `200`:
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `presets[]` | 배열 | 질문 버튼 목록 (표시 순서대로) |
+| `presets[].presetId` | 정수 | 버튼 번호. 화면 목록의 key로 쓴다 |
+| `presets[].question` | 문자열 | 버튼에 보일 질문(최대 200자) |
+| `presets[].answer` | 문자열 | 버튼을 누르면 보일 답(최대 2000자) |
+
+```json
+{
+  "presets": [
+    { "presetId": 1, "question": "대안 신용 점수는 기존 신용 점수와 무엇이 다른가요?", "answer": "기존 신용 점수는 대출·카드 같은 금융 거래 기록만 봅니다. …" },
+    { "presetId": 2, "question": "점수 영향도(SHAP)는 어떻게 읽나요?", "answer": "점수 영향도는 … 원인·결과를 뜻하지는 않습니다. …" }
+  ]
+}
+```
+
+- DB 열 이름(`QUESTION_TEXT`·`ANSWER_TEXT`·`DISPLAY_ORDER`)은 그대로 내보내지 않는다.
+- 프론트: `features/ai/api/chatbotApi.js`의 `getChatbotPresets()`. mock은 시드와 같은 4개를 돌려준다(로그인하지 않았으면 401).

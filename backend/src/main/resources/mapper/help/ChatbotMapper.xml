@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- N-32 용어 도우미(챗봇) — 질문 버튼(CHATBOT_PRESET_QUESTION) 조회 (FP-181) -->
+<mapper namespace="com.baeksuescape.help.mapper.ChatbotMapper">
+
+    <!-- N-32-1 질문 버튼 전체를 표시 순서대로 읽는다. 순서가 같으면 먼저 넣은 버튼이 앞이다 -->
+    <select id="selectPresets" resultType="com.baeksuescape.help.dto.ChatbotPresetRow">
+        SELECT PRESET_ID AS presetId, QUESTION_TEXT AS questionText, ANSWER_TEXT AS answerText, DISPLAY_ORDER AS displayOrder
+          FROM CHATBOT_PRESET_QUESTION
+         ORDER BY DISPLAY_ORDER, PRESET_ID
+    </select>
+</mapper>
