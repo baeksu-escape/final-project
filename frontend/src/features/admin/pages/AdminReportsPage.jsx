@@ -3,7 +3,7 @@ import { Button, Notice, NumberInput, Select, Toast } from '../../../common/comp
 import { fetchAdminReports, fetchSettings, updateSetting } from '../api/adminReportApi.js'
 import AdminReportDetail from '../components/AdminReportDetail.jsx'
 import AdminReportList from '../components/AdminReportList.jsx'
-import { AUTO_HIDE_KEY, labelOf, REPORT_PERIODS, REPORT_RESULTS, REPORT_REASONS, REPORT_STATUSES } from '../../community/config/communityCodes.js'
+import { AUTO_HIDE_KEY, labelOf, REPORT_PERIODS, REPORT_RESULTS, REPORT_REASONS, REPORT_STATUS_FILTERS } from '../../community/config/communityCodes.js'
 import '../../community/community.css'
 
 // 오늘에서 days일 전 날짜 'YYYY-MM-DD' (내 컴퓨터 날짜 기준)
@@ -87,7 +87,7 @@ export default function AdminReportsPage() {
       </div>
 
       <section className="card l-g2 report-filters" aria-label="필터">
-        <Select label="상태" value={status} onChange={setStatus} options={REPORT_STATUSES} placeholder="전체" />
+        <Select label="상태" value={status} onChange={setStatus} options={REPORT_STATUS_FILTERS} placeholder="전체" />
         <Select label="사유" value={reason} onChange={setReason} options={REPORT_REASONS} placeholder="전체" />
         <Select label="기간" value={period} onChange={(value) => setPeriod(value ?? 'all')} options={REPORT_PERIODS} />
         <div className="report-filters__threshold">
