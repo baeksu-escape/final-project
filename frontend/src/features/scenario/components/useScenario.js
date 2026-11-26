@@ -30,7 +30,8 @@ export function useScenario(userId, workerTypeCode) {
 
   const ready = load.key === key
   const current = draft.key === key ? draft : { key, values: INITIAL, lastValid: INITIAL, presetId: BASE_PRESET.id }
-  const inputError = scenarioInputError(current.values)
+  // (시안 2차) 저장값을 넘겨 금액 칸 항목은 범위를 원으로 안내한다.
+  const inputError = scenarioInputError(current.values, ready ? load.baseline : null)
 
   // N-17-3 첫 계산과 재시도는 즉시 요청하고 이후 입력은 300ms 모아서 요청한다.
   useEffect(() => {
