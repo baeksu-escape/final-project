@@ -15,14 +15,19 @@
 .iv-details__grid dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
 .iv-details__grid span { display: block; margin-top: 5px; color: var(--mut2); font-size: 12px; }
 .iv-deficits .card__body { display: grid; gap: 12px; }
-.iv-deficits__list { display: grid; gap: 10px; margin: 0; padding-left: 20px; }
-.iv-deficits__list li { display: grid; gap: 4px; padding: 8px 0; }
+/* N-22-2 부족한 달 카드 배치 — 넓으면 최대 4칸, 좁아지면 3·2·1칸이며 카드가 하나여도 칸 폭을 유지한다. */
+.iv-deficits__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(220px, calc((100% - 30px) / 4)), 1fr)); gap: 10px; margin: 0; padding-left: 0; list-style: none; }
+/* 항목 안쪽 여백은 공통 panel-sunk가 정한다(여기서 padding을 주면 우선순위가 높아 덮어쓴다). */
+.iv-deficits__list li { display: grid; gap: 4px; align-content: start; overflow-wrap: anywhere; }
 .iv-deficits__list li span { color: var(--mut); font-size: 13px; line-height: 1.5; }
 .iv-unavailable { margin: 0; color: var(--mut); font-size: 13px; line-height: 1.6; }
 @media (max-width: 900px) {
   .iv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .iv-details__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* N-22-1 표의 최저·부족 배지 — 공통 .chip 모양에 색만 얹는다. 글자는 흰 바탕·어두운 테마 모두 4.5:1 이상이 되도록 토큰을 어둡게(밝게) 섞는다. */
+.iv-badge--low { background: color-mix(in srgb, var(--warn) 16%, transparent); border-color: color-mix(in srgb, var(--warn) 35%, transparent); color: var(--warn-fg); }
+.iv-badge--short { background: color-mix(in srgb, var(--bad) 16%, transparent); border-color: color-mix(in srgb, var(--bad) 35%, transparent); color: color-mix(in srgb, var(--bad) 60%, var(--fg)); }
 @media (max-width: 560px) {
   .iv-kpis, .iv-details__grid { grid-template-columns: 1fr; }
 }

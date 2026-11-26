@@ -230,7 +230,7 @@ function handleCashFlowForecast({ query, token }) {
   }
 }
 
-// N-21-8 DIAG-09 예상 대안 점수 mock — 본문은 현금흐름 전망 조건과 같은 이름이다. 검사·문구는 실제 API와 같다.
+// 11/25 팀 결정으로 현금흐름 화면 미사용(핸들러는 남겨 둠). N-21-8 DIAG-09 예상 대안 점수 mock — 본문은 현금흐름 전망 조건과 같은 이름이다. 검사·문구는 실제 API와 같다.
 // 점수는 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"의 mock 규칙이다(진짜 모델 아님). 납부 상태는 실제 API처럼 점수에 쓰지 않는다.
 function handleExpectedScore({ body, token }) {
   requireMockUser(token) // 실제 API처럼 로그인하지 않았으면 401

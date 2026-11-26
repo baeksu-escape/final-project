@@ -1,6 +1,6 @@
 import { apiGet } from '../../../common/api/client.js'
-import { adaptAssetDebtData, adaptCashFlowData, adaptCashFlowForecast, adaptExpectedScore, describeExpectedScoreError, validateForecastConditions } from '../adapters/financeAdapter.js'
-import { calculateFinancialHealth, getCashFlowForecast, getExpectedScore, getMemberFinancialHealth } from './diagnosisApi.js'
+import { adaptAssetDebtData, adaptCashFlowData, adaptCashFlowForecast, validateForecastConditions } from '../adapters/financeAdapter.js'
+import { calculateFinancialHealth, getCashFlowForecast, getMemberFinancialHealth } from './diagnosisApi.js'
 import { previewAssetDebtMock } from '../mocks/financeMockCalculations.js'
 
 const PEER_BENCHMARK_PATH = '/api/members/me/peer-benchmark'
@@ -30,6 +30,7 @@ export async function getCashFlowData(userId) {
   const server = await getCashFlowForecast({ forecastMonths: 3 })
   return adaptCashFlowData({
     months: server?.months,
+    pastDeficitMonthsCount: server?.pastDeficitMonthsCount ?? null,
     fixedExpenseAmount: server?.baseFixedExpenseAmount ?? null,
     otherExpenseAmount: server?.baseOtherExpenseAmount ?? null,
     monthlyPaymentAmount: server?.baseMonthlyLoanPayment ?? null,
@@ -68,33 +69,16 @@ function adaptFinancialHealth(server, local) {
   return { ...local, totalNetAssetAmount: server.netAsset, ratios, overallRisk }
 }
 
-// N-21-4·N-21-5·N-21-8 조건을 검증한 뒤 DIAG-08-1로 전망을, DIAG-09로 예상 점수를 같은 조건(소득 변동 폭·월 고정 지출·납부 상태)으로 함께 조회한다.
-// 예상 점수가 실패해도 전망은 그대로 돌려주고, 점수 영역에는 scoreError 안내만 남긴다(전망과 점수 분리).
+// N-21-2·N-21-4·N-21-5 조건(소득 변동 폭·월 고정 지출·예측 기간)을 검증한 뒤 DIAG-08-1로 전망을 조회한다.
+// 11/25 팀 결정으로 예상 점수(DIAG-09)는 부르지 않고 납부 상태(paymentStatus)도 보내지 않는다(서버는 둘 다 생략 가능).
 export async function forecastCashFlow({ userId, baseline, conditions }) {
   requireUser(userId)
-  requireExactKeys(conditions, ['incomeVariationPct', 'fixedExpenseAmount', 'paymentStatus', 'months'])
+  requireExactKeys(conditions, ['incomeVariationPct', 'fixedExpenseAmount', 'months'])
   const error = validateForecastConditions(conditions)
   if (error) throw new Error(error)
   adaptCashFlowData(baseline) // 기준 자료 형식 검사(틀리면 오류)
-  const shared = { incomeVariationPct: conditions.incomeVariationPct, fixedExpenseAmount: conditions.fixedExpenseAmount, paymentStatus: conditions.paymentStatus }
-  const [forecast, score] = await Promise.allSettled([
-    getCashFlowForecast({ forecastMonths: conditions.months, ...shared }),
-    getExpectedScore(shared),
-  ])
-  if (forecast.status === 'rejected') throw forecast.reason
-  const scoreResult = score.status === 'fulfilled'
-    ? adaptExpectedScoreSafely(score.value)
-    : { currentScore: null, endScore: null, scorePath: [], scoreNotices: [], scoreError: describeExpectedScoreError(score.reason) }
-  return { ...adaptCashFlowForecast(forecast.value), ...scoreResult }
-}
-
-// N-21-8 예상 점수 응답 형식이 틀려도 전망은 살리고 점수 영역에만 오류 안내를 남긴다.
-function adaptExpectedScoreSafely(raw) {
-  try {
-    return adaptExpectedScore(raw)
-  } catch (error) {
-    return { currentScore: null, endScore: null, scorePath: [], scoreNotices: [], scoreError: error.message }
-  }
+  const forecast = await getCashFlowForecast({ forecastMonths: conditions.months, incomeVariationPct: conditions.incomeVariationPct, fixedExpenseAmount: conditions.fixedExpenseAmount })
+  return adaptCashFlowForecast(forecast)
 }
 
 // N-21 로그인 회원 식별값이 없으면 호출하지 않는다.

@@ -46,12 +46,14 @@ export function adaptCashFlowData(raw) {
   for (let i=1;i<months.length;i++) if (nextMonth(months[i-1].baseMonth) !== months[i].baseMonth) throw new Error('현금흐름 기준 월이 연속되지 않습니다.')
   for (const key of ['fixedExpenseAmount','otherExpenseAmount','monthlyPaymentAmount']) if (!validAmount(raw[key])) throw new Error(`${key} 금액이 올바르지 않습니다.`)
   if (raw.currentScore != null && (!Number.isInteger(raw.currentScore) || raw.currentScore < 0 || raw.currentScore > 1000)) throw new Error('currentScore가 올바르지 않습니다.')
-  return { months, fixedExpenseAmount: raw.fixedExpenseAmount ?? null, otherExpenseAmount: raw.otherExpenseAmount ?? null,
+  // N-21-6 최근 12개월 중 적자 달 수(서버 pastDeficitMonthsCount). 없거나 올바르지 않으면 null이라 화면이 "—"로 보여 준다.
+  const pastDeficitMonthsCount = Number.isSafeInteger(raw.pastDeficitMonthsCount) && raw.pastDeficitMonthsCount >= 0 ? raw.pastDeficitMonthsCount : null
+  return { months, pastDeficitMonthsCount, fixedExpenseAmount: raw.fixedExpenseAmount ?? null, otherExpenseAmount: raw.otherExpenseAmount ?? null,
     monthlyPaymentAmount: raw.monthlyPaymentAmount ?? null, currentScore: raw.currentScore ?? null,
     assumptions: Array.isArray(raw.assumptions) && raw.assumptions.every((value) => typeof value === 'string') ? raw.assumptions : [] }
 }
 
-// N-21-5 DIAG-08-1 응답을 화면 결과 모양으로 바꾼다(점수 필드는 호출하는 쪽에서 붙인다).
+// N-21-5 DIAG-08-1 응답을 화면 결과 모양으로 바꾼다. 예상 점수 필드는 11/25 팀 결정으로 붙이지 않는다.
 export function adaptCashFlowForecast(raw) {
   const rows = raw?.monthlyForecasts
   if (!Array.isArray(rows) || rows.length === 0 || typeof raw.worstForecastMonth !== 'string'
@@ -66,7 +68,7 @@ export function adaptCashFlowForecast(raw) {
     tightestMonth: { baseMonth: raw.worstForecastMonth, netAmount: raw.worstNetCashFlow }, source: 'diag-08-1' }
 }
 
-// N-21-8 DIAG-09 응답을 화면 값으로 바꾼다. scorePath는 서버가 준 예상 점수 1개만 담으며, 차트가 예측 기간 마지막 달에 현재 점수(마지막 실적 달)와 직선으로 잇는다. 달마다 점수를 만들지 않는다.
+// 11/25 팀 결정으로 화면 미사용(함수는 남겨 둠). N-21-8 DIAG-09 응답을 화면 값으로 바꾼다. scorePath는 서버가 준 예상 점수 1개만 담으며, 차트가 예측 기간 마지막 달에 현재 점수(마지막 실적 달)와 직선으로 잇는다. 달마다 점수를 만들지 않는다.
 // 납부 밀림 가정과 모델 변경을 안내한다. 점수 차이를 원인처럼 쓰지 않는다.
 export function adaptExpectedScore(raw) {
   const isScore = (value) => Number.isInteger(value) && value >= 0 && value <= 1000
@@ -78,7 +80,7 @@ export function adaptExpectedScore(raw) {
   return { currentScore: raw.currentScore, endScore: raw.expectedScore, paymentStatusApplied: raw.paymentStatusApplied, assumedDelinquencyCount: raw.assumedDelinquencyCount ?? null, scorePath: [{ score: raw.expectedScore }], scoreNotices: notices, scoreError: '' }
 }
 
-// N-21-8 DIAG-09 실패 코드를 점수 영역에만 보여 줄 안내 문구로 바꾼다(전망 결과는 그대로 둔다).
+// 11/25 팀 결정으로 화면 미사용(함수는 남겨 둠). N-21-8 DIAG-09 실패 코드를 점수 영역에만 보여 줄 안내 문구로 바꾼다(전망 결과는 그대로 둔다).
 export function describeExpectedScoreError(error) {
   const code = error?.data?.code
   if (error?.status === 404 && code === 'ASSESSMENT_NOT_FOUND') return '저장된 대안 점수가 없어 예상 점수를 계산할 수 없습니다.'
@@ -91,7 +93,6 @@ export function validateForecastConditions(conditions) {
   if (![3,6,12].includes(conditions?.months)) return '예측 기간은 3·6·12개월 중에서 선택해 주세요.'
   if (!Number.isSafeInteger(conditions?.incomeVariationPct) || conditions.incomeVariationPct < 0 || conditions.incomeVariationPct > 200) return '소득 변동 폭은 0~200% 정수여야 합니다.'
   if (!Number.isSafeInteger(conditions?.fixedExpenseAmount) || conditions.fixedExpenseAmount < 0) return '월 고정 지출은 0 이상의 원 단위 정수여야 합니다.'
-  if (!['ON_TIME','DELAYED'].includes(conditions?.paymentStatus)) return '납부 상태를 선택해 주세요.'
   return ''
 }
 
