@@ -37,6 +37,8 @@ export default function CompareBar({
     ? { display: 'contents', fontSize: '12.5px' }
     : { display: 'grid', gridTemplateColumns: '48px 1fr 90px', gap: '8px', alignItems: 'center', fontSize: '12.5px' };
   const overflowWrap = averages ? 'anywhere' : undefined;
+  // N-15-3 여러 평균 행에서 값이 숫자가 아니라 안내 문구면 막대를 그리지 않고 막대 칸부터 값 칸까지 문구가 차지해 좁은 화면에서도 읽힌다.
+  const noticeStyle = { gridColumn: '2 / -1', color: 'var(--mut2, #8a9bb4)', overflowWrap, minWidth: 0 };
 
   const myPercent = Math.min(100, Math.max(0, (numMy / max) * 100));
 
@@ -52,23 +54,29 @@ export default function CompareBar({
       {/* 내 수치 */}
       <div style={rowStyle}>
         <span style={{ fontWeight: 600, color: 'var(--mint, #00e6a5)', overflowWrap }}>{myLabel}</span>
-        <div style={{ position: 'relative', height: '10px', borderRadius: '5px', background: 'var(--line, #22314b)', overflow: 'hidden' }}>
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              height: '100%',
-              width: `${myPercent.toFixed(1)}%`,
-              backgroundColor: 'var(--mint, #00e6a5)',
-              borderRadius: '5px',
-              transition: 'width 0.3s ease',
-            }}
-          />
-        </div>
-        <b className="num" style={{ textAlign: 'right', color: 'var(--mint, #00e6a5)', fontFamily: 'inherit', overflowWrap }}>
-          {averages && myValue == null ? myUnavailableText : <>{formatValue(numMy)}{unit}</>}
-        </b>
+        {averages && myValue == null ? (
+          <b className="num" style={{ ...noticeStyle, color: 'var(--mint, #00e6a5)', fontFamily: 'inherit' }}>{myUnavailableText}</b>
+        ) : (
+          <>
+            <div style={{ position: 'relative', height: '10px', borderRadius: '5px', background: 'var(--line, #22314b)', overflow: 'hidden' }}>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  height: '100%',
+                  width: `${myPercent.toFixed(1)}%`,
+                  backgroundColor: 'var(--mint, #00e6a5)',
+                  borderRadius: '5px',
+                  transition: 'width 0.3s ease',
+                }}
+              />
+            </div>
+            <b className="num" style={{ textAlign: 'right', color: 'var(--mint, #00e6a5)', fontFamily: 'inherit', overflowWrap }}>
+              <>{formatValue(numMy)}{unit}</>
+            </b>
+          </>
+        )}
       </div>
 
       {/* 평균 수치 */}
@@ -77,23 +85,29 @@ export default function CompareBar({
         const avgPercent = Math.min(100, Math.max(0, (number / max) * 100));
         return <div key={index} data-avg-index={index} style={rowStyle}>
           <span style={{ color: 'var(--mut, #a7b4c6)', overflowWrap }}>{row.label}</span>
-          <div style={{ position: 'relative', height: '10px', borderRadius: '5px', background: 'var(--line, #22314b)', overflow: 'hidden' }}>
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                height: '100%',
-                width: `${avgPercent.toFixed(1)}%`,
-                backgroundColor: 'var(--line2, #4a5b78)',
-                borderRadius: '5px',
-                transition: 'width 0.3s ease',
-              }}
-            />
-          </div>
-          <span className="num" style={{ textAlign: 'right', color: 'var(--mut2, #8a9bb4)', fontFamily: 'inherit', overflowWrap }}>
-            {averages && row.value == null ? (row.unavailableText ?? '비교 회원 부족') : <>{formatValue(number)}{unit}</>}
-          </span>
+          {averages && row.value == null ? (
+            <span className="num" style={{ ...noticeStyle, fontFamily: 'inherit' }}>{row.unavailableText ?? '비교 회원 부족'}</span>
+          ) : (
+            <>
+              <div style={{ position: 'relative', height: '10px', borderRadius: '5px', background: 'var(--line, #22314b)', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    height: '100%',
+                    width: `${avgPercent.toFixed(1)}%`,
+                    backgroundColor: 'var(--line2, #4a5b78)',
+                    borderRadius: '5px',
+                    transition: 'width 0.3s ease',
+                  }}
+                />
+              </div>
+              <span className="num" style={{ textAlign: 'right', color: 'var(--mut2, #8a9bb4)', fontFamily: 'inherit', overflowWrap }}>
+                <>{formatValue(number)}{unit}</>
+              </span>
+            </>
+          )}
         </div>
       })}
     </div>

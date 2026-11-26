@@ -14,8 +14,8 @@ UI 원본은 `5unyCwrGcxS3WrWFUk9qid`의 `1794641606-4f83` 버전으로 앞선 F
 ## 공통 계약
 
 - `getAssetDebtData(userId, workerTypeCode)`: `totalAssetAmount`, `annualIncomeAmount`, `totalDebtAmount`, `annualPaymentAmount`, `loans`, `peer`, `assumptions`.
-- 자산·부채 기준값은 DIAG-03-1, 직군 평균은 DIAG-01의 `sameWorkerType`을 병렬 조회한다. mock 모드에서는 각 API의 mock 응답을 사용한다.
-- 대출 행은 `loanId`, `loanTypeName`, `balanceAmount`, `annualRatePct`, `rateTypeCode`, `remainingMonths`, `monthlyPaymentAmount`. 표는 원본 UI 열(종류·잔액·금리·방식·월 상환)만 사용한다.
+- 자산·부채 기준값은 DIAG-03-1, 평균은 `peer-benchmark`(`/api/members/me/peer-benchmark`)의 직군 평균(`sameWorkerType`)과 연령대 평균(`sameAgeBand`)을 병렬 조회한다. 한 카드에서 항목마다 세 줄(나·같은 직군 평균·같은 연령대 평균)로 비교한다. mock 모드에서는 각 API의 mock 응답을 사용한다.
+- 대출 행은 `loanId`, `loanTypeName`, `balanceAmount`, `annualRatePct`, `rateTypeCode`, `remainingMonths`, `monthlyPaymentAmount`. 표는 원본 UI 열(종류·잔액·금리·방식·남은 기간·월 상환)만 사용한다.
 - `getCashFlowData(userId)`: DIAG-08-1 응답에서 정확히 12개 연속 월의 `months[{baseMonth,incomeAmount}]`와 기준값 `baseFixedExpenseAmount`·`baseOtherExpenseAmount`·`baseMonthlyLoanPayment`를 읽어 화면 이름 `fixedExpenseAmount`·`otherExpenseAmount`·`monthlyPaymentAmount`로 옮긴다(서버 값이며 mock 아님). 저장값이 없으면 null을 유지하고 예측은 불가로 표시한다. `currentScore`는 이 응답에 없다.
 - `forecastCashFlow({userId,baseline,conditions})`: 조건은 `incomeVariationPct`, `fixedExpenseAmount`, `paymentStatus`, `months`. 결과는 `forecastMonths`, `monthlyExpenseAmount`, `cumulativeSurplusAmount`, `tightestMonth`, `scorePath`, `currentScore`, `endScore`, `source`.
 - 금액은 정수 원 단위, 비율은 %, 점수는 0~1000이다. 미입력은 NULL을 유지한다. UI와 mock 요청 입구에서 형식·범위 검사를 하며 실제 서버 검증을 의미하지 않는다.
@@ -27,7 +27,7 @@ UI 원본은 `5unyCwrGcxS3WrWFUk9qid`의 `1794641606-4f83` 버전으로 앞선 F
 - 순수 비율 계산은 `calculateAssetDebt`와 공용 `calculateDsr`를 사용한다. 기준 상수는 DSR 30/40, 자산 대비 40/60, 순자산 대비 70/100 한 벌이다.
 - 총자산 NULL은 0원과 다르다. 분모 0·순자산 0 이하의 비율은 NULL과 사유로 표시한다. 유효한 위험·주의는 미산출 지표 때문에 숨기지 않는다.
 - 금액 입력은 공통 MoneyInput(3자리 콤마, 숫자만, 15자리까지)을 쓴다. NULL은 형식 오류 대신 미입력 안내로 구분한다.
-- 같은 직군 평균은 회원 평균 API를 사용한다. 공통 CompareBar에 NULL을 넘겨 0으로 바꾸지 않고 비교 불가로 표시한다.
+- 같은 직군·연령대 평균은 회원 평균 API를 사용한다. 공통 CompareBar에 NULL을 넘겨 0으로 바꾸지 않고, 평균 줄마다 이유를 보여 준다(표본 부족 "같은 직군/연령대 회원이 5명 미만이라 평균을 보여 드릴 수 없어요"(5는 서버 최소 인원 기준), 연령대 평균 형식 오류 "같은 연령대 평균(총자산·연소득·총부채)을 불러오지 못했어요", 조회 실패 "직군·연령대 평균을 불러오지 못했어요."). 안내 문구는 막대 없이 막대 칸부터 값 칸까지 한 줄로 차지한다.
 - 건전성 화면의 직군 평균 막대·범례·수치는 파랑 계열 `--vio2`, 연령대 평균은 노랑 `--warn`을 사용한다. 사용자 막대와 테마 정의는 변경하지 않는다.
 - 시연 상환액은 총부채 변경 비율로 저장 연 상환액을 조정한다. 저장 부채가 0원인 경우 새 부채의 월 4.8% ×12를 사용한다. 이 추정은 mocks에만 있으며 실제 금융 계산 규칙이 아니다.
 
