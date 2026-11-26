@@ -4,8 +4,6 @@ const monthLabel = (baseMonth) => `${Number(String(baseMonth).slice(5, 7))}월`
 
 const won = (v) => (Number.isFinite(v) ? `${Math.round(v).toLocaleString('ko-KR')}원` : '—')
 
-// N-21-5 월 지출 구성 — 월 고정 지출(조건 값)·월 원리금(대출 상환)·할부·정기결제(기타 지출 기준값)와 합계를 보여 준다. 간편결제는 합계에 넣지 않는다.
-// 월 고정 지출은 마지막으로 예측에 적용된 조건의 값이다. 서버 baseOtherExpenseAmount는 "월 지출 합계 − 고정지출(할부·정기결제·기타)"이라 할부·정기결제·기타 칸에 쓴다. 값이 하나라도 없으면 합계는 "—"이다. 조건이 바뀌어 결과가 이전 조건 기준이면 그래프처럼 흐리게 보인다.
 // N-21-5 월 지출 구성의 항목 한 줄 — 목록이 있으면 접힌 줄(합계 줄 문구 그대로)을 펼쳐 항목을 보여 주고, 없으면 금액만 보여 준다.
 function BreakdownRow({ label, amount, items }) {
   const summary = <>{label} <b className="num">{won(amount)}</b></>
@@ -35,6 +33,8 @@ const loanItemTexts = (items) => {
   })
 }
 
+// N-21-5 월 지출 구성 카드 — 월 고정 지출·월 원리금(대출 상환)·할부·정기결제·기타와 합계를 보여 주고, 원리금·기타는 항목(N-21-3)을 펼쳐 볼 수 있다. 간편결제는 합계에 넣지 않는다.
+// 월 고정 지출은 마지막으로 예측에 적용된 조건 값, 나머지는 마지막으로 성공한 예측 응답의 기준값(서버가 항목 목록 합으로 계산)이다. 값이 하나라도 없으면 합계는 "—", 조건만 바뀐 상태면 그래프처럼 흐리게 보인다.
 function ExpenseBreakdown({ baseline, fixedExpenseAmount, stale }) {
   const parts = [fixedExpenseAmount, baseline?.monthlyPaymentAmount, baseline?.otherExpenseAmount]
   const total = parts.every(Number.isFinite) ? parts.reduce((sum, v) => sum + v, 0) : null
@@ -55,7 +55,8 @@ function ExpenseBreakdown({ baseline, fixedExpenseAmount, stale }) {
 
 export default function CashFlowSummary({ result, baseline, fixedExpenseAmount, stale }) {
   const { cumulativeSurplusAmount, tightestMonth } = result
-  const deficit = baseline?.pastDeficitMonthsCount
+  const expenseBaseline = result.expenseBaseline ?? baseline
+  const deficit = expenseBaseline?.pastDeficitMonthsCount
   return (
     <div className="cf-summary">
       <div className="cf-summary__item">
@@ -66,7 +67,7 @@ export default function CashFlowSummary({ result, baseline, fixedExpenseAmount, 
         <span className="cf-hint">{tightestMonth ? `가장 빠듯한 달은 ${monthLabel(tightestMonth.baseMonth)}` : '가장 빠듯한 달'}</span>
         <strong className="cf-big">{tightestMonth ? `${signed(tightestMonth.netAmount)}원` : '—'}</strong>
       </div>
-      <ExpenseBreakdown baseline={baseline} fixedExpenseAmount={fixedExpenseAmount} stale={stale} />
+      <ExpenseBreakdown baseline={expenseBaseline} fixedExpenseAmount={fixedExpenseAmount} stale={stale} />
       {/* N-21-6 서버가 대출 원리금을 뺀 월 지출로 센 값이라 위 지출 구성 합계와 기준이 다르다. 줄은 값이 없어도 자리를 유지한다. */}
       <span className="cf-hint cf-summary__item--wide">최근 12개월 중 소득이 월 지출(대출 상환 제외)보다 적었던 달 {Number.isFinite(deficit) ? `${deficit}개월` : '—'}</span>
     </div>

@@ -81,7 +81,7 @@ export async function forecastCashFlow({ userId, baseline, conditions }) {
   if (error) throw new Error(error)
   adaptCashFlowData(baseline) // 기준 자료 형식 검사(틀리면 오류)
   const forecast = await getCashFlowForecast({ forecastMonths: conditions.months, incomeVariationPct: conditions.incomeVariationPct, fixedExpenseAmount: conditions.fixedExpenseAmount })
-  return adaptCashFlowForecast(forecast)
+  return adaptCashFlowForecast(forecast, baseline)
 }
 
 // N-21 로그인 회원 식별값이 없으면 호출하지 않는다.

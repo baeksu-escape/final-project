@@ -47,6 +47,25 @@ function adaptLoanPaymentItems(list) {
   return list.map((item) => ({ loanId: Number.isFinite(item.loanId) ? item.loanId : null, loanTypeName: textOrNull(item.loanTypeName), monthlyPaymentAmount: item.monthlyPaymentAmount }))
 }
 
+// N-21-5 예측 응답의 지출 구성은 기준값 조회와 같은 규칙으로 검증한다. 응답에 값이 빠진 경우 처음 조회한 기준값을 보완값으로 사용한다.
+function adaptCashFlowSummary(raw = {}, fallback = {}) {
+  const amount = (key, fallbackKey) => {
+    const value = Object.hasOwn(raw, key) ? raw[key] : fallback[fallbackKey]
+    return validAmount(value) ? value : null
+  }
+  const pastDeficitMonthsCount = Object.hasOwn(raw, 'pastDeficitMonthsCount')
+    ? Number.isSafeInteger(raw.pastDeficitMonthsCount) && raw.pastDeficitMonthsCount >= 0 ? raw.pastDeficitMonthsCount : null
+    : fallback.pastDeficitMonthsCount ?? null
+  return {
+    fixedExpenseAmount: amount('baseFixedExpenseAmount', 'fixedExpenseAmount'),
+    otherExpenseAmount: amount('baseOtherExpenseAmount', 'otherExpenseAmount'),
+    monthlyPaymentAmount: amount('baseMonthlyLoanPayment', 'monthlyPaymentAmount'),
+    pastDeficitMonthsCount,
+    otherExpenseItems: Object.hasOwn(raw, 'baseOtherExpenseItems') ? adaptOtherExpenseItems(raw.baseOtherExpenseItems) : fallback.otherExpenseItems ?? [],
+    loanPaymentItems: Object.hasOwn(raw, 'baseLoanItems') ? adaptLoanPaymentItems(raw.baseLoanItems) : fallback.loanPaymentItems ?? [],
+  }
+}
+
 // N-21 현금흐름 월별 기준 자료는 정확히 12개월 연속이어야 하며 NULL 소득은 그대로 둔다.
 export function adaptCashFlowData(raw) {
   // 소득은 12개월 입력으로 확정(decisions.md 1-4)이라 정상 경로에서는 12개월이 온다. 그보다 짧으면 안전장치로 예측을 막고 0으로 채우지 않는다.
@@ -62,14 +81,21 @@ export function adaptCashFlowData(raw) {
   if (raw.currentScore != null && (!Number.isInteger(raw.currentScore) || raw.currentScore < 0 || raw.currentScore > 1000)) throw new Error('currentScore가 올바르지 않습니다.')
   // N-21-6 최근 12개월 중 적자 달 수(서버 pastDeficitMonthsCount). 없거나 올바르지 않으면 null이라 화면이 "—"로 보여 준다.
   const pastDeficitMonthsCount = Number.isSafeInteger(raw.pastDeficitMonthsCount) && raw.pastDeficitMonthsCount >= 0 ? raw.pastDeficitMonthsCount : null
-  return { months, pastDeficitMonthsCount,
-    otherExpenseItems: adaptOtherExpenseItems(raw.baseOtherExpenseItems), loanPaymentItems: adaptLoanPaymentItems(raw.baseLoanItems), fixedExpenseAmount: raw.fixedExpenseAmount ?? null, otherExpenseAmount: raw.otherExpenseAmount ?? null,
-    monthlyPaymentAmount: raw.monthlyPaymentAmount ?? null, currentScore: raw.currentScore ?? null,
+  const summary = adaptCashFlowSummary({
+    baseFixedExpenseAmount: raw.fixedExpenseAmount,
+    baseOtherExpenseAmount: raw.otherExpenseAmount,
+    baseMonthlyLoanPayment: raw.monthlyPaymentAmount,
+    pastDeficitMonthsCount: raw.pastDeficitMonthsCount,
+    baseOtherExpenseItems: raw.baseOtherExpenseItems,
+    baseLoanItems: raw.baseLoanItems,
+  })
+  return { months, pastDeficitMonthsCount, ...summary,
+    currentScore: raw.currentScore ?? null,
     assumptions: Array.isArray(raw.assumptions) && raw.assumptions.every((value) => typeof value === 'string') ? raw.assumptions : [] }
 }
 
 // N-21-5 DIAG-08-1 응답을 화면 결과 모양으로 바꾼다. 예상 점수 필드는 11/25 팀 결정으로 붙이지 않는다.
-export function adaptCashFlowForecast(raw) {
+export function adaptCashFlowForecast(raw, baseline) {
   const rows = raw?.monthlyForecasts
   if (!Array.isArray(rows) || rows.length === 0 || typeof raw.worstForecastMonth !== 'string'
     || !Number.isSafeInteger(raw.worstNetCashFlow) || !Number.isSafeInteger(raw.totalAccumulatedSurplus)) throw new Error('현금흐름 전망 응답 형식이 올바르지 않습니다.')
@@ -80,7 +106,8 @@ export function adaptCashFlowForecast(raw) {
   const first = rows[0]
   return { forecastMonths, monthlyExpenseAmount: first.forecastExpense + first.forecastLoanPayment,
     cumulativeSurplusAmount: raw.totalAccumulatedSurplus,
-    tightestMonth: { baseMonth: raw.worstForecastMonth, netAmount: raw.worstNetCashFlow }, source: 'diag-08-1' }
+    tightestMonth: { baseMonth: raw.worstForecastMonth, netAmount: raw.worstNetCashFlow }, source: 'diag-08-1',
+    expenseBaseline: adaptCashFlowSummary(raw, baseline) }
 }
 
 // 11/25 팀 결정으로 화면 미사용(함수는 남겨 둠). N-21-8 DIAG-09 응답을 화면 값으로 바꾼다. scorePath는 서버가 준 예상 점수 1개만 담으며, 차트가 예측 기간 마지막 달에 현재 점수(마지막 실적 달)와 직선으로 잇는다. 달마다 점수를 만들지 않는다.
