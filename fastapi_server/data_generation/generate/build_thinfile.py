@@ -44,11 +44,13 @@ def make_service(plan,loans,cfg):
    loan_months.append(dict(customer_id=l.customer_id,account_id=l.account_id,month=str(end.to_period('M')),opened_date=str(opened.date()),budget_service_krw=amount))
  return {cid:v.tolist() for cid,v in service.items()},pd.DataFrame(loan_months)
 
-def run(out,per_cohort=600,seed=20261030):
+def run(out,per_cohort=600,seed=20261030,input_rules=True):
+ # v3.7.0 input_rules=False면 소득·지출 생성 규칙을 끈다(서비스 시연 회원 생성이 이 값을 쓴다).
  out=Path(out);out.mkdir(parents=True,exist_ok=True)
  plan=make_plan(per_cohort,seed)
  base,dictionary,summary,ledgers=generate(plan,seed,no_credit_exposure_probability=NO_CREDIT_EXPOSURE_PROBABILITY,sparse_history_exposure_probability=SPARSE_HISTORY_EXPOSURE_PROBABILITY)
- cfg=json.loads((ROOT/'extension_config.json').read_text());cfg.update(seed=seed,rows=0,age_by_customer=dict(zip(plan.customer_id,plan.age)))
+ cfg=json.loads((ROOT/'extension_config.json').read_text(encoding='utf-8'));cfg.update(seed=seed,rows=0,age_by_customer=dict(zip(plan.customer_id,plan.age)))
+ if not input_rules:cfg.pop('input_rules',None)
  cfg['service_by_customer'],loan_months=make_service(plan,ledgers['loans'],cfg)
  prior=yaml.safe_load((ROOT/'reference/claude_config.yaml').read_text())
  b,p,h,s,checks=build(base,cfg,prior)

@@ -1,4 +1,4 @@
-# Credit Extension 합성 데이터 v3.6.1
+# Credit Extension 합성 데이터 v3.7.0
 
 신용평가 교육·시연용 합성 데이터의 생성 코드, 설정, 통계 원자료, 문서다. 모든 데이터는 합성 데이터이며 실제 개인·금융기관 자료가 아니다. 결과는 시연용이고 실제 모집단의 통계나 예측력 근거로 쓰지 않는다.
 
@@ -6,14 +6,15 @@
 
 | 데이터 | 내용 | 생성 스크립트 | 문서 |
 |---|---|---|---|
-| 기존 집단 12,000명 | 207열 신용정보(`data/base_207.csv`, 포함됨)에 소득·지출·자산·월별 현금흐름을 붙인다 | `generate/extend.py` | `docs/DATA_SPEC.md` |
+| 기존 집단 139,347명 (v3.7.0, 이전 12,000명) | 교육용 합성 원본 155,746행 중 직군 해당 전부의 207열 신용정보에 소득·지출·자산·월별 현금흐름을 붙인다. 소득·지출 규칙은 `extension_config.json`의 `input_rules` | `generate/extend.py` | `docs/DATA_SPEC.md` |
+| 연체 라벨 재설계(v3.7.0) | 원본 logit에 상환 부담·잔액·소득 등의 가정 효과를 더해 두 집단의 `label_any_delinquency_12m`을 다시 만든다 | `generate/build_delinquency_label.py` | `reference/delinquency_label.json`, `docs/DATA_SPEC.md` |
 | 씬파일 집단 2,400명 | 금융이력 부족 3개 집단 + 이력 충분한 20대 비교군, 각 600명. 대출·카드·연체 원장 포함 | `generate/build_thinfile.py` | `docs/THINFILE.md` |
 | 간편결제·사회보험 원천 | 두 집단의 간편결제 월자료, 국민연금·건강보험 고지·납부 월자료, 고객 단위 집계(v3.5.0) | `generate/build_nonfinancial_sources.py` | `docs/NONFINANCIAL_SOURCES.md` |
 | 비금융 효과 라벨 | 기존 라벨 옆에 비금융 효과를 가정한 라벨 열을 추가한다 | `generate/build_nonfinancial_labels.py` | `docs/NONFINANCIAL_LABEL.md` |
 | 대출 원장·상환 일정 | 두 집단의 대출 계좌별 상환 일정(만기일시·원리금균등·원금균등)과 금리 시나리오 | `generate/build_loan_extension.py` | `docs/LOAN_EXTENSION.md` |
 | 6개월 입력 집계(보존·참고용) | 회원이 입력하는 소득·지출·상환액 중 최근 6개월(2026-03~2026-08) 집계. 기존 값 보존·참고용 compatibility_only, 기본 학습 제외 | `generate/build_input_features_6m.py` | `docs/DATA_SPEC.md` |
 | 12개월 입력 집계(기본 학습) | 최근 완결 12개월의 소득·지출·상환 집계. 모델 표 role=feature, 독립 전처리 시연 포함. v3.6.0: 서비스 입력 규칙과 같은 정의의 9열(지출 = 평균 월 지출, 상환 = 기준월 상환액, 급여소득자 소득 = 기준월 × 12)을 같은 파일에 추가(평균 월 지출은 ROUND_HALF_UP). 기존 12개월 10열은 상세 파일에만 두고 모델 표에서 뺐다 | `generate/build_input_features_12m.py` | `docs/DATA_SPEC.md` |
-| 학습·검증·시험 분리(v3.6.0) | 고객 ID 단위 TRAIN/VALID/TEST 70/15/15, 직군 × 기존 라벨 층화, 집단마다 따로 | `generate/build_data_split.py` | `docs/DATA_SPEC.md` |
+| 학습·검증·시험 분리(v3.6.0) | 고객 ID 단위 TRAIN/VALID/TEST 70/15/15, 직군 × 연체 라벨 층화, 집단마다 따로. v3.7.0: 이전 12,000명은 모두 TRAIN, 씬파일 분할은 유지 | `generate/build_data_split.py` | `docs/DATA_SPEC.md` |
 | 서비스 개발용 더미 | 가상 대출상품, 가입 회원(12개월 입력, v3.5.11), 외부 금융·통신·간편결제·공공보험·신용평가사·공과금 API 응답. **학습에 쓰지 않는다** | `generate/build_loan_products.py`, `build_members.py`, `build_external_api.py` | `docs/SERVICE_DUMMY_DATA.md` |
 | 가정 민감도·비금융 실험 | 가정을 바꿨을 때의 변화, 라벨 신호 확인, 비금융 효과 라벨의 AUC 상승 측정 | `experiments/` 5개 스크립트 | `docs/ASSUMPTION_SENSITIVITY.md`, `docs/NONFINANCIAL_EXPERIMENT.md`, `docs/NONFINANCIAL_LABEL.md` |
 
@@ -30,22 +31,22 @@
 | `reference/` | 통계 원자료, 생성 설정·기준점, 원본 사전과 원본 학원 생성기 |
 | `docs/` | 문서와 데이터 사전 |
 | `tools/` | 모델 팀 전달 묶음 만들기(`build_handoff.py`) |
-| `data/` | 입력 `base_207.csv`. 생성 결과도 여기와 `thinfile/`, `loan_extension/`, `service_dummy/`, `nonfinancial_label_lift/` 등에 생긴다 |
+| `data/` | 생성 결과(`base_207.csv` 포함). `thinfile/`, `loan_extension/`, `service_dummy/`, `nonfinancial_label_lift/` 등에도 생긴다. Git 제외 |
 
 ## 생성 순서
 
-이 패키지에는 입력인 `data/base_207.csv`만 들어 있고 생성 결과는 없다. 압축을 푼 폴더(이 README가 있는 곳)에서 `python -m <폴더>.<스크립트>` 형태로 실행한다.
+v3.7.0의 입력은 교육용 합성 원본 `financial_credit_synthetic_155746x207.csv`(약 89MB, Git 제외, 팀 `#파일공유`)다. 원본 생성기(`reference/academy/generate_dataset_original.py`)의 기본 설정 출력과 같다. 이 README가 있는 폴더에서 `python -X utf8 -m <폴더>.<스크립트>` 형태로 실행한다(Windows에서는 `-X utf8`이 필요하다).
 
 ```bash
-cp data/base_207.csv /tmp/base_207_input.csv          # 입력을 먼저 복사한다
-python -m generate.extend --input /tmp/base_207_input.csv --rows 0 --out data
+python -m generate.extend --input <원본 CSV 경로> --rows 0 --out data
 python -m generate.build_thinfile
-python -m generate.build_nonfinancial_sources          # 위 두 단계 다음 (v3.5.0)
+python -m generate.build_delinquency_label             # 위 두 단계 다음 (v3.7.0, 원본 생성기를 한 번 다시 실행한다)
+python -m generate.build_nonfinancial_sources          # extend·build_thinfile 다음 (v3.5.0)
 python -m generate.build_nonfinancial_labels           # build_nonfinancial_sources 다음
 python -m generate.build_input_features_6m             # 보존·참고용 6개월, 기존 값 유지
 python -m generate.build_input_features_12m            # 기본 학습용 12개월 (v3.5.13, v3.6.0 서비스 정의 열 포함)
-python -m generate.build_data_split                     # 학습·검증·시험 분리 (v3.6.0, build_thinfile 다음이면 됨)
-python -m generate.build_loan_extension
+python -m generate.build_data_split                     # 학습·검증·시험 분리 (v3.6.0, build_delinquency_label 다음)
+# python -m generate.build_loan_extension              # 모델에 쓰지 않는다. v3.7.0 전체 행에서는 실행·검증하지 않았다
 python -m generate.build_loan_products
 python -m generate.build_members
 python -m generate.build_external_api                  # build_members 다음
@@ -70,7 +71,10 @@ python -m verify.verify_nonfinancial_sources           # v3.5.0
 python -m verify.verify_input_features_6m              # 보존·참고용 6개월
 python -m verify.verify_input_features_12m             # 기본 학습용 12개월 (서비스 정의 열 포함)
 python -m verify.verify_data_split                      # 학습·검증·시험 분리 (v3.6.0)
+python -m verify.verify_delinquency_label               # 새 연체 라벨과 데이터 확인 기준 (v3.7.0)
 ```
+
+`verify_statistics`는 통계 원자료 CSV의 해시를 비교하므로 Windows에서 줄바꿈이 CRLF로 바뀐 체크아웃에서는 실패한다(값은 같음, v3.7.0 변경과 무관). v3.7.0에서는 `verify_loan_extension`·`verify_assumption_sensitivity`·`verify_nonfinancial_experiment`를 실행하지 않았다.
 
 고정 예제 테스트(생성 불필요): `python -m unittest discover -s tests -t .`
 

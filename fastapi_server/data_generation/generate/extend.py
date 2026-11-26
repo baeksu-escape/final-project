@@ -22,6 +22,19 @@ def allocate(total, weights):
         out[rows, order[rows, k]] += 1
     return out
 
+def apply_income_floor(annual, base, ids, service_by_customer, dsr_range, seed):
+    """연소득을 max(생성값, 연 상환액 ÷ U)로 올린다(U는 dsr_range의 균등난수). 상환액이 소득보다 큰 사람이 생기지 않게 한다.
+    별도 난수 흐름(213, 9)을 써서 다른 생성값의 난수 순서를 바꾸지 않는다. 씬파일은 월별 상환 예산의 합을 상환액으로 쓴다."""
+    low, high = dsr_range
+    if not 0 < low <= high <= 1:
+        raise ValueError('income_floor_dsr_range must satisfy 0 < low <= high <= 1')
+    if service_by_customer is None:
+        owed = base.LRZ021201.to_numpy(dtype=np.int64)*1000
+    else:
+        owed = np.array([sum(service_by_customer[str(cid)]) for cid in ids], dtype=np.int64)
+    limit = np.random.default_rng(np.random.SeedSequence([seed, 213, 9])).uniform(low, high, len(annual))
+    return np.maximum(annual, np.rint(owed/limit).astype(np.int64))
+
 def build(source, cfg, prior):
     seed = int(cfg['seed'])
     # Namespace 213 is reserved for extend.py; thinfile_engine.py uses 212.
@@ -84,6 +97,11 @@ def build(source, cfg, prior):
             new_sigma = np.sqrt(2*np.log(row['mean_monthly_krw']/row['median_monthly_krw']))
             income[mask] = 12*row['median_monthly_krw']*np.exp(new_sigma*latent)
     annual = np.rint(income).astype(np.int64)
+    # v3.7.0 (N-12-2) 소득·지출 생성 규칙. 설정이 없거나 꺼져 있으면 v3.6.1과 같은 출력이다(서비스 시연 회원 생성은 끈다).
+    rules = cfg.get('input_rules') or {}
+    rules_on = bool(rules.get('enabled', False))
+    if rules_on:
+        annual = apply_income_floor(annual, base, ids, cfg.get('service_by_customer'), rules['income_floor_dsr_range'], seed)
     si = np.array([cfg['monthly_sigma'][s] for s in seg])
     amp = np.array([cfg['season_amplitude'][s] for s in seg])
     phase = rng.uniform(0, 2*np.pi, n)
@@ -115,6 +133,9 @@ def build(source, cfg, prior):
         heterogeneity /= np.exp(cfg['asset_to_income_log_sigma']**2/2)
         assets = np.rint(annual*(st['mean_assets_10k_krw']/st['mean_income_10k_krw'])*heterogeneity).astype(np.int64)
         liquid = np.rint(assets*(st['mean_savings_10k_krw']/st['mean_assets_10k_krw'])*cfg['accessible_savings_fraction']).astype(np.int64)
+    if rules_on:
+        # 지출 비율을 낮추고 상한을 둔다(저소득 구간에서 버는 만큼 거의 다 쓰던 값 완화, 교육용 가정).
+        expense_ratio = np.minimum(expense_ratio*rules['expense_ratio_scale'], rules['expense_ratio_max'])
     raw_expense = np.rint(annual*expense_ratio).astype(np.int64)
     # Budget constraint (assumption): expense is capped at (income - debt service) + drawdown_fraction * liquid assets.
     # When even the cap is below the minimum living expense, spending is NOT cut below min(raw, floor); the customer
@@ -124,6 +145,9 @@ def build(source, cfg, prior):
     cap = annual-service_annual + drawdown_limit  # may be negative: debt-service shortfall is NOT erased
     floor = cfg['minimum_annual_living_expense_krw']
     annual_expense = np.maximum(np.minimum(raw_expense, cap), np.minimum(raw_expense, floor)).astype(np.int64)
+    if rules_on and not rules['expense_cap_enabled']:
+        # 상환액이 클수록 지출을 깎던 상한을 쓰지 않는다(지출이 상환 부담과 반대로 움직이던 원인). 자금 부족 표시는 그대로 계산한다.
+        annual_expense = raw_expense
     annual_fixed = np.rint(annual_expense*cfg['fixed_expense_share']).astype(np.int64)
     fixed = allocate(annual_fixed, np.ones((n,m)))
     variable = allocate(annual_expense-annual_fixed, rng.lognormal(0,cfg['variable_expense_sigma'],(n,m)))
