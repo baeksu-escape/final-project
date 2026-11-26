@@ -19,8 +19,14 @@ export function adaptAssetDebtData(raw) {
   })
   if (!Object.hasOwn(raw, 'peer') || !Array.isArray(raw.assumptions) || raw.assumptions.some((value) => typeof value !== 'string')) throw new Error('시연 가정 응답이 올바르지 않습니다.')
   const workerPeer = adaptPeer(raw.peer)
-  // N-15-2 기존 화면이 peer만 전달하므로 직군 평균 필드에 연령대 평균과 조회 상태를 함께 실어 보낸다.
-  const peer = workerPeer === null ? null : { ...workerPeer, agePeer: adaptAgePeer(raw.peer.agePeer), peerFailed: raw.peer.peerFailed ?? false }
+  // N-15-2 연령대 평균의 형식 오류를 표본 부족과 구분하고, 검증한 값을 다시 변환할 때도 오류 표시를 유지한다.
+  const agePeer = adaptAgePeer(raw.peer?.agePeer)
+  const peer = workerPeer === null ? null : {
+    ...workerPeer,
+    agePeer,
+    agePeerInvalid: agePeer === null && (raw.peer.agePeer != null || raw.peer.agePeerInvalid === true),
+    peerFailed: raw.peer.peerFailed ?? false,
+  }
   return { totalAssetAmount: raw.totalAssetAmount ?? null, annualIncomeAmount: raw.annualIncomeAmount ?? null,
     totalDebtAmount: raw.totalDebtAmount ?? null, annualPaymentAmount: raw.annualPaymentAmount ?? null, loans,
     peer, assumptions: Array.isArray(raw.assumptions) ? raw.assumptions : [],
