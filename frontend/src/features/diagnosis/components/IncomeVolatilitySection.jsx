@@ -178,6 +178,8 @@ export default function IncomeVolatilitySection({ data }) {
           <p>최근 12개월 중 월 고정지출보다 소득이 적은 달이 없습니다.</p>
         ) : (
           <>
+          {/* N-22-5 가장 가까운 부족 달 앞에 월 고정지출 기준을 알려 준다. */}
+          <p className="hint">월 고정지출보다 소득이 적었던 달 기준</p>
           {/* N-22-5 가장 가까운 소득 부족 달 — 다시 올 달·남은 개월 수와 미리 모아 둘 금액을 한 줄로 안내한다. */}
           {response.nearestDeficit && (
             <p>가장 가까운 부족 달: {response.nearestDeficit.dueMonth ? `${formatMonth(response.nearestDeficit.dueMonth)}(${response.nearestDeficit.monthsUntil}개월 뒤)` : `${response.nearestDeficit.monthsUntil}개월 뒤`}, 미리 모아 둘 금액 {formatWon(response.nearestDeficit.reserveAmount)}</p>
