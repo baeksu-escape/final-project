@@ -15,11 +15,11 @@ import {
   SAMPLE_MEMBER_FINANCIAL_HEALTH,
 } from './diagnosisMockData.js'
 
-// N-21-3 월 지출 구성 mock 예시 — 할부·정기결제에는 분류가 빈 항목 1개를 넣어 화면의 이름 규칙이 보이게 한다.
+// N-21-3 월 지출 구성 mock 예시 — 실제 서버처럼 할부·정기결제는 expenseCategory가 NULL이고 기타(OTHER)는 저장된 한글 이름이다.
 const MOCK_OTHER_EXPENSE_ITEMS = [
-  { expenseGroupCode: 'INSTALLMENT', expenseCategory: 'INSTALLMENT', description: '노트북', monthlyAmount: 150000 },
-  { expenseGroupCode: 'SUBSCRIPTION', expenseCategory: 'SUBSCRIPTION', description: '넷플릭스', monthlyAmount: 15000 },
-  { expenseGroupCode: 'SUBSCRIPTION', expenseCategory: null, description: '', monthlyAmount: 9000 },
+  { expenseGroupCode: 'INSTALLMENT', expenseCategory: null, description: '노트북', monthlyAmount: 150000 },
+  { expenseGroupCode: 'SUBSCRIPTION', expenseCategory: null, description: '넷플릭스', monthlyAmount: 15000 },
+  { expenseGroupCode: 'OTHER', expenseCategory: '의료비', description: '', monthlyAmount: 9000 },
 ]
 // 대출 목록은 같은 mock 회원의 자산·부채·시나리오 mock 대출(SAMPLE_MEMBER_FINANCIAL_HEALTH)과 같은 종류·월 상환액·순서다(월 35만 원).
 const MOCK_LOAN_ITEMS = SAMPLE_MEMBER_FINANCIAL_HEALTH.loans.map(({ loanId, loanTypeName, monthlyPaymentAmount }) => ({ loanId, loanTypeName, monthlyPaymentAmount }))

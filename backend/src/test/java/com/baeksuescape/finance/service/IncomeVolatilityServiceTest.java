@@ -195,8 +195,7 @@ class IncomeVolatilityServiceTest {
         assertEquals(0L, response.getPeakOffPeakGap());
 
         // 전망 이력도 12개월(2025-09 ~ 2026-08)이므로 전망은 2026-09부터 시작한다.
-        when(mapper.selectLatestTotalExpense(1L)).thenReturn(1461547L);
-        when(mapper.selectLatestLoanMonthlyPayment(1L)).thenReturn(0L);
+        // 고정지출만 있고 기타 지출·대출 항목은 없다(mock 기본값 빈 리스트): 월 지출 합계 = 고정지출, 원리금 0
         CashFlowForecastResponse forecast = service.forecastSavedCashFlow(1L, null);
         assertEquals("2026-09", forecast.getMonthlyForecasts().get(0).getForecastYearMonth());
 
@@ -222,9 +221,10 @@ class IncomeVolatilityServiceTest {
     @DisplayName("FP-203: 저장 데이터 전망은 12개월 평균 소득·지출 합계·원리금에 조건을 적용하고 마지막 입력월 다음 달부터 시작한다")
     void testForecastSavedCashFlow() {
         when(mapper.selectRecentIncomeMonths(2L)).thenReturn(freelancerRows());
-        when(mapper.selectLatestTotalExpense(2L)).thenReturn(1315514L);
+        // 월 지출 합계 1,315,514 = 고정 1,100,000 + 기타 지출 항목 합 215,514, 원리금 200,000은 대출 항목 합
         when(mapper.selectLatestFixedExpense(2L)).thenReturn(1100000L);
-        when(mapper.selectLatestLoanMonthlyPayment(2L)).thenReturn(200000L);
+        when(mapper.selectLatestOtherExpenseItems(2L)).thenReturn(List.of(CashFlowForecastResponse.BaseOtherExpenseItem.builder().expenseGroupCode("INSTALLMENT").expenseCategory("c").description("d").monthlyAmount(150000L).build(), CashFlowForecastResponse.BaseOtherExpenseItem.builder().expenseGroupCode("OTHER").expenseCategory("c").description("d").monthlyAmount(65514L).build()));
+        when(mapper.selectLatestLoanItems(2L)).thenReturn(List.of(CashFlowForecastResponse.BaseLoanItem.builder().loanId(1L).loanTypeName("신용대출").monthlyPaymentAmount(200000L).build()));
 
         CashFlowConditionRequest condition = CashFlowConditionRequest.builder()
                 .incomeChangePercent(-10.0)
@@ -260,9 +260,10 @@ class IncomeVolatilityServiceTest {
     @DisplayName("N-21-2 화면 조건: 소득 변동 폭 100%면 과거 같은 달 소득, 고정지출을 보내면 FIXED 자리만 그 값으로 바꾼다")
     void testForecastSavedCashFlow_screenConditions() {
         when(mapper.selectRecentIncomeMonths(2L)).thenReturn(freelancerRows());
-        when(mapper.selectLatestTotalExpense(2L)).thenReturn(1500000L);   // 고정 1,315,514 + 기타 184,486
+        // 월 지출 합계 1,500,000 = 고정 1,315,514 + 기타 지출 항목 합 184,486
         when(mapper.selectLatestFixedExpense(2L)).thenReturn(1315514L);
-        when(mapper.selectLatestLoanMonthlyPayment(2L)).thenReturn(200000L);
+        when(mapper.selectLatestOtherExpenseItems(2L)).thenReturn(List.of(CashFlowForecastResponse.BaseOtherExpenseItem.builder().expenseGroupCode("SUBSCRIPTION").expenseCategory("c").description("d").monthlyAmount(184486L).build()));
+        when(mapper.selectLatestLoanItems(2L)).thenReturn(List.of(CashFlowForecastResponse.BaseLoanItem.builder().loanId(1L).loanTypeName("신용대출").monthlyPaymentAmount(200000L).build()));
 
         CashFlowConditionRequest condition = CashFlowConditionRequest.builder()
                 .forecastMonths(3)
@@ -290,9 +291,7 @@ class IncomeVolatilityServiceTest {
     @DisplayName("N-21-3·5 항목별 내역: 기타 지출·대출 목록의 합이 기준값과 같고, 정렬은 매퍼가 준 순서 그대로다")
     void testForecastSavedCashFlow_baseItems() {
         when(mapper.selectRecentIncomeMonths(2L)).thenReturn(freelancerRows());
-        when(mapper.selectLatestTotalExpense(2L)).thenReturn(1500000L);
         when(mapper.selectLatestFixedExpense(2L)).thenReturn(1000000L);
-        when(mapper.selectLatestLoanMonthlyPayment(2L)).thenReturn(300000L);
         when(mapper.selectLatestOtherExpenseItems(2L)).thenReturn(List.of(
                 CashFlowForecastResponse.BaseOtherExpenseItem.builder().expenseGroupCode("INSTALLMENT").expenseCategory("가전").description("노트북").monthlyAmount(300000L).build(),
                 CashFlowForecastResponse.BaseOtherExpenseItem.builder().expenseGroupCode("SUBSCRIPTION").expenseCategory("구독").description("영상").monthlyAmount(200000L).build()));
@@ -309,6 +308,12 @@ class IncomeVolatilityServiceTest {
         assertEquals(response.getBaseMonthlyLoanPayment(),
                 response.getBaseLoanItems().stream().mapToLong(CashFlowForecastResponse.BaseLoanItem::getMonthlyPaymentAmount).sum());
         assertEquals("신용대출", response.getBaseLoanItems().get(0).getLoanTypeName());
+        // 기준값 2개는 목록 합 그대로이고, 월 지출 합계(고정 100만 + 기타 50만)가 전망·과거 실적에 쓰인다.
+        assertEquals(500000L, response.getBaseOtherExpenseAmount());
+        assertEquals(300000L, response.getBaseMonthlyLoanPayment());
+        assertEquals(1500000L, response.getMonthlyForecasts().get(0).getForecastExpense());
+        assertEquals(300000L, response.getMonthlyForecasts().get(0).getForecastLoanPayment());
+        assertEquals(1500000L, response.getMonths().get(0).getExpenseAmount());
     }
 
     @Test
@@ -320,6 +325,10 @@ class IncomeVolatilityServiceTest {
 
         CashFlowForecastResponse response = service.forecastSavedCashFlow(2L, null);
 
+        // 항목이 없으면 기타 지출·원리금 기준값은 0이고 월 지출 합계는 고정지출뿐이다.
+        assertEquals(0L, response.getBaseOtherExpenseAmount());
+        assertEquals(0L, response.getBaseMonthlyLoanPayment());
+        assertEquals(0L, response.getMonthlyForecasts().get(0).getForecastLoanPayment());
         assertNotNull(response.getBaseOtherExpenseItems());
         assertTrue(response.getBaseOtherExpenseItems().isEmpty());
         assertNotNull(response.getBaseLoanItems());
