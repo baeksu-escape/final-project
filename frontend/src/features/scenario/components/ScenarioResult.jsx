@@ -11,11 +11,26 @@ const ROWS = [
   { key: 'monthlyIncomeAmount', label: '월 소득' },
   { key: 'monthlyExpenseAmount', label: '월 고정 지출' },
   { key: 'monthlyPaymentAmount', label: '월 원리금' },
-  { key: 'monthlySurplusAmount', label: '월 잉여', surplus: true },
+  { key: 'monthlySurplusAmount', label: '월 여유 자금', surplus: true },
 ]
 
+// N-17-1 현재 월 원리금에 포함된 대출을 받은 순서대로 구분해 펼쳐 보여 준다.
+function loanItemLabels(items) {
+  const names = items.map((item) => item.loanTypeName?.trim() || '대출')
+  const counts = names.reduce((result, name) => ({ ...result, [name]: (result[name] ?? 0) + 1 }), {})
+  const seen = {}
+  return items.map((item, index) => {
+    const name = names[index]
+    seen[name] = (seen[name] ?? 0) + 1
+    const numberedName = counts[name] > 1 ? `${name} ${seen[name]}` : name
+    const rate = Number.isFinite(item.annualRatePct) ? `${item.annualRatePct.toFixed(1)}%` : '—'
+    const rateType = item.rateTypeCode === 'FIXED' ? '고정' : item.rateTypeCode === 'VARIABLE' ? '변동' : '미확인'
+    return { key: item.loanId ?? index, text: `${numberedName} ${rate} ${rateType} ${won(item.monthlyPaymentAmount)}` }
+  })
+}
+
 // N-17-5 현재와 시나리오 결과 및 서버 계산 가정을 함께 보여 준다.
-export default function ScenarioResult({ result, assumptions, stale, calcError }) {
+export default function ScenarioResult({ result, baseline, assumptions, stale, calcError }) {
   const { current, changed } = result
   const max = Math.max(1, ...ROWS.flatMap((row) => [current[row.key], changed[row.key]]).filter(Number.isFinite).map(Math.abs))
   const width = (value) => `${Number.isFinite(value) ? Math.min(100, (Math.abs(value) / max) * 100) : 0}%`
@@ -25,7 +40,7 @@ export default function ScenarioResult({ result, assumptions, stale, calcError }
       <p className="sc-warn" aria-live="polite">{calcError ? '계산하지 못해 이전 조건 결과를 보여 주고 있습니다.' : stale ? '위 결과는 이전 조건 기준입니다. 계산이 끝나면 바뀝니다.' : '\u00a0'}</p>
       <div className="sc-kpis">
         <div className="sc-kpi">
-          <span className="sc-hint">이 상황의 월 잉여</span>
+          <span className="sc-hint">이 상황의 월 여유 자금</span>
           <strong className={`sc-big ${changed.monthlySurplusAmount < 0 ? 'sc-neg' : 'sc-pos'}`}>{signedWon(changed.monthlySurplusAmount)}</strong>
           <span className="sc-hint">지금보다 {signedWon(result.surplusDiffAmount)}</span>
         </div>
@@ -42,7 +57,11 @@ export default function ScenarioResult({ result, assumptions, stale, calcError }
       <div className="sc-bars">
         {ROWS.map((row) => (
           <div key={row.key} className="sc-bar-row">
-            <span className="sc-bar-row__title">{row.label}</span>
+            <span className="sc-bar-row__title">
+              {row.key === 'monthlyPaymentAmount' && baseline?.loanItems?.length ? (
+                <details><summary>{row.label} (보유 대출 {baseline.loanItems.length}건)</summary><ul>{loanItemLabels(baseline.loanItems).map((item) => <li key={item.key}>{item.text}</li>)}</ul></details>
+              ) : row.label}
+            </span>
             <span className="sc-hint">현재</span>
             <span className="sc-track"><i className="sc-fill sc-fill--current" style={{ width: width(current[row.key]) }} /></span>
             <span className="sc-hint sc-num">{won(current[row.key])}</span>
@@ -59,7 +78,7 @@ export default function ScenarioResult({ result, assumptions, stale, calcError }
   )
 }
 
-// N-17-4 판정 문구 — 돈이 모자라면 버틸 수 있는 개월 수, 좋아지면 늘어나는 잉여를 보여 준다.
+// N-17-4 판정 문구 — 돈이 모자라면 버틸 수 있는 개월 수, 좋아지면 늘어나는 여유 자금을 보여 준다.
 function Verdict({ result }) {
   const { changed, current } = result
   if (result.verdict === 'SHORTFALL') {
@@ -75,7 +94,7 @@ function Verdict({ result }) {
   if (result.verdict === 'IMPROVED') {
     return (
       <p className="sc-box sc-box--ok">
-        지금보다 매달 <strong>{won(result.surplusDiffAmount)}</strong> 더 남습니다(월 잉여 {won(changed.monthlySurplusAmount)}).
+        지금보다 매달 <strong>{won(result.surplusDiffAmount)}</strong> 더 남습니다(월 여유 자금 {won(changed.monthlySurplusAmount)}).
         {' '}상환 부담률은 {pct(current.dsrPct)} → {pct(changed.dsrPct)}입니다.
       </p>
     )

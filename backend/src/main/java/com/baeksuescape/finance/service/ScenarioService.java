@@ -3,6 +3,7 @@ package com.baeksuescape.finance.service;
 import com.baeksuescape.finance.dto.cashflow.MonthlyIncomeItem;
 import com.baeksuescape.finance.dto.scenario.PolicyRateRow;
 import com.baeksuescape.finance.dto.scenario.ScenarioBaseResponse;
+import com.baeksuescape.finance.dto.scenario.ScenarioBaseResponse.ScenarioLoanItem;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateRequest;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateResponse;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateResponse.Side;
@@ -68,13 +69,19 @@ public class ScenarioService {
     private final ScenarioMapper scenarioMapper;
 
     /** N-17-1 시나리오 기준값. 저장된 소득이 없으면 404 NOT_FOUND(현금흐름 전망과 같음). */
+    // N-17-1 기준 상환액은 함께 반환하는 대출 목록의 합으로 구해 목록·합계 기준월을 맞춘다.
     public ScenarioBaseResponse base(long userId) {
         Baseline b = loadBaseline(userId);
+        List<ScenarioLoanItem> loanItems = scenarioMapper.selectLatestLoanItems(userId);
+        if (loanItems == null) {
+            loanItems = List.of();
+        }
+        long monthlyPaymentAmount = loanItems.stream().mapToLong(ScenarioLoanItem::monthlyPaymentAmount).sum();
         PolicyRateRow rate = scenarioMapper.selectLatestPolicyRate();
         ScenarioBaseResponse.PolicyRate policyRate = rate == null ? null
                 : new ScenarioBaseResponse.PolicyRate(rate.getBaseDate(), rate.getRatePct());
-        return new ScenarioBaseResponse(b.income(), b.expense(), b.payment(), b.variableBalance(), b.totalAsset(),
-                policyRate, ASSUMPTIONS);
+        return new ScenarioBaseResponse(b.income(), b.expense(), monthlyPaymentAmount, b.variableBalance(), b.totalAsset(),
+                policyRate, ASSUMPTIONS, loanItems);
     }
 
     /** N-17-2~4 조건을 반영한 상환 여력. 조건은 DB를 읽기 전에 검사한다(범위 밖이면 400). */

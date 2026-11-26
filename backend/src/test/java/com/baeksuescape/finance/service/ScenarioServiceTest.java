@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.baeksuescape.finance.dto.cashflow.MonthlyIncomeItem;
 import com.baeksuescape.finance.dto.scenario.PolicyRateRow;
 import com.baeksuescape.finance.dto.scenario.ScenarioBaseResponse;
+import com.baeksuescape.finance.dto.scenario.ScenarioBaseResponse.ScenarioLoanItem;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateRequest;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateResponse;
 import com.baeksuescape.finance.dto.scenario.VariableLoanRow;
@@ -64,6 +65,9 @@ class ScenarioServiceTest {
                 .thenReturn(List.of(month("2026-07", 2_800_000L), month("2026-08", 3_200_000L)));
         when(incomeMapper.selectLatestTotalExpense(USER_ID)).thenReturn(1_800_000L);
         when(incomeMapper.selectLatestLoanMonthlyPayment(USER_ID)).thenReturn(500_000L);
+        when(scenarioMapper.selectLatestLoanItems(USER_ID)).thenReturn(List.of(
+                new ScenarioLoanItem(1L, "신용대출", new BigDecimal("5.0"), "VARIABLE", 200_000L),
+                new ScenarioLoanItem(2L, "주택담보대출", new BigDecimal("4.2"), "FIXED", 300_000L)));
         when(scenarioMapper.selectLatestVariableLoans(USER_ID)).thenReturn(List.of(loan(30_000_000L, "5", 200_000L)));
         when(scenarioMapper.selectLatestTotalAsset(USER_ID)).thenReturn(totalAsset);
     }
@@ -86,6 +90,9 @@ class ScenarioServiceTest {
         assertEquals(3_000_000L, base.monthlyIncomeAmount());
         assertEquals(1_800_000L, base.monthlyExpenseAmount());
         assertEquals(500_000L, base.monthlyPaymentAmount());
+        assertEquals(2, base.loanItems().size());
+        assertEquals(1L, base.loanItems().get(0).loanId());
+        assertEquals(500_000L, base.loanItems().stream().mapToLong(ScenarioLoanItem::monthlyPaymentAmount).sum());
         assertEquals(30_000_000L, base.variableLoanBalanceAmount());
         assertEquals(40_000_000L, base.totalAssetAmount());
         assertEquals(LocalDate.of(2026, 10, 31), base.policyRate().baseDate());
@@ -103,6 +110,19 @@ class ScenarioServiceTest {
 
         assertNull(base.policyRate());
         assertNull(base.totalAssetAmount());
+    }
+
+    @Test
+    @DisplayName("N-17-1: 대출이 없으면 빈 목록과 0원 상환액을 반환한다")
+    void baseWithoutLoans() {
+        givenStored(40_000_000L);
+        when(scenarioMapper.selectLatestLoanItems(USER_ID)).thenReturn(List.of());
+        when(scenarioMapper.selectLatestPolicyRate()).thenReturn(null);
+
+        ScenarioBaseResponse base = service.base(USER_ID);
+
+        assertEquals(List.of(), base.loanItems());
+        assertEquals(0L, base.monthlyPaymentAmount());
     }
 
     @Test

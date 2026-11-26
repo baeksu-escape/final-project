@@ -184,7 +184,7 @@ class MemberFinanceControllerTest {
     void getScenarioBase() throws Exception {
         when(scenarioService.base(2L)).thenReturn(new ScenarioBaseResponse(3_000_000L, 1_800_000L, 500_000L,
                 30_000_000L, null, new ScenarioBaseResponse.PolicyRate(LocalDate.of(2026, 10, 31), new BigDecimal("3.000")),
-                List.of("가정 1")));
+                List.of("가정 1"), List.of()));
 
         mockMvc.perform(loggedIn(get(SCENARIO_BASE), 2L))
                 .andExpect(status().isOk())
