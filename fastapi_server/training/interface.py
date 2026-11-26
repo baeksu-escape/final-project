@@ -7,6 +7,9 @@ import pandas as pd
 from training import config
 from training.preprocess import encode_categories
 
+# N-12-2 서비스 값(원)을 학습 표의 단위로 바꿀 때 나누는 수. 학습 표의 대부업 대출 잔액(LA0099212)은 천원이다(model_table_columns.csv).
+SERVICE_TO_MODEL_DIVISOR = {"LA0099212": 1000}
+
 
 def to_model_input(feature_dict: dict, model_name: str) -> pd.DataFrame:
     """피처 dict를 model_name("legacy" 또는 "alternative") 모델의 입력 한 행으로 바꾼다.
@@ -20,4 +23,7 @@ def to_model_input(feature_dict: dict, model_name: str) -> pd.DataFrame:
     frame = encode_categories(pd.DataFrame([row], columns=features))
     numeric = [name for name in features if name not in config.CATEGORICAL_FEATURES]
     frame[numeric] = frame[numeric].apply(pd.to_numeric).astype("float64")   # None은 NaN이 된다. 숫자가 아닌 문자열은 오류로 멈춘다
+    for name, divisor in SERVICE_TO_MODEL_DIVISOR.items():
+        if name in features:
+            frame[name] = frame[name] / divisor      # 모델 입력만 바꾼다. 받은 dict(저장·화면에 쓰는 값)는 원 그대로다
     return frame
