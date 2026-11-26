@@ -29,7 +29,7 @@ function getIncomeUnavailableMessage(reason) {
   return '월 소득 자료를 확인할 수 없어 지표를 계산할 수 없습니다.'
 }
 
-// N-22-1 월별 소득 표는 기본 접힘이고, 접힌 한 줄에 최고·최저 달을 요약한다. N-22-3 최근 12개월 월별 소득 표 — 현금흐름 기준 자료의 months를 그대로 보여 주고, 가장 많이 번 달·가장 적게 번 달·월 고정지출보다 적은 달에 짧은 표시를 붙인다.
+// N-22-6 월별 소득 표는 기준 자료가 있으면 표시하고, 최고는 표에서 계산하며 최저·부족 표시는 변동성 응답이 있을 때 붙인다.
 function MonthlyIncomeCard({ months, lowestBaseMonth, deficitMonths }) {
   const rows = Array.isArray(months) ? months : []
   const incomes = rows.filter((row) => Number.isFinite(row.incomeAmount))
@@ -42,7 +42,7 @@ function MonthlyIncomeCard({ months, lowestBaseMonth, deficitMonths }) {
           <summary>
             월별 소득 12개월 보기
             {highest && ` 최고 ${formatMonth(highest.baseMonth)} ${formatWon(highest.incomeAmount)}`}
-            {lowest && Number.isFinite(lowest.incomeAmount) && `, 최저 ${formatMonth(lowest.baseMonth)} ${formatWon(lowest.incomeAmount)}`}
+            {lowestBaseMonth && lowest && Number.isFinite(lowest.incomeAmount) && `, 최저 ${formatMonth(lowest.baseMonth)} ${formatWon(lowest.incomeAmount)}`}
           </summary>
           <div className="data-table-wrap">
           <table className="data-table">
@@ -54,8 +54,8 @@ function MonthlyIncomeCard({ months, lowestBaseMonth, deficitMonths }) {
                     {formatMonth(row.baseMonth)}
                     {highest?.baseMonth === row.baseMonth && <> <Chip accent>최고</Chip></>}
                     {/* N-22-1 최저·부족은 공통 Chip이 className을 받지 않아 같은 chip 모양에 색 수식 클래스를 단 span을 쓴다. */}
-                    {lowest?.baseMonth === row.baseMonth && <> <span className="chip iv-badge--low">최저</span></>}
-                    {deficitMonths.includes(row.baseMonth) && <> <span className="chip iv-badge--short">부족</span></>}
+                    {lowestBaseMonth && lowest?.baseMonth === row.baseMonth && <> <span className="chip iv-badge--low">최저</span></>}
+                    {deficitMonths && deficitMonths.includes(row.baseMonth) && <> <span className="chip iv-badge--short">부족</span></>}
                   </td>
                   <td className="num">{formatWon(row.incomeAmount)}</td>
                 </tr>
@@ -161,8 +161,12 @@ export default function IncomeVolatilitySection({ data }) {
         </Card>
       )}
 
-      {hasIncomeStats && (
-        <MonthlyIncomeCard months={data?.months} lowestBaseMonth={stats.lowestMonth?.baseMonth} deficitMonths={(deficits ?? []).map((item) => item.baseMonth)} />
+      {Array.isArray(data?.months) && data.months.length > 0 && (
+        <MonthlyIncomeCard
+          months={data.months}
+          lowestBaseMonth={stats?.lowestMonth?.baseMonth}
+          deficitMonths={deficits?.map((item) => item.baseMonth)}
+        />
       )}
 
       <Card title="소득 부족 달 미리 보기" className="iv-deficits">
