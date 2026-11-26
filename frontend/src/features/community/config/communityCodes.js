@@ -9,6 +9,15 @@ export const CONTENT_MAX = 1300
 export const COMMENT_MAX = 1000
 export const DETAIL_MAX = 500
 
+// N-06 글 카테고리 4개(FP-261, 서버 CommunityCodes·DDL CK_BPT_CATEGORY와 같다). 글쓰기 기본값은 자유다.
+export const POST_CATEGORIES = Object.freeze([
+  { value: 'CREDIT_SCORE', label: '신용점수' },
+  { value: 'LOAN', label: '대출·상환' },
+  { value: 'CARD', label: '카드·결제' },
+  { value: 'FREE', label: '자유' },
+])
+export const DEFAULT_CATEGORY = 'FREE'
+
 // N-33-1 신고 사유 5개 (이 순서로 보여 준다). 상세 내용은 OTHER일 때만 받는다.
 export const REPORT_REASONS = Object.freeze([
   { value: 'ABUSE', label: '욕설·비방' },
@@ -26,6 +35,9 @@ export const REPORT_STATUSES = Object.freeze([
   { value: 'DONE', label: '처리 완료' },
   { value: 'REJECTED', label: '반려' },
 ])
+
+// N-34-1 상태 필터 선택지(FP-277) — '검토 중'은 저장하는 곳이 없어 늘 0건이라 필터에서만 뺀다. 목록의 상태 이름은 위 4개를 쓴다.
+export const REPORT_STATUS_FILTERS = Object.freeze(REPORT_STATUSES.filter((item) => item.value !== 'IN_REVIEW'))
 
 // N-34-3 관리자 처리 결과 3개 — 처리 기록·저장 알림의 이름 표시용. 예전에 '숨김 유지'로 처리한 기록도 이름이 보여야 해서 3개를 그대로 둔다.
 export const REPORT_RESULTS = Object.freeze([

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -108,12 +110,13 @@ class CommunityApiContractTest {
 
     @Test
     void 글_목록은_items와_쪽_정보를_준다() throws Exception {
-        given(boardService.list(7L, 2, 10, "적금")).willReturn(new BoardDtos.PostPage(
-                List.of(new BoardDtos.PostSummary(3L, null, "탈퇴한 회원", 4, AT, true, false)), 2, 10, 11));
+        given(boardService.list(7L, 2, 10, "적금", null, "LOAN")).willReturn(new BoardDtos.PostPage(
+                List.of(new BoardDtos.PostSummary(3L, "LOAN", null, "탈퇴한 회원", 4, AT, true, false)), 2, 10, 11));
 
-        mvc.perform(asUser(get("/api/board/posts").param("page", "2").param("keyword", "적금")))
+        mvc.perform(asUser(get("/api/board/posts").param("page", "2").param("keyword", "적금").param("category", "LOAN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].postId").value(3))
+                .andExpect(jsonPath("$.items[0].categoryCode").value("LOAN"))
                 .andExpect(jsonPath("$.items[0].title").value((Object) null))
                 .andExpect(jsonPath("$.items[0].nickname").value("탈퇴한 회원"))
                 .andExpect(jsonPath("$.items[0].commentCount").value(4))
@@ -127,15 +130,29 @@ class CommunityApiContractTest {
 
     @Test
     void 글_상세는_댓글을_함께_준다() throws Exception {
-        given(boardService.detail(7L, 3L)).willReturn(new BoardDtos.PostDetail(3L, "제목", "내용", "닉네임", AT, null, false, true,
+        given(boardService.detail(7L, 3L)).willReturn(new BoardDtos.PostDetail(3L, "CARD", "제목", "내용", "닉네임", AT, null, false, true,
                 List.of(new BoardDtos.Comment(9L, "댓글", "다른닉", AT, false, false))));
 
         mvc.perform(asUser(get("/api/board/posts/3")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categoryCode").value("CARD"))
                 .andExpect(jsonPath("$.title").value("제목"))
                 .andExpect(jsonPath("$.mine").value(true))
                 .andExpect(jsonPath("$.comments[0].commentId").value(9))
                 .andExpect(jsonPath("$.comments[0].content").value("댓글"));
+    }
+
+    @Test
+    void 글_카테고리는_정해진_값만_받는다() throws Exception {
+        given(boardService.create(eq(7L), any())).willReturn(new BoardDtos.PostCreated(12L));
+        for (String code : List.of("CREDIT_SCORE", "LOAN", "CARD", "FREE")) {
+            mvc.perform(asUser(json(post("/api/board/posts"),
+                    "{\"title\":\"글\",\"content\":\"내용\",\"categoryCode\":\"" + code + "\"}"))).andExpect(status().isOk());
+        }
+        mvc.perform(asUser(json(put("/api/board/posts/12"), "{\"title\":\"글\",\"content\":\"내용\",\"categoryCode\":\"EMPLOYEE\"}")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("categoryCode"));
     }
 
     @Test
@@ -179,6 +196,83 @@ class CommunityApiContractTest {
         mvc.perform(asUser(json(post("/api/board/posts/3/comments"), "{\"content\":\"좋은 정보네요\"}")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.commentId").value(21));
+    }
+
+    @Test
+    @DisplayName("글 목록은 filter 쿼리를 서비스로 넘긴다")
+    void postList_passesFilter() throws Exception {
+        given(boardService.list(7L, 1, 10, null, "mine", null)).willReturn(new BoardDtos.PostPage(List.of(), 1, 10, 0));
+
+        mvc.perform(asUser(get("/api/board/posts").param("filter", "mine")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCount").value(0));
+        verify(boardService).list(7L, 1, 10, null, "mine", null);
+    }
+
+    // ---- COMM-10·11 내 댓글 수정·삭제 ----
+
+    @Test
+    @DisplayName("댓글을 고치고 지우면 빈 객체를 주고, 토큰의 회원 번호와 경로의 글·댓글 번호를 넘긴다")
+    void comment_updateAndDelete() throws Exception {
+        mvc.perform(asUser(json(put("/api/board/posts/3/comments/21"), "{\"content\":\"고친 댓글\"}")))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{}", true));
+        verify(boardService).updateComment(7L, 3L, 21L, new BoardDtos.CommentWrite("고친 댓글"));
+
+        mvc.perform(asUser(delete("/api/board/posts/3/comments/21")))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{}", true));
+        verify(boardService).deleteComment(7L, 3L, 21L);
+    }
+
+    @Test
+    @DisplayName("댓글 수정은 빈 내용·1000자 초과면 400, 로그인 전이면 수정·삭제 모두 401이다")
+    void comment_invalidAndUnauthorized() throws Exception {
+        for (String text : List.of(" ", "가".repeat(1001))) {
+            mvc.perform(asUser(json(put("/api/board/posts/3/comments/21"), "{\"content\":\"" + text + "\"}")))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                    .andExpect(jsonPath("$.fieldErrors[0].field").value("content"));
+        }
+        mvc.perform(json(put("/api/board/posts/3/comments/21"), "{\"content\":\"댓글\"}")).andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/board/posts/3/comments/21")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(boardService);
+    }
+
+    @Test
+    @DisplayName("숨겨진 댓글 오류는 공통 오류 형식 409 COMMENT_HIDDEN으로 나간다")
+    void comment_hidden_conflict() throws Exception {
+        willThrow(new ApiException(HttpStatus.CONFLICT, "COMMENT_HIDDEN", "신고로 숨김 처리된 댓글은 고치거나 지울 수 없습니다."))
+                .given(boardService).deleteComment(7L, 3L, 21L);
+
+        mvc.perform(asUser(delete("/api/board/posts/3/comments/21")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COMMENT_HIDDEN"));
+    }
+
+    // ---- COMM-09 내가 쓴 댓글 ----
+
+    @Test
+    void 내가_쓴_댓글은_일반_사용자만_보고_items와_쪽_정보를_준다() throws Exception {
+        given(boardService.myComments(7L, 2, 10, "적금", "LOAN")).willReturn(new BoardDtos.MyCommentPage(
+                List.of(new BoardDtos.MyComment(21L, 3L, "LOAN", "적금 질문", "글쓴이", null, AT, true)), 2, 10, 11));
+
+        mvc.perform(asUser(get("/api/members/me/comments").param("page", "2").param("keyword", "적금").param("category", "LOAN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].commentId").value(21))
+                .andExpect(jsonPath("$.items[0].postId").value(3))
+                .andExpect(jsonPath("$.items[0].categoryCode").value("LOAN"))
+                .andExpect(jsonPath("$.items[0].postTitle").value("적금 질문"))
+                .andExpect(jsonPath("$.items[0].content").value((Object) null))
+                .andExpect(jsonPath("$.items[0].postNickname").value("글쓴이"))
+                .andExpect(jsonPath("$.items[0].createdAt").exists())
+                .andExpect(jsonPath("$.items[0].hidden").value(true))
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalCount").value(11));
+
+        mvc.perform(get("/api/members/me/comments")).andExpect(status().isUnauthorized());
+        mvc.perform(asAdmin(get("/api/members/me/comments"))).andExpect(status().isForbidden());
     }
 
     // ---- COMM-07 신고 ----

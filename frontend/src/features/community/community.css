@@ -65,8 +65,10 @@
 .lounge-search {
   display: flex;
   gap: 8px;
-  width: min(100%, 320px);
+  width: min(100%, 420px);
 }
+
+
 
 .lounge-table__no {
   width: 56px;
@@ -402,82 +404,106 @@
   padding: 32px;
 }
 
-.lounge-hot {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.lounge-hot:empty {
-  display: none;
-}
-
-.lounge-hot__card {
+/* 조회 범위·카테고리 두 줄 — 제목 바로 아래 */
+.lounge-filters {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 140px;
-  padding: 20px;
-  border: 0;
-  border-radius: 20px;
-  background: var(--panel2);
-  color: var(--fg);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 0.2s, background 0.2s;
 }
 
-.lounge-hot__card:hover {
-  transform: translateY(-3px);
-  background: var(--sel);
+/* 조회 범위 줄 */
+.lounge-view-row {
+  display: flex;
+  align-items: center;
 }
 
-.lounge-hot__badge {
-  align-self: flex-start;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--panel);
-  color: #7c5cff;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.lounge-hot__card b {
-  font-size: 16.5px;
-  font-weight: 700;
-  line-height: 1.45;
-}
-
-.lounge-hot__meta {
-  margin-top: auto;
-  color: var(--mut2);
-  font-size: 13px;
-}
-
-.lounge-tabs {
+/* 카테고리 작은 버튼 — 조회 범위보다 작고 옅게, 고른 것은 옅은 파랑 */
+.lounge-cats {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
 }
 
-.lounge-tabs__btn {
-  padding: 9px 16px;
-  border: 1px solid var(--line2);
-  border-radius: 12px;
-  background: var(--panel);
-  color: var(--fg2);
-  font: inherit;
+/* 공통 segmented의 회색 상자를 빼고 알약 버튼으로, 고른 것은 연한 파랑 바탕 + 파란 글씨 */
+.lounge-view-row .segmented {
+  flex: none;
+  padding: 0;
+  gap: 8px;
+  background: none;
+}
+
+.lounge-view-row .segmented__button {
+  min-height: 34px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--panel2);
   font-size: 14px;
+}
+
+.lounge-view-row .segmented__button[aria-pressed='true'] {
+  background: var(--sel);
+  color: var(--acc);
+  box-shadow: none;
+}
+
+.lounge-cats__btn {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--panel2);
+  color: var(--mut);
+  font: inherit;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 
-.lounge-tabs__btn[aria-selected='true'] {
-  border-color: var(--fg);
-  background: var(--fg);
-  color: var(--panel);
+.lounge-cats__btn:hover {
+  color: var(--fg);
+}
+
+.lounge-cats__btn[aria-pressed='true'] {
+  background: var(--sel);
+  color: var(--acc);
+}
+
+/* 목록 자리 — 글 수와 상관없이 10줄 높이를 지켜 탭·카테고리·쪽을 바꿔도 화면 크기가 그대로다 */
+.lounge-results {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 724px;
+}
+
+.lounge-results__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* 새 결과를 기다리는 동안 앞 목록을 흐리게 둔다. 빨리 오면 깜빡이지 않게 잠깐 뒤에 흐려진다. */
+.lounge-results__body[inert] {
+  opacity: 0.4;
+  transition: opacity 0.15s 0.2s;
+}
+
+.lounge-results__loading {
+  position: absolute;
+  top: 96px;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  margin: 0;
+  text-align: center;
+  animation: lounge-loading 0s 0.2s backwards;
+}
+
+@keyframes lounge-loading {
+  from {
+    visibility: hidden;
+  }
 }
 
 .lounge-feed {
@@ -495,6 +521,36 @@
   padding: 4px 8px;
   border-bottom: 1px solid var(--line);
   transition: background 0.15s;
+}
+
+/* 글 줄 — 카테고리 · 제목 · 회원 · 쓴 날짜 */
+.lounge-feed__row--post {
+  grid-template-columns: 84px minmax(0, 1fr) 160px 90px;
+}
+
+.lounge-feed__category {
+  color: var(--mut);
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+/* 열 제목 줄 — 위쪽 굵은 선·회색 바탕·굵은 글자로 글 줄과 구별한다 */
+.lounge-feed__head {
+  padding: 12px 8px;
+  border-top: 2px solid var(--fg);
+  border-bottom: 0;
+  background: var(--panel2);
+}
+
+.lounge-feed__head > span {
+  color: var(--fg);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+/* 내가 쓴 댓글 줄 — 카테고리 · 게시글 제목 · 댓글 · 게시글 쓴 회원 · 댓글 쓴 날짜 */
+.lounge-feed__row--comment {
+  grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1.2fr) 160px 90px;
 }
 
 .lounge-feed__row:hover {
@@ -540,7 +596,11 @@
 }
 
 .lounge-feed__row--hidden .lounge-feed__title {
+  display: block;
+  overflow: hidden;
   color: var(--mut2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: default;
 }
 
@@ -571,7 +631,17 @@
 .lounge-feed__date {
   color: var(--mut2);
   font-size: 13.5px;
-  text-align: right;
+}
+
+/* 짧은 칸(카테고리·회원·쓴 날짜)은 열 제목과 함께 가운데 정렬. 제목·댓글은 왼쪽 그대로 */
+.lounge-feed__category,
+.lounge-feed__head > span:first-child,
+.lounge-feed__date {
+  text-align: center;
+}
+
+.lounge-feed__author {
+  justify-content: center;
 }
 
 .lounge-empty {
@@ -585,12 +655,22 @@
     padding: 22px 16px;
   }
 
-  .lounge-hot {
-    grid-template-columns: minmax(0, 1fr);
+  .lounge-feed__row {
+    grid-template-columns: minmax(0, 1fr) 76px;
   }
 
-  .lounge-feed__row {
-    grid-template-columns: minmax(0, 1fr) auto;
+  .lounge-feed__row--post {
+    grid-template-columns: 64px minmax(0, 1fr) 76px;
+    gap: 10px;
+  }
+
+  .lounge-feed__row--comment {
+    grid-template-columns: 64px minmax(0, 1fr) 76px;
+    gap: 10px;
+  }
+
+  .lounge-feed__row .lounge-feed__post {
+    display: none;
   }
 
   .lounge-feed__author {
