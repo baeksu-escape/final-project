@@ -22,6 +22,9 @@ public interface UserAccountMapper {
     // N-03 아이디 찾기 후보 — 휴대폰 HMAC이 같은 일반 회원(탈퇴 제외). 휴대폰은 UNIQUE가 아니라 여러 명일 수 있다.
     List<UserAccount> selectUsersByPhoneHmac(@Param("phoneHmac") String phoneHmac);
 
+    // FP-258 N-03-1 이메일로 아이디 찾기 대상 — 이메일 HMAC이 같은 일반 회원(탈퇴 제외). 없으면 null.
+    UserAccount selectUserByEmailHmac(@Param("emailHmac") String emailHmac);
+
     // N-03 비밀번호 재설정 대상 — 아이디·이메일 HMAC이 모두 맞는 일반 회원(탈퇴 제외). 없으면 null.
     UserAccount selectUserByLoginIdAndEmailHmac(@Param("loginId") String loginId, @Param("emailHmac") String emailHmac);
 

@@ -189,6 +189,26 @@ class PhoneVerificationServiceTest {
     }
 
     @Test
+    void 아이디_찾기_목적은_FIND_ID로_보내고_확인하며_그_토큰은_가입에_쓰지_못한다() {
+        service.send(new AuthRequests.PhoneSend(PHONE, "FIND_ID"));
+        ArgumentCaptor<VerificationCode> saved = ArgumentCaptor.forClass(VerificationCode.class);
+        verify(codeMapper).insertCode(saved.capture());
+        assertThat(saved.getValue().getPurposeCode()).isEqualTo("FIND_ID");
+
+        VerificationCode findRow = row(9L, "123456", 0, NOW.plusMinutes(3));
+        findRow.setPurposeCode("FIND_ID");
+        given(codeMapper.selectLatest("FIND_ID", HMAC.phone(PHONE))).willReturn(findRow);
+        String token = service.verify(new AuthRequests.PhoneVerify(PHONE, "123456", "FIND_ID")).verificationToken();
+        assertThat(tokenService.parsePhone(token)).contains(new VerificationTokenService.Claim(9L, "FIND_ID", HMAC.phone(PHONE)));
+
+        findRow.setVerifiedAt(NOW);
+        given(codeMapper.selectById(9L)).willReturn(findRow);
+        given(codeMapper.consume(eq(9L), any())).willReturn(1);
+        assertThat(codeOf(() -> service.consume(token, PhonePurpose.SIGNUP, PHONE))).isNotEqualTo("no error");
+        assertThat(codeOf(() -> service.consume(token, PhonePurpose.FIND_ID, PHONE))).isEqualTo("no error");
+    }
+
+    @Test
     void 다른_번호의_토큰_이메일_인증_토큰_깨진_토큰_빈_토큰은_쓰지_못한다() {
         given(codeMapper.selectById(5L)).willReturn(verifiedRow(5L));
         given(codeMapper.consume(eq(5L), any())).willReturn(1);

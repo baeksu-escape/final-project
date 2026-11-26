@@ -89,6 +89,8 @@
 --     점수대별 금리·한도(SCORE_BAND_OFFER)와 대출 상품 최소 점수(LOAN_PRODUCT.MIN_ALT_SCORE)도 새 경계에 맞춘다(더미 시드 21·22). 기존 DB는 activate_cutoff_cut_0_3.sql, 되돌리기는 rollback_cutoff_cut_0_3_to_0_1.sql.
 --  C15 [2026-11-25 · C조 동주] BOARD_POST에 글 카테고리 열 CATEGORY_CODE 추가(N-06, FP-261). 기본값 FREE(자유), CHECK 4개 값. 표 수(48)는 그대로다.
 --     기존 DB는 alter_board_post_category.sql(이미 있는 글은 모두 FREE).
+--  C16 [2026-11-26 · A팀 우찬] VERIFICATION_CODE.CK_VCD_PURPOSE에 'FIND_ID' 추가(N-03-1 아이디 찾기 휴대폰·이메일 인증, FP-258). 열·표 수(48)는 그대로다.
+--     기존 DB는 alter_verification_code_find_id.sql(제약만 다시 만든다, 인증 기록은 그대로).
 -- ====================================================================
 
 
@@ -275,7 +277,8 @@ CREATE TABLE VERIFICATION_CODE (
     CREATED_AT             TIMESTAMP            DEFAULT SYSTIMESTAMP NOT NULL,
     CONSTRAINT PK_VERIFICATION_CODE PRIMARY KEY (VERIFICATION_ID),
     CONSTRAINT FK_VCD_USER FOREIGN KEY (USER_ID) REFERENCES APP_USER (USER_ID),
-    CONSTRAINT CK_VCD_PURPOSE CHECK (PURPOSE_CODE IN ('SIGNUP', 'FIND_PASSWORD', 'CHANGE_EMAIL', 'ADMIN_LOGIN')),
+    -- v0.3.2 (C16) FIND_ID 추가: 아이디 찾기 휴대폰·이메일 인증(FP-258)
+    CONSTRAINT CK_VCD_PURPOSE CHECK (PURPOSE_CODE IN ('SIGNUP', 'FIND_PASSWORD', 'CHANGE_EMAIL', 'ADMIN_LOGIN', 'FIND_ID')),
     CONSTRAINT CK_VCD_CHANNEL CHECK (CHANNEL_CODE IN ('EMAIL', 'PHONE'))
 );
 COMMENT ON TABLE  VERIFICATION_CODE IS '인증코드 발송·확인 이력 (N-02-3, N-03-2, N-04-3, 관리자 2단계 인증)';

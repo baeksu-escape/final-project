@@ -52,33 +52,39 @@ public final class AuthRequests {
             @NotBlank(message = "인증 목적이 필요합니다.") String purpose) {
     }
 
-    // AUTH-07 인증코드 발송. purpose: SIGNUP | RESET_PASSWORD | CHANGE_EMAIL
+    // AUTH-07 인증코드 발송. purpose: SIGNUP | RESET_PASSWORD | CHANGE_EMAIL | FIND_ID(FP-258)
     public record EmailSend(
             @NotBlank(message = "이메일을 입력해 주세요.") String email,
             @NotBlank(message = "인증 목적이 필요합니다.") String purpose,
             String loginId) {
     }
 
-    // AUTH-08 인증코드 확인. 재설정 목적이면 loginId도 온다.
+    // AUTH-08 인증코드 확인. 재설정 목적이면 loginId와 name(FP-258)도 온다.
     public record EmailVerify(
             @NotBlank(message = "이메일을 입력해 주세요.") String email,
             @NotBlank(message = "인증코드를 입력해 주세요.") String code,
             @NotBlank(message = "인증 목적이 필요합니다.") String purpose,
-            String loginId) {
+            String loginId,
+            String name) {
     }
 
-    // AUTH-09 아이디 찾기(이름·휴대폰, 사용자 결정)
+    // AUTH-09 아이디 찾기(FP-258) — 이름 + 휴대폰 또는 이메일 인증. method: PHONE | EMAIL.
+    // 방법에 맞는 칸(phone 또는 email)과 그 인증 토큰(FIND_ID 목적)을 함께 보낸다. 칸 검사는 서비스가 방법에 따라 한다.
     public record FindId(
             @NotBlank(message = "이름을 입력해 주세요.") String name,
-            @NotBlank(message = "휴대폰 번호를 입력해 주세요.") String phone) {
+            String phone,
+            String method,
+            String email,
+            String verificationToken) {
     }
 
-    // AUTH-10 비밀번호 재설정
+    // AUTH-10 비밀번호 재설정. FP-258 name이 아이디·이메일과 같은 계정이어야 한다.
     public record PasswordReset(
             @NotBlank(message = "아이디를 입력해 주세요.") String loginId,
             @NotBlank(message = "이메일을 입력해 주세요.") String email,
             @NotBlank(message = "이메일 인증을 완료해 주세요.") String emailVerificationToken,
-            @NotBlank(message = "비밀번호를 입력해 주세요.") String newPassword) {
+            @NotBlank(message = "비밀번호를 입력해 주세요.") String newPassword,
+            String name) {
     }
 
     // AUTH-04 간편 로그인 코드 교환

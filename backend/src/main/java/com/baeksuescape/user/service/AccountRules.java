@@ -52,6 +52,11 @@ public final class AccountRules {
         return value == null ? "" : value.replaceAll("\\D", "");
     }
 
+    // FP-258 아이디·비밀번호 찾기 본인 확인 — 입력한 이름(앞뒤 공백 제거)이 복호화한 가입 이름과 같은지 본다. 비었으면 다르다고 본다.
+    public static boolean nameMatches(String input, String storedName) {
+        return input != null && !input.isBlank() && input.strip().equals(storedName);
+    }
+
     // 숫자만 남긴 휴대폰 형식(010·011·016~019로 시작하는 10~11자리).
     public static boolean isValidPhone(String digits) {
         return digits != null && PHONE.matcher(digits).matches();

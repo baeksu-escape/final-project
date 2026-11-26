@@ -8,7 +8,9 @@ import java.util.Optional;
 public enum EmailPurpose {
     SIGNUP("SIGNUP"),
     RESET_PASSWORD("FIND_PASSWORD"),
-    CHANGE_EMAIL("CHANGE_EMAIL");
+    CHANGE_EMAIL("CHANGE_EMAIL"),
+    // FP-258 아이디 찾기(이메일 인증). 가입 여부를 알려 주지 않도록 항상 보낸다.
+    FIND_ID("FIND_ID");
 
     private final String dbCode;
 

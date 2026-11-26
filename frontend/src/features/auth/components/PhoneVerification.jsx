@@ -13,7 +13,7 @@ const toFourDigits = (value) => value.replace(/\D/g, '').slice(0, 4)
 const IDLE_FLOW = { target: null, status: 'idle', message: '', codeOpen: false }
 
 // N-02 휴대폰 입력·인증(11/18 1차 시연 후속) — `010 - [가운데 4자리] - [끝 4자리] [인증번호 받기]` 한 줄과, 받은 뒤 열리는 6자리 확인 칸.
-// 구조는 EmailVerification과 같다: 번호 칸 값은 부모가 갖고, 이 컴포넌트는 발송 → 코드 입력 → [확인]을 맡는다. 회원가입에서만 쓴다.
+// 구조는 EmailVerification과 같다: 번호 칸 값은 부모가 갖고, 이 컴포넌트는 발송 → 코드 입력 → [확인]을 맡는다. 회원가입과 아이디 찾기(FP-258)에서 쓴다.
 // 사용 예:
 //   <PhoneVerification
 //     middle={form.phoneMiddle} last={form.phoneLast}

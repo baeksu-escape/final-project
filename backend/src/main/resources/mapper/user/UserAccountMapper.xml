@@ -16,7 +16,8 @@
         NAME_ENC AS nameEnc, PHONE_ENC AS phoneEnc, PHONE_HMAC AS phoneHmac, EMAIL_ENC AS emailEnc, EMAIL_HMAC AS emailHmac,
         BIRTH_YEAR AS birthYear, WORKER_TYPE_CODE AS workerTypeCode, ROLE_CODE AS roleCode,
         ACCOUNT_STATUS_CODE AS accountStatusCode, LOGIN_FAIL_COUNT AS loginFailCount,
-        PASSWORD_CHANGE_REQUIRED_YN AS passwordChangeRequiredYn, LAST_LOGIN_AT AS lastLoginAt, CREATED_AT AS createdAt
+        PASSWORD_CHANGE_REQUIRED_YN AS passwordChangeRequiredYn, LAST_LOGIN_AT AS lastLoginAt, CREATED_AT AS createdAt,
+        UPDATED_AT AS updatedAt
     </sql>
 
     <select id="selectById" resultType="com.baeksuescape.user.dto.UserAccount">
@@ -39,6 +40,15 @@
            AND ROLE_CODE = 'ROLE_USER'
            AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
          ORDER BY USER_ID
+    </select>
+
+    <!-- FP-258 N-03-1 이메일로 아이디 찾기: 일반 회원만, 탈퇴 회원 제외(EMAIL_HMAC은 UNIQUE라 한 행) -->
+    <select id="selectUserByEmailHmac" resultType="com.baeksuescape.user.dto.UserAccount">
+        SELECT <include refid="accountColumns"/>
+          FROM APP_USER
+         WHERE EMAIL_HMAC = #{emailHmac}
+           AND ROLE_CODE = 'ROLE_USER'
+           AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
     </select>
 
     <!-- N-03 비밀번호 재설정 대상: 일반 회원만, 탈퇴 회원 제외 -->
@@ -90,7 +100,7 @@
         UPDATE APP_USER
            SET LOGIN_FAIL_COUNT = #{failCount}
         <if test="lock">
-             , ACCOUNT_STATUS_CODE = 'LOCKED', LOCKED_AT = #{now}, LOCK_REASON = '비밀번호 5회 연속 실패'
+             , ACCOUNT_STATUS_CODE = 'LOCKED', LOCKED_AT = #{now}, LOCK_REASON = '비밀번호 10회 실패'
         </if>
              , UPDATED_AT = #{now}
          WHERE USER_ID = #{userId}

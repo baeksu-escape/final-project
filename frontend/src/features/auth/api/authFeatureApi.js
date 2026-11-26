@@ -49,17 +49,17 @@ export function requestEmailCode(payload) {
   return apiPost(AUTH_FEATURE_API.EMAIL_SEND, payload)
 }
 
-// 이메일 인증코드 확인 — { email, code, purpose, loginId? } → { verificationToken }
+// 이메일 인증코드 확인 — { email, code, purpose, loginId?, name?(재설정, FP-258) } → { verificationToken }
 export function verifyEmailCode(payload) {
   return apiPost(AUTH_FEATURE_API.EMAIL_VERIFY, payload)
 }
 
-// N-03 아이디 찾기 — { name, phone } → { maskedLoginId }
+// N-03-1 아이디 찾기(FP-258) — { method: PHONE|EMAIL, name, phone 또는 email, verificationToken } → { maskedLoginId, loginId }
 export function requestFindId(payload) {
   return apiPost(AUTH_FEATURE_API.FIND_ID, payload)
 }
 
-// N-03 비밀번호 재설정 — { loginId, email, emailVerificationToken, newPassword } → {}
+// N-03 비밀번호 재설정 — { loginId, name(FP-258), email, emailVerificationToken, newPassword } → {}
 export function requestPasswordReset(payload) {
   return apiPost(AUTH_FEATURE_API.PASSWORD_RESET, payload)
 }

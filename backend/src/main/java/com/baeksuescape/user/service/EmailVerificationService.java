@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.baeksuescape.global.config.AvenueProperties;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
+import com.baeksuescape.global.util.PiiCrypto;
 import com.baeksuescape.global.util.PiiHmac;
 import com.baeksuescape.user.dto.AuthRequests;
 import com.baeksuescape.user.dto.AuthResponses;
@@ -42,12 +43,15 @@ public class EmailVerificationService {
     private final EmailCodeSender sender;
     private final PasswordEncoder passwordEncoder;
     private final PiiHmac hmac;
+    // FP-258 재설정 목적 확인에서 가입 이름을 복호화해 입력한 이름과 비교한다.
+    private final PiiCrypto crypto;
     private final AvenueProperties properties;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
     public EmailVerificationService(VerificationCodeMapper codeMapper, UserAccountMapper userMapper, VerificationTokenService tokenService,
-            EmailCodeSender sender, PasswordEncoder passwordEncoder, PiiHmac hmac, AvenueProperties properties, Clock clock) {
+            EmailCodeSender sender, PasswordEncoder passwordEncoder, PiiHmac hmac, PiiCrypto crypto, AvenueProperties properties, Clock clock) {
+        this.crypto = crypto;
         this.codeMapper = codeMapper;
         this.userMapper = userMapper;
         this.tokenService = tokenService;
@@ -82,7 +86,8 @@ public class EmailVerificationService {
     }
 
     // AUTH-08 인증코드 확인. 같은 목적·대상의 최근 코드만 본다. 틀리면 시도 횟수를 올리고 5회가 되면 그 코드는 쓸 수 없다.
-    // 재설정 목적이면 코드가 맞은 뒤 아이디·이메일이 같은 일반 회원이 있는지 보고, 없으면 404(프론트 mock과 같은 순서).
+    // 재설정 목적이면 코드가 맞은 뒤 아이디·이메일·이름(FP-258)이 같은 일반 회원이 있는지 보고, 없으면 404(프론트 mock과 같은 순서).
+    // 아이디 찾기(FIND_ID) 목적은 계정을 보지 않는다 — 찾기 요청(AUTH-09)이 토큰을 쓸 때 이름과 함께 확인한다.
     @Transactional(noRollbackFor = ApiException.class)
     public AuthResponses.EmailVerified verify(AuthRequests.EmailVerify request) {
         EmailPurpose purpose = purposeOf(request.purpose());
@@ -101,7 +106,7 @@ public class EmailVerificationService {
         Long userId = null;
         if (purpose == EmailPurpose.RESET_PASSWORD) {
             UserAccount account = request.loginId() == null ? null : userMapper.selectUserByLoginIdAndEmailHmac(request.loginId().strip(), target);
-            if (account == null) throw AuthErrors.accountNotFound();
+            if (account == null || !AccountRules.nameMatches(request.name(), crypto.decrypt(account.getNameEnc()))) throw AuthErrors.accountNotFound();
             userId = account.getUserId();
         }
         codeMapper.markVerified(row.getVerificationId(), userId, now, now.plus(VerificationTokenService.LIFETIME));

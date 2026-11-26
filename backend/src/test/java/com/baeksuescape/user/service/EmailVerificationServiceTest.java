@@ -1,6 +1,7 @@
 package com.baeksuescape.user.service;
 
 import static com.baeksuescape.user.service.UserFixtures.CLOCK;
+import static com.baeksuescape.user.service.UserFixtures.CRYPTO;
 import static com.baeksuescape.user.service.UserFixtures.ENCODER;
 import static com.baeksuescape.user.service.UserFixtures.HMAC;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,7 +57,7 @@ class EmailVerificationServiceTest {
         properties = TestKeys.properties();
         tokenService = new VerificationTokenService(properties, CLOCK);
         service = new EmailVerificationService(codeMapper, userMapper, tokenService, (email, code, purpose) -> sentCodes.add(code),
-                ENCODER, HMAC, properties, CLOCK);
+                ENCODER, HMAC, CRYPTO, properties, CLOCK);
     }
 
     private static String codeOf(Runnable action) {
@@ -127,7 +128,7 @@ class EmailVerificationServiceTest {
     @Test
     void 맞는_코드면_확인을_기록하고_인증_토큰을_준다() {
         given(codeMapper.selectLatest("SIGNUP", HMAC.email(EMAIL))).willReturn(row(5L, "SIGNUP", "123456", 0, NOW.plusMinutes(3)));
-        String token = service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "SIGNUP", null)).verificationToken();
+        String token = service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "SIGNUP", null, null)).verificationToken();
         assertThat(tokenService.parse(token)).contains(new VerificationTokenService.Claim(5L, "SIGNUP", HMAC.email(EMAIL)));
         verify(codeMapper).markVerified(eq(5L), isNull(), eq(NOW), eq(NOW.plusMinutes(10)));
     }
@@ -135,35 +136,55 @@ class EmailVerificationServiceTest {
     @Test
     void 틀린_코드는_400이고_시도_횟수를_올린다() {
         given(codeMapper.selectLatest("SIGNUP", HMAC.email(EMAIL))).willReturn(row(5L, "SIGNUP", "123456", 0, NOW.plusMinutes(3)));
-        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "000000", "SIGNUP", null)))).isEqualTo("400 INVALID_VERIFICATION_CODE");
+        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "000000", "SIGNUP", null, null)))).isEqualTo("400 INVALID_VERIFICATION_CODE");
         verify(codeMapper).increaseAttempt(5L);
     }
 
     @Test
     void 다섯_번_틀린_코드와_만료된_코드와_이미_확인한_코드는_맞아도_400() {
         given(codeMapper.selectLatest("SIGNUP", HMAC.email(EMAIL))).willReturn(row(5L, "SIGNUP", "123456", 5, NOW.plusMinutes(3)));
-        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "SIGNUP", null)))).isEqualTo("400 INVALID_VERIFICATION_CODE");
+        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "SIGNUP", null, null)))).isEqualTo("400 INVALID_VERIFICATION_CODE");
 
         given(codeMapper.selectLatest("SIGNUP", HMAC.email(EMAIL))).willReturn(row(6L, "SIGNUP", "123456", 0, NOW.minusSeconds(1)));
-        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "SIGNUP", null)))).isEqualTo("400 INVALID_VERIFICATION_CODE");
+        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "SIGNUP", null, null)))).isEqualTo("400 INVALID_VERIFICATION_CODE");
 
         VerificationCode verified = row(7L, "SIGNUP", "123456", 0, NOW.plusMinutes(3));
         verified.setVerifiedAt(NOW.minusMinutes(1));
         given(codeMapper.selectLatest("SIGNUP", HMAC.email(EMAIL))).willReturn(verified);
-        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "SIGNUP", null)))).isEqualTo("400 INVALID_VERIFICATION_CODE");
+        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "SIGNUP", null, null)))).isEqualTo("400 INVALID_VERIFICATION_CODE");
 
         verify(codeMapper, never()).increaseAttempt(anyLong());
         verify(codeMapper, never()).markVerified(anyLong(), any(), any(), any());
     }
 
     @Test
-    void 재설정_목적은_아이디와_이메일이_같은_계정이_있어야_한다() {
+    void 재설정_목적은_아이디와_이메일과_이름이_같은_계정이_있어야_한다() {
         given(codeMapper.selectLatest("FIND_PASSWORD", HMAC.email(EMAIL))).willReturn(row(5L, "FIND_PASSWORD", "123456", 0, NOW.plusMinutes(3)));
-        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "RESET_PASSWORD", "nobody")))).isEqualTo("404 ACCOUNT_NOT_FOUND");
+        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "RESET_PASSWORD", "nobody", "홍길동")))).isEqualTo("404 ACCOUNT_NOT_FOUND");
 
         given(userMapper.selectUserByLoginIdAndEmailHmac("newbie01", HMAC.email(EMAIL))).willReturn(UserFixtures.user(42L, "newbie01"));
-        service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "RESET_PASSWORD", "newbie01"));
+        // FP-258 이름이 다르거나 비면 아이디·이메일이 맞아도 같은 404이고, 코드는 확인 처리되지 않는다.
+        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "RESET_PASSWORD", "newbie01", "김철수")))).isEqualTo("404 ACCOUNT_NOT_FOUND");
+        assertThat(codeOf(() -> service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "RESET_PASSWORD", "newbie01", null)))).isEqualTo("404 ACCOUNT_NOT_FOUND");
+        verify(codeMapper, never()).markVerified(anyLong(), any(), any(), any());
+
+        service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "RESET_PASSWORD", "newbie01", " 홍길동 "));
         verify(codeMapper).markVerified(eq(5L), eq(42L), any(), any());
+    }
+
+    @Test
+    void 아이디_찾기_목적은_가입_여부와_상관없이_보내고_확인에서_계정을_보지_않는다() {
+        given(userMapper.countByEmailHmac(HMAC.email(EMAIL))).willReturn(1);
+        service.send(new AuthRequests.EmailSend(EMAIL, "FIND_ID", null));
+        ArgumentCaptor<VerificationCode> saved = ArgumentCaptor.forClass(VerificationCode.class);
+        verify(codeMapper).insertCode(saved.capture());
+        assertThat(saved.getValue().getPurposeCode()).isEqualTo("FIND_ID");
+        assertThat(sentCodes).hasSize(1);
+
+        given(codeMapper.selectLatest("FIND_ID", HMAC.email(EMAIL))).willReturn(row(7L, "FIND_ID", "123456", 0, NOW.plusMinutes(3)));
+        assertThat(service.verify(new AuthRequests.EmailVerify(EMAIL, "123456", "FIND_ID", null, null)).verificationToken()).isNotBlank();
+        verify(codeMapper).markVerified(eq(7L), isNull(), any(), any());
+        verify(userMapper, never()).selectUserByLoginIdAndEmailHmac(any(), any());
     }
 
     // ---- 인증 토큰 한 번 쓰기 ----

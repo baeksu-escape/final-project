@@ -117,7 +117,7 @@ class SecurityConfigTest {
         mvc.perform(get("/api/members/me/__test/ping").header(HttpHeaders.AUTHORIZATION, bearer(11L, "ROLE_USER")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"))
-                .andExpect(jsonPath("$.message").value("잠긴 계정입니다. 관리자에게 문의해 주세요."));
+                .andExpect(jsonPath("$.message").value("잠긴 계정입니다. 비밀번호 찾기에서 이메일 인증 후 비밀번호를 재설정하면 풀립니다."));
         mvc.perform(get("/api/admin/__test/ping").header(HttpHeaders.AUTHORIZATION, bearer(12L, "ROLE_ADMIN")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"));

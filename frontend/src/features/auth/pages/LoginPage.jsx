@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { requestLogin } from '../../../common/api/authApi.js'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { Button, TextInput, Toast } from '../../../common/components/index.js'
@@ -20,6 +20,7 @@ function toLoginErrorMessage(error) {
   // 관리자 로그인 준비 중 안내는 서버 문구를 그대로 보여 준다(비밀번호가 틀렸다고 잘못 보이지 않게).
   if (error?.data?.code === AUTH_ERROR_CODES.ADMIN_2FA_NOT_READY) return error.message
   // FP-80 관리자 인증번호를 1분 안에 다시 요청하면 429 — 서버 문구(잠시 뒤 다시 시도)를 그대로 보여 준다.
+  // FP-258 로그인 5회 실패 뒤 5분 제한(429 LOGIN_TEMPORARILY_BLOCKED)도 남은 분이 담긴 서버 문구를 그대로 보여 준다.
   if (error?.status === 0 || error?.status === 429) return error.message
   return LOGIN_FAILED_MESSAGE
 }
@@ -155,6 +156,12 @@ export default function LoginPage() {
           <p className="auth-form__error" role="alert">
             {formError}
           </p>
+        )}
+        {/* FP-258 잠긴 계정은 비밀번호 재설정으로 풀린다 — 안내 바로 아래에 비밀번호 찾기로 가는 글자 링크를 둔다. */}
+        {formError === ACCOUNT_LOCKED_MESSAGE && (
+          <Link to={AUTH_PATHS.FIND_PASSWORD} className="text-link">
+            비밀번호 찾기
+          </Link>
         )}
         {/* 11/18 1차 시연 후속: 헤더 버튼을 하나로 합쳐서, 회원가입은 [로그인] 옆 보조 버튼으로 들어간다(좌우 한 줄, 아주 좁은 창에서만 위아래). 아래 링크 줄에서는 [회원가입]을 뺀다. */}
         <div className="login-form__actions">

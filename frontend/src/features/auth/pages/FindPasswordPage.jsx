@@ -13,12 +13,14 @@ import '../auth.css'
 
 // N-03 비밀번호 찾기 화면 — ① 아이디·이메일 인증 → ② 새 비밀번호 재설정 → ③ 완료 순서로 진행한다.
 // 11/18 화면 확인 후속: 이메일은 회원가입과 같은 한 줄 칸(SplitEmailField: 앞부분 @ 도메인 선택 [인증코드 받기])으로 받는다.
+// FP-258 N-03-2 아이디·이름·이메일이 모두 같은 계정만 통과한다(코드 확인과 재설정 둘 다 서버가 확인, 다르면 같은 404 문구).
 export default function FindPasswordPage() {
   const [step, setStep] = useState('verify')
   const [loginId, setLoginId] = useState('')
+  const [name, setName] = useState('')
   // 이메일 앞부분·도메인 선택·직접 입력 도메인. 합친 값(email)으로 인증한다.
   const [emailParts, setEmailParts] = useState({ emailLocal: '', emailDomainChoice: '', emailCustomDomain: '' })
-  const [verification, setVerification] = useState(null) // { loginId, email, verificationToken }
+  const [verification, setVerification] = useState(null) // { loginId, name, email, verificationToken }
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [passwordErrors, setPasswordErrors] = useState({})
@@ -26,8 +28,10 @@ export default function FindPasswordPage() {
   const [pending, setPending] = useState(false)
 
   const email = joinEmail(emailParts.emailLocal, resolveEmailDomain(emailParts.emailDomainChoice, emailParts.emailCustomDomain))
-  // 인증받은 뒤 아이디나 이메일을 바꾸면 인증이 풀린 것으로 본다.
-  const verified = verification !== null && verification.loginId === loginId.trim() && verification.email === email
+  // 인증받은 뒤 아이디·이름·이메일을 바꾸면 인증이 풀린 것으로 본다.
+  const verified =
+    verification !== null && verification.loginId === loginId.trim() && verification.name === name.trim() && verification.email === email
+  const ready = loginId.trim() !== '' && name.trim() !== ''
 
   const handleReset = async (event) => {
     event.preventDefault()
@@ -40,6 +44,7 @@ export default function FindPasswordPage() {
     try {
       await requestPasswordReset({
         loginId: verification.loginId,
+        name: verification.name,
         email: verification.email,
         emailVerificationToken: verification.verificationToken,
         newPassword: password,
@@ -106,16 +111,17 @@ export default function FindPasswordPage() {
       <h1 className="auth-page__title">비밀번호 찾기</h1>
       <div className="auth-form find-password-form">
         <TextInput label="아이디" value={loginId} onChange={setLoginId} autoComplete="username" />
+        <TextInput label="이름" value={name} onChange={setName} autoComplete="name" hint="가입할 때 입력한 이름" />
         <SplitEmailField
           local={emailParts.emailLocal}
           domainChoice={emailParts.emailDomainChoice}
           customDomain={emailParts.emailCustomDomain}
           onChange={(patch) => setEmailParts((prev) => ({ ...prev, ...patch }))}
           purpose={EMAIL_PURPOSES.RESET_PASSWORD}
-          extraBody={{ loginId: loginId.trim() }}
-          disabled={!loginId.trim()}
+          extraBody={{ loginId: loginId.trim(), name: name.trim() }}
+          disabled={!ready}
           verified={verified}
-          onVerified={({ verificationToken }) => setVerification({ loginId: loginId.trim(), email, verificationToken })}
+          onVerified={({ verificationToken }) => setVerification({ loginId: loginId.trim(), name: name.trim(), email, verificationToken })}
         />
         <button type="button" className="auth-form__submit" onClick={() => setStep('reset')} disabled={!verified}>
           다음

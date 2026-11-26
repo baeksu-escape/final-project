@@ -1,6 +1,7 @@
 package com.baeksuescape.user.service;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +31,13 @@ import com.baeksuescape.user.service.social.DevSocialStore;
 @Service
 public class AuthService {
 
-    static final int MAX_LOGIN_FAILURES = 5;
+    // FP-258 단계적 제한: 5회 실패하면 5분 동안 로그인을 막고, 누적 10회면 잠근다(비밀번호 찾기 재설정이나 관리자가 푼다).
+    static final int TEMP_BLOCK_FAILURES = 5;
+    static final int TEMP_BLOCK_MINUTES = 5;
+    static final int MAX_LOGIN_FAILURES = 10;
+    // FP-258 AUTH-09 아이디 찾기 방법(프론트 authConstants.js FIND_ID_METHODS와 같은 값)
+    static final String FIND_ID_PHONE = "PHONE";
+    static final String FIND_ID_EMAIL = "EMAIL";
     static final String LOG_SOURCE = "auth-service";
 
     private final UserAccountMapper userMapper;
@@ -79,32 +86,51 @@ public class AuthService {
         return loginResponse(account);
     }
 
-    // 아이디·비밀번호를 확인한다. 로그인과 간편 로그인 연결(AUTH-05)이 같은 규칙을 쓴다.
+    // 아이디·비밀번호를 확인한다. 로그인과 간편 로그인 연결(AUTH-05)이 같은 규칙을 쓴다(FP-258 단계적 제한).
     //   없는 계정·탈퇴·비밀번호 없는 계정·틀린 비밀번호 → 401(어느 쪽이 틀렸는지 알리지 않음)
-    //   틀리면 실패 횟수 +1, 5회째면 잠그고 423. 잠긴 계정은 비밀번호가 맞을 때만 423으로 알린다(프론트 mock과 같은 순서).
+    //   잠긴 계정은 횟수를 세지 않고, 비밀번호가 맞을 때만 423으로 알린다(프론트 mock과 같은 순서).
+    //   5회째 실패하면 그때부터 5분 동안 비밀번호와 상관없이 429(제한 중에는 횟수를 올리지 않음). 10회째면 잠그고 423.
     @Transactional(noRollbackFor = ApiException.class)
     public UserAccount authenticate(String loginId, String password) {
         UserAccount account = userMapper.selectByLoginId(loginId.strip());
         if (account == null || account.isWithdrawn() || account.getPasswordHash() == null) throw AuthErrors.loginFailed();
-        if (!passwordEncoder.matches(password, account.getPasswordHash())) {
-            if (!account.isLocked()) {
-                int failures = account.getLoginFailCount() + 1;
-                boolean lock = failures >= MAX_LOGIN_FAILURES;
-                userMapper.updateLoginFailure(account.getUserId(), failures, lock, LocalDateTime.now(clock));
-                // FP-80 N-28-1 로그인 실패 n/5회, 5회째 자동 잠금(WARN). 아이디는 가린 값만 남긴다.
-                String masked = SystemLogService.maskLoginId(account.getLoginId());
-                systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 실패 " + failures + "/" + MAX_LOGIN_FAILURES + "회 (" + masked + ")",
+        boolean passwordMatches = passwordEncoder.matches(password, account.getPasswordHash());
+        if (account.isLocked()) {
+            if (passwordMatches) throw AuthErrors.accountLocked();
+            throw AuthErrors.loginFailed();
+        }
+        LocalDateTime now = LocalDateTime.now(clock);
+        long blockedMinutes = remainingBlockMinutes(account, now);
+        if (blockedMinutes > 0) throw AuthErrors.loginTemporarilyBlocked(blockedMinutes);
+        if (!passwordMatches) {
+            int failures = account.getLoginFailCount() + 1;
+            boolean lock = failures >= MAX_LOGIN_FAILURES;
+            userMapper.updateLoginFailure(account.getUserId(), failures, lock, now);
+            // FP-80 N-28-1 로그인 실패 n/10회(WARN), 5회째 5분 제한, 10회째 자동 잠금. 아이디는 가린 값만 남긴다.
+            String masked = SystemLogService.maskLoginId(account.getLoginId());
+            systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 실패 " + failures + "/" + MAX_LOGIN_FAILURES + "회 (" + masked + ")",
+                    account.getUserId());
+            if (lock) {
+                systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 " + MAX_LOGIN_FAILURES + "회 실패로 계정 자동 잠금 (" + masked + ")",
                         account.getUserId());
-                if (lock) {
-                    systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 " + MAX_LOGIN_FAILURES + "회 실패로 계정 자동 잠금 (" + masked + ")",
-                            account.getUserId());
-                    throw AuthErrors.accountLocked();
-                }
+                throw AuthErrors.accountLocked();
+            }
+            if (failures == TEMP_BLOCK_FAILURES) {
+                systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE,
+                        "로그인 " + TEMP_BLOCK_FAILURES + "회 실패로 " + TEMP_BLOCK_MINUTES + "분 제한 (" + masked + ")", account.getUserId());
+                throw AuthErrors.loginTemporarilyBlocked(TEMP_BLOCK_MINUTES);
             }
             throw AuthErrors.loginFailed();
         }
-        if (account.isLocked()) throw AuthErrors.accountLocked();
         return account;
+    }
+
+    // FP-258 5분 제한의 남은 분(올림). 실패 횟수가 정확히 5회이고 그 실패를 기록한 시각(UPDATED_AT)에서 5분이 안 지났을 때만 0보다 크다.
+    private static long remainingBlockMinutes(UserAccount account, LocalDateTime now) {
+        if (account.getLoginFailCount() != TEMP_BLOCK_FAILURES || account.getUpdatedAt() == null) return 0;
+        long seconds = Duration.between(now, account.getUpdatedAt().plusMinutes(TEMP_BLOCK_MINUTES)).getSeconds();
+        if (seconds <= 0) return 0;
+        return (seconds + 59) / 60;
     }
 
     // 로그인 성공 처리(실패 횟수 0, 마지막 로그인 시각)와 응답. 간편 로그인도 쓴다.
@@ -225,19 +251,40 @@ public class AuthService {
         return AuthErrors.duplicateLoginId();
     }
 
-    // AUTH-09 아이디 찾기(이름·휴대폰). 휴대폰 HMAC으로 후보를 찾고 이름을 복호화해 비교한다. 탈퇴·관리자 계정은 찾지 않는다.
+    // AUTH-09 N-03-1 아이디 찾기(FP-258) — 이름 + 휴대폰 또는 이메일 인증(FIND_ID 목적 토큰). 토큰이 없거나 맞지 않으면 400(가입의 인증 오류와 같음).
+    // 토큰을 먼저 한 번 쓰고, 휴대폰·이메일 HMAC으로 찾은 일반 회원 중 이름(복호화)이 같은 계정의 아이디를 가리지 않고 준다.
+    // 일치하는 계정이 없으면 404이고 트랜잭션이 되돌아가 토큰은 다시 쓸 수 있다. 탈퇴·관리자 계정은 찾지 않는다.
+    @Transactional
     public AuthResponses.FoundId findId(AuthRequests.FindId request) {
-        String phone = AccountRules.normalizePhone(request.phone());
-        String name = request.name().strip();
-        if (phone.isEmpty()) throw AuthErrors.accountNotFound();
-        return userMapper.selectUsersByPhoneHmac(hmac.phone(phone)).stream()
-                .filter(account -> name.equals(crypto.decrypt(account.getNameEnc())))
+        String method = request.method() == null ? "" : request.method().strip();
+        if (!FIND_ID_PHONE.equals(method) && !FIND_ID_EMAIL.equals(method)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "아이디를 찾을 방법을 골라 주세요.",
+                    List.of(new FieldErrorItem("method", "아이디를 찾을 방법을 골라 주세요.")));
+        }
+        // 토큰이 없으면 가입과 같은 오류로 막는다: 휴대폰은 400 INVALID_INPUT(phone 칸), 이메일은 400 EMAIL_VERIFICATION_REQUIRED.
+        if (isBlank(request.verificationToken())) {
+            throw FIND_ID_PHONE.equals(method) ? PhoneVerificationService.verificationRequired() : EmailVerificationService.verificationRequired();
+        }
+        List<UserAccount> candidates;
+        if (FIND_ID_PHONE.equals(method)) {
+            String phone = AccountRules.normalizePhone(request.phone());
+            phoneVerification.consume(request.verificationToken(), PhonePurpose.FIND_ID, phone);
+            candidates = userMapper.selectUsersByPhoneHmac(hmac.phone(phone));
+        } else {
+            String email = request.email() == null ? "" : request.email().strip();
+            emailVerification.consume(request.verificationToken(), EmailPurpose.FIND_ID, email, null);
+            UserAccount account = userMapper.selectUserByEmailHmac(hmac.email(email));
+            candidates = account == null ? List.of() : List.of(account);
+        }
+        return candidates.stream()
+                .filter(account -> AccountRules.nameMatches(request.name(), crypto.decrypt(account.getNameEnc())))
                 .findFirst()
-                .map(account -> new AuthResponses.FoundId(AccountRules.maskLoginId(account.getLoginId())))
+                .map(account -> new AuthResponses.FoundId(AccountRules.maskLoginId(account.getLoginId()), account.getLoginId()))
                 .orElseThrow(AuthErrors::accountNotFound);
     }
 
     // AUTH-10 비밀번호 재설정 — 이메일 인증 토큰(재설정 목적, 확인 때 찾은 계정)을 한 번 쓰고 새 비밀번호로 바꾼다. 잠긴 계정은 풀린다.
+    // FP-258 아이디·이메일에 이름(복호화 비교)까지 같은 계정만 통과한다. 하나라도 다르면 같은 404.
     // FP-80 관리자는 쓸 수 없다: 조회가 일반 회원만 찾으므로(selectUserByLoginIdAndEmailHmac) 관리자 아이디는 "없는 계정"과 같은 404가 된다.
     @Transactional
     public void resetPassword(AuthRequests.PasswordReset request) {
@@ -247,7 +294,7 @@ public class AuthService {
         }
         String email = request.email().strip();
         UserAccount account = userMapper.selectUserByLoginIdAndEmailHmac(request.loginId().strip(), hmac.email(email));
-        if (account == null) throw AuthErrors.accountNotFound();
+        if (account == null || !AccountRules.nameMatches(request.name(), crypto.decrypt(account.getNameEnc()))) throw AuthErrors.accountNotFound();
         emailVerification.consume(request.emailVerificationToken(), EmailPurpose.RESET_PASSWORD, email, account.getUserId());
         userMapper.updatePasswordAndUnlock(account.getUserId(), passwordEncoder.encode(request.newPassword()), LocalDateTime.now(clock));
     }
