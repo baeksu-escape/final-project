@@ -14,9 +14,13 @@ import com.baeksuescape.community.dto.PostRow;
 public interface BoardMapper {
 
     // N-06-1 목록: 삭제 글을 빼고 최신순. likePattern은 '%검색어%'(특수문자는 \로 막은 값)이고 null이면 전체.
-    List<PostRow> selectPosts(@Param("likePattern") String likePattern, @Param("offset") int offset, @Param("limit") int limit);
+    // ownerUserId가 있으면 그 회원 글만 준다.
+    // category가 있으면 그 카테고리의 보이는 글만 준다.
+    List<PostRow> selectPosts(@Param("likePattern") String likePattern, @Param("ownerUserId") Long ownerUserId,
+            @Param("category") String category, @Param("offset") int offset, @Param("limit") int limit);
 
-    int countPosts(@Param("likePattern") String likePattern);
+    int countPosts(@Param("likePattern") String likePattern, @Param("ownerUserId") Long ownerUserId,
+            @Param("category") String category);
 
     // 글 한 개(상태와 상관없이). 없으면 null
     PostRow selectPost(@Param("postId") long postId);
@@ -25,8 +29,8 @@ public interface BoardMapper {
     int insertPost(PostRow row);
 
     // 보이는 글만 고친다. 그 사이 숨겨졌으면 0
-    int updatePostContent(@Param("postId") long postId, @Param("title") String title, @Param("content") String content,
-            @Param("now") LocalDateTime now);
+    int updatePostContent(@Param("postId") long postId, @Param("categoryCode") String categoryCode, @Param("title") String title,
+            @Param("content") String content, @Param("now") LocalDateTime now);
 
     // 상태가 fromStatus일 때만 바꾼다. 그 사이 다른 처리로 바뀌었으면 0
     int updatePostStatus(@Param("postId") long postId, @Param("fromStatus") String fromStatus, @Param("toStatus") String toStatus,
@@ -40,11 +44,25 @@ public interface BoardMapper {
     // N-06-3 한 글의 댓글: 삭제 댓글을 빼고 오래된 순
     List<CommentRow> selectComments(@Param("postId") long postId);
 
+    // COMM-09 내가 쓴 댓글: 삭제 댓글·삭제된 글의 댓글을 빼고 최신순. 글이 숨김이면 categoryCode·postTitle·postNickname은 null
+    // likePattern이 있으면 보이는 댓글의 내용이나 보이는 글의 제목에서 찾고, category가 있으면 그 카테고리의 보이는 글에 쓴 댓글만 준다.
+    List<CommentRow> selectMyComments(@Param("userId") long userId, @Param("likePattern") String likePattern,
+            @Param("category") String category, @Param("offset") int offset, @Param("limit") int limit);
+
+    int countMyComments(@Param("userId") long userId, @Param("likePattern") String likePattern,
+            @Param("category") String category);
+
     // 댓글 한 개(상태와 상관없이). 없으면 null
     CommentRow selectComment(@Param("commentId") long commentId);
 
     // 댓글 저장. 저장하면 row.commentId에 새 번호가 채워진다.
     int insertComment(CommentRow row);
+
+    // 보이는 글의 보이는 댓글만 고친다. 그 사이 댓글이나 글이 숨겨졌거나 지워졌으면 0
+    int updateCommentContent(@Param("commentId") long commentId, @Param("content") String content, @Param("now") LocalDateTime now);
+
+    // COMM-11 작성자 댓글 삭제 — 보이는 글의 보이는 댓글만 DELETED로. 그 사이 댓글이나 글이 숨겨졌거나 지워졌으면 0
+    int deleteMyComment(@Param("commentId") long commentId, @Param("now") LocalDateTime now);
 
     // 상태가 fromStatus일 때만 바꾼다. 그 사이 다른 처리로 바뀌었으면 0
     int updateCommentStatus(@Param("commentId") long commentId, @Param("fromStatus") String fromStatus,

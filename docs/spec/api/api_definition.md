@@ -115,7 +115,7 @@
 | 409 | `ALT_DATA_EMPTY` | DIAG-09: 통신비 또는 공과금 기관 기록이 0건이라 ML-03을 부르지 않음 → "통신비·공과금 기록이 없어 예상 점수를 계산할 수 없어요." (점수 산출 RPT-01의 `NOT_SCORABLE` `ALT_DATA_EMPTY`와 같은 기준, FP-239 리뷰 후속) 🆕 11/23 |
 | 503 | `MODEL_NOT_READY` | SIM-02·DIAG-09: 실제 모델 파일 없음, 연결 실패, 타임아웃, 그 밖의 5xx. 저장하지 않으므로 `MODEL_ERROR` 기록 없음 |
 
-- 커뮤니티(동주, PR #80) 오류 code: 403 `NOT_OWNER`(남의 글 수정·삭제), 404 `POST_NOT_FOUND`·`TARGET_NOT_FOUND`·`REPORT_NOT_FOUND`, 409 `OWN_CONTENT`(본인 글 신고)·`DUPLICATE_REPORT`·`POST_HIDDEN`·`STATUS_CHANGED`·`ALREADY_HANDLED`, 429 `DAILY_LIMIT_EXCEEDED`(하루 3번 초과).
+- 커뮤니티(동주, PR #80) 오류 code: 403 `NOT_OWNER`(남의 글 수정·삭제), 404 `POST_NOT_FOUND`·`TARGET_NOT_FOUND`·`REPORT_NOT_FOUND`·`COMMENT_NOT_FOUND`(없거나 삭제된 댓글, 다른 글의 댓글 🆕 11/25), 409 `OWN_CONTENT`(본인 글 신고)·`DUPLICATE_REPORT`·`POST_HIDDEN`·`COMMENT_HIDDEN`(신고로 숨겨진 댓글 수정·삭제 🆕 11/25)·`STATUS_CHANGED`·`ALREADY_HANDLED`, 429 `DAILY_LIMIT_EXCEEDED`(하루 3번 초과).
 ---
 
 ## 2. API 목록
@@ -261,19 +261,22 @@
 
 | ID | 메서드 · 경로 | 기능 | 주요 표 | 인증 | 상태 |
 |---|---|---|---|---|---|
-| COMM-01 | `GET /api/board/posts?page&size&keyword` | N-06-1 글 목록·상세 조회 (목록, `page`는 1부터·기본 10개, `keyword`는 제목·본문 검색, 숨김 글은 검색 안 됨) | `BOARD_POST` | USER | ✅ (PR #80) |
-| COMM-02 | `GET /api/board/posts/{postId}` | N-06-1 글 목록·상세 조회 (상세. 숨김이면 제목·내용 null + `hidden: true`) | `BOARD_POST`, `BOARD_COMMENT` | USER | ✅ (PR #80) |
-| COMM-03 | `POST /api/board/posts` | N-06-2 글 작성 (제목 200자, **본문 1300자**) | `BOARD_POST`, `BOARD_POST_LOG` | USER | ✅ (PR #80) |
-| COMM-04 | `PUT /api/board/posts/{postId}` | N-06-5 내 글 수정 (본문 1300자) | `BOARD_POST`, `BOARD_POST_LOG` | USER | ✅ (PR #80) |
-| COMM-05 | `DELETE /api/board/posts/{postId}` | N-06-6 내 글 삭제 (`DELETED`, 미처리 신고는 남음) | `BOARD_POST`, `BOARD_POST_LOG` | USER | ✅ (PR #80) |
+| COMM-01 | `GET /api/board/posts?page&size&keyword&filter&category` | N-06-1 글 목록·상세 조회 (목록, `page`는 1부터·기본 10개, `keyword`는 제목·본문 검색, 숨김 글은 검색 안 됨). `filter=mine`(선택)은 내 글만(숨긴 내 글 포함), 다른 값이면 무시, `totalCount`도 같은 조건. 늘 최신순(정렬 `sort`는 11/26 뺐다). `category`(선택)는 그 카테고리의 보이는 글만, 응답 글마다 `categoryCode`(숨긴 글은 null) 🆕 11/25 | `BOARD_POST`, `BOARD_COMMENT` | USER | ✅ (PR #80, 조건 추가 FP-279·카테고리 FP-261 🆕 11/25) |
+| COMM-02 | `GET /api/board/posts/{postId}` | N-06-1 글 목록·상세 조회 (상세. 숨김이면 제목·내용 null + `hidden: true`). 응답에 `categoryCode`(숨김이면 null) 🆕 11/25 | `BOARD_POST`, `BOARD_COMMENT` | USER | ✅ (PR #80) |
+| COMM-03 | `POST /api/board/posts` | N-06-2 글 작성 (제목 200자, **본문 1300자**). `categoryCode` 선택(없으면 `FREE`, 정해진 값이 아니면 400 `INVALID_INPUT`) 🆕 11/25 | `BOARD_POST`, `BOARD_POST_LOG` | USER | ✅ (PR #80) |
+| COMM-04 | `PUT /api/board/posts/{postId}` | N-06-5 내 글 수정 (본문 1300자). `categoryCode` 선택(없으면 기존 값 유지) 🆕 11/25 | `BOARD_POST`, `BOARD_POST_LOG` | USER | ✅ (PR #80) |
+| COMM-05 | `DELETE /api/board/posts/{postId}` | N-06-6 내 글 삭제 (`DELETED`, 미처리 신고는 남음. 신고로 숨겨진 글은 본인도 못 지움 409 `POST_HIDDEN` 🆕 11/25) | `BOARD_POST`, `BOARD_POST_LOG` | USER | ✅ (PR #80, 숨김 규칙 변경 FP-280 🆕 11/25) |
 | COMM-06 | `GET`·`POST /api/board/posts/{postId}/comments` | N-06-3 댓글 작성·조회 (1000자) | `BOARD_COMMENT` | USER | ✅ (PR #80) |
 | COMM-07 | `POST /api/reports` | N-06-4 신고하기 진입, N-33-1 신고 접수, N-33-2 기준 건수 자동 숨김 (본인 글 불가, 같은 대상 중복 불가, 하루 3번, '기타'만 상세 500자) | `CONTENT_REPORT`, `APP_SETTING` | USER | ✅ (PR #80) |
-| COMM-08 | `GET /api/members/me/posts?page&size` | 마이페이지 [게시판관리] 내가 쓴 글 목록 (N-ID 미정). 본인 글만, 삭제 글 제외, 숨김 글은 `hidden: true`. `page`·기본 개수는 COMM-01 규칙(1부터, 기본 10개). 응답 `{ items: [{ postId, title, createdAt, commentCount, hidden }], page, size, totalCount }` | `BOARD_POST`, `BOARD_COMMENT` | USER | 🟡 제안 (우찬, FP-222 화면에서 사용 예정. 담당·경로는 C팀 확정) 🆕 11/23 |
-| COMM-09 | `GET /api/members/me/comments?page&size` | 마이페이지 [게시판관리] 내가 쓴 댓글 목록 (N-ID 미정). 본인 댓글만, 삭제된 글의 댓글 제외. `page`·기본 개수는 COMM-01 규칙(1부터, 기본 10개). 응답 `{ items: [{ commentId, postId, postTitle, content(앞부분), createdAt }], page, size, totalCount }` | `BOARD_COMMENT`, `BOARD_POST` | USER | 🟡 제안 (우찬, FP-222 화면에서 사용 예정. 담당·경로는 C팀 확정) 🆕 11/23 |
+| ~~COMM-08~~ | ~~`GET /api/members/me/posts?page&size`~~ | 마이페이지 [게시판관리] 내가 쓴 글 목록 | — | USER | ⛔ 만들지 않음 — 게시판관리 탭을 쓰지 않기로 했고(A조 합의), 내 글은 COMM-01 `filter=mine`이 준다 🆕 11/25 |
+| COMM-09 | `GET /api/members/me/comments?page&size&keyword&category` | 신용 라운지 [내가 쓴 댓글] 탭 목록 (N-06, 세부 N-ID 미정). 본인 댓글만 최신순, 삭제 댓글과 삭제된 글의 댓글 제외. `page`·기본 개수는 COMM-01 규칙(1부터, 기본 10개). `keyword`(선택)는 보이는 댓글의 내용이나 보이는 글의 제목에서 찾고, `category`(선택)는 그 카테고리의 보이는 글에 쓴 댓글만. 응답 `{ items: [{ commentId, postId, categoryCode, postTitle, postNickname, content, createdAt, hidden }], page, size, totalCount }` — `postNickname`은 글을 쓴 회원, `createdAt`은 댓글 쓴 시각. 숨김 댓글은 `content` null + `hidden: true`, 숨김 글의 댓글은 `categoryCode`·`postTitle`·`postNickname` null 🆕 11/25 | `BOARD_COMMENT`, `BOARD_POST` | USER | ✅ 동주 (FP-279) 🆕 11/25 |
+| COMM-10 | `PUT /api/board/posts/{postId}/comments/{commentId}` | N-06 내 댓글 수정 (세부 N-ID 미정). 요청 `{ content }`(1000자), 응답 `{}`. 남의 댓글 403 `NOT_OWNER`, 댓글 없음·다른 글의 댓글 404 `COMMENT_NOT_FOUND`, 숨긴 글 409 `POST_HIDDEN`, 숨긴 댓글 409 `COMMENT_HIDDEN`, 그사이 상태 바뀜 409 `STATUS_CHANGED` 🆕 11/25 | `BOARD_COMMENT`, `BOARD_POST`(읽기) | USER | ✅ 동주 (FP-280) 🆕 11/25 |
+| COMM-11 | `DELETE /api/board/posts/{postId}/comments/{commentId}` | N-06 내 댓글 삭제 (세부 N-ID 미정). 행은 남기고 상태만 `DELETED`, 응답 `{}`. 오류는 COMM-10과 같음 🆕 11/25 | `BOARD_COMMENT`, `BOARD_POST`(읽기) | USER | ✅ 동주 (FP-280) 🆕 11/25 |
 
 - 게시글 본문은 DDL C9로 `CLOB` → `VARCHAR2(1300 CHAR)`(PR #80). 기존 DB는 `docs/spec/sql/alter_board_post_content_varchar2.sql`. 공용 DB는 11/18 적용 완료(범영). CLOB 상태의 DB에서도 글쓰기·검색·수정·삭제가 동작하는 것을 11/17 로컬에서 확인했다.
+- 글 카테고리(`BOARD_POST.CATEGORY_CODE`, DDL C15): `CREDIT_SCORE` 신용점수, `LOAN` 대출·상환, `CARD` 카드·결제, `FREE` 자유(기본값). 기존 DB는 `docs/spec/sql/alter_board_post_category.sql`을 실행해야 라운지가 열린다. 🆕 11/25
 - 탈퇴 회원 글은 그대로 두고 작성자만 "탈퇴한 회원"으로 표시한다. 알림(D-25)은 넣지 않았다.
-- COMM-08·09는 마이페이지 [게시판관리] 탭(FP-222)이 쓸 API 제안이다. 경로는 1장 공통 규칙(본인 데이터는 `/api/members/me/**`)에 맞췄다. 구현 전까지 화면은 '준비 중' 안내만 보여 준다. 🆕 11/23
+- 신고로 숨겨진 글·댓글은 작성자도 수정·삭제할 수 없고 관리자만 처리한다(ADM-13). 반려로 숨김이 풀리면 다시 고치거나 지울 수 있다. 숨기기 전 평상시에는 신고가 들어와 있어도 본인이 고치거나 지울 수 있다. 🆕 11/25
 
 ### 2-9. 도움말·AI — 담당 광희 (FP-179)
 
@@ -359,4 +362,4 @@
 | ~~Q-8~~ | ~~DIAG-07-1·08-1 경로~~ ✅ **해결:** `/api/members/me/…`로 이동(광희 PR #103, 우찬 합의, SIM-01·02·DIAG-09 포함) 🆕 11/20 | — |
 | ~~Q-9~~ | ~~SIM-03·대출 상품 담당~~ ✅ **해결:** 대출 상품 LOAN-01~05 경환(FP-90, PR #101), SIM-03은 만들지 않고 SIM-04 + LOAN-01로 대신 🆕 11/20 | — |
 | ~~Q-10~~ | ~~ADM-03(N-26 관리자 통계) 담당과 Jira 번호. 정의서에 있던 FP-191은 커뮤니티 카드였다. 비교 통계는 FP-159(광희)~~ ✅ **해결 🆕 11/20:** 광희, API FP-161·화면 FP-162 | — |
-| Q-11 | COMM-08·09(내가 쓴 글·댓글 목록) 구현 담당·경로·응답 필드 확정, 기능 정의서 N-ID 부여 🆕 11/23 | C팀(동주) |
+| Q-11 | ~~COMM-08·09(내가 쓴 글·댓글 목록) 구현 담당·경로·응답 필드 확정~~ ✅ COMM-09 동주(FP-279), COMM-08은 만들지 않음 🆕 11/25. 남은 것: 내가 쓴 댓글·내 댓글 수정·삭제(COMM-09~11)의 기능 정의서 N-ID 부여 | C팀(동주) |
