@@ -24,9 +24,9 @@ const IDLE_FLOW = { target: null, status: 'idle', message: '', codeOpen: false }
 //     onVerified={setVerification}                                // { email, verificationToken }
 //     error={errors.email}
 //   />
-//   FP-258 2차: 앞부분·직접 입력 도메인은 입력·붙여넣기 모두 filterEmailLocal·filterEmailDomain(소문자·허용 문자만)을 거친다.
+//   FP-258 앞부분·직접 입력 도메인은 filterEmailLocal·filterEmailDomain으로 거른다(한글 조합은 끝날 때, useImeSafeFilter).
 //   문구는 한 번에 하나만 보인다: 완료 / (실패 > 부모 오류 > 발송 안내). 이메일을 고치면 발송·코드·오류·안내를 모두 비운다.
-//   FP-258 4차 beforeRequest: [받기]·[확인] 요청 전에 부른다. false를 돌려주면 보내지 않는다(아이디·비밀번호 찾기의 이름 검사). 없으면 그대로 보낸다.
+//   FP-258 beforeRequest: [받기]·[확인] 요청 전에 부른다. false를 돌려주면 보내지 않는다(아이디·비밀번호 찾기의 이름 검사). 없으면 그대로 보낸다.
 export default function SplitEmailField({
   local,
   domainChoice,
@@ -44,7 +44,6 @@ export default function SplitEmailField({
   const [flow, setFlow] = useState(IDLE_FLOW)
   const [code, setCode] = useState('')
   const [pending, setPending] = useState(false)
-  // FP-258 3차 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(useImeSafeFilter). input에 조합 이벤트를 직접 단다.
   const bindFilter = useImeSafeFilter()
   const localInput = bindFilter((value) => handleEmailChange({ emailLocal: value }), filterEmailLocal)
   const domainInput = bindFilter((value) => handleEmailChange({ emailCustomDomain: value }), filterEmailDomain)

@@ -30,17 +30,14 @@ export default function FindPasswordPage() {
   const [passwordErrors, setPasswordErrors] = useState({})
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
-  // FP-258 2차 새 비밀번호·확인 칸 [보기] 상태. 재설정 요청 직전에 가린다.
   const { reveal, hideAll } = usePasswordReveal()
-  // FP-258 3차 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(useImeSafeFilter). 공통 TextInput 대신 감싼 div가 조합 이벤트를 받는다.
   const bindFilter = useImeSafeFilter()
   const loginIdInput = bindFilter(setLoginId, filterLoginId)
   const nameInput = bindFilter((value) => {
     setName(value)
     setNameError('')
   }, filterName)
-  // FP-258 4차 다음 단계 요청([받기]·[확인]·[찾기]·[다음]) 전과 칸을 벗어날 때 이름을 가입과 같은 규칙(validateName)으로 본다.
-  // "홍길ㄷ"처럼 자모가 남았거나 형식이 틀리면 이름 칸 아래에 오류를 보여 주고 요청을 보내지 않는다. 고치면 오류를 지운다.
+  // FP-258 요청 전과 칸을 벗어날 때 이름을 가입과 같은 규칙(validateName)으로 보고, 틀리면 이름 칸 아래에 알리고 요청을 보내지 않는다.
   const checkName = (value = name) => {
     const message = validateName(value)
     setNameError(message)
@@ -73,7 +70,6 @@ export default function FindPasswordPage() {
         emailVerificationToken: verification.verificationToken,
         newPassword: password,
       })
-      // FP-258 2차 재설정이 끝나 완료 화면으로 바뀌기 직전에만 가린다. 실패하면 보기 상태를 그대로 둔다.
       hideAll()
       setStep('done')
     } catch (error) {

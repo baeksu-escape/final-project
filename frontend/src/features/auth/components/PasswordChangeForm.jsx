@@ -13,7 +13,6 @@ export default function PasswordChangeForm({ onSaved, onCancel }) {
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
-  // FP-258 2차 비밀번호 칸 3개의 [보기] 상태. 저장 요청 직전에 가린다.
   const { reveal, hideAll } = usePasswordReveal()
 
   // 항목 하나를 바꾸는 함수를 만든다.
@@ -45,7 +44,6 @@ export default function PasswordChangeForm({ onSaved, onCancel }) {
     setPending(true)
     try {
       await requestPasswordChange({ currentPassword: form.currentPassword, newPassword: form.password })
-      // FP-258 2차 저장에 성공해 폼이 닫히기 직전에만 가린다. 실패하면 보기 상태를 그대로 둔다.
       hideAll()
       onSaved('비밀번호를 바꿨습니다.')
     } catch (saveError) {

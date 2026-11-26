@@ -180,7 +180,7 @@ class SocialAndMyPageServiceTest {
         verify(userMapper).updateEmail(eq(7L), anyString(), eq(HMAC.email("new@example.com")), any());
     }
 
-    // FP-258 2차 대문자·앞뒤 공백이 있는 새 이메일은 소문자로 바꿔 판정·토큰 확인하고, 암호문(EMAIL_ENC)도 소문자로 저장한다. 한글 이메일은 400.
+    // FP-258 대문자·앞뒤 공백이 있는 새 이메일은 소문자로 바꿔 판정·토큰 확인하고, 암호문(EMAIL_ENC)도 소문자로 저장한다. 한글 이메일은 400.
     @Test
     void 이메일_변경은_소문자로_저장하고_규칙에_맞지_않으면_400() {
         given(userMapper.selectById(7L)).willReturn(UserFixtures.user(7L, "employee"));

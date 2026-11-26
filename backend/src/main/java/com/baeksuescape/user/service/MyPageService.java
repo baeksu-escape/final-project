@@ -84,7 +84,7 @@ public class MyPageService {
     @Transactional
     public void changeEmail(long userId, MyPageDtos.EmailChange request) {
         UserAccount account = require(userId);
-        // FP-258 2차 앞뒤 공백을 빼고 소문자로 바꾼 값으로 판정하고, 암호문(EMAIL_ENC)도 소문자로 저장한다.
+        // FP-258 암호문(EMAIL_ENC)도 소문자로 바꾼 값으로 저장한다.
         String email = AccountRules.normalizeEmail(request.email());
         if (!AccountRules.isValidEmail(email)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "이메일 형식이 올바르지 않습니다.",

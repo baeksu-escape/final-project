@@ -38,8 +38,7 @@ public final class AuthErrors {
         return new ApiException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", NO_MATCH_MESSAGE);
     }
 
-    // FP-258 2차 아이디·비밀번호 찾기의 이름 형식 검사 — 가입과 같은 규칙(AccountRules.nameError)이고, 틀리면 400 INVALID_INPUT(name 칸).
-    // 형식이 맞는데 계정이 없으면 지금처럼 accountNotFound(404)다.
+    // FP-258 아이디·비밀번호 찾기의 이름 형식 검사 — 가입과 같은 규칙(AccountRules.nameError)이고, 틀리면 400 INVALID_INPUT(name 칸).
     public static void requireValidName(String name) {
         String error = AccountRules.nameError(name);
         if (error != null) {

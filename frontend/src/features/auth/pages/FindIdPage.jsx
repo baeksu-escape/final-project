@@ -31,13 +31,11 @@ export default function FindIdPage() {
   const [formError, setFormError] = useState('')
   const [loginId, setLoginId] = useState(null)
   const [pending, setPending] = useState(false)
-  // FP-258 3차 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(useImeSafeFilter). 공통 TextInput 대신 감싼 div가 조합 이벤트를 받는다.
   const nameInput = useImeSafeFilter()((value) => {
     setName(value)
     setFieldErrors((prev) => (prev.name ? { ...prev, name: undefined } : prev))
   }, filterName)
-  // FP-258 4차 다음 단계 요청([받기]·[확인]·[찾기]·[다음]) 전과 칸을 벗어날 때 이름을 가입과 같은 규칙(validateName)으로 본다.
-  // "홍길ㄷ"처럼 자모가 남았거나 형식이 틀리면 이름 칸 아래에 오류를 보여 주고 요청을 보내지 않는다. 고치면 오류를 지운다.
+  // FP-258 요청 전과 칸을 벗어날 때 이름을 가입과 같은 규칙(validateName)으로 보고, 틀리면 이름 칸 아래에 알리고 요청을 보내지 않는다.
   const checkName = (value = name) => {
     const nameError = validateName(value)
     setFieldErrors((prev) => ({ ...prev, name: nameError || undefined }))
@@ -63,7 +61,6 @@ export default function FindIdPage() {
   const handleSubmit = async (event) => {
     event.preventDefault()
     const errors = {}
-    // FP-258 2차 이름은 가입과 같은 규칙(완성형 한글 2~20자)으로 본다. 서버도 같은 규칙으로 400(name 칸)을 준다.
     const nameError = validateName(name)
     if (nameError) errors.name = nameError
     setFieldErrors(errors)

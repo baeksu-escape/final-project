@@ -59,7 +59,7 @@ public final class AuthResponses {
     }
 
     // AUTH-09 아이디 찾기
-    // AUTH-09 FP-258 본인 인증을 마쳤으므로 가리지 않은 loginId도 준다. maskedLoginId는 기존 화면·mock과 맞추려 남긴다.
+    // FP-258 본인 인증을 마쳤으므로 가리지 않은 loginId도 준다(maskedLoginId는 그대로 둔다).
     public record FoundId(String maskedLoginId, String loginId) {
     }
 

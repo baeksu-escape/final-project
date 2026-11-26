@@ -9,7 +9,6 @@ export default function ProfileUnlockCard({ onUnlock }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
-  // FP-258 2차 비밀번호 [보기] 상태. 확인 요청 직전에 가린다.
   const { reveal, hideAll } = usePasswordReveal()
 
   const handleSubmit = async (event) => {
@@ -22,7 +21,6 @@ export default function ProfileUnlockCard({ onUnlock }) {
     setError('')
     try {
       await onUnlock(password)
-      // FP-258 2차 확인에 성공해 내 정보가 열리기 직전에만 가린다. 실패하면 보기 상태를 그대로 둔다.
       hideAll()
     } catch (unlockError) {
       setError(unlockError.message)

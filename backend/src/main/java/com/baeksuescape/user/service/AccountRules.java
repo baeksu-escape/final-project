@@ -25,8 +25,7 @@ public final class AccountRules {
     private static final Pattern NICKNAME = Pattern.compile("^[A-Za-z0-9가-힣]{" + NICKNAME_MIN + "," + NICKNAME_MAX + "}$");
     public static final String NICKNAME_RULE_MESSAGE = "닉네임은 한글·영문·숫자 2~7자로 입력해 주세요.";
     public static final String NAME_RULE_MESSAGE = "이름은 한글 2~20자로 입력해 주세요. (숫자·영문·기호 불가)";
-    // FP-258 2차 이메일 규칙(프론트 validation.js isValidEmailLocal·isValidEmailDomain과 같음).
-    // 앞부분: a-z0-9 . _ - 만, 처음·끝은 a-z0-9, 점 연속 불가(64자). 도메인: 점으로 나눈 덩어리마다 a-z0-9로 시작·끝, 마지막은 영문 2자 이상.
+    // FP-258 이메일 규칙(프론트 validation.js와 같음) — 앞부분 a-z0-9._-(처음·끝 a-z0-9, 점 연속 불가, 64자), 도메인 덩어리는 a-z0-9로 시작·끝, 마지막은 영문 2자 이상.
     private static final Pattern EMAIL_LOCAL = Pattern.compile("^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$");
     private static final Pattern DOMAIN_LABEL = Pattern.compile("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$");
     private static final Pattern TOP_LEVEL_DOMAIN = Pattern.compile("^[a-z]{2,}$");
@@ -59,12 +58,12 @@ public final class AccountRules {
         return TOP_LEVEL_DOMAIN.matcher(labels[labels.length - 1]).matches();
     }
 
-    // FP-258 2차 이메일 정리 — 앞뒤 공백을 빼고 소문자로 바꾼다. 가입·이메일 변경·인증코드·아이디 찾기·재설정이 이 값으로 판정·저장한다. null이면 빈 문자열.
+    // FP-258 이메일 정리 — 앞뒤 공백을 빼고 소문자로 바꾼다. 가입·이메일 변경·인증코드·아이디 찾기·재설정이 이 값으로 판정·저장한다.
     public static String normalizeEmail(String value) {
         return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
     }
 
-    // FP-258 2차 로그인 아이디 정리 — 앞뒤 공백을 빼고 소문자로 바꾼다(로그인·비밀번호 찾기 조회). null이면 빈 문자열.
+    // FP-258 로그인 아이디 정리 — 앞뒤 공백을 빼고 소문자로 바꾼다(로그인·비밀번호 찾기 조회).
     public static String normalizeLoginId(String value) {
         return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
     }
@@ -80,7 +79,7 @@ public final class AccountRules {
         return value == null ? "" : value.replaceAll("\\D", "");
     }
 
-    // FP-258 아이디·비밀번호 찾기 본인 확인 — 입력한 이름(앞뒤 공백 제거)이 복호화한 가입 이름과 같은지 본다. 비었으면 다르다고 본다.
+    // FP-258 아이디·비밀번호 찾기 본인 확인 — 입력한 이름(앞뒤 공백 제거)이 복호화한 가입 이름과 같은지 본다.
     public static boolean nameMatches(String input, String storedName) {
         return input != null && !input.isBlank() && input.strip().equals(storedName);
     }
@@ -106,7 +105,7 @@ public final class AccountRules {
     }
 
     // 가입 이름 오류 문구. 숫자·영문·기호·공백·자음만 입력은 거절한다. 문제없으면 null.
-    // FP-258 2차부터 아이디 찾기·비밀번호 찾기도 이 규칙을 쓴다(AuthErrors.requireValidName). 관리자 계정 만들기는 쓰지 않는다.
+    // FP-258 아이디·비밀번호 찾기도 이 규칙을 쓴다(AuthErrors.requireValidName). 관리자 계정 만들기는 쓰지 않는다.
     public static String nameError(String name) {
         if (name == null || name.isBlank()) return "이름을 입력해 주세요.";
         if (!NAME.matcher(name).matches()) return NAME_RULE_MESSAGE;

@@ -34,7 +34,7 @@ public class UserAccount {
     private String passwordChangeRequiredYn;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
-    // FP-258 마지막으로 행을 고친 시각. 로그인 5분 제한은 5회째 실패를 기록한 이 시각부터 센다(로그인 실패가 UPDATED_AT을 고친다).
+    // FP-258 행을 마지막으로 고친 시각. 로그인 5분 제한은 5회째 실패를 기록한 이 시각부터 센다.
     private LocalDateTime updatedAt;
 
     public boolean isAdmin() {

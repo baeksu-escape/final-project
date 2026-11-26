@@ -49,9 +49,7 @@ export default function LoginPage() {
   const [challenge, setChallenge] = useState(null)
   // FP-80 첫 비밀번호 설정 토큰. 있으면 비밀번호 설정 단계다.
   const [passwordSetupToken, setPasswordSetupToken] = useState(null)
-  // FP-258 2차 비밀번호 [보기] 상태. 로그인 요청 직전에 가린다.
   const { reveal, hideAll } = usePasswordReveal()
-  // FP-258 3차 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(useImeSafeFilter). 공통 TextInput 대신 감싼 div가 조합 이벤트를 받는다.
   const loginIdInput = useImeSafeFilter()(setLoginId, filterLoginId)
 
   // 맡아 둔 알림은 한 번만 쓴다. 꺼낸 뒤 바로 비워서 다음 로그아웃 때 다시 뜨지 않게 한다.
@@ -71,7 +69,6 @@ export default function LoginPage() {
     setPending(true)
     try {
       const result = await requestLogin(loginId.trim(), password)
-      // FP-258 2차 성공해 다음 화면(관리자 2단계 인증·첫 화면)으로 넘어가기 직전에만 가린다. 실패하면 보기 상태를 그대로 둔다.
       hideAll()
       if (result.twoFactorRequired) {
         setChallenge({ challengeToken: result.challengeToken, maskedEmail: result.maskedEmail })
@@ -175,7 +172,7 @@ export default function LoginPage() {
             {formError}
           </p>
         )}
-        {/* FP-258 잠긴 계정은 비밀번호 재설정으로 풀린다 — 안내 바로 아래에 비밀번호 찾기로 가는 글자 링크를 둔다. */}
+        {/* FP-258 잠금 안내 아래에 비밀번호 찾기 링크를 둔다(재설정하면 풀린다). */}
         {formError === ACCOUNT_LOCKED_MESSAGE && (
           <Link to={AUTH_PATHS.FIND_PASSWORD} className="text-link">
             비밀번호 찾기

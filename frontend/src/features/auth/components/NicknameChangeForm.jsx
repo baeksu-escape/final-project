@@ -21,8 +21,7 @@ export default function NicknameChangeForm({ currentNickname, onSaved, onCancel 
   const checked = check?.nickname === text && check.available
 
   // 칸 값을 바꾸면 지난 안내를 지운다.
-  // FP-258 2차 입력·붙여넣기는 가입과 같은 걸러내기(filterNickname: 한글·영문·숫자 7자)를 거친다.
-  // FP-258 3차 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(useImeSafeFilter, 감싼 div가 조합 이벤트를 받는다).
+  // FP-258 가입과 같은 filterNickname으로 거른다(한글 조합은 끝날 때, useImeSafeFilter).
   const nicknameInput = useImeSafeFilter()((value) => {
     setNickname(value)
     setError('')

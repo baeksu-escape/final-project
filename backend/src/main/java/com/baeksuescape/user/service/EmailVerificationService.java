@@ -66,7 +66,6 @@ public class EmailVerificationService {
     @Transactional
     public AuthResponses.EmailSent send(AuthRequests.EmailSend request) {
         EmailPurpose purpose = purposeOf(request.purpose());
-        // FP-258 2차 이메일은 앞뒤 공백을 빼고 소문자로 바꾼 값으로 판정·발송한다.
         String email = AccountRules.normalizeEmail(request.email());
         if (!AccountRules.isValidEmail(email)) throw invalidEmail();
         String target = hmac.email(email);
@@ -92,7 +91,7 @@ public class EmailVerificationService {
     @Transactional(noRollbackFor = ApiException.class)
     public AuthResponses.EmailVerified verify(AuthRequests.EmailVerify request) {
         EmailPurpose purpose = purposeOf(request.purpose());
-        // FP-258 2차 재설정 목적은 이름 형식(가입과 같은 규칙)을 코드보다 먼저 본다. 틀리면 400 name 칸이고 시도 횟수는 늘지 않는다.
+        // FP-258 재설정 목적은 이름 형식을 코드보다 먼저 본다(틀리면 400 name 칸, 시도 횟수는 그대로).
         if (purpose == EmailPurpose.RESET_PASSWORD) AuthErrors.requireValidName(request.name());
         String email = AccountRules.normalizeEmail(request.email());
         String target = hmac.email(email);

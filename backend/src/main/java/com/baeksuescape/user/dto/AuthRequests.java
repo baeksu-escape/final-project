@@ -68,8 +68,7 @@ public final class AuthRequests {
             String name) {
     }
 
-    // AUTH-09 아이디 찾기(FP-258) — 이름 + 휴대폰 또는 이메일 인증. method: PHONE | EMAIL.
-    // 방법에 맞는 칸(phone 또는 email)과 그 인증 토큰(FIND_ID 목적)을 함께 보낸다. 칸 검사는 서비스가 방법에 따라 한다.
+    // AUTH-09 아이디 찾기(FP-258) — 이름 + method(PHONE | EMAIL)에 맞는 칸(phone 또는 email)과 그 FIND_ID 인증 토큰. 칸 검사는 서비스가 한다.
     public record FindId(
             @NotBlank(message = "이름을 입력해 주세요.") String name,
             String phone,

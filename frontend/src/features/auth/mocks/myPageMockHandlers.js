@@ -70,7 +70,7 @@ registerMockHandlers({
   },
 
   // N-04-3 이메일 변경 — 새 이메일의 인증 토큰(목적 CHANGE_EMAIL)을 한 번 쓰고 저장한다.
-  // FP-258 2차 서버처럼 앞뒤 공백을 빼고 소문자로 바꾼 이메일로 판정·저장한다.
+  // FP-258 서버처럼 앞뒤 공백을 빼고 소문자로 바꾼 이메일로 판정·저장한다.
   'PUT /api/members/me/email': ({ body, token }) => {
     const account = requireAccountByToken(token)
     const email = normalizeEmail(body?.email)

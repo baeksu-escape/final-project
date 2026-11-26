@@ -92,7 +92,7 @@ public class AuthService {
     //   5회째 실패하면 그때부터 5분 동안 비밀번호와 상관없이 429(제한 중에는 횟수를 올리지 않음). 10회째면 잠그고 423.
     @Transactional(noRollbackFor = ApiException.class)
     public UserAccount authenticate(String loginId, String password) {
-        // FP-258 2차 아이디는 앞뒤 공백을 빼고 소문자로 바꿔 조회한다(가입 아이디는 소문자만 받는다).
+        // FP-258 가입 아이디는 소문자만 받으므로 소문자로 바꿔 조회한다.
         UserAccount account = userMapper.selectByLoginId(AccountRules.normalizeLoginId(loginId));
         if (account == null || account.isWithdrawn() || account.getPasswordHash() == null) throw AuthErrors.loginFailed();
         boolean passwordMatches = passwordEncoder.matches(password, account.getPasswordHash());
@@ -126,7 +126,7 @@ public class AuthService {
         return account;
     }
 
-    // FP-258 5분 제한의 남은 분(올림). 실패 횟수가 정확히 5회이고 그 실패를 기록한 시각(UPDATED_AT)에서 5분이 안 지났을 때만 0보다 크다.
+    // FP-258 5분 제한의 남은 분(올림). 실패가 정확히 5회이고 그 시각(UPDATED_AT)에서 5분이 안 지났을 때만 0보다 크다.
     private static long remainingBlockMinutes(UserAccount account, LocalDateTime now) {
         if (account.getLoginFailCount() != TEMP_BLOCK_FAILURES || account.getUpdatedAt() == null) return 0;
         long seconds = Duration.between(now, account.getUpdatedAt().plusMinutes(TEMP_BLOCK_MINUTES)).getSeconds();
@@ -166,7 +166,7 @@ public class AuthService {
         validateSignup(request, now.getYear());
 
         String loginId = request.loginId();
-        // FP-258 2차 이메일은 소문자로 바꿔 HMAC·암호문(EMAIL_ENC) 모두 같은 값으로 저장한다.
+        // FP-258 이메일은 소문자로 바꿔 HMAC·암호문(EMAIL_ENC) 모두 같은 값으로 저장한다.
         String email = AccountRules.normalizeEmail(request.email());
         String nickname = request.nickname().strip();
         String phone = AccountRules.normalizePhone(request.phone());
@@ -253,12 +253,11 @@ public class AuthService {
         return AuthErrors.duplicateLoginId();
     }
 
-    // AUTH-09 N-03-1 아이디 찾기(FP-258) — 이름 + 휴대폰 또는 이메일 인증(FIND_ID 목적 토큰). 토큰이 없거나 맞지 않으면 400(가입의 인증 오류와 같음).
-    // 토큰을 먼저 한 번 쓰고, 휴대폰·이메일 HMAC으로 찾은 일반 회원 중 이름(복호화)이 같은 계정의 아이디를 가리지 않고 준다.
+    // AUTH-09 N-03-1 아이디 찾기(FP-258) — 이름 + 휴대폰 또는 이메일 인증(FIND_ID 토큰)으로 찾은 일반 회원의 아이디를 가리지 않고 준다.
     // 일치하는 계정이 없으면 404이고 트랜잭션이 되돌아가 토큰은 다시 쓸 수 있다. 탈퇴·관리자 계정은 찾지 않는다.
     @Transactional
     public AuthResponses.FoundId findId(AuthRequests.FindId request) {
-        // FP-258 2차 이름은 가입과 같은 규칙으로 먼저 본다(틀리면 400 name 칸, 토큰은 쓰지 않음).
+        // 이름 형식을 먼저 본다(틀리면 400 name 칸, 토큰은 쓰지 않음).
         AuthErrors.requireValidName(request.name());
         String method = request.method() == null ? "" : request.method().strip();
         if (!FIND_ID_PHONE.equals(method) && !FIND_ID_EMAIL.equals(method)) {
@@ -292,7 +291,7 @@ public class AuthService {
     // FP-80 관리자는 쓸 수 없다: 조회가 일반 회원만 찾으므로(selectUserByLoginIdAndEmailHmac) 관리자 아이디는 "없는 계정"과 같은 404가 된다.
     @Transactional
     public void resetPassword(AuthRequests.PasswordReset request) {
-        // FP-258 2차 이름 형식(가입과 같은 규칙)을 먼저 본다. 아이디·이메일은 소문자로 바꿔 찾는다.
+        // 이름 형식(가입과 같은 규칙)을 먼저 본다.
         AuthErrors.requireValidName(request.name());
         if (!AccountRules.isValidPassword(request.newPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "비밀번호 규칙을 지켜 주세요.",

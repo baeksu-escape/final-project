@@ -92,7 +92,6 @@ export default function SignupPage() {
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
   const [completed, setCompleted] = useState(false)
-  // FP-258 2차 비밀번호·확인 칸 [보기] 상태. 가입 요청 직전에 가린다.
   const { reveal, hideAll } = usePasswordReveal()
   const bindFilter = useImeSafeFilter()
 
@@ -136,8 +135,7 @@ export default function SignupPage() {
     })
   }
   const update = (field) => (value) => patchForm({ [field]: value })
-  // FP-258 2차 입력·붙여넣기를 칸별 걸러내기 함수(validation.js)에 통과시킨 뒤 넣는다.
-  // FP-258 3차 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(useImeSafeFilter). 공통 TextInput 대신 감싼 div가 조합 이벤트를 받는다.
+  // FP-258 칸별 걸러내기(validation.js)를 거친 값만 넣는다(한글 조합은 끝날 때, useImeSafeFilter).
   const filteredInput = (field, filter) => bindFilter((value) => patchForm({ [field]: value }), filter)
   const loginIdInput = filteredInput('loginId', filterSignupLoginId)
   const nameInput = filteredInput('name', filterName)
@@ -187,7 +185,6 @@ export default function SignupPage() {
         phoneVerificationToken: phoneVerification.verificationToken,
         ...(socialSignup?.linkKey ? { socialLinkKey: socialSignup.linkKey } : {}),
       })
-      // FP-258 2차 가입이 끝나 완료 화면으로 바뀌기 직전에만 가린다. 실패하면 보기 상태를 그대로 둔다.
       hideAll()
       setCompleted(true)
     } catch (error) {
