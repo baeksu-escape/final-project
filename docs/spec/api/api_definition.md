@@ -156,8 +156,6 @@
 | MEM-07 | `DELETE /api/members/me` | N-04-7 회원 탈퇴 `{ password }` — 상태 `WITHDRAWN`·개인정보 덮어쓰기, 소셜 연결·인증 기록·동의로 불러온 데이터 삭제, 직접 입력·평가는 보관. 간편 로그인 전용 계정은 토큰 발급 10분 이내로 확인(넘으면 403 `RECENT_LOGIN_REQUIRED`) | `APP_USER`, `USER_*`, `SYSTEM_LOG` | USER | ✅ |
 | MEM-08 | `PATCH /api/members/me/nickname` 🆕 11/23 | N-04-3 계정 관리 (닉네임 변경 `{ nickname }`, 규칙은 가입과 같음. 중복 확인은 AUTH-13. 같은 닉네임이면 400 `SAME_NICKNAME`, 다른 회원이 쓰면 409 `DUPLICATE_NICKNAME`) | `APP_USER` | USER | ✅ (FP-222) |
 
-- [게시판관리] 탭은 COMM-08·09(🟡, C팀 확정 대기)가 생기면 연결한다. 🆕 11/23
-
 ### 2-3. 데이터 입력 — 담당 우찬 (FP-75)
 
 | ID | 메서드 · 경로 | 기능 | 주요 표 | 인증 | 상태 |
