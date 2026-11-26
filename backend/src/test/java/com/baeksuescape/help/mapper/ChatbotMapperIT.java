@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.baeksuescape.help.dto.ChatbotPresetRow;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,5 +48,21 @@ class ChatbotMapperIT {
         assertEquals("IT시험 답 앞", rows.get(0).getAnswerText());
         assertEquals(98, rows.get(0).getDisplayOrder());
         assertEquals("IT시험 질문 뒤", rows.get(1).getQuestionText());
+    }
+
+    @Test
+    @DisplayName("N-32-2 호출 기록을 넣으면 그 시각 이후의 성공(Y)만 센다 — 실패(N)와 기준 시각 전 기록은 세지 않는다")
+    void questionLogCount() {
+        long userId = jdbcTemplate.queryForObject("SELECT MIN(USER_ID) FROM APP_USER", Long.class);
+        // 미래 시각을 기준으로 잡아 기존 기록과 섞이지 않게 한다
+        LocalDateTime since = LocalDateTime.of(2099, 1, 1, 0, 0);
+        assertEquals(0, mapper.countSuccessSince(userId, since));
+
+        mapper.insertQuestionLog(userId, since.minusMinutes(1), "Y");
+        mapper.insertQuestionLog(userId, since.plusHours(1), "Y");
+        mapper.insertQuestionLog(userId, since.plusHours(2), "N");
+        mapper.insertQuestionLog(userId, since.plusHours(3), "Y");
+
+        assertEquals(2, mapper.countSuccessSince(userId, since));
     }
 }

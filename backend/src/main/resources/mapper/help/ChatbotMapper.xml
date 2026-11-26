@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<!-- N-32 용어 도우미(챗봇) — 질문 버튼(CHATBOT_PRESET_QUESTION) 조회 (FP-181) -->
+<!-- N-32 용어 도우미(챗봇) — 질문 버튼(CHATBOT_PRESET_QUESTION) 조회, 자유 질문 호출 기록(CHATBOT_QUESTION_LOG) (FP-181) -->
 <mapper namespace="com.baeksuescape.help.mapper.ChatbotMapper">
 
     <!-- N-32-1 질문 버튼 전체를 표시 순서대로 읽는다. 순서가 같으면 먼저 넣은 버튼이 앞이다 -->
@@ -10,4 +10,18 @@
           FROM CHATBOT_PRESET_QUESTION
          ORDER BY DISPLAY_ORDER, PRESET_ID
     </select>
+
+    <!-- N-32-2 하루 횟수 — 성공한 호출만 센다(IX_CQL_USER_DAY 색인) -->
+    <select id="countSuccessSince" resultType="int">
+        SELECT COUNT(*)
+          FROM CHATBOT_QUESTION_LOG
+         WHERE USER_ID = #{userId}
+           AND ASKED_AT &gt;= #{since}
+           AND SUCCESS_YN = 'Y'
+    </select>
+
+    <!-- N-32-2 호출 기록. 질문 글 열은 없다(저장하지 않음). 시각은 하루 횟수를 셀 때와 같은 서버 Clock(Asia/Seoul) 값을 넣는다 -->
+    <insert id="insertQuestionLog">
+        INSERT INTO CHATBOT_QUESTION_LOG (USER_ID, ASKED_AT, SUCCESS_YN) VALUES (#{userId}, #{askedAt}, #{successYn})
+    </insert>
 </mapper>
