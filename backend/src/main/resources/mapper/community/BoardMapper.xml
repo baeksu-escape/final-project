@@ -8,18 +8,27 @@
         CASE WHEN U.USER_ID IS NULL OR U.ACCOUNT_STATUS_CODE = 'WITHDRAWN' THEN '탈퇴한 회원' ELSE U.NICKNAME END
     </sql>
 
-    <!-- 목록 검색: 보이는 글의 제목·내용에서만 찾는다(숨김 글 내용이 검색으로 드러나지 않게). -->
+    <!-- 목록 조건(목록·개수가 함께 쓴다). 검색은 보이는 글의 제목·내용에서만 찾는다(숨김 글 내용이 검색으로 드러나지 않게).
+         ownerUserId가 있으면 그 회원 글만(숨긴 글 포함), category가 있으면 그 카테고리의 보이는 글만 고른다. -->
     <sql id="postListWhere">
         WHERE P.STATUS_CODE &lt;&gt; 'DELETED'
         <if test="likePattern != null">
             AND P.STATUS_CODE = 'VISIBLE'
             AND (P.TITLE LIKE #{likePattern} ESCAPE '\' OR P.CONTENT LIKE #{likePattern} ESCAPE '\')
         </if>
+        <if test="ownerUserId != null">
+            AND P.USER_ID = #{ownerUserId}
+        </if>
+        <if test="category != null">
+            AND P.STATUS_CODE = 'VISIBLE'
+            AND P.CATEGORY_CODE = #{category}
+        </if>
     </sql>
 
-    <!-- N-06-1 목록 한 쪽. 댓글 수는 삭제되지 않은 댓글만 센다. -->
+    <!-- N-06-1 목록 한 쪽. 댓글 수는 삭제되지 않은 댓글만 센다. 최신순. -->
     <select id="selectPosts" resultType="com.baeksuescape.community.dto.PostRow">
         SELECT P.POST_ID AS postId, P.USER_ID AS userId, P.TITLE AS title, P.STATUS_CODE AS statusCode,
+               P.CATEGORY_CODE AS categoryCode,
                <include refid="authorName"/> AS nickname,
                (SELECT COUNT(*) FROM BOARD_COMMENT C WHERE C.POST_ID = P.POST_ID AND C.STATUS_CODE &lt;&gt; 'DELETED') AS commentCount,
                P.CREATED_AT AS createdAt, P.UPDATED_AT AS updatedAt
@@ -38,6 +47,7 @@
 
     <select id="selectPost" resultType="com.baeksuescape.community.dto.PostRow">
         SELECT P.POST_ID AS postId, P.USER_ID AS userId, P.TITLE AS title, P.CONTENT AS content, P.STATUS_CODE AS statusCode,
+               P.CATEGORY_CODE AS categoryCode,
                <include refid="authorName"/> AS nickname,
                P.CREATED_AT AS createdAt, P.UPDATED_AT AS updatedAt
           FROM BOARD_POST P
@@ -47,14 +57,14 @@
 
     <!-- N-06-2 글 저장 (상태 VISIBLE) -->
     <insert id="insertPost" useGeneratedKeys="true" keyProperty="postId" keyColumn="POST_ID">
-        INSERT INTO BOARD_POST (USER_ID, TITLE, CONTENT, STATUS_CODE, CREATED_AT)
-        VALUES (#{userId}, #{title}, #{content}, 'VISIBLE', #{createdAt})
+        INSERT INTO BOARD_POST (USER_ID, CATEGORY_CODE, TITLE, CONTENT, STATUS_CODE, CREATED_AT)
+        VALUES (#{userId}, #{categoryCode}, #{title}, #{content}, 'VISIBLE', #{createdAt})
     </insert>
 
     <!-- 글 수정: 보이는 글만 (숨겨진 글은 수정 불가, C조 11/12 확정) -->
     <update id="updatePostContent">
         UPDATE BOARD_POST
-           SET TITLE = #{title}, CONTENT = #{content}, UPDATED_AT = #{now}
+           SET CATEGORY_CODE = #{categoryCode}, TITLE = #{title}, CONTENT = #{content}, UPDATED_AT = #{now}
          WHERE POST_ID = #{postId}
            AND STATUS_CODE = 'VISIBLE'
     </update>
@@ -84,6 +94,44 @@
          ORDER BY C.CREATED_AT, C.COMMENT_ID
     </select>
 
+    <!-- COMM-09 내가 쓴 댓글 조건: 삭제 댓글과 삭제된 글의 댓글은 뺀다. 숨김 글·숨김 댓글은 남긴다(내용·제목은 비워서 보냄).
+         검색은 보이는 댓글의 내용이나 보이는 글의 제목에서만 찾는다(숨긴 내용이 검색으로 드러나지 않게).
+         category가 있으면 그 카테고리의 보이는 글에 쓴 댓글만 고른다. -->
+    <sql id="myCommentWhere">
+         WHERE C.USER_ID = #{userId}
+           AND C.STATUS_CODE &lt;&gt; 'DELETED'
+           AND P.STATUS_CODE &lt;&gt; 'DELETED'
+        <if test="likePattern != null">
+           AND ((C.STATUS_CODE = 'VISIBLE' AND C.CONTENT LIKE #{likePattern} ESCAPE '\')
+                OR (P.STATUS_CODE = 'VISIBLE' AND P.TITLE LIKE #{likePattern} ESCAPE '\'))
+        </if>
+        <if test="category != null">
+           AND P.STATUS_CODE = 'VISIBLE'
+           AND P.CATEGORY_CODE = #{category}
+        </if>
+    </sql>
+
+    <!-- COMM-09 내가 쓴 댓글 한 쪽(최신순). 숨김 글의 카테고리·제목·작성자는 내보내지 않는다. U는 글을 쓴 회원이다. -->
+    <select id="selectMyComments" resultType="com.baeksuescape.community.dto.CommentRow">
+        SELECT C.COMMENT_ID AS commentId, C.POST_ID AS postId, C.USER_ID AS userId, C.CONTENT AS content, C.STATUS_CODE AS statusCode,
+               CASE WHEN P.STATUS_CODE = 'VISIBLE' THEN P.CATEGORY_CODE END AS categoryCode,
+               CASE WHEN P.STATUS_CODE = 'VISIBLE' THEN P.TITLE END AS postTitle,
+               CASE WHEN P.STATUS_CODE = 'VISIBLE' THEN <include refid="authorName"/> END AS postNickname, C.CREATED_AT AS createdAt
+          FROM BOARD_COMMENT C
+          JOIN BOARD_POST P ON P.POST_ID = C.POST_ID
+          LEFT JOIN APP_USER U ON U.USER_ID = P.USER_ID
+        <include refid="myCommentWhere"/>
+         ORDER BY C.CREATED_AT DESC, C.COMMENT_ID DESC
+        OFFSET #{offset} ROWS FETCH NEXT #{limit} ROWS ONLY
+    </select>
+
+    <select id="countMyComments" resultType="int">
+        SELECT COUNT(*)
+          FROM BOARD_COMMENT C
+          JOIN BOARD_POST P ON P.POST_ID = C.POST_ID
+        <include refid="myCommentWhere"/>
+    </select>
+
     <select id="selectComment" resultType="com.baeksuescape.community.dto.CommentRow">
         SELECT C.COMMENT_ID AS commentId, C.POST_ID AS postId, C.USER_ID AS userId, C.CONTENT AS content, C.STATUS_CODE AS statusCode,
                <include refid="authorName"/> AS nickname, C.CREATED_AT AS createdAt
@@ -97,6 +145,27 @@
         INSERT INTO BOARD_COMMENT (POST_ID, USER_ID, CONTENT, STATUS_CODE, CREATED_AT)
         VALUES (#{postId}, #{userId}, #{content}, 'VISIBLE', #{createdAt})
     </insert>
+
+    <!-- 작성자가 고치거나 지울 수 있는 댓글: 댓글과 그 글이 모두 보이는 상태. 확인과 UPDATE 사이에 숨겨진 경우를 막는다(PR 리뷰) -->
+    <sql id="editableCommentWhere">
+         WHERE COMMENT_ID = #{commentId}
+           AND STATUS_CODE = 'VISIBLE'
+           AND EXISTS (SELECT 1 FROM BOARD_POST P WHERE P.POST_ID = BOARD_COMMENT.POST_ID AND P.STATUS_CODE = 'VISIBLE')
+    </sql>
+
+    <!-- N-06 내 댓글 수정(COMM-10) -->
+    <update id="updateCommentContent">
+        UPDATE BOARD_COMMENT
+           SET CONTENT = #{content}, UPDATED_AT = #{now}
+        <include refid="editableCommentWhere"/>
+    </update>
+
+    <!-- N-06 내 댓글 삭제(COMM-11): 행은 남기고 상태만 DELETED -->
+    <update id="deleteMyComment">
+        UPDATE BOARD_COMMENT
+           SET STATUS_CODE = 'DELETED', UPDATED_AT = #{now}
+        <include refid="editableCommentWhere"/>
+    </update>
 
     <update id="updateCommentStatus">
         UPDATE BOARD_COMMENT

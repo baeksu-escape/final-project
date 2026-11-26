@@ -32,6 +32,12 @@ export const nicknameOf = (loginId) => NICK[loginId] ?? loginId
 // 날짜 '2026-10-29 10:12' → 서버 LocalDateTime 모양 '2026-10-29T10:12:00'
 const at = (text) => `${text.replace(' ', 'T')}:00`
 
+// 예시 글의 카테고리 (없는 번호는 자유)
+const CATEGORY_BY_POST = {
+  6: 'CREDIT_SCORE', 5: 'LOAN', 3: 'LOAN', 1: 'CREDIT_SCORE',
+  21: 'CARD', 23: 'LOAN', 25: 'CREDIT_SCORE', 26: 'CARD', 28: 'CREDIT_SCORE', 31: 'CARD', 32: 'LOAN',
+}
+
 // status: VISIBLE | HIDDEN_BY_REPORT | DELETED (DDL BOARD_POST.STATUS_CODE)
 export const mockPosts = [
   { postId: 8, authorId: 'op_jin33', title: '여기 가입만 하면 누구나 점수 50점 오릅니다', content: '여기 가입만 하면 누구나 점수가 50점 이상 올라갑니다.\n저는 하루 만에 올랐어요. 지금 바로 가입하세요.', createdAt: at('2026-11-02 08:15'), status: 'VISIBLE' },
@@ -57,7 +63,7 @@ export const mockPosts = [
     ['마이너스통장 잔액도 대출로 잡히나요?', 'ki_minsu', '2026-10-12 16:15'],
     ['가입 첫 주 후기', 'le_sujin', '2026-10-11 11:30'],
   ].map(([title, authorId, time], index) => ({ postId: 21 + index, authorId, title, content: `${title}\n\n(시연용 예시 글입니다.)`, createdAt: at(time), status: 'VISIBLE' })),
-].map((post) => ({ ...post, updatedAt: null }))
+].map((post) => ({ ...post, categoryCode: CATEGORY_BY_POST[post.postId] ?? 'FREE', updatedAt: null }))
 
 export const mockComments = [
   { commentId: 601, postId: 6, authorId: 'ju_ara', content: '저도 자동이체 걸어 두니 마음이 편하더라고요.', createdAt: at('2026-10-29 11:02'), status: 'VISIBLE' },
@@ -65,6 +71,9 @@ export const mockComments = [
   { commentId: 401, postId: 4, authorId: 'ju_ara', content: '저는 성수기 수입의 30%를 따로 떼어 둬요.', createdAt: at('2026-10-28 22:05'), status: 'VISIBLE' },
   { commentId: 301, postId: 3, authorId: 'an_hyuk88', content: '너 같은 사람이 연체하는 거지. 남 탓 그만해라.', createdAt: at('2026-10-30 19:02'), status: 'HIDDEN_BY_REPORT' },
   { commentId: 302, postId: 3, authorId: 'ch_hoyoung', content: '40%가 은행에서 보는 기준이라 넘으면 한도가 줄어드는 경우가 많아요.', createdAt: at('2026-10-26 10:11'), status: 'VISIBLE' },
+  // 데모 계정 employee의 댓글 — 내가 쓴 댓글 탭(COMM-09) 확인용(보이는 것 1개, 신고로 숨김 1개)
+  { commentId: 303, postId: 3, authorId: 'employee', content: '저도 궁금했는데 감사합니다. 상환 기간을 늘리면 부담률이 내려가더라고요.', createdAt: at('2026-10-26 11:25'), status: 'VISIBLE' },
+  { commentId: 402, postId: 4, authorId: 'employee', content: '(시연용 숨김 댓글)', createdAt: at('2026-10-28 23:10'), status: 'HIDDEN_BY_REPORT' },
   { commentId: 101, postId: 1, authorId: 'ki_minsu', content: '다시 꾸준히 내면 대안 점수에 다시 반영된다고 나오더라고요.', createdAt: at('2026-10-24 13:30'), status: 'VISIBLE' },
 ]
 
