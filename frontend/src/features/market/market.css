@@ -1,12 +1,8 @@
 /* N-24 상권 분석 화면 전용 스타일 — 'Avenue 기능 데모 v2'의 서울 상권 히트맵 기준.
-   색·글꼴은 tokens.css 변수를 쓰고, 상권 전용 색(지도 빨강 5단계, 판정 7색, 매출 보라)만 이 파일에 둔다(두 테마 공통).
-   1차 시연 후속: 지도·범례·구별 평균·분포·상하위 동은 빨강 5단계(값이 클수록 진함), 판정 7색은 배지 글자 판정에만 남긴다. */
+   색·글꼴은 tokens.css 변수를 쓰고, 상권 전용 색(지도 지표별 5단계, 판정 7색, 매출 보라)만 이 파일에 둔다(두 테마 공통).
+   1차 시연 후속: 지도·범례·구별 평균·분포·상하위 동은 고른 지표 색 5단계(값이 클수록 진함), 판정 7색은 배지 글자 판정에만 남긴다.
+   FP-278(11/26): 지표마다 색을 나눴다 — 폐업률 갈색, 매출 전년비 초록, 개업률 주황, 점포 수·유동인구 증감 파랑. */
 .market-page {
-  --market-heat1: #fde0dc;
-  --market-heat2: #f9a99d;
-  --market-heat3: #f26b5b;
-  --market-heat4: #d63a2f;
-  --market-heat5: #9e1b18;
   --market-neu: #45ad78;
   --market-neg1: #f2a3b6;
   --market-neg2: #ee7495;
@@ -36,12 +32,48 @@
 .market-bin--pos3 { --bin: var(--market-pos3); }
 .market-bin--none { --bin: var(--market-none); }
 
-/* 지도 색 단계 — 값이 클수록 진한 빨강. 진한 두 단계 위 글자는 흰색(--bin-fg) */
+/* FP-278 지표별 색 5단계(--market-heat1~5). 가장 진한 단계도 너무 어둡지 않게 해 칸끼리 차이는 보이되 눈이 편하게 했다(11/26 동주). 화면(.market-page)에는 고른 지표, 지표 칩·상세 창 지표 카드에는 그 칸의 지표 클래스를 붙인다.
+   클래스가 없으면 폐업률 갈색을 쓴다. */
+.market-page,
+.market-metric--closeRate {
+  --market-heat1: #f1e8de;
+  --market-heat2: #e2cdb5;
+  --market-heat3: #cdad8b;
+  --market-heat4: #b08a63;
+  --market-heat5: #8b6844;
+}
+
+.market-metric--salesYoY {
+  --market-heat1: #e3f4ea;
+  --market-heat2: #c0e6cf;
+  --market-heat3: #92d2ad;
+  --market-heat4: #5fb688;
+  --market-heat5: #3a926a;
+}
+
+.market-metric--openRate {
+  --market-heat1: #fff0dc;
+  --market-heat2: #ffd9ab;
+  --market-heat3: #ffbd76;
+  --market-heat4: #f59e45;
+  --market-heat5: #d97f24;
+}
+
+.market-metric--storeYoY,
+.market-metric--livingPopYoY {
+  --market-heat1: #e2edfc;
+  --market-heat2: #c2d8f8;
+  --market-heat3: #98bcf1;
+  --market-heat4: #6c9ce6;
+  --market-heat5: #4a7cc9;
+}
+
+/* 지도 색 단계 — 값이 클수록 진하다. 가장 진한 단계도 밝은 편이라 위 글자는 모두 어두운 색이다 */
 .market-heat--1 { --bin: var(--market-heat1); }
 .market-heat--2 { --bin: var(--market-heat2); }
 .market-heat--3 { --bin: var(--market-heat3); }
-.market-heat--4 { --bin: var(--market-heat4); --bin-fg: #fff; }
-.market-heat--5 { --bin: var(--market-heat5); --bin-fg: #fff; }
+.market-heat--4 { --bin: var(--market-heat4); }
+.market-heat--5 { --bin: var(--market-heat5); }
 .market-heat--none { --bin: var(--market-none); }
 
 /* 공통 글자 */
@@ -95,6 +127,14 @@
 
 .market-filters__row--region {
   align-items: flex-end;
+}
+
+/* 업종 — 고른 버튼이 티 나게 연한 파랑 바탕 + 파란 굵은 글씨(라운지 조회 범위와 같은 방식, 공통 CSS는 그대로, 11/26) */
+.market-filters .segmented__button[aria-pressed='true'] {
+  background: var(--sel);
+  color: var(--acc);
+  font-weight: 700;
+  box-shadow: none;
 }
 
 /* 고른 지표의 뜻 한 줄(1차 시연 후속) — 지표 칩과 같은 들여쓰기 */
@@ -153,8 +193,21 @@
 }
 
 .market-metric-chip b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13.5px;
   font-weight: 600;
+}
+
+/* FP-278 지표 이름 앞 색 점 — 그 지표 색(4단계) */
+.market-metric-chip b::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--market-heat4);
 }
 
 .market-metric-chip span {
@@ -162,9 +215,14 @@
   color: var(--mut);
 }
 
+/* 고른 지표 칩은 그 지표 색 — 테두리 4단계, 바탕은 3단계를 옅게 섞어 다크 모드에서도 글자가 보이게 */
 .market-metric-chip[aria-pressed='true'] {
-  border-color: var(--acc);
-  background: var(--sel);
+  border-color: var(--market-heat4);
+  background: color-mix(in srgb, var(--market-heat3) 18%, var(--panel));
+}
+
+.market-metric-chip[aria-pressed='true'] b {
+  color: var(--market-heat4);
 }
 
 /* 지도 + 오른쪽 정보 (데모 상권 탭처럼 지도 아래에 정보 카드를 가로로 놓는다) */
@@ -212,11 +270,49 @@
 
 .market-map__dong--dim { opacity: 0.28; }
 
+/* 구를 골랐을 때 다른 구의 동 — 색을 빼고 흐린 회색으로. 누르면 그 구로 이동한다(테두리 강조 없음, 11/26) */
+.market-map__svg--dong .market-map__dong--dim {
+  fill: var(--market-none);
+  opacity: 0.5;
+}
+
+.market-map__svg--dong .market-map__dong--dim:hover {
+  stroke: var(--panel2);
+  stroke-width: 0.8;
+  opacity: 0.8;
+}
+
+/* FP-278 구 색(서울 전체를 멀리서 볼 때) — 구 모양을 칠한다. 마우스를 올린 구는 구 경계선을 진하게 한다(.market-map__gu--on) */
+.market-map__gu-fill {
+  fill: var(--bin);
+  cursor: pointer;
+  transition: fill 0.25s, opacity 0.25s;
+}
+
+/* FP-278 동 색(확대했을 때) — 칸 색을 바탕과 섞어 단계 차이를 약하게 한다. 섞는 비율만 바꾸면 세기가 바뀐다(범례 막대도 같은 값) */
+.market-map__svg--dong .market-map__dong:not(.market-map__dong--dim),
+.market-legend--dong .market-ramp__cell {
+  fill: color-mix(in srgb, var(--bin) 85%, var(--panel));
+  background: color-mix(in srgb, var(--bin) 85%, var(--panel));
+}
+
+/* 다크 모드는 70%가 알맞아 따로 둔다(화이트 모드는 70%면 너무 연하다는 의견, 11/26) */
+:root[data-theme='dark'] .market-map__svg--dong .market-map__dong:not(.market-map__dong--dim),
+:root[data-theme='dark'] .market-legend--dong .market-ramp__cell {
+  fill: color-mix(in srgb, var(--bin) 70%, var(--panel));
+  background: color-mix(in srgb, var(--bin) 70%, var(--panel));
+}
+
 .market-map__gu {
   fill: none;
   stroke: var(--fg);
   stroke-width: 1.4;
   opacity: 0.6;
+}
+
+.market-map__gu--on {
+  stroke-width: 2.6;
+  opacity: 1;
 }
 
 .market-map__outline {
@@ -242,9 +338,15 @@
   vector-effect: non-scaling-stroke;
 }
 
+/* 동 이름 — 잘 안 보인다는 의견(11/26)으로 구 이름처럼 글자 둘레에 바탕색 테두리를 둘렀다 */
 .market-map__dong-label {
-  fill: #0b1222;
-  font-weight: 500;
+  fill: var(--fg);
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
 .market-map__ctl {
@@ -372,9 +474,14 @@
 .market-chart__grid { stroke: var(--line); }
 .market-chart__hit { cursor: pointer; }
 .market-chart__hit:focus-visible { outline: 2px solid var(--info); }
-.market-chart__label { fill: var(--mut); font-family: var(--f-b); }
+.market-chart__label { fill: var(--fg2); font-family: var(--f-b); }
 .market-chart__label--on { fill: var(--fg); font-weight: 700; }
-.market-chart__bar { fill: var(--bin); }
+/* 가장 연한 단계 막대도 흰 바탕에서 보이게 조금 진한 얇은 테두리를 둔다(11/26) */
+.market-chart__bar {
+  fill: var(--bin);
+  stroke: color-mix(in srgb, var(--bin) 75%, var(--fg));
+  stroke-width: 0.6;
+}
 .market-chart__bar--on { stroke: var(--fg); stroke-width: 1; }
 .market-chart__value { fill: var(--fg2); }
 .market-chart__tick { fill: var(--mut2); }
@@ -467,12 +574,6 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
-}
-
-.market-detail__nav {
-  display: flex;
-  flex-wrap: wrap;
   gap: 6px;
 }
 
