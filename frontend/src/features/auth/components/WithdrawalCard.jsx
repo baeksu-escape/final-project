@@ -5,9 +5,11 @@ import { TextInput } from '../../../common/components/index.js'
 import { requestWithdrawal } from '../api/myPageApi.js'
 import { AUTH_PATHS } from '../authPaths.js'
 
-// N-04-7 탈퇴 확인 폼의 안내문.
-const WITHDRAWAL_NOTICE =
-  '탈퇴하면 계정이 탈퇴 상태로 바뀌고 이름·이메일·휴대폰 같은 개인정보는 지워집니다. 진단 내역은 서비스 기록으로 보관되고, 동의로 불러온 대안 데이터와 간편 로그인 연결은 삭제됩니다. 되돌릴 수 없습니다.'
+// N-04-7 탈퇴 확인 폼의 안내문(FP-259 3차) — 두 줄로 나눠 보여 준다.
+const WITHDRAWAL_NOTICE_LINES = Object.freeze([
+  '탈퇴 시 계정의 상태가 변경되고, 개인정보는 지워집니다.',
+  '진단 내역만 서비스 기록으로 보관되며, 되돌릴 수 없습니다.',
+])
 // 탈퇴를 마친 뒤 로그인 화면에 띄울 알림.
 const WITHDRAWAL_DONE_MESSAGE = '탈퇴를 마쳤습니다.'
 
@@ -49,7 +51,11 @@ export default function WithdrawalCard({ onCancel }) {
 
   return (
     <form className="account-form withdrawal-form" onSubmit={handleSubmit} noValidate>
-      <p className="withdrawal-form__notice">{WITHDRAWAL_NOTICE}</p>
+      <p className="withdrawal-form__notice">
+        {WITHDRAWAL_NOTICE_LINES[0]}
+        <br />
+        {WITHDRAWAL_NOTICE_LINES[1]}
+      </p>
       <TextInput
         label="비밀번호 확인"
         type="password"
@@ -66,12 +72,15 @@ export default function WithdrawalCard({ onCancel }) {
           {formError}
         </p>
       )}
-      <button type="submit" className="account-form__submit" disabled={pending}>
-        {pending ? '탈퇴 처리 중…' : '탈퇴하기'}
-      </button>
-      <button type="button" className="account-form__cancel" onClick={onCancel} disabled={pending}>
-        취소
-      </button>
+      {/* FP-259 3차 [탈퇴하기]·[취소]를 계정 관리 버튼과 같은 2칸 격자로 나란히 둔다. */}
+      <div className="withdrawal-form__actions">
+        <button type="submit" className="account-form__submit" disabled={pending}>
+          {pending ? '탈퇴 처리 중…' : '탈퇴하기'}
+        </button>
+        <button type="button" className="account-form__cancel" onClick={onCancel} disabled={pending}>
+          취소
+        </button>
+      </div>
     </form>
   )
 }

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { SegmentedControl } from '../../../common/components/index.js'
@@ -23,6 +24,10 @@ const TAB_OPTIONS = Object.freeze([
 export default function MyPage() {
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
+  // FP-259 4차 [내정보] 비밀번호 확인 상태와 원래 값(MEM-02 응답)은 이 화면 상태에만 둔다. 마이페이지 안에서 탭을 오가도 다시 묻지 않고,
+  // 다른 페이지로 가거나 새로고침·로그아웃으로 이 화면이 사라지면 함께 지워진다(브라우저 저장소에는 넣지 않는다).
+  const [profileUnlocked, setProfileUnlocked] = useState(false)
+  const [unmaskedProfile, setUnmaskedProfile] = useState(null)
   const requested = searchParams.get('tab')
   const tab = Object.values(TABS).includes(requested) ? requested : TABS.HISTORY
 
@@ -39,8 +44,14 @@ export default function MyPage() {
       {/* UI 리뉴얼(FP-252) 신용 기록 요약(점수 링·숫자 타일) — FP-259부터 [진단내역] 탭 안, 진단 내역 표 위에 둔다 */}
       {tab === TABS.HISTORY && <MyCreditSummary />}
       {tab === TABS.HISTORY && <DiagnosisHistoryPanel />}
-      {/* 내정보 탭을 떠나면 MyProfileTab이 사라지며 잠금·원래 값도 함께 지워진다. */}
-      {tab === TABS.PROFILE && <MyProfileTab />}
+      {tab === TABS.PROFILE && (
+        <MyProfileTab
+          unlocked={profileUnlocked}
+          onUnlock={() => setProfileUnlocked(true)}
+          unmasked={unmaskedProfile}
+          onUnmaskedChange={setUnmaskedProfile}
+        />
+      )}
     </section>
   )
 }

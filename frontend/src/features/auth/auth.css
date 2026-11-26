@@ -413,18 +413,32 @@
   min-width: 0;
 }
 
-.my-page > .my-profile-card {
-  grid-column: span 2;
+/* FP-259 4차 탭 줄([진단내역 | 내정보])은 두 열을 합친 전체 폭으로 늘린다(공통 .segmented는 inline-flex라 글자 폭만 차지한다). */
+.my-page > .segmented {
+  display: flex;
 }
 
-.my-page > .account-manage-card {
-  grid-column: span 1;
+/* [내정보] 탭 내용 — 탭 줄 아래에 내 정보(넓게 2칸) + 계정 관리(1칸)를 나란히 두고 윗선을 맞춘다. 좁은 화면은 위아래로 쌓는다.
+   FP-259 5차 내 정보는 늘 자기 내용 높이만 갖고, 계정 관리만 줄 높이만큼 늘어난다.
+   평소에는 두 카드 높이가 같고, [회원 탈퇴] 폼을 펼치면 오른쪽만 길어진다. */
+.my-profile-tab {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.my-profile-tab > .my-profile-card {
+  align-self: start;
+}
+
+.my-profile-tab .card__body {
+  flex: 1;
 }
 
 @media (max-width: 960px) {
-  .my-page > .my-profile-card,
-  .my-page > .account-manage-card {
-    grid-column: 1 / -1;
+  .my-profile-tab {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -481,6 +495,50 @@
 .my-profile-card__unmasked {
   color: var(--mut2);
   font-size: 12.5px;
+}
+
+/* FP-259 6차 내 정보 제목 줄 — 제목 왼쪽, [표시]·[숨기기]·[가림 해제] 오른쪽 끝, 원래 값 안내는 그 버튼 왼쪽에 한 줄로.
+   줄 높이를 버튼 높이(36px)로 고정해 원래 값을 펼치거나 가려도 카드 높이가 변하지 않는다.
+   제목 아래 간격은 카드 기본 제목 간격(--sp-4)과 같게 맞춘다(카드 본문 간격은 --sp-3). */
+.my-profile-card__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  margin-bottom: calc(var(--sp-4) - var(--sp-3));
+}
+
+.my-profile-card__head .card__title {
+  flex: none;
+}
+
+.my-profile-card__head .my-profile-card__unmasked {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-profile-card__head .my-profile-card__unmask {
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+}
+
+/* 좁은 화면에서는 안내 문구만 제목 아래 줄로 내린다(버튼은 제목 줄 오른쪽에 그대로). */
+@media (max-width: 560px) {
+  .my-profile-card__head {
+    flex-wrap: wrap;
+  }
+
+  .my-profile-card__head .my-profile-card__unmasked {
+    order: 3;
+    flex-basis: 100%;
+    text-align: left;
+    white-space: normal;
+  }
 }
 
 .my-profile-card__unmask-form {
@@ -589,9 +647,8 @@
 }
 
 /* 회원 탈퇴 — 데모 .warnbox, 탈퇴 버튼은 위험 색.
-   FP-222 카드가 화면 전체 폭이라 열린 확인 상자도 전체 폭으로 늘어났다. 가입·찾기 화면과 같은 600px까지만 넓어지게 한다. */
+   FP-259 3차 계정 관리 카드 안으로 옮겨, 상자를 카드 폭에 맞춘다(예전 600px 제한은 위 버튼 격자와 폭이 어긋나 뺐다). */
 .withdrawal-form {
-  max-width: 600px;
   border-color: var(--warn-line);
   background: var(--warn-bg);
 }
@@ -614,6 +671,22 @@
   border-color: var(--bad);
   background: var(--inp);
   color: var(--bad);
+}
+
+/* FP-259 3차 [회원 탈퇴]는 위 2×2 버튼(.account-manage-card__actions, 간격 8px)의 왼쪽 칸과 같은 너비. */
+.account-manage-card .withdrawal-card__open {
+  width: calc((100% - 8px) / 2);
+}
+
+/* [탈퇴하기]·[취소]도 위 버튼과 같은 2칸 격자·8px 간격. 상자 안쪽 여백만큼 칸이 조금 좁다. */
+.withdrawal-form__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.withdrawal-form__actions .account-form__submit {
+  align-self: stretch;
 }
 
 /* 진단 내역 표 — 데모 .tbl */

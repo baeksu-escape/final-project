@@ -5,12 +5,11 @@ import MyProfileCard from './MyProfileCard.jsx'
 import ProfileUnlockCard from './ProfileUnlockCard.jsx'
 
 // FP-222 v2 마이 페이지 [내정보] 탭 — 먼저 비밀번호를 확인하고(기존 MEM-02 가림 해제), 맞으면 내 정보(N-04-1·N-04-2)·계정 관리(N-04-3, 회원 탈퇴 N-04-7 포함)를 연다.
-// 잠금 상태와 원래 값은 이 컴포넌트 상태에만 있어서, 다른 탭이나 화면으로 가면(컴포넌트가 사라지면) 함께 지워지고 다시 들어오면 잠겨 있다.
-// 카드들은 Fragment로 돌려줘 .my-page 격자의 바로 아래 칸이 되게 한다(내 정보 2칸 + 계정 관리 1칸 배치를 그대로 쓴다).
-export default function MyProfileTab() {
-  const [unlocked, setUnlocked] = useState(false)
+// FP-259 4차 확인 상태(unlocked)와 원래 값(unmasked)은 MyPage가 들고 있어, 마이페이지 안에서 탭을 오가도 다시 묻지 않는다.
+// 다른 페이지·새로고침·로그아웃으로 MyPage가 사라지면 함께 지워져 다시 묻는다.
+// 내 정보(넓게)·계정 관리(좁게)는 탭 안의 격자(.my-profile-tab)에 나란히 두고 윗선·높이를 맞춘다.
+export default function MyProfileTab({ unlocked, onUnlock, unmasked, onUnmaskedChange }) {
   const [profile, setProfile] = useState(null)
-  const [unmasked, setUnmasked] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -22,7 +21,7 @@ export default function MyProfileTab() {
       .then(({ profile: next }) => {
         if (cancelled) return
         setProfile(next)
-        if (reloadKey > 0) setUnmasked(null)
+        if (reloadKey > 0) onUnmaskedChange(null)
         setLoadError('')
       })
       .catch((error) => {
@@ -31,18 +30,18 @@ export default function MyProfileTab() {
     return () => {
       cancelled = true
     }
-  }, [reloadKey])
+  }, [reloadKey, onUnmaskedChange])
 
-  // N-04-2 가림 해제(MEM-02) — 서버가 비밀번호를 확인하면 원래 값을 상태에만 둔다. 틀리면 오류를 그대로 던진다(카드가 보여 준다).
+  // N-04-2 가림 해제(MEM-02) — 서버가 비밀번호를 확인하면 원래 값을 화면 상태에만 둔다. 틀리면 오류를 그대로 던진다(카드가 보여 준다).
   const handleUnmask = async (password) => {
     const { profile: original } = await requestUnmaskProfile(password)
-    setUnmasked(original)
+    onUnmaskedChange(original)
   }
 
-  // 탭 잠금 해제 — 가림 해제와 같은 확인이다. 성공하면 받은 원래 값을 바로 보여 준다.
+  // 탭 잠금 해제 — 가림 해제와 같은 확인이다. FP-259 4차 확인 뒤에도 가린 값부터 보여 주고, 원래 값은 [표시]를 눌러야 보인다.
   const handleUnlock = async (password) => {
     await handleUnmask(password)
-    setUnlocked(true)
+    onUnlock()
   }
 
   if (!unlocked) return <ProfileUnlockCard onUnlock={handleUnlock} />
@@ -63,9 +62,11 @@ export default function MyProfileTab() {
           {loadError}
         </p>
       )}
-      <MyProfileCard profile={profile} unmasked={unmasked} onUnmask={handleUnmask} />
-      {/* N-04-7 회원 탈퇴는 계정 관리 카드 맨 아래로 옮겼다(FP-259). */}
-      <AccountManageCard currentNickname={profile.nickname} onSaved={() => setReloadKey((key) => key + 1)} />
+      <div className="my-profile-tab">
+        <MyProfileCard profile={profile} unmasked={unmasked} onUnmask={handleUnmask} />
+        {/* N-04-7 회원 탈퇴는 계정 관리 카드 맨 아래로 옮겼다(FP-259). */}
+        <AccountManageCard currentNickname={profile.nickname} onSaved={() => setReloadKey((key) => key + 1)} />
+      </div>
     </>
   )
 }
