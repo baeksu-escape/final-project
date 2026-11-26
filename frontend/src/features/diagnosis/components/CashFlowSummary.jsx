@@ -63,8 +63,8 @@ export default function CashFlowSummary({ result, baseline, fixedExpenseAmount, 
         <strong className={cumulativeSurplusAmount < 0 ? 'cf-big cf-neg' : 'cf-big cf-pos'}>{signed(cumulativeSurplusAmount)}원</strong>
       </div>
       <div className="cf-summary__item">
-        <span className="cf-hint">가장 빠듯한 달</span>
-        <strong className="cf-big">{tightestMonth ? `${monthLabel(tightestMonth.baseMonth)} ${signed(tightestMonth.netAmount)}원` : '—'}</strong>
+        <span className="cf-hint">{tightestMonth ? `가장 빠듯한 달은 ${monthLabel(tightestMonth.baseMonth)}` : '가장 빠듯한 달'}</span>
+        <strong className="cf-big">{tightestMonth ? `${signed(tightestMonth.netAmount)}원` : '—'}</strong>
       </div>
       <ExpenseBreakdown baseline={baseline} fixedExpenseAmount={fixedExpenseAmount} stale={stale} />
       {/* N-21-6 서버가 대출 원리금을 뺀 월 지출로 센 값이라 위 지출 구성 합계와 기준이 다르다. 줄은 값이 없어도 자리를 유지한다. */}

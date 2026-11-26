@@ -29,7 +29,7 @@ export default function CashFlowConditions({ values, status, error, stale, basel
       </div>
       <Button variant="primary" onClick={onForecast} disabled={!canForecast}>예측 다시 하기</Button>
       {/* C-17 조건을 처음 값(저장된 기준값)으로 되돌린다. 바뀐 조건이 없으면 비활성이라 자리는 늘 유지된다. */}
-      <Button size="sm" onClick={onReset} disabled={!canReset}>내 현재 값으로 되돌리기</Button>
+      <Button variant="primary" size="sm" onClick={onReset} disabled={!canReset}>내 현재 값으로 되돌리기</Button>
     </Card>
   )
 }
