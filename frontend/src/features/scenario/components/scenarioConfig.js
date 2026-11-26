@@ -26,12 +26,12 @@ export const SCENARIO_FIELDS = [
 
 const KEYS = SCENARIO_FIELDS.map((field) => field.key)
 
-// (시안 5차) 쉬운 화면용 상황 버튼 2개 — 슬라이더 범위의 끝값을 넣는다.
-// 최악: 금리·지출은 가장 많이 오르고 소득은 가장 많이 줄어든 값, 최적: 그 반대.
+// (시안 8차) 쉬운 화면용 상황 버튼 2개(베스트·워스트 순서) — 슬라이더 범위의 끝값을 넣는다.
+// 워스트: 금리·지출은 가장 많이 오르고 소득은 가장 많이 줄어든 값, 베스트: 그 반대.
 const isCost = (field) => field.key !== 'incomePct'
 export const EASY_PRESETS = [
-  { id: 'worst', label: '최악의 시나리오', ...Object.fromEntries(SCENARIO_FIELDS.map((f) => [f.key, isCost(f) ? f.sliderMax : f.sliderMin])) },
-  { id: 'best', label: '최적의 시나리오', ...Object.fromEntries(SCENARIO_FIELDS.map((f) => [f.key, isCost(f) ? f.sliderMin : f.sliderMax])) },
+  { id: 'best', label: '베스트 케이스 (Best Case)', ...Object.fromEntries(SCENARIO_FIELDS.map((f) => [f.key, isCost(f) ? f.sliderMin : f.sliderMax])) },
+  { id: 'worst', label: '워스트 케이스 (Worst Case)', ...Object.fromEntries(SCENARIO_FIELDS.map((f) => [f.key, isCost(f) ? f.sliderMax : f.sliderMin])) },
 ]
 
 // (시안 2차) 금액 칸을 쓸 수 있는 항목이면 지금 금액(원), 아니면 null.
