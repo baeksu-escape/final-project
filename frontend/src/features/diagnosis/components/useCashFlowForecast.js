@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { forecastCashFlow, getCashFlowData } from '../api/financeApi.js'
 
-// 처음 화면에 쓰는 예측 조건(UI 참고자료 기본값: 변동 폭 100%, 제때 납부, 12개월). 월 고정 지출은 저장값으로 채운다.
-const DEFAULT_CONDITIONS = { incomeVariationPct: 100, fixedExpenseAmount: null, paymentStatus: 'ON_TIME', months: 12 }
+// 처음 화면에 쓰는 예측 조건(UI 참고자료 기본값: 변동 폭 100%, 12개월). 월 고정 지출은 저장값으로 채운다. 납부 상태는 11/25 팀 결정으로 입력과 요청에서 뺐다.
+const DEFAULT_CONDITIONS = { incomeVariationPct: 100, fixedExpenseAmount: null, months: 12 }
 const CONDITION_KEYS = Object.keys(DEFAULT_CONDITIONS)
 const sameConditions = (a, b) => CONDITION_KEYS.every((key) => a?.[key] === b?.[key])
 
@@ -100,18 +100,21 @@ export function useCashFlowForecast(userId, workerTypeCode) {
   const canForecast = complete && current.status !== 'loading' && !conditionError(current.values)
     && !sameConditions(current.values, current.applied)
 
-  // N-21-8 예상 점수만 실패했을 때, 마지막으로 예측한 같은 조건으로 바로 다시 요청한다(전망 결과는 새 응답이 올 때까지 그대로 둔다).
-  const retryScore = () => {
-    if (!complete || current.status === 'loading' || !current.applied) return
-    cancelPending()
-    runForecast(baseline, { ...current.applied }, key, seq.current)
-  }
-
-  // N-21-8 유효한 변경 조건을 버튼으로 예측한다.
+  // N-21-2·N-21-5 유효한 변경 조건을 버튼으로 예측한다.
   const forecast = () => {
     if (!canForecast) return
     cancelPending()
     runForecast(baseline, { ...current.values }, key, seq.current)
+  }
+
+  // C-17 예측 조건을 처음 상태(변동 폭 100%·12개월·저장된 월 고정 지출)로 되돌린다. 예측은 [예측 다시 하기]로 한다.
+  const initialValues = { ...DEFAULT_CONDITIONS, fixedExpenseAmount: baseline?.fixedExpenseAmount ?? null }
+  const canReset = Boolean(baseline) && !sameConditions(current.values, initialValues)
+  const reset = () => {
+    if (!canReset) return
+    cancelPending()
+    const invalid = conditionError(initialValues)
+    setForm({ ...current, values: initialValues, status: invalid ? 'invalid' : 'idle', error: invalid })
   }
 
   return {
@@ -121,14 +124,16 @@ export function useCashFlowForecast(userId, workerTypeCode) {
     baselineComplete: complete,
     values: current.values,
     result: current.result,
+    applied: current.applied,
     status: current.status,
     error: current.error,
     stale: Boolean(current.result) && !sameConditions(current.values, current.applied),
     canForecast,
     setCondition,
+    canReset,
+    reset,
     forecast,
     retry: forecast,
-    retryScore,
     reload: () => setRevision((value) => value + 1),
   }
 }

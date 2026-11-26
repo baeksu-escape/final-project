@@ -25,6 +25,6 @@ export function createFinanceMockData(workerTypeCode) {
       totalDebtAmount: loans.reduce((sum, loan) => sum + loan.balanceAmount, 0), annualPaymentAmount: monthlyPaymentAmount * 12, loans,
       peer: { annualIncomeAmount: sample.peer[0] * 10000, totalAssetAmount: sample.peer[1] * 10000, totalDebtAmount: sample.peer[2] * 10000 }, assumptions: [...ASSET_ASSUMPTIONS] },
     cash: { months, fixedExpenseAmount: sample.fixed * 10000, otherExpenseAmount: sample.other * 10000, monthlyPaymentAmount,
-      currentScore: 701, assumptions: ['직군별 공통 시연값이며 회원의 실제 DB 자료가 아닙니다.', '소득 전망·예상 점수는 UI 시연식이며 실제 평가에 반영되지 않습니다.'] },
+      currentScore: 701, assumptions: ['직군별 공통 시연값이며 회원의 실제 DB 자료가 아닙니다.', '소득 전망은 UI 시연식이며 실제 평가에 반영되지 않습니다.'] },
   }
 }

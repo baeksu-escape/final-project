@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../../common/auth/useAuth.js'
-import { Button, Card } from '../../../common/components/index.js'
+import { Button, Card, Chip } from '../../../common/components/index.js'
 import { getIncomeVolatility } from '../api/incomeVolatilityApi.js'
 import '../styles/incomeVolatility.css'
 
@@ -27,6 +27,53 @@ function formatMonth(value) {
 function getIncomeUnavailableMessage(reason) {
   if (reason === 'INCOME_MISSING') return '월 소득이 미입력된 달이 있어 소득 지표를 계산할 수 없습니다.'
   return '월 소득 자료를 확인할 수 없어 지표를 계산할 수 없습니다.'
+}
+
+// N-22-6 월별 소득 표는 기준 자료가 있으면 표시하고, 최고는 표에서 계산하며 최저·부족 표시는 변동성 응답이 있을 때 붙인다.
+// 급여소득자는 월급 1건이 같은 금액 12개월로 내려오므로, 금액이 모두 같으면 최고·최저 배지와 제목의 최고·최저를 숨기고 "매달 ○○원"으로 보여 준다.
+function MonthlyIncomeCard({ months, lowestBaseMonth, deficitMonths }) {
+  const rows = Array.isArray(months) ? months : []
+  const incomes = rows.filter((row) => Number.isFinite(row.incomeAmount))
+  const varies = incomes.some((row) => row.incomeAmount !== incomes[0].incomeAmount)
+  const highest = varies ? incomes.reduce((top, row) => (row.incomeAmount > top.incomeAmount ? row : top)) : null
+  const lowest = varies ? rows.find((row) => row.baseMonth === lowestBaseMonth) ?? null : null
+  // 접힌 제목 요약: 이어 읽히지 않게 괄호로 묶는다.
+  const summaryParts = []
+  if (highest) summaryParts.push(`최고 ${formatMonth(highest.baseMonth)} ${formatWon(highest.incomeAmount)}`)
+  if (lowest && Number.isFinite(lowest.incomeAmount)) summaryParts.push(`최저 ${formatMonth(lowest.baseMonth)} ${formatWon(lowest.incomeAmount)}`)
+  if (incomes.length && !varies) summaryParts.push(`매달 ${formatWon(incomes[0].incomeAmount)}`)
+  const hasDeficit = Boolean(deficitMonths) && rows.some((row) => deficitMonths.includes(row.baseMonth))
+  return (
+    <Card title="최근 12개월 소득">
+      {rows.length === 0 ? <p>소득 기록이 없어요.</p> : (
+        <details>
+          <summary>
+            {`월별 소득 12개월 보기${summaryParts.length ? ` (${summaryParts.join(', ')})` : ''}`}
+          </summary>
+          <div className="data-table-wrap">
+          <table className="data-table">
+            <thead><tr><th scope="col">월</th><th scope="col">소득</th></tr></thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.baseMonth}>
+                  <td>
+                    {formatMonth(row.baseMonth)}
+                    {highest?.baseMonth === row.baseMonth && <> <Chip accent>최고</Chip></>}
+                    {/* N-22-1 최저·부족은 공통 Chip이 className을 받지 않아 같은 chip 모양에 색 수식 클래스를 단 span을 쓴다. */}
+                    {lowestBaseMonth && lowest?.baseMonth === row.baseMonth && <> <span className="chip iv-badge--low">최저</span></>}
+                    {deficitMonths && deficitMonths.includes(row.baseMonth) && <> <span className="chip iv-badge--short">부족</span></>}
+                  </td>
+                  <td className="num">{formatWon(row.incomeAmount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+          {hasDeficit && <p className="hint">부족: 소득이 월 고정지출보다 적은 달</p>}
+        </details>
+      )}
+    </Card>
+  )
 }
 
 // N-22-1 지표 조회 상태 — 회원·직군·기준 자료가 바뀌거나 화면을 떠나면 늦은 응답을 버리고, 실패하면 다시 시도할 수 있다.
@@ -116,9 +163,17 @@ export default function IncomeVolatilitySection({ data }) {
               <dt>가장 적게 번 달과 월 고정지출</dt>
               <dd>{lowMonthComparison}</dd>
             </div>
-            <div><dt>성수기·비수기 소득 차이</dt><dd>{formatWon(stats.gapAmount)}</dd></div>
+            <div><dt>가장 많이 번 달과 적게 번 달의 차이</dt><dd>{formatWon(stats.gapAmount)}</dd></div>
           </dl>
         </Card>
+      )}
+
+      {Array.isArray(data?.months) && data.months.length > 0 && (
+        <MonthlyIncomeCard
+          months={data.months}
+          lowestBaseMonth={stats?.lowestMonth?.baseMonth}
+          deficitMonths={deficits?.map((item) => item.baseMonth)}
+        />
       )}
 
       <Card title="소득 부족 달 미리 보기" className="iv-deficits">
@@ -130,17 +185,19 @@ export default function IncomeVolatilitySection({ data }) {
           <p>최근 12개월 중 월 고정지출보다 소득이 적은 달이 없습니다.</p>
         ) : (
           <>
+          {/* N-22-5 가장 가까운 부족 달 앞에 월 고정지출 기준을 알려 준다. */}
+          <p className="hint">월 고정지출보다 소득이 적었던 달 기준</p>
+          {/* N-22-5 가장 가까운 소득 부족 달 — 다시 올 달·남은 개월 수와 미리 모아 둘 금액을 한 줄로 안내한다. */}
           {response.nearestDeficit && (
-            <p>가장 가까운 부족 달: {response.nearestDeficit.dueMonth ? `${formatMonth(response.nearestDeficit.dueMonth)}(${response.nearestDeficit.monthsUntil}개월 뒤)` : `${response.nearestDeficit.monthsUntil}개월 뒤`} · 미리 모아 둘 금액 {formatWon(response.nearestDeficit.reserveAmount)}</p>
+            <p>가장 가까운 부족 달: {response.nearestDeficit.dueMonth ? `${formatMonth(response.nearestDeficit.dueMonth)}(${response.nearestDeficit.monthsUntil}개월 뒤)` : `${response.nearestDeficit.monthsUntil}개월 뒤`}, 미리 모아 둘 금액 {formatWon(response.nearestDeficit.reserveAmount)}</p>
           )}
+          {/* N-22-6 부족한 달 카드 — 다시 올 때가 가까운 순서(최근 12개월 안에서는 오래된 달부터)로 그린다. */}
           <ul className="iv-deficits__list">
-            {deficits.map((item) => (
-              <li key={item.baseMonth}>
+            {[...deficits].sort((a, b) => a.monthsUntilNextOccurrence - b.monthsUntilNextOccurrence).map((item) => (
+              <li key={item.baseMonth} className="panel-sunk">
                 <strong>{formatMonth(item.baseMonth)}</strong>
-                <span>소득 {formatWon(item.incomeAmount)} · 부족액 {formatWon(item.shortageAmount)}</span>
-                <span>다시 올 시점: {item.monthsUntilNextOccurrence}개월 뒤</span>
-                <span>미리 준비할 금액: {formatWon(item.shortageAmount)}</span>
-              </li>
+                <span>소득 <b className="num">{formatWon(item.incomeAmount)}</b></span>
+                <span>부족액 <b className="num">{formatWon(item.shortageAmount)}</b></span>              </li>
             ))}
           </ul>
           </>
