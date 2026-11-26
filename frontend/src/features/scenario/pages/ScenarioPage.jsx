@@ -17,7 +17,7 @@ export default function ScenarioPage() {
     <div className="sc-page">
       <header className="sc-heading">
         <h1>시나리오 테스트</h1>
-        <p>금리·소득·지출이 나빠지거나 좋아질 때 매달 남는 돈이 어떻게 바뀌는지 미리 봅니다. 값을 바꾸면 바로 다시 계산합니다.</p>
+        <p>금리가 오르거나 소득이 줄면 한 달에 얼마가 남을까요? 상황을 고르거나 값을 움직이면 바로 계산해요.</p>
       </header>
       <div className="sc-layout">
         <ScenarioControls values={sc.values} presetId={sc.presetId} inputError={sc.inputError || sc.calcError} calcError={sc.inputError ? '' : sc.calcError} variableLoanBalanceAmount={sc.baseline?.variableLoanBalanceAmount ?? null}
