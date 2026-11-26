@@ -155,8 +155,8 @@
 | `baseOtherExpenseAmount` 🆕 11/19 | 정수 | 기타 지출 = 월 지출 합계 − 고정지출(할부·정기결제·기타) | N-21-1·2 |
 | `baseMonthlyLoanPayment` 🆕 11/19 | 정수 | 저장된 월 대출 원리금 합계 | N-21-1·2 |
 | `baseOtherExpenseItems[]` 🆕 11/26 | 배열 | 기타 지출(FIXED 제외)의 항목별 내역. 소득 기준월, 금액 큰 순·같으면 저장 순, 0원 항목도 포함. 합 = `baseOtherExpenseAmount`. 항목이 없으면 `[]` | N-21-1·3·5 |
-| `baseOtherExpenseItems[].expenseGroupCode` 🆕 11/26 | 문자열 | 지출 그룹 코드(`FIXED` 제외) | N-21-3 |
-| `baseOtherExpenseItems[].expenseCategory` 🆕 11/26 | 문자열 | 지출 분류 | N-21-3 |
+| `baseOtherExpenseItems[].expenseGroupCode` 🆕 11/26 | 문자열 | 지출 그룹 코드(`INSTALLMENT`·`SUBSCRIPTION`·`OTHER`, `FIXED` 제외) | N-21-3 |
+| `baseOtherExpenseItems[].expenseCategory` 🆕 11/26 | 문자열 | 지출 분류. 저장된 값 그대로라 `OTHER` 그룹은 한글 분류 이름(예: "의료비"), 할부·정기결제는 `null` | N-21-3 |
 | `baseOtherExpenseItems[].description` 🆕 11/26 | 문자열 | 설명 | N-21-3 |
 | `baseOtherExpenseItems[].monthlyAmount` 🆕 11/26 | 정수 | 월 금액(원) | N-21-3 |
 | `baseLoanItems[]` 🆕 11/26 | 배열 | 보유 대출별 월 원리금. 소득 기준월, 대출 번호 순. 합 = `baseMonthlyLoanPayment`. 대출이 없으면 `[]` | N-21-1·3·5 |
