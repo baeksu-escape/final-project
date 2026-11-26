@@ -32,7 +32,7 @@
 | DB | Oracle |
 | DB 테이블 | 테이블 이름·구조는 `docs/spec/sql/avenue_ddl.sql`을 따른다. 상권 표 5개 제거·빈 알림 표 추가 후 47개, 11/19 모형 성능 비교용 평가 표본 표(`MODEL_EVAL_SAMPLE`, #99)를 더해 **48개**다 (D-05) 🆕 11/20 |
 | 추가 필요 테이블 | 기존 추가 대상은 DDL에 반영했다. 알림도 `USER_NOTIFICATION`으로 빈 테이블만 준비하며 시드·생성·발송 기능은 추가하지 않는다 (D-25, 회의 결정) |
-| AI 서비스 | 서비스 기능은 **OpenAI API(강사 제공 키)**를 AI 요약(N-31-2, RPT-04)과 용어 챗봇 자유 질문(N-32-2, HELP-03, 하루 10회)에만 사용한다. Spring Boot 3.2.5에서 Spring에 원래 있는 RestClient로 직접 부른다(Spring AI 1.0은 Spring Boot 3.4 이상이라 쓰지 않음, 새 라이브러리 없음). 키는 각자 PC의 `application.properties`(`avenue.ai.openai.api-key`)에만 넣고, 비어 있으면 두 API만 503 `AI_UNAVAILABLE`이다. 개발용 AI 도구는 별개로 자유롭게 사용한다 🆕 11/26 Gemini 무료 등급에서 변경(강사 안내, 광희 FP-181) |
+| AI 서비스 | 서비스 기능은 **OpenAI API(강사 제공 키)**를 AI 요약(N-31-2, RPT-04)과 용어 챗봇 자유 질문(N-32-2, HELP-03, 하루 10회)에만 사용한다. Spring Boot 3.2.5에서 Spring에 원래 있는 RestClient로 직접 부른다(Spring AI 1.0은 Spring Boot 3.4 이상이라 쓰지 않음, 새 라이브러리 없음). 키 값은 **환경변수 `OPENAI_API_KEY`에만** 넣는다(강사 안내: .env 또는 환경변수만, 메신저·노션·코드·properties에 복사 금지). properties에는 `avenue.ai.openai.api-key=${OPENAI_API_KEY:}`만 두고, 비어 있으면 두 API만 503 `AI_UNAVAILABLE`이다. 개발용 AI 도구는 별개로 자유롭게 사용한다 🆕 11/26 Gemini 무료 등급에서 변경(강사 안내, 광희 FP-181) |
 | 지도 | **외부 지도 API(네이버·카카오)를 쓰지 않는다** (N-24-4, 2026-11-13 동주 결정). 데모 v2처럼 보로노이 모식도로 그린다: 동 중심 좌표로 다각형을 미리 계산해 파일로 저장하고, 화면은 SVG path로 그리기만 한다(지도 라이브러리·API 키·SDK 없음). 행정동 경계 GeoJSON은 프로젝트에 넣지 않는다. 이유: 행정동 영역만 칠하면 되는 화면이라 지도 API를 쓸 이유가 없다 |
 | 상권 데이터 | N-24는 DB·API 없이 정적 JSON(`frontend/public/data/market/`)을 쓴다. 상권 지표·동 좌표·다각형은 파일로 제공하며 신용모델에는 넣지 않는다. 상권 전용 표 5개는 제거하고 C8 지도 코드 열은 추가하지 않는다. 다른 기능용 공공통계 표는 유지한다 (11/14, 동주 전달) |
 | 저장소 구조 | 실제 저장소(`frontend/`, `backend/`, `fastapi_server/`, `docs/`)를 따른다. 없는 폴더를 임의로 만들지 않는다 |

@@ -1008,7 +1008,7 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 - **하루 횟수**: `APP_SETTING.CHATBOT_DAILY_LIMIT`(행이 없거나 숫자가 아니면 10). 오늘 0시(서버 시각 Asia/Seoul)부터 **성공한 호출(`SUCCESS_YN = 'Y'`)만** 센다. 질문 버튼(HELP-02)은 세지 않는다.
 - 기록: 성공하면 `Y`, AI가 실패하면 `N`으로 한 줄 남긴다(시각·성공 여부만). 키가 없어서(503) 부르지 못한 경우는 남기지 않는다.
 - 같은 사용자가 동시에 여러 번 보내면 하루 횟수를 1회쯤 넘을 수 있다(시연 범위에서 허용).
-- 호출 설정: `avenue.ai.openai.api-key`(강사 제공 키, 각자 `application.properties`에만), 모델 기본 `gpt-4o-mini`(`avenue.ai.openai.model`로 바꿀 수 있음), 시간 제한 연결 2초·응답 15초(D-18).
+- 호출 설정: `avenue.ai.openai.api-key=${OPENAI_API_KEY:}`(강사 제공 키 값은 환경변수 `OPENAI_API_KEY`에만, properties·코드에 쓰지 않음), 모델 기본 `gpt-4o-mini`(`avenue.ai.openai.model`로 바꿀 수 있음), 시간 제한 연결 2초·응답 15초(D-18).
 
 응답 `200`:
 

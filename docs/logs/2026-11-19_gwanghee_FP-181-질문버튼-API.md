@@ -95,7 +95,7 @@
 | `backend/.../help/controller/AiSummaryController.java` | 새 파일. `POST /api/report/{requestId}/ai-summary` |
 | `backend/.../help/service/AiSummaryService.java` | 새 파일. 저장된 요약 재사용, 산출 안 됨 409, 계산값만 넣은 글, 1000자 자르기, 빈 경우만 저장 |
 | `backend/.../help/mapper/AiSummaryMapper.java·xml`, `dto/AiSummaryResponse.java` | 새 파일. `AI_SUMMARY IS NULL`일 때만 UPDATE, 조회 |
-| `backend/src/main/resources/application.properties.example` | `avenue.ai.openai.api-key=`(빈 값)와 설명 |
+| `backend/src/main/resources/application.properties.example` | `avenue.ai.openai.api-key=${OPENAI_API_KEY:}`(키 값은 환경변수에만)와 설명 |
 | 테스트 | `OpenAiClientTest`(새, JDK HttpServer로 가짜 응답), `AiSummaryServiceTest`(새), `AiSummaryMapperIT`(새), `ChatbotServiceTest`·`ChatbotControllerTest`·`ChatbotMapperIT` 보강 |
 | `frontend/src/features/ai/api/chatbotApi.js`, `mocks/chatbotMockHandlers.js` | `askChatbotQuestion()`, mock 입력 검사·10회 초과 429·남은 횟수 |
 | `frontend/src/features/ai/api/aiSummaryApi.js`, `mocks/aiSummaryMockHandlers.js` | 새 파일. `requestAiSummary(requestId)`, mock 리포트 한 건 |
@@ -109,7 +109,7 @@
 - DB: 표 구조 변경 없음, 새 SQL 없음. `CHATBOT_QUESTION_LOG`·`APP_SETTING.CHATBOT_DAILY_LIMIT`(10)·`ASSESSMENT.AI_SUMMARY`는 DDL에 이미 있다(행이 없어도 기본 10).
 - API: HELP-03 추가, RPT-04 추가, HELP-02 응답에 `remainingCount`·`dailyLimit` 추가(기존 필드는 그대로라 FP-207 화면은 그대로 동작)
 - 영향을 받는 팀원
-  - 전원: 백엔드는 키 없이도 켜진다. AI 기능을 시연할 PC에만 `avenue.ai.openai.api-key`를 넣는다(값은 커밋 금지).
+  - 전원: 백엔드는 키 없이도 켜진다. 각자 `application.properties`에 `avenue.ai.openai.api-key=${OPENAI_API_KEY:}` 한 줄(키 값 없음)을 복사하고, AI 기능을 시연할 PC에만 환경변수 `OPENAI_API_KEY`를 설정한다(강사 안내: 키 값은 .env 또는 환경변수에만, 메신저·노션·코드·properties에 복사 금지).
   - AGENTS.md·decisions.md는 팀 공통 문서라 PR 본문과 팀 채널에 알린다.
   - 범영 님: RPT 경로에 광희 API가 생긴다(`/api/report/{requestId}/ai-summary`). 저장한 요약은 RPT-02·03 `aiSummary`로 나간다.
   - FP-207(용어 도우미 화면)·FP-182(AI 요약 카드)가 이 API를 쓴다.
