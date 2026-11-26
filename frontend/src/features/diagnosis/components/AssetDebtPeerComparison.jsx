@@ -9,7 +9,7 @@ export default function AssetDebtPeerComparison({ values, peer }) {
   const hasAverage = FIELDS.some(({ key }) => peer?.[key] != null || peer?.agePeer?.[key] != null)
   const averageSummary = hasAverage ? '입력한 회원의 평균입니다.' : !peer?.agePeerInvalid && '평균을 계산할 회원이 부족합니다.'
   return <Card title="같은 직군·연령대 평균과 비교" className="ad-peer">
-    <p className="ad-hint">{peer?.peerFailed ? '직군·연령대 평균을 불러오지 못했어요.' : averageSummary} 단위: 원</p>
+    <p className="ad-hint">{peer?.peerFailed ? '직군·연령대 평균을 불러오지 못했어요.' : averageSummary}{hasAverage && !peer?.peerFailed && ' 단위: 원'}</p>
     <div className="ad-peer__items">{FIELDS.map(({ key, label }) => {
       const myValue = values?.[key]
       const valid = Number.isSafeInteger(myValue) && myValue >= 0
