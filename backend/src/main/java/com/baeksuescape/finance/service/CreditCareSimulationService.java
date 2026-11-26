@@ -35,7 +35,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * FP-170 N-18 신용케어 시뮬레이터 — SIM-01 입력 10개의 내 실제 값, SIM-02 바꾼 값으로 점수 재계산(FastAPI ML-04, 저장 안 함).
+ * FP-170 N-18 신용케어 시뮬레이터 — SIM-01 입력 10개의 내 현재 값, SIM-02 바꾼 값으로 점수 재계산(FastAPI ML-04, 저장 안 함).
  * 출발 평가는 점수가 나온(SCORED) 가장 최근 평가다. 저장된 피처값(FEATURE_SNAPSHOT)은 서버 안에서만 쓰고 화면에 보내지 않는다.
  */
 @Service
@@ -64,11 +64,15 @@ public class CreditCareSimulationService {
     static final Set<String> ALLOWED_KEYS = Set.of(TELECOM, UTILITY, "DELINQ_COUNT_12M", "CASH_ADVANCE_MONTHS",
             "NEW_LOAN_COUNT_3M", "LOAN_BALANCE_AMT", "PRIVATE_LENDER_LOAN_BALANCE_AMT", EASYPAY, CARD_LIMIT, CARD_SPEND);
     /**
-     * 상한이 있는 키: 통신비 정시 납부·공과금 미납 개월 수는 0~12 (피처 정의서 8-2, 학습 데이터 기준). 나머지 상한은 화면 범위가 정해지면 추가한다.
-     * TODO(정의서 8-2) 통신비는 B팀 명세 예시의 18·24개월과 맞추는 중이라 12는 임시값이다(화면 mock과 같다).
+     * N-18-2 통신비 정시 납부·공과금 미납 개월 수의 상한은 12다.
+     * 통신비 정시 납부 0~12는 11/20 범영·광희 확정이다.
      */
     static final int MAX_MONTHS = 12;
     private static final Set<String> MONTH_KEYS = Set.of(TELECOM, UTILITY);
+
+    /** N-18-2 나머지 슬라이더 상한은 화면 SLIDER_FIELDS와 학습 데이터 기준(b2e6f38)에 맞춘다. */
+    private static final Map<String, Integer> SLIDER_MAX_VALUES = Map.of(
+            "DELINQ_COUNT_12M", 6, "CASH_ADVANCE_MONTHS", 10, "NEW_LOAN_COUNT_3M", 4, EASYPAY, 60);
 
     static final String MODEL_NOT_READY_MESSAGE = "점수 계산 서버가 준비 중입니다. 잠시 후 다시 시도해 주세요.";
 
@@ -202,6 +206,8 @@ public class CreditCareSimulationService {
                 errors.add(new FieldErrorItem(field, "0 이상의 정수를 입력해 주세요."));
             } else if (MONTH_KEYS.contains(key) && ((Number) value).longValue() > MAX_MONTHS) {
                 errors.add(new FieldErrorItem(field, "0~" + MAX_MONTHS + " 사이로 입력해 주세요."));
+            } else if (SLIDER_MAX_VALUES.containsKey(key) && ((Number) value).longValue() > SLIDER_MAX_VALUES.get(key)) {
+                errors.add(new FieldErrorItem(field, "0~" + SLIDER_MAX_VALUES.get(key) + " 사이로 입력해 주세요."));
             } else {
                 cleaned.put(key, ((Number) value).longValue());
             }

@@ -273,7 +273,7 @@ def main():
     record("E2E-11", "시뮬레이터 재계산(SIM-02)·화면 값", status == 200 and not wrong,
            f"HTTP {status}, 전 {(sim.get('before') or {}).get('score')} → 후 {(sim.get('after') or {}).get('score')}, "
            f"감점 요인 {len(sim.get('topReductionFactors') or [])}개" + (f", 틀림: {'; '.join(wrong)}" if wrong else ""))
-    # 통신비 정시 납부 상한 12개월은 임시값(SIM-02 TODO). 상한이 바뀌면 13도 같이 바꾼다(README 참고).
+    # 통신비 정시 납부 상한 12개월은 11/20 확정(범영·광희). 상한이 바뀌면 13도 같이 바꾼다(README 참고).
     status, err = api.call("POST", "/api/members/me/credit-care-recalculate", {"changes": {"TELECOM_ON_TIME_MONTHS": 13}})
     fe = [f.get("field") for f in (err or {}).get("fieldErrors") or []]
     record("E2E-12", "시뮬레이터 범위 밖 → 400", status == 400 and "changes.TELECOM_ON_TIME_MONTHS" in fe,
