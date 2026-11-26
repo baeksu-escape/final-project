@@ -7,8 +7,14 @@
 .sc-pos { color: var(--mint); }
 .sc-warn { color: var(--warn); }
 .sc-num { font-variant-numeric: tabular-nums; text-align: right; }
-.sc-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 18px; align-items: start; }
+.sc-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 18px; align-items: stretch; }
+/* (시안 7차) 위 여백은 결과 카드와 같은 28px로 두어 두 카드 제목 높이를 맞추고, 좌우만 20px로 줄인다. [초기화]도 같은 여백에 둔다. */
+.sc-controls { position: relative; padding: 28px 20px; }
+.sc-reset { position: absolute; top: 28px; right: 20px; padding: 2px 4px; border: 0; background: transparent; color: var(--fg2); font: inherit; font-size: 13.5px; cursor: pointer; }
+.sc-reset:hover { color: var(--acc); }
 .sc-controls .card__body { display: grid; gap: 10px; }
+/* (시안 7차) 결과 카드가 더 길면 남는 높이를 항목 사이에 고르게 나눠 내용을 아래로 펼친다. */
+.sc-controls .card__body { flex: 1; align-content: space-evenly; }
 .sc-group { display: grid; gap: 6px; }
 .sc-preset-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .sc-group__title { font-size: 12.5px; font-weight: 600; }
@@ -35,5 +41,24 @@
 .sc-box { margin: 16px 0 8px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line2); font-size: 13px; }
 .sc-box--warn { border-color: var(--warn-line); background: var(--warn-bg); color: var(--warn-fg); }
 .sc-box--ok { border-color: var(--ok-line); background: var(--ok-bg); color: var(--ok-fg); }
+/* (시안·쉬운 화면 11/26 광희) 상황 칩 한 줄, 항목 한 줄(슬라이더 + 숫자 칸), 답 문장, 큰 숫자 2칸, 작은 줄, 자세히 보기 접기 */
+.sc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.sc-chips .sc-preset { min-height: 34px; padding: 4px 14px; border-radius: 999px; text-align: center; }
+.sc-row-field { display: grid; gap: 6px; padding-top: 10px; }
+.sc-calc { display: grid; gap: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+/* (시안 6차) 최악·최적 버튼은 카드 너비를 반씩 나눠 쓴다. */
+.sc-calc .sc-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sc-row-field__help { margin-top: -2px; }
+.sc-detail { margin-top: 18px; }
+.sc-detail__title { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--fg2); }
+.sc-detail > .sc-hint { margin-top: 14px; }
+.sc-answer { margin: 0 0 14px; padding: 16px 18px; border-radius: 12px; border: 1px solid var(--line2); font-size: 17px; line-height: 1.55; }
+.sc-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.sc-big--xl { font-size: 32px; }
+.sc-lines { display: grid; gap: 6px; margin: 14px 0 0; }
+.sc-lines > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 2px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.sc-lines dt { color: var(--mut); }
+.sc-lines dd { margin: 0; font-variant-numeric: tabular-nums; }
 @media (max-width: 960px) { .sc-layout, .sc-kpis { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .sc-pair { grid-template-columns: 1fr; } .sc-big--xl { font-size: 26px; } }
 @media (max-width: 480px) { .sc-preset-groups { grid-template-columns: 1fr; } }
