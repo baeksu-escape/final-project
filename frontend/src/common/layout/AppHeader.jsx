@@ -8,6 +8,7 @@ import { ADMIN_TABS, NAV_GROUPS, PATHS, findNavGroup } from '../config/navigatio
 import { ROLE_LABELS, isAdmin } from '../config/roles.js'
 import MegaNav from './MegaNav.jsx'
 import { ADMIN_PATHS } from '../../features/admin/adminConstants.js'
+import GlossaryHelperDialog from '../../features/ai/components/GlossaryHelperDialog.jsx'
 
 // TODO(D-23) 알림 범위가 정해지기 전까지 [알림]을 누르면 이 안내만 보여 준다.
 const NOTIFICATION_PENDING_MESSAGE = '알림 기능은 준비 중입니다.'
@@ -18,6 +19,8 @@ export default function AppHeader() {
   const { user, logout } = useAuth()
   const { pathname } = useLocation()
   const [toastMessage, setToastMessage] = useState('')
+  // N-32-1 용어 도우미 창(FP-207) 열림 여부
+  const [helperOpen, setHelperOpen] = useState(false)
   const admin = isAdmin(user)
   const showMenu = canSeeMainMenu(user)
   // 관리자는 분류 없이 메뉴 5개를 그대로 쓴다
@@ -50,6 +53,8 @@ export default function AppHeader() {
               <>
                 {/* TODO(D-23) 알림 자리 — 알림 내용과 범위는 팀 결정 전이라 안내만 띄운다. */}
                 <button type="button" className="app-header__text-btn" onClick={() => setToastMessage(NOTIFICATION_PENDING_MESSAGE)}>알림</button>
+                {/* N-32-1 용어 도우미(FP-207) — 명세의 오른쪽 아래 떠 있는 창 대신 알림 옆 버튼 + 공통 Modal(새 CSS 없음, 11/26) */}
+                <button type="button" className="app-header__text-btn" onClick={() => setHelperOpen(true)}>용어 도우미</button>
                 <NavLink to={PATHS.MY_PAGE} className="app-header__text-btn">마이페이지</NavLink>
               </>
             )}
@@ -68,6 +73,7 @@ export default function AppHeader() {
         )}
       </header>
       <Toast message={toastMessage} onClose={() => setToastMessage('')} />
+      {!admin && <GlossaryHelperDialog open={helperOpen} onClose={() => setHelperOpen(false)} />}
     </>
   )
 }
