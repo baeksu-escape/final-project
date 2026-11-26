@@ -87,6 +87,8 @@
 --     DEPOSIT_AMT·INVESTMENT_AMT·REAL_ESTATE_AMT·OTHER_ASSET_AMT (NULL 허용, CHECK >= 0). 표 수(48)는 그대로다.
 --  C14 [2026-11-23 · B팀 재욱] 서비스 등급 구간을 CUT-0.3으로 전환 (FP-248, 구조 변경 없음). 기준 데이터만 바뀐다: CUT-0.1 ACTIVE→RETIRED, CUT-0.3 DRAFT→ACTIVE(ACTIVATED_AT 채움).
 --     점수대별 금리·한도(SCORE_BAND_OFFER)와 대출 상품 최소 점수(LOAN_PRODUCT.MIN_ALT_SCORE)도 새 경계에 맞춘다(더미 시드 21·22). 기존 DB는 activate_cutoff_cut_0_3.sql, 되돌리기는 rollback_cutoff_cut_0_3_to_0_1.sql.
+--  C15 [2026-11-25 · C조 동주] BOARD_POST에 글 카테고리 열 CATEGORY_CODE 추가(N-06, FP-261). 기본값 FREE(자유), CHECK 4개 값. 표 수(48)는 그대로다.
+--     기존 DB는 alter_board_post_category.sql(이미 있는 글은 모두 FREE).
 -- ====================================================================
 
 
@@ -1113,15 +1115,19 @@ CREATE TABLE BOARD_POST (
     TITLE                  VARCHAR2(200 CHAR)   NOT NULL,
     -- v0.3.2 (C9) CLOB 대신 VARCHAR2. 한글 1300자 = 3900바이트라 4000바이트 안에 들어간다
     CONTENT                VARCHAR2(1300 CHAR)  NOT NULL,
+    -- v0.3.2 (C15) 글 카테고리
+    CATEGORY_CODE          VARCHAR2(20 CHAR)    DEFAULT 'FREE' NOT NULL,
     STATUS_CODE            VARCHAR2(20 CHAR)    DEFAULT 'VISIBLE' NOT NULL,
     CREATED_AT             TIMESTAMP            DEFAULT SYSTIMESTAMP NOT NULL,
     UPDATED_AT             TIMESTAMP,
     CONSTRAINT PK_BOARD_POST PRIMARY KEY (POST_ID),
     CONSTRAINT FK_BPT_USER FOREIGN KEY (USER_ID) REFERENCES APP_USER (USER_ID),
+    CONSTRAINT CK_BPT_CATEGORY CHECK (CATEGORY_CODE IN ('CREDIT_SCORE', 'LOAN', 'CARD', 'FREE')),
     CONSTRAINT CK_BPT_STATUS CHECK (STATUS_CODE IN ('VISIBLE', 'HIDDEN_BY_REPORT', 'DELETED'))
 );
 COMMENT ON TABLE  BOARD_POST IS '신용 라운지 게시글 (N-06)';
 COMMENT ON COLUMN BOARD_POST.CONTENT IS 'v0.3.2 (C9) 본문. 1300자까지 (Spring @Size와 같은 값)';
+COMMENT ON COLUMN BOARD_POST.CATEGORY_CODE IS 'v0.3.2 (C15) 글 카테고리 (N-06). CREDIT_SCORE=신용점수, LOAN=대출·상환, CARD=카드·결제, FREE=자유(기본값)';
 COMMENT ON COLUMN BOARD_POST.USER_ID IS '작성자 (탈퇴해도 값 유지. 작성자 ACCOUNT_STATUS_CODE가 WITHDRAWN이면 "탈퇴한 회원"으로 표시, N-04-7)';
 -- v0.3.2 (C7) 작성자 삭제도 DELETED. 누가 지웠는지는 BOARD_POST_LOG
 COMMENT ON COLUMN BOARD_POST.STATUS_CODE IS 'VISIBLE, HIDDEN_BY_REPORT=신고로 숨김, DELETED=작성자 또는 관리자 삭제 (누가 지웠는지는 BOARD_POST_LOG)';

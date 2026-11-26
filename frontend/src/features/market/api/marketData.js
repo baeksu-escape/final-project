@@ -1,6 +1,8 @@
 // N-24-2 상권 데이터 조회 — DB·API 없이 public/data/market의 정적 JSON을 읽는다(11/13 결정).
 // 한 번 읽은 파일은 메모리에 보관해 업종을 다시 고를 때 다시 받지 않는다.
-const BASE = `${import.meta.env.BASE_URL}data/market/`
+import { tidyGeo } from '../utils/mapGeometry.js'
+
+const BASE =`${import.meta.env.BASE_URL}data/market/`
 const cache = new Map()
 
 // 파일 하나를 읽어 JSON으로 돌려준다. 실패하면 캐시에서 지워 다음에 다시 시도할 수 있게 한다.
@@ -22,7 +24,8 @@ export async function loadMarketBase() {
     loadJson('meta.json'),
     loadJson('dongs.json'),
     loadJson('dong-categories.json'),
-    loadJson('geo.json'),
+    // FP-278 지도 모양의 가시를 지우고 구 이름 위치를 구 안쪽으로 옮겨 쓴다(utils/mapGeometry.js)
+    loadJson('geo.json').then(tidyGeo),
   ])
   return { meta, dongs, dongCategories, geo }
 }

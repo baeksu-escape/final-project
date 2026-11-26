@@ -965,9 +965,10 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 - 인증: 로그인 필요(보안 설정 "그 밖의 `/api/**`"). 토큰이 없으면 `401 UNAUTHORIZED`다.
 - 요청 값은 없다. 질문 버튼 전체를 **표시 순서**(`ORDER BY DISPLAY_ORDER, PRESET_ID`)로 돌려준다.
 - **AI를 부르지 않고 질문 횟수도 줄지 않는다**(N-32-1). 호출 기록(`CHATBOT_QUESTION_LOG`)을 남기지 않는다. 화면은 한 번 받아 두고 버튼을 누를 때 받아 둔 `answer`를 보여 주면 된다.
-- 등록된 버튼이 없으면 오류가 아니라 `{ "presets": [] }`다.
-- 기준 데이터: [`docs/spec/sql/add_chatbot_preset_question.sql`](../sql/add_chatbot_preset_question.sql)(합성 교육용 문구 4개, 표시 순서 1~4 기준으로 다시 실행해도 됨). dummy_db 생성기에는 들어 있지 않아 DDL·시드 다음에 따로 실행한다. 공용 DB 실행은 병합 후 DB 담당(범영)이 한다.
-- 자유 질문(HELP-03 `POST /api/chatbot/questions`, N-32-2, 하루 10회)은 아직 없다. Gemini 키·타임아웃(D-18)·넘길 정보(D-21)를 정한 뒤 FP-181 2부에서 만든다.
+- 🆕 11/26 창을 처음 열 때 남은 자유 질문 횟수를 보여 주도록 `remainingCount`·`dailyLimit`을 함께 준다(값은 HELP-03과 같은 기준, 기록을 읽기만 함).
+- 등록된 버튼이 없으면 오류가 아니라 `{ "presets": [], ... }`다.
+- 기준 데이터: [`docs/spec/sql/add_chatbot_preset_question.sql`](../sql/add_chatbot_preset_question.sql)(합성 교육용 문구 4개, 표시 순서 1~4 기준으로 다시 실행해도 됨). dummy_db 생성기에는 들어 있지 않아 DDL·시드 다음에 따로 실행한다. 공용 DB 실행은 병합 후 PR 작성자(광희)가 한다(🆕 11/23 규칙).
+- 자유 질문은 아래 「N-32-2 용어 도우미 자유 질문 (HELP-03)」 절에 있다 🆕 11/26.
 
 응답 `200`:
 
@@ -977,15 +978,101 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 | `presets[].presetId` | 정수 | 버튼 번호. 화면 목록의 key로 쓴다 |
 | `presets[].question` | 문자열 | 버튼에 보일 질문(최대 200자) |
 | `presets[].answer` | 문자열 | 버튼을 누르면 보일 답(최대 2000자) |
+| `remainingCount` | 정수 | 오늘 남은 자유 질문 횟수(0 아래로 내려가지 않음) 🆕 11/26 |
+| `dailyLimit` | 정수 | 하루 자유 질문 횟수(`APP_SETTING.CHATBOT_DAILY_LIMIT`, 없으면 10) 🆕 11/26 |
 
 ```json
 {
   "presets": [
     { "presetId": 1, "question": "대안 신용 점수는 기존 신용 점수와 무엇이 다른가요?", "answer": "기존 신용 점수는 대출·카드 같은 금융 거래 기록만 봅니다. …" },
     { "presetId": 2, "question": "점수 영향도(SHAP)는 어떻게 읽나요?", "answer": "점수 영향도는 … 원인·결과를 뜻하지는 않습니다. …" }
-  ]
+  ],
+  "remainingCount": 10,
+  "dailyLimit": 10
 }
 ```
 
 - DB 열 이름(`QUESTION_TEXT`·`ANSWER_TEXT`·`DISPLAY_ORDER`)은 그대로 내보내지 않는다.
-- 프론트: `features/ai/api/chatbotApi.js`의 `getChatbotPresets()`. mock은 시드와 같은 4개를 돌려준다(로그인하지 않았으면 401).
+- 프론트: `features/ai/api/chatbotApi.js`의 `getChatbotPresets()`. mock은 시드와 같은 4개와 남은 횟수를 돌려준다(로그인하지 않았으면 401).
+
+## N-32-2 용어 도우미 자유 질문 (HELP-03, FP-181, 담당 광희) 🆕 11/26
+
+| 메서드 | 경로 | 설명 | 데이터 출처 |
+|---|---|---|---|
+| POST | `/api/chatbot/questions` | 사용자가 직접 쓴 금융 용어·질문에 AI(OpenAI)가 쉬운 말로 답한다. 하루 10회 | OpenAI, DB `CHATBOT_QUESTION_LOG`·`APP_SETTING` |
+
+- 인증: 로그인 필요(보안 설정 "그 밖의 `/api/**`"). 토큰이 없으면 `401 UNAUTHORIZED`다.
+- 요청 본문: `{ "question": "DSR이 뭐예요?" }` — 1~200자, 앞뒤 공백은 뗀다.
+- **AI에는 질문 글만 넘긴다**(D-21, AGENTS.md 5장). 회원 번호·점수·개인정보를 붙이지 않는다. 질문 글은 DB와 서버 로그 어디에도 저장하지 않는다.
+- 지시 문장(서버에 고정): 금융 용어·개념을 쉬운 한국어 3~5문장으로 설명, 개인 재무 상담·상품 추천·투자 권유 안 함, 금융과 관계없는 질문은 범위를 안내, 모르면 지어내지 않음. 답 길이 상한 400토큰.
+- **하루 횟수**: `APP_SETTING.CHATBOT_DAILY_LIMIT`(행이 없거나 숫자가 아니면 10). 오늘 0시(서버 시각 Asia/Seoul)부터 **성공한 호출(`SUCCESS_YN = 'Y'`)만** 센다. 질문 버튼(HELP-02)은 세지 않는다.
+- 기록: 성공하면 `Y`, AI가 실패하면 `N`으로 한 줄 남긴다(시각·성공 여부만). 키가 없어서(503) 부르지 못한 경우는 남기지 않는다.
+- 같은 사용자가 동시에 여러 번 보내면 하루 횟수를 1회쯤 넘을 수 있다(시연 범위에서 허용).
+- 호출 설정: `avenue.ai.openai.api-key=${OPENAI_API_KEY:}`(강사 제공 키 값은 환경변수 `OPENAI_API_KEY`에만, properties·코드에 쓰지 않음), 모델 기본 `gpt-5.6-luna`(`avenue.ai.openai.model`로 바꿀 수 있음), 시간 제한 연결 2초·응답 15초(D-18).
+
+응답 `200`:
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `answer` | 문자열 | AI 답(앞뒤 공백 뗌) |
+| `remainingCount` | 정수 | 이번 질문까지 뺀 오늘 남은 횟수 |
+| `dailyLimit` | 정수 | 하루 횟수 |
+
+```json
+{ "answer": "DSR은 1년 동안 갚는 대출 원금과 이자를 1년 소득으로 나눈 비율이에요. …", "remainingCount": 9, "dailyLimit": 10 }
+```
+
+오류(공통 형식 `{ code, message, fieldErrors }`):
+
+| HTTP | code | 언제 |
+|---|---|---|
+| 400 | `INVALID_INPUT` | `question`이 없음·공백만·200자 초과(`fieldErrors[0].field = "question"`) |
+| 401 | `UNAUTHORIZED` | 토큰 없음·만료 |
+| 429 | `DAILY_LIMIT_EXCEEDED` | 오늘 성공한 질문이 하루 횟수에 이름 → "자유 질문은 하루 10번까지 할 수 있습니다. 내일 다시 이용해 주세요." |
+| 502 | `AI_FAILED` | OpenAI 연결 실패·시간 초과·4xx(키 오류·한도)·5xx·빈 답. 횟수는 줄지 않는다 |
+| 503 | `AI_UNAVAILABLE` | 서버에 OpenAI 키가 없음 |
+
+- 프론트: `features/ai/api/chatbotApi.js`의 `askChatbotQuestion(question)`. mock은 고정 예시 답을 주고 같은 입력 검사·10회 초과 429를 흉내 낸다(새로고침하면 다시 10회).
+
+## N-31-2 AI 요약 생성·저장 (RPT-04, FP-181, 담당 광희) 🆕 11/26
+
+| 메서드 | 경로 | 설명 | 데이터 출처 |
+|---|---|---|---|
+| POST | `/api/report/{requestId}/ai-summary` | 내 평가 한 건을 AI(OpenAI)로 3문장 이내 요약해 저장하고 돌려준다. 저장돼 있으면 AI를 부르지 않는다 | RPT-03과 같은 평가 조회, DB `ASSESSMENT.AI_SUMMARY`, OpenAI |
+
+- 인증: `ROLE_USER`(보안 설정 `/api/report/**`). 토큰 없음 401, 관리자 토큰 403.
+- 요청 본문은 없다. `requestId`는 RPT-03과 같다(소문자 UUID, 형식이 틀리면 400, 남의 평가·없는 평가는 404 `ASSESSMENT_NOT_FOUND` — 범영 님 `ReportService.byRequestId`를 그대로 쓴다).
+- 처리 순서:
+  1. 그 평가에 `AI_SUMMARY`가 있으면 그대로 돌려준다(`generated: false`). AI를 부르지 않는다.
+  2. 산출되지 않은 평가(`gradeStatusCode`가 `SCORED`가 아님)면 409 `NOT_SCORED`.
+  3. 아래 값만 AI에 넘겨 요약을 받는다. 결과는 1000자(열 크기)로 자르고, **요약이 비어 있을 때만** 저장한다.
+  4. 동시에 두 요청이 와서 다른 요청이 먼저 저장했으면 저장된 요약을 돌려준다(`generated: false`).
+- **AI에 넘기는 값**(N-31-2 "계산된 숫자만", AGENTS.md 5장): 기존·대안 점수와 한글 등급(좋음·보통·주의, 산정 불가면 "산정 불가"), 대안 − 기존 점수 차이와 등급 변화 여부, SHAP 상위 3개 요인의 이름과 작용 점수(`shapScore`, 부호 포함). **넘기지 않는 값**: 피처 원래 값(`featureValue`), 회원 번호·`requestId`, 직군 코드, 개인정보.
+- 지시 문장(서버에 고정): 받은 숫자만 써서 3문장 이내, 영향 요인은 "작용한 정도"로만 쓰고 원인처럼 쓰지 않음(AGENTS.md 5장 SHAP), 상품 추천·투자 권유 안 함, 마지막 문장에 시연용 계산이라 실제 대출 심사 결과가 아니라고 밝힘. 답 길이 상한 300토큰.
+- 저장한 요약은 리포트 응답(RPT-02·03)의 `aiSummary`로도 나간다(B팀 명세서 3-2).
+
+응답 `200`:
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `requestId` | 문자열 | 요청한 평가 번호 |
+| `aiSummary` | 문자열 | 요약 문장(최대 1000자) |
+| `generated` | 불리언 | 이번 요청에서 새로 만들었으면 true, 저장된 요약이면 false |
+
+```json
+{ "requestId": "3f1c2a9e-8b7d-4c1e-9a2b-1d2e3f4a5b6c", "aiSummary": "대안 신용 점수가 기존보다 50점 높게 계산됐어요. …", "generated": true }
+```
+
+오류:
+
+| HTTP | code | 언제 |
+|---|---|---|
+| 400 | `INVALID_INPUT` | `requestId`가 소문자 UUID가 아님 |
+| 401 / 403 | `UNAUTHORIZED` / `FORBIDDEN` | 토큰 없음 / 관리자 계정 |
+| 404 | `ASSESSMENT_NOT_FOUND` | 없는 평가·남의 평가 |
+| 409 | `NOT_SCORED` | 점수가 산출되지 않은 평가 |
+| 502 | `AI_FAILED` | OpenAI 실패. 저장하지 않으므로 다시 요청하면 다시 만든다 |
+| 503 | `AI_UNAVAILABLE` | 서버에 OpenAI 키가 없음 |
+
+- 구현 위치: 범영 님 `ReportController`·`AssessmentMapper`를 고치지 않으려고 `help` 패키지의 `AiSummaryController`·`AiSummaryService`·`AiSummaryMapper`에 둔다.
+- 프론트: `features/ai/api/aiSummaryApi.js`의 `requestAiSummary(requestId)`. mock은 mock 리포트(`creditMockData.js`의 `scoredReport`) 한 건에만 고정 예시 요약을 준다(처음 `generated: true`, 그다음 false).
