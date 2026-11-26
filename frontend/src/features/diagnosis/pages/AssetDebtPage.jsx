@@ -77,7 +77,11 @@ export default function AssetDebtPage() {
         <Notice>상환액 변화는 시연 가정입니다. 실제 신용평가·대출 심사 결과가 아닙니다.</Notice>
         {Array.isArray(result?.assumptions) && result.assumptions.length > 0 && <ul className="ad-hint">{result.assumptions.map((assumption, index) => <li key={index}>{assumption}</li>)}</ul>}
       </Card>
-      <div><AssetDebtRatios result={result} /></div>
+      <div><AssetDebtRatios
+        result={result}
+        utilityPayment={baseline.utilityPayment}
+        utilityPaymentInvalid={baseline.utilityPaymentInvalid}
+      /></div>
     </div>
     <div className="ad-bottom-grid"><AssetDebtPeerComparison values={values} peer={baseline.peer} workerLabel={workerLabel} /><AssetDebtLoans loans={baseline.loans} /></div>
   </div>

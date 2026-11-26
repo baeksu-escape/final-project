@@ -5,9 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.baeksuescape.finance.dto.health.FinancialHealthBaseResponse.UtilityPaymentMonth;
 import com.baeksuescape.finance.dto.health.HealthAssetRow;
 import com.baeksuescape.finance.dto.health.HealthLoanRow;
 import java.math.BigDecimal;
+import java.sql.PreparedStatement;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +21,8 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -97,5 +103,62 @@ class FinancialHealthMapperIT {
         assertEquals(460_000L, first.getMonthlyPaymentAmount());
         assertEquals("카드론", rows.get(1).getLoanTypeName());
         assertTrue(rows.get(0).getLoanId() < rows.get(1).getLoanId());
+    }
+
+    /** N-20-1 최신 기관 연동 청구월부터 달력 12개월을 조회한다. 빈 달과 범위 밖 기록은 제외하고 시작월은 포함한다. */
+    @Test
+    @DisplayName("최신 연동 청구월 포함 최근 12개월 중 기록이 있는 달만 청구월 오름차순으로 읽는다")
+    void selectRecentUtilityPayments() {
+        long consentId = insertUtilityConsent();
+        insertUtilityPayment("2099-12", "ON_TIME", "MANUAL", null);
+        YearMonth latestImported = YearMonth.of(2099, 11);
+        for (int offset = 0; offset <= 13; offset++) {
+            if (offset == 5) {
+                continue;
+            }
+            String status = switch (offset) {
+                case 0 -> "UNPAID";
+                case 11 -> "LATE";
+                default -> "ON_TIME";
+            };
+            insertUtilityPayment(latestImported.minusMonths(offset).toString(), status, "IMPORTED", consentId);
+        }
+
+        List<UtilityPaymentMonth> payments = mapper.selectRecentUtilityPayments(userId);
+
+        assertEquals(List.of("2098-12", "2099-01", "2099-02", "2099-03", "2099-04",
+                        "2099-05", "2099-07", "2099-08", "2099-09", "2099-10", "2099-11"),
+                payments.stream().map(UtilityPaymentMonth::billMonth).toList());
+        assertEquals("LATE", payments.get(0).paymentStatusCode());
+        assertEquals("UNPAID", payments.get(payments.size() - 1).paymentStatusCode());
+    }
+
+    /** N-20-1 기관 연동 공과금 기록의 외래 키에 쓰는 테스트용 동의를 만든다. */
+    private long insertUtilityConsent() {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbc.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO USER_CONSENT (USER_ID, CONSENT_TYPE_CODE, PROVIDER_CODE, ITEM_CODE, REQUIRED_YN, AGREED_YN)
+                    VALUES (?, 'ALT_DATA_PROVISION', 'utility', 'UTILITY_BILL', 'Y', 'Y')
+                    """, new String[]{"CONSENT_ID"});
+            statement.setLong(1, userId);
+            return statement;
+        }, keyHolder);
+        return keyHolder.getKey().longValue();
+    }
+
+    /** N-20-1 납부 상태와 출처별 DB 제약을 충족하는 공과금 기록을 만든다. */
+    private void insertUtilityPayment(String billMonth, String status, String source, Long consentId) {
+        LocalDate dueDate = YearMonth.parse(billMonth).atDay(20);
+        LocalDate paidDate = switch (status) {
+            case "ON_TIME" -> dueDate;
+            case "LATE" -> dueDate.plusDays(1);
+            default -> null;
+        };
+        jdbc.update("""
+                INSERT INTO USER_UTILITY_PAYMENT (USER_ID, BILL_MONTH, BILLED_AMT, DUE_DATE, PAID_DATE,
+                                                  PAYMENT_STATUS_CODE, SOURCE_CODE, CONSENT_ID, BASE_DATE)
+                VALUES (?, ?, 20000, ?, ?, ?, ?, ?, ?)
+                """, userId, billMonth, dueDate, paidDate, status, source, consentId, dueDate);
     }
 }

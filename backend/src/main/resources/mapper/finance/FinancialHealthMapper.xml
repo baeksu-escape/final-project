@@ -4,6 +4,13 @@
 <!-- FP-239 N-16-1·2·4 DIAG-03-1 자산·부채 저장값 조회. 기준월은 소득 기준월(USER_INCOME_MONTH의 가장 늦은 달)로 현금흐름·시나리오와 같다 -->
 <mapper namespace="com.baeksuescape.finance.mapper.FinancialHealthMapper">
 
+    <resultMap id="utilityPaymentMonthMap" type="com.baeksuescape.finance.dto.health.FinancialHealthBaseResponse$UtilityPaymentMonth">
+        <constructor>
+            <arg column="BILL_MONTH" javaType="java.lang.String"/>
+            <arg column="PAYMENT_STATUS_CODE" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
     <!-- 기준월 자산 행. 총자산 NULL은 미입력이라 그대로 둔다(0으로 바꾸지 않음). NO_LOAN_YN은 대출 "해당 없음" 판단에 쓴다 -->
     <select id="selectLatestAsset" resultType="com.baeksuescape.finance.dto.health.HealthAssetRow">
         SELECT TOTAL_ASSET_AMT AS totalAssetAmount, NO_LOAN_YN AS noLoanYn
@@ -22,5 +29,19 @@
          WHERE L.USER_ID = #{userId}
            AND L.BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
          ORDER BY L.LOAN_ID
+    </select>
+
+    <!-- N-20-1 가장 늦은 기관 연동 청구월을 포함한 달력 12개월의 기록을 청구월 오름차순으로 반환한다. -->
+    <select id="selectRecentUtilityPayments" resultMap="utilityPaymentMonthMap">
+        SELECT BILL_MONTH, PAYMENT_STATUS_CODE
+          FROM USER_UTILITY_PAYMENT
+         WHERE USER_ID = #{userId}
+           AND SOURCE_CODE = 'IMPORTED'
+           AND BILL_MONTH &gt;= (
+               SELECT TO_CHAR(ADD_MONTHS(TO_DATE(MAX(BILL_MONTH), 'YYYY-MM'), -11), 'YYYY-MM')
+                 FROM USER_UTILITY_PAYMENT
+                WHERE USER_ID = #{userId}
+                  AND SOURCE_CODE = 'IMPORTED')
+         ORDER BY BILL_MONTH
     </select>
 </mapper>

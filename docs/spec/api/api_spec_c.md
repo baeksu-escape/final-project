@@ -539,7 +539,7 @@
 
 ### GET `/api/members/me/financial-health` — DIAG-03-1 자산·부채 저장값 (FP-239) 🆕 11/20
 
-로그인 회원의 **저장된 값**을 돌려준다. 비율·위험 단계는 계산하지 않는다(화면이 이 값으로 위 POST를 부른다). 같은 직군 평균(`peer`)은 넣지 않는다. 화면이 DIAG-01(`/peer-benchmark`)의 `sameWorkerType`을 붙인다(경환 님 11/20).
+로그인 회원의 **저장된 값**을 돌려준다. 자산·부채 건전성 비율·위험 단계는 계산하지 않는다(화면이 이 값으로 위 POST를 부른다). 같은 직군 평균(`peer`)은 넣지 않는다. 화면이 DIAG-01(`/peer-benchmark`)의 `sameWorkerType`을 붙인다(경환 님 11/20).
 
 - 로그인한 일반 회원만(보안 설정: 토큰 없음 401, 관리자 403). 회원은 토큰에서 꺼내고 쿼리·본문은 없다.
 - 기준월 = 그 회원의 가장 늦은 소득월(DIAG-07-1·08-1·N-17과 같음). 미입력은 0원으로 바꾸지 않고 `null`이다(O-15 A안, DIAG-01과 같은 규칙).
@@ -552,12 +552,39 @@
   | `totalDebtAmount` | 기준월 대출이 있으면 `BALANCE_AMT` 합, 대출 행이 없고 `NO_LOAN_YN='Y'`(해당 없음)면 0 | `null`(둘 다 아님) |
   | `annualPaymentAmount` | 같은 규칙으로 `MONTHLY_PAYMENT_AMT` 합 × 12, 해당 없음은 0 | `null` |
   | `loans[]` | N-16-4 보유 대출(기준월, `LOAN_ID` 순): `loanId`, `loanTypeCode`, `loanTypeName`(`DIM_LOAN_TYPE`), `balanceAmount`, `annualRatePct`(연 %), `rateTypeCode`(`FIXED`·`VARIABLE`·`UNKNOWN`), `remainingMonths`, `monthlyPaymentAmount` | 빈 배열 |
+  | `utilityPayment` | N-20-1·5 공과금 기한 내 납부율과 월별 납부 상태 (아래 필드 표) 🆕 11/26 | `null`(기관 연동 기록 없음) |
+
+- 🆕 11/26 (FP-266, N-20-1·5) `USER_UTILITY_PAYMENT`에서 로그인 회원의 `SOURCE_CODE='IMPORTED'` 행만 조회한다. 가장 늦은 연동 청구월과 직전 11개월이 **달력 12개월** 범위다. 범위 안에 기록이 없는 달이 있으면 12건 미만을 반환한다.
+
+  | `utilityPayment` 안의 필드 | 값 |
+  |---|---|
+  | `recordedMonthCount` | 기록이 있는 달 수(1~12) |
+  | `onTimeMonthCount` | 기한 내 납부한 달 수(`ON_TIME`) |
+  | `lateMonthCount` | 미납 개월 수(`LATE` + `UNPAID`, 피처 정의서 `feature_definition.md` 3-2의 `utility_late_months`와 같은 기준) |
+  | `onTimeRatePct` | 기한 내 납부율(%). `FinancialHealthCalculator.calculateRatio(onTimeMonthCount, recordedMonthCount)`로 기한 내 납부 개월 ÷ 기록 개월 × 100을 계산하고 소수 둘째 자리까지 반올림한다(HALF_UP). |
+  | `months[]` | 월별 납부 상태. 청구월 오름차순 |
+  | `months[].billMonth` | 청구월 `"YYYY-MM"` |
+  | `months[].paymentStatusCode` | `ON_TIME`(기한 내 납부)·`LATE`(기한 뒤 납부)·`UNPAID`(미납) |
+
+- 🆕 11/26 DDL의 `NOT NULL`과 `CK_UUP_STATUS` 제약은 위 세 코드만 허용한다. `null`이나 기타 코드가 들어오면 상태별 집계에서 제외하고 해당 달은 `months`와 `recordedMonthCount`에 포함한다. 납부율 분모는 `recordedMonthCount`다.
+- 🆕 11/26 화면은 공과금 납부율을 DSR 계산과 별도로 참고 항목으로 표시한다. `recordedMonthCount < 12`이면 조회된 달 수를 안내한다.
+
+- 응답 예시 🆕 11/26
 
   ```json
   { "baseMonth": "2026-08", "totalAssetAmount": 30000000, "annualIncomeAmount": 25193976,
     "totalDebtAmount": 15000000, "annualPaymentAmount": 4200000,
     "loans": [ { "loanId": 101, "loanTypeCode": "CREDIT", "loanTypeName": "신용대출", "balanceAmount": 12000000,
-                 "annualRatePct": 5.0, "rateTypeCode": "VARIABLE", "remainingMonths": 36, "monthlyPaymentAmount": 200000 } ] }
+                 "annualRatePct": 5.0, "rateTypeCode": "VARIABLE", "remainingMonths": 36, "monthlyPaymentAmount": 200000 } ],
+    "utilityPayment": {
+      "recordedMonthCount": 3, "onTimeMonthCount": 1, "lateMonthCount": 2, "onTimeRatePct": 33.33,
+      "months": [
+        { "billMonth": "2026-04", "paymentStatusCode": "ON_TIME" },
+        { "billMonth": "2026-06", "paymentStatusCode": "LATE" },
+        { "billMonth": "2026-08", "paymentStatusCode": "UNPAID" }
+      ]
+    }
+  }
   ```
 - 오류: `404 NOT_FOUND` "저장된 소득 데이터가 없습니다."(다른 저장값 API와 같음). 401·403은 위와 같다.
 - 프론트: `diagnosisApi.js`의 `getMemberFinancialHealth()`. mock은 예시값이다(총자산·대출은 N-17 시나리오 기준값 예시와 같다).
