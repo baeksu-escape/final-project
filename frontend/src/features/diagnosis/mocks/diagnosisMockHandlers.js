@@ -334,6 +334,7 @@ function handleScenarioBase({ token }) {
     monthlyIncomeAmount: b.monthlyIncomeAmount,
     monthlyExpenseAmount: b.monthlyExpenseAmount,
     monthlyPaymentAmount: b.monthlyPaymentAmount,
+    loanItems: b.loanItems,
     variableLoanBalanceAmount: b.variableLoanBalanceAmount,
     totalAssetAmount: b.totalAssetAmount,
     policyRate: b.policyRate,

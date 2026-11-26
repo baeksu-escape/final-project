@@ -417,6 +417,18 @@
   | `totalAssetAmount` | 정수(원) 또는 `null` | 총자산. 미입력이면 `null`(버틸 개월 수를 구하지 않음) |
   | `policyRate` | 객체 또는 `null` | `{ baseDate: "2026-10-31", ratePct: 3.000 }` 출발 금리(연 %) |
   | `assumptions` | 문자열 배열 | 화면에 그대로 보여 줄 계산 가정 4개 |
+  | `loanItems` | 배열 | 기준월 `LOAN_ID` 순 대출 항목: `loanId`, `loanTypeName`, `annualRatePct`(연 %, 예: 8.9), `rateTypeCode`(`FIXED`·`VARIABLE`·`UNKNOWN`), `monthlyPaymentAmount`(원). 대출이 없으면 빈 배열 |
+
+  ```json
+  { "monthlyIncomeAmount": 2099498, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 350000,
+    "variableLoanBalanceAmount": 12000000, "totalAssetAmount": 30000000,
+    "policyRate": { "baseDate": "2026-10-31", "ratePct": 3.000 },
+    "assumptions": ["금리 변화는 변동금리 대출에만 반영하고, …"],
+    "loanItems": [
+      { "loanId": 101, "loanTypeName": "신용대출", "annualRatePct": 8.9, "rateTypeCode": "VARIABLE", "monthlyPaymentAmount": 200000 },
+      { "loanId": 102, "loanTypeName": "주택담보대출", "annualRatePct": 4.2, "rateTypeCode": "FIXED", "monthlyPaymentAmount": 150000 }
+    ] }
+  ```
 
 - 오류: `404 NOT_FOUND` "저장된 소득 데이터가 없습니다."(현금흐름 전망과 같음)
 

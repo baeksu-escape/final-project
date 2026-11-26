@@ -22,7 +22,7 @@ export default function ScenarioPage() {
       <div className="sc-layout">
         <ScenarioControls values={sc.values} presetId={sc.presetId} inputError={sc.inputError || sc.calcError} calcError={sc.inputError ? '' : sc.calcError} variableLoanBalanceAmount={sc.baseline?.variableLoanBalanceAmount ?? null}
           onChange={sc.setValue} onSelect={sc.selectPreset} onRetry={sc.retry} />
-        {sc.result ? <ScenarioResult result={sc.result} assumptions={sc.result.assumptions ?? sc.baseline?.assumptions ?? []} stale={sc.stale} calcError={sc.calcError} />
+        {sc.result ? <ScenarioResult result={sc.result} baseline={sc.baseline} assumptions={sc.result.assumptions ?? sc.baseline?.assumptions ?? []} stale={sc.stale} calcError={sc.calcError} />
           : <Card title="결과" className="sc-result"><Notice type="warn">{sc.calcError || '시나리오를 계산하고 있습니다.'}</Notice></Card>}
       </div>
     </div>

@@ -41,7 +41,7 @@ export default function ScenarioControls({ values, presetId, inputError, calcErr
       <p className={inputError ? 'sc-status sc-status--warn' : 'sc-status'} role="status" aria-live="polite">
         {inputError || (Number.isSafeInteger(variableLoanBalanceAmount)
           ? `변동금리 대출 ${variableLoanBalanceAmount.toLocaleString('ko-KR')}원에 금리 변화를 적용합니다.`
-          : '변동금리 대출 잔액 정보가 없어 변경 후 월 원리금과 월 잉여는 계산하지 않습니다.')}
+          : '변동금리 대출 잔액 정보가 없어 변경 후 월 원리금과 월 여유 자금은 계산하지 않습니다.')}
         {calcError && <> <Button size="sm" onClick={onRetry}>다시 시도</Button></>}
       </p>
     </Card>
