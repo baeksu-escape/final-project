@@ -403,6 +403,7 @@ function handleMemberScenarioRecalculate({ body, token }) {
   return {
     current,
     changed,
+    loanItems: b.loanItems,
     monthlyInterestChangeAmount: interestChange,
     surplusDiffAmount,
     survivableMonths,
