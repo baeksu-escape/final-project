@@ -261,7 +261,7 @@
 
 | ID | 메서드 · 경로 | 기능 | 주요 표 | 인증 | 상태 |
 |---|---|---|---|---|---|
-| COMM-01 | `GET /api/board/posts?page&size&keyword&filter&sort&category` | N-06-1 글 목록·상세 조회 (목록, `page`는 1부터·기본 10개, `keyword`는 제목·본문 검색, 숨김 글은 검색 안 됨). `filter=mine`은 내 글만(숨긴 내 글 포함), `sort=comments`는 전체 글 중 댓글이 1개 이상인 보이는 글을 댓글 많은 순(같으면 최신순). 둘 다 선택이고 다른 값이면 무시, `totalCount`도 같은 조건. `category`(선택)는 그 카테고리의 보이는 글만, 응답 글마다 `categoryCode`(숨긴 글은 null) 🆕 11/25 | `BOARD_POST`, `BOARD_COMMENT` | USER | ✅ (PR #80, 조건 추가 FP-279·카테고리 FP-261 🆕 11/25) |
+| COMM-01 | `GET /api/board/posts?page&size&keyword&filter&category` | N-06-1 글 목록·상세 조회 (목록, `page`는 1부터·기본 10개, `keyword`는 제목·본문 검색, 숨김 글은 검색 안 됨). `filter=mine`(선택)은 내 글만(숨긴 내 글 포함), 다른 값이면 무시, `totalCount`도 같은 조건. 늘 최신순(정렬 `sort`는 11/26 뺐다). `category`(선택)는 그 카테고리의 보이는 글만, 응답 글마다 `categoryCode`(숨긴 글은 null) 🆕 11/25 | `BOARD_POST`, `BOARD_COMMENT` | USER | ✅ (PR #80, 조건 추가 FP-279·카테고리 FP-261 🆕 11/25) |
 | COMM-02 | `GET /api/board/posts/{postId}` | N-06-1 글 목록·상세 조회 (상세. 숨김이면 제목·내용 null + `hidden: true`). 응답에 `categoryCode`(숨김이면 null) 🆕 11/25 | `BOARD_POST`, `BOARD_COMMENT` | USER | ✅ (PR #80) |
 | COMM-03 | `POST /api/board/posts` | N-06-2 글 작성 (제목 200자, **본문 1300자**). `categoryCode` 선택(없으면 `FREE`, 정해진 값이 아니면 400 `INVALID_INPUT`) 🆕 11/25 | `BOARD_POST`, `BOARD_POST_LOG` | USER | ✅ (PR #80) |
 | COMM-04 | `PUT /api/board/posts/{postId}` | N-06-5 내 글 수정 (본문 1300자). `categoryCode` 선택(없으면 기존 값 유지) 🆕 11/25 | `BOARD_POST`, `BOARD_POST_LOG` | USER | ✅ (PR #80) |
@@ -274,7 +274,7 @@
 | COMM-11 | `DELETE /api/board/posts/{postId}/comments/{commentId}` | N-06 내 댓글 삭제 (세부 N-ID 미정). 행은 남기고 상태만 `DELETED`, 응답 `{}`. 오류는 COMM-10과 같음 🆕 11/25 | `BOARD_COMMENT`, `BOARD_POST`(읽기) | USER | ✅ 동주 (FP-280) 🆕 11/25 |
 
 - 게시글 본문은 DDL C9로 `CLOB` → `VARCHAR2(1300 CHAR)`(PR #80). 기존 DB는 `docs/spec/sql/alter_board_post_content_varchar2.sql`. 공용 DB는 11/18 적용 완료(범영). CLOB 상태의 DB에서도 글쓰기·검색·수정·삭제가 동작하는 것을 11/17 로컬에서 확인했다.
-- 글 카테고리(`BOARD_POST.CATEGORY_CODE`, DDL C15): `CREDIT_SCORE` 신용점수, `LOAN` 대출·상환, `CARD` 카드·결제, `EMPLOYEE` 직장인, `SELF_EMPLOYED` 자영업, `FREELANCER` 프리랜서, `FREE` 자유(기본값). 기존 DB는 `docs/spec/sql/alter_board_post_category.sql`을 실행해야 라운지가 열린다. 🆕 11/25
+- 글 카테고리(`BOARD_POST.CATEGORY_CODE`, DDL C15): `CREDIT_SCORE` 신용점수, `LOAN` 대출·상환, `CARD` 카드·결제, `FREE` 자유(기본값). 기존 DB는 `docs/spec/sql/alter_board_post_category.sql`을 실행해야 라운지가 열린다. 🆕 11/25
 - 탈퇴 회원 글은 그대로 두고 작성자만 "탈퇴한 회원"으로 표시한다. 알림(D-25)은 넣지 않았다.
 - 신고로 숨겨진 글·댓글은 작성자도 수정·삭제할 수 없고 관리자만 처리한다(ADM-13). 반려로 숨김이 풀리면 다시 고치거나 지울 수 있다. 숨기기 전 평상시에는 신고가 들어와 있어도 본인이 고치거나 지울 수 있다. 🆕 11/25
 

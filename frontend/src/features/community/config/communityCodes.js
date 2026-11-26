@@ -9,14 +9,11 @@ export const CONTENT_MAX = 1300
 export const COMMENT_MAX = 1000
 export const DETAIL_MAX = 500
 
-// N-06 글 카테고리 7개(FP-261, 서버 CommunityCodes·DDL CK_BPT_CATEGORY와 같다). 글쓰기 기본값은 자유다.
+// N-06 글 카테고리 4개(FP-261, 서버 CommunityCodes·DDL CK_BPT_CATEGORY와 같다). 글쓰기 기본값은 자유다.
 export const POST_CATEGORIES = Object.freeze([
   { value: 'CREDIT_SCORE', label: '신용점수' },
   { value: 'LOAN', label: '대출·상환' },
   { value: 'CARD', label: '카드·결제' },
-  { value: 'EMPLOYEE', label: '직장인' },
-  { value: 'SELF_EMPLOYED', label: '자영업' },
-  { value: 'FREELANCER', label: '프리랜서' },
   { value: 'FREE', label: '자유' },
 ])
 export const DEFAULT_CATEGORY = 'FREE'

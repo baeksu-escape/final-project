@@ -1,5 +1,5 @@
 -- v0.3.2 (C15) N-06 신용 라운지 글 카테고리(FP-261): 기존 DB의 BOARD_POST에 CATEGORY_CODE 열을 추가한다.
---   코드: CREDIT_SCORE 신용점수, LOAN 대출·상환, CARD 카드·결제, EMPLOYEE 직장인, SELF_EMPLOYED 자영업, FREELANCER 프리랜서, FREE 자유
+--   코드: CREDIT_SCORE 신용점수, LOAN 대출·상환, CARD 카드·결제, FREE 자유
 -- 누가·언제·어디에: 기존 DB(공용 DB는 PR 작성자가 병합 후 실행하고 DB 변경 채널에 남긴다 — sql README 「공용 DB 적용 규칙」, 로컬은 각자)에서 스키마 소유자로 실행한다.
 --   새로 DDL(avenue_ddl.sql)을 실행하는 DB는 필요 없다.
 -- 글·댓글·신고는 지우거나 바꾸지 않는다. 이미 있는 글은 모두 '자유'(FREE)가 된다.
@@ -21,13 +21,13 @@ BEGIN
         EXECUTE IMMEDIATE q'[
             ALTER TABLE BOARD_POST ADD (
                 CATEGORY_CODE VARCHAR2(20 CHAR) DEFAULT 'FREE' NOT NULL
-                CONSTRAINT CK_BPT_CATEGORY CHECK (CATEGORY_CODE IN ('CREDIT_SCORE', 'LOAN', 'CARD', 'EMPLOYEE', 'SELF_EMPLOYED', 'FREELANCER', 'FREE'))
+                CONSTRAINT CK_BPT_CATEGORY CHECK (CATEGORY_CODE IN ('CREDIT_SCORE', 'LOAN', 'CARD', 'FREE'))
             )]';
     END IF;
 END;
 /
 
-COMMENT ON COLUMN BOARD_POST.CATEGORY_CODE IS 'v0.3.2 (C15) 글 카테고리 (N-06). CREDIT_SCORE=신용점수, LOAN=대출·상환, CARD=카드·결제, EMPLOYEE=직장인, SELF_EMPLOYED=자영업, FREELANCER=프리랜서, FREE=자유(기본값)';
+COMMENT ON COLUMN BOARD_POST.CATEGORY_CODE IS 'v0.3.2 (C15) 글 카테고리 (N-06). CREDIT_SCORE=신용점수, LOAN=대출·상환, CARD=카드·결제, FREE=자유(기본값)';
 
 -- 확인 1: CATEGORY_CODE, VARCHAR2, 20, N이 나오면 된다.
 SELECT COLUMN_NAME, DATA_TYPE, CHAR_LENGTH, NULLABLE

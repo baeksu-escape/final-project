@@ -34,9 +34,8 @@ public class BoardService {
 
     public static final int DEFAULT_PAGE_SIZE = 10;
     public static final int MAX_PAGE_SIZE = 50;
-    // COMM-01 filter·sort 값. 이 값이 아니면 조건 없이 최신순으로 본다.
+    // COMM-01 filter 값. 이 값이 아니면 조건 없이 전체 글을 본다.
     public static final String FILTER_MINE = "mine";
-    public static final String SORT_COMMENTS = "comments";
 
     private final BoardMapper boardMapper;
     private final ContentStatusService contentStatus;
@@ -49,18 +48,16 @@ public class BoardService {
     }
 
     // N-06-1 글 목록 한 쪽(최신순, 기본 10개). 검색어는 보이는 글의 제목·내용에서 찾는다.
-    // filter=mine이면 내 글만, sort=comments면 전체 글에서 댓글 많은 순(같으면 최신순)으로 준다(FP-279).
-    // category가 있으면 그 카테고리의 보이는 글만 준다.
-    public BoardDtos.PostPage list(long userId, int page, int size, String keyword, String filter, String sort, String category) {
+    // filter=mine이면 내 글만(FP-279), category가 있으면 그 카테고리의 보이는 글만 준다(FP-261).
+    public BoardDtos.PostPage list(long userId, int page, int size, String keyword, String filter, String category) {
         int safePage = Math.max(page, 1);
         int safeSize = safeSize(size);
         String likePattern = toLikePattern(keyword);
         Long ownerUserId = FILTER_MINE.equals(filter) ? userId : null;
-        boolean byComments = SORT_COMMENTS.equals(sort);
         String categoryCode = blankToNull(category);
-        int total = boardMapper.countPosts(likePattern, ownerUserId, byComments, categoryCode);
+        int total = boardMapper.countPosts(likePattern, ownerUserId, categoryCode);
         List<BoardDtos.PostSummary> items = boardMapper
-                .selectPosts(likePattern, ownerUserId, byComments, categoryCode, (safePage - 1) * safeSize, safeSize).stream()
+                .selectPosts(likePattern, ownerUserId, categoryCode, (safePage - 1) * safeSize, safeSize).stream()
                 .map(row -> {
                     boolean hidden = HIDDEN.equals(row.getStatusCode());
                     return new BoardDtos.PostSummary(row.getPostId(), hidden ? null : row.getCategoryCode(),

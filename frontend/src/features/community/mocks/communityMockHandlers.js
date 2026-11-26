@@ -274,14 +274,13 @@ function registerReportRoutes(reportId) {
 }
 
 registerMockHandlers({
-  // N-06-1 글 목록 — 삭제 글은 빼고, 검색은 보이는 글에서만. 최신순. filter=mine은 내 글, sort=comments는 댓글 많은 순(같으면 최신순), category는 그 카테고리의 보이는 글.
+  // N-06-1 글 목록 — 삭제 글은 빼고, 검색은 보이는 글에서만. 최신순. filter=mine은 내 글, category는 그 카테고리의 보이는 글.
   'GET /api/board/posts': ({ token, query }) => {
     const { loginId } = currentUser(token)
     const page = Math.max(1, Number(query.get('page')) || 1)
     const size = Math.min(50, Math.max(1, Number(query.get('size')) || 10))
     const keyword = (query.get('keyword') ?? '').trim()
     const mineOnly = query.get('filter') === 'mine'
-    const byComments = query.get('sort') === 'comments'
     const category = (query.get('category') ?? '').trim()
     const commentCountOf = (post) => mockComments.filter((c) => c.postId === post.postId && c.status !== DELETED).length
     const rows = mockPosts
@@ -289,8 +288,7 @@ registerMockHandlers({
       .filter((post) => !keyword || (post.status === VISIBLE && (post.title + post.content).includes(keyword)))
       .filter((post) => !category || (post.status === VISIBLE && post.categoryCode === category))
       .filter((post) => !mineOnly || post.authorId === loginId)
-      .filter((post) => !byComments || (post.status === VISIBLE && commentCountOf(post) > 0))
-      .sort((a, b) => (byComments ? commentCountOf(b) - commentCountOf(a) : 0) || b.createdAt.localeCompare(a.createdAt) || b.postId - a.postId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.postId - a.postId)
     const items = rows.slice((page - 1) * size, page * size).map((post) => {
       const hidden = post.status === HIDDEN
       return {

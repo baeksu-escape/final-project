@@ -110,7 +110,7 @@ class CommunityApiContractTest {
 
     @Test
     void 글_목록은_items와_쪽_정보를_준다() throws Exception {
-        given(boardService.list(7L, 2, 10, "적금", null, null, "LOAN")).willReturn(new BoardDtos.PostPage(
+        given(boardService.list(7L, 2, 10, "적금", null, "LOAN")).willReturn(new BoardDtos.PostPage(
                 List.of(new BoardDtos.PostSummary(3L, "LOAN", null, "탈퇴한 회원", 4, AT, true, false)), 2, 10, 11));
 
         mvc.perform(asUser(get("/api/board/posts").param("page", "2").param("keyword", "적금").param("category", "LOAN")))
@@ -145,11 +145,11 @@ class CommunityApiContractTest {
     @Test
     void 글_카테고리는_정해진_값만_받는다() throws Exception {
         given(boardService.create(eq(7L), any())).willReturn(new BoardDtos.PostCreated(12L));
-        for (String code : List.of("CREDIT_SCORE", "LOAN", "CARD", "EMPLOYEE", "SELF_EMPLOYED", "FREELANCER", "FREE")) {
+        for (String code : List.of("CREDIT_SCORE", "LOAN", "CARD", "FREE")) {
             mvc.perform(asUser(json(post("/api/board/posts"),
                     "{\"title\":\"글\",\"content\":\"내용\",\"categoryCode\":\"" + code + "\"}"))).andExpect(status().isOk());
         }
-        mvc.perform(asUser(json(put("/api/board/posts/12"), "{\"title\":\"글\",\"content\":\"내용\",\"categoryCode\":\"ETC\"}")))
+        mvc.perform(asUser(json(put("/api/board/posts/12"), "{\"title\":\"글\",\"content\":\"내용\",\"categoryCode\":\"EMPLOYEE\"}")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("categoryCode"));
@@ -199,14 +199,14 @@ class CommunityApiContractTest {
     }
 
     @Test
-    @DisplayName("글 목록은 filter·sort 쿼리를 서비스로 넘긴다")
-    void postList_passesFilterAndSort() throws Exception {
-        given(boardService.list(7L, 1, 10, null, "mine", "comments", null)).willReturn(new BoardDtos.PostPage(List.of(), 1, 10, 0));
+    @DisplayName("글 목록은 filter 쿼리를 서비스로 넘긴다")
+    void postList_passesFilter() throws Exception {
+        given(boardService.list(7L, 1, 10, null, "mine", null)).willReturn(new BoardDtos.PostPage(List.of(), 1, 10, 0));
 
-        mvc.perform(asUser(get("/api/board/posts").param("filter", "mine").param("sort", "comments")))
+        mvc.perform(asUser(get("/api/board/posts").param("filter", "mine")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalCount").value(0));
-        verify(boardService).list(7L, 1, 10, null, "mine", "comments", null);
+        verify(boardService).list(7L, 1, 10, null, "mine", null);
     }
 
     // ---- COMM-10·11 내 댓글 수정·삭제 ----

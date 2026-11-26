@@ -76,11 +76,11 @@ class BoardServiceTest {
 
     @Test
     void 목록은_10개씩_나누고_숨김_글은_제목을_비운다() {
-        given(boardMapper.countPosts(null, null, false, null)).willReturn(12);
-        given(boardMapper.selectPosts(null, null, false, null, 10, 10))
+        given(boardMapper.countPosts(null, null, null)).willReturn(12);
+        given(boardMapper.selectPosts(null, null, null, 10, 10))
                 .willReturn(List.of(post(2, ME, "VISIBLE"), post(1, OTHER, "HIDDEN_BY_REPORT")));
 
-        BoardDtos.PostPage page = service.list(ME, 2, 0, "  ", null, null, null);
+        BoardDtos.PostPage page = service.list(ME, 2, 0, "  ", null, null);
 
         assertThat(page.page()).isEqualTo(2);
         assertThat(page.size()).isEqualTo(10);
@@ -162,10 +162,10 @@ class BoardServiceTest {
 
     @Test
     void 카테고리를_고르면_목록과_개수를_같은_조건으로_읽는다() {
-        given(boardMapper.countPosts("%적금%", null, false, "LOAN")).willReturn(1);
-        given(boardMapper.selectPosts("%적금%", null, false, "LOAN", 0, 10)).willReturn(List.of(post(1, OTHER, "VISIBLE")));
+        given(boardMapper.countPosts("%적금%", null, "LOAN")).willReturn(1);
+        given(boardMapper.selectPosts("%적금%", null, "LOAN", 0, 10)).willReturn(List.of(post(1, OTHER, "VISIBLE")));
 
-        BoardDtos.PostPage page = service.list(ME, 1, 10, "적금", null, null, "LOAN");
+        BoardDtos.PostPage page = service.list(ME, 1, 10, "적금", null, "LOAN");
 
         assertThat(page.totalCount()).isEqualTo(1);
         assertThat(page.items()).hasSize(1);
@@ -261,29 +261,24 @@ class BoardServiceTest {
     }
 
     @Test
-    @DisplayName("filter=mine은 내 글만, sort=comments는 댓글 많은 순으로 읽고 개수도 같은 조건으로 센다")
-    void list_filterAndSort() {
-        given(boardMapper.countPosts(null, ME, false, null)).willReturn(3);
-        given(boardMapper.selectPosts(null, ME, false, null, 0, 10)).willReturn(List.of(post(1, ME, "VISIBLE")));
-        given(boardMapper.countPosts("%적금%", null, true, null)).willReturn(5);
-        given(boardMapper.selectPosts("%적금%", null, true, null, 0, 10)).willReturn(List.of(post(2, OTHER, "VISIBLE")));
+    @DisplayName("filter=mine은 내 글만 읽고 개수도 같은 조건으로 센다")
+    void list_filterMine() {
+        given(boardMapper.countPosts(null, ME, null)).willReturn(3);
+        given(boardMapper.selectPosts(null, ME, null, 0, 10)).willReturn(List.of(post(1, ME, "VISIBLE")));
 
-        BoardDtos.PostPage mine = service.list(ME, 1, 10, null, "mine", null, null);
-        BoardDtos.PostPage popular = service.list(ME, 1, 10, "적금", null, "comments", null);
+        BoardDtos.PostPage mine = service.list(ME, 1, 10, null, "mine", null);
 
         assertThat(mine.totalCount()).isEqualTo(3);
         assertThat(mine.items().get(0).mine()).isTrue();
-        assertThat(popular.totalCount()).isEqualTo(5);
-        assertThat(popular.items().get(0).postId()).isEqualTo(2L);
     }
 
     @Test
-    @DisplayName("정해진 값이 아닌 filter·sort는 무시하고 전체 글을 최신순으로 읽는다")
-    void list_unknownFilterAndSort_ignored() {
-        given(boardMapper.countPosts(null, null, false, null)).willReturn(1);
-        given(boardMapper.selectPosts(null, null, false, null, 0, 10)).willReturn(List.of(post(1, OTHER, "VISIBLE")));
+    @DisplayName("정해진 값이 아닌 filter는 무시하고 전체 글을 읽는다")
+    void list_unknownFilter_ignored() {
+        given(boardMapper.countPosts(null, null, null)).willReturn(1);
+        given(boardMapper.selectPosts(null, null, null, 0, 10)).willReturn(List.of(post(1, OTHER, "VISIBLE")));
 
-        assertThat(service.list(ME, 1, 10, null, "other", "views", " ").items()).hasSize(1);
+        assertThat(service.list(ME, 1, 10, null, "other", " ").items()).hasSize(1);
     }
 
     // 1번 글(postStatus)과 21번 댓글을 준비한다.

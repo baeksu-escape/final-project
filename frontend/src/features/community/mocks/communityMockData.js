@@ -34,8 +34,8 @@ const at = (text) => `${text.replace(' ', 'T')}:00`
 
 // 예시 글의 카테고리 (없는 번호는 자유)
 const CATEGORY_BY_POST = {
-  6: 'CREDIT_SCORE', 5: 'LOAN', 4: 'FREELANCER', 3: 'LOAN', 2: 'SELF_EMPLOYED', 1: 'CREDIT_SCORE',
-  21: 'CARD', 22: 'EMPLOYEE', 23: 'SELF_EMPLOYED', 24: 'FREELANCER', 25: 'CREDIT_SCORE', 26: 'CARD', 28: 'CREDIT_SCORE', 31: 'CARD', 32: 'LOAN',
+  6: 'CREDIT_SCORE', 5: 'LOAN', 3: 'LOAN', 1: 'CREDIT_SCORE',
+  21: 'CARD', 23: 'LOAN', 25: 'CREDIT_SCORE', 26: 'CARD', 28: 'CREDIT_SCORE', 31: 'CARD', 32: 'LOAN',
 }
 
 // status: VISIBLE | HIDDEN_BY_REPORT | DELETED (DDL BOARD_POST.STATUS_CODE)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Notice, Toast } from '../../../common/components/index.js'
+import { Button, Card, Notice, SegmentedControl, Toast } from '../../../common/components/index.js'
 import { createComment, createPost, deleteComment, deletePost, fetchMyComments, fetchPost, fetchPosts, updateComment, updatePost } from '../api/boardApi.js'
 import MyCommentTable from '../components/MyCommentTable.jsx'
 import Pager from '../components/Pager.jsx'
@@ -11,15 +11,15 @@ import ReportModal from '../components/ReportModal.jsx'
 import { PAGE_SIZE, POST_CATEGORIES } from '../config/communityCodes.js'
 import '../community.css'
 
-// 목록 위 보기 탭 — query를 서버에 보내 전체 글에서 고른다(COMM-01, FP-279). title은 목록 제목
+// 조회 범위 버튼(제목 아래) — query를 서버에 보내 전체 글에서 고른다(COMM-01, FP-279). label은 목록 제목으로도 쓴다
 const COMMENTS_TAB = 'comments'
 const LIST_TABS = [
-  { key: 'all', label: '전체보기', title: '전체 글', query: {} },
-  { key: 'talk', label: '댓글 많은 글', title: '댓글 많은 글', query: { sort: 'comments' } },
-  { key: 'mine', label: '내 글', title: '내 글', query: { filter: 'mine' } },
+  { key: 'all', label: '전체 글', query: {} },
+  { key: 'mine', label: '내 글', query: { filter: 'mine' } },
   // 내가 쓴 댓글(COMM-09)은 글 목록 대신 내 댓글을 따로 읽는다
-  { key: COMMENTS_TAB, label: '내가 쓴 댓글', title: '내가 쓴 댓글' },
+  { key: COMMENTS_TAB, label: '내가 쓴 댓글' },
 ]
+const VIEW_OPTIONS = LIST_TABS.map((tab) => ({ value: tab.key, label: tab.label }))
 const tabOf = (key) => LIST_TABS.find((tab) => tab.key === key)
 
 // FP-223 주소(?post=3, ?post=3&mode=edit, ?mode=write)에서 지금 볼 화면을 읽는다. 번호가 이상하면 목록으로 본다.
@@ -49,7 +49,7 @@ export default function LoungePage() {
   const [page, setPage] = useState(1)
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
-  // 글 카테고리 필터(탭 4개가 함께 쓴다). ''이면 전체
+  // 글 카테고리 필터(보기 4개가 함께 쓴다). ''이면 전체
   const [category, setCategory] = useState('')
   // key: 어떤 조건(탭·쪽·검색어·카테고리)으로 읽은 목록인지 — 지금 조건과 다르면 흐리게(누를 수 없게) 두고 '불러오는 중'을 보여 준다
   const [list, setList] = useState({ key: null, data: null, error: '' })
@@ -247,7 +247,7 @@ export default function LoungePage() {
       <section className="card lounge-list" aria-labelledby="lounge-list-title">
         <div className="lounge-list__head">
           <h2 id="lounge-list-title" className="card__title">
-            {tabOf(feedTab).title} {ready && data && <span className="lounge-count">{data.totalCount}건</span>}
+            {tabOf(feedTab).label} {ready && data && <span className="lounge-count">{data.totalCount}건</span>}
           </h2>
           <form className="lounge-search" onSubmit={handleSearch} role="search">
             <label htmlFor="lounge-search-input" className="sr-only">
@@ -265,20 +265,18 @@ export default function LoungePage() {
             </Button>
           </form>
         </div>
-        <div className="lounge-tabs" role="tablist" aria-label="글 보기">
-          {LIST_TABS.map((tab) => (
-            <button key={tab.key} type="button" role="tab" aria-selected={feedTab === tab.key} className="lounge-tabs__btn" onClick={() => handleTab(tab.key)}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        {/* 카테고리 작은 버튼 — 고른 것은 aria-pressed로 표시한다 */}
-        <div className="lounge-cats" role="group" aria-label="카테고리">
-          {[{ value: '', label: '전체' }, ...POST_CATEGORIES].map((item) => (
-            <button key={item.value} type="button" aria-pressed={category === item.value} className="lounge-cats__btn" onClick={() => handleCategory(item.value)}>
-              {item.label}
-            </button>
-          ))}
+        {/* 위 줄은 조회 범위(공통 SegmentedControl), 아래 줄은 카테고리 작은 버튼(고른 것은 aria-pressed) */}
+        <div className="lounge-filters">
+          <div className="lounge-view-row">
+            <SegmentedControl label="조회 범위" options={VIEW_OPTIONS} value={feedTab} onChange={handleTab} />
+          </div>
+          <div className="lounge-cats" role="group" aria-label="카테고리">
+            {[{ value: '', label: '전체' }, ...POST_CATEGORIES].map((item) => (
+              <button key={item.value} type="button" aria-pressed={category === item.value} className="lounge-cats__btn" onClick={() => handleCategory(item.value)}>
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="lounge-results" aria-busy={!ready}>
           {!ready && (

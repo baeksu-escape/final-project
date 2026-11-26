@@ -14,14 +14,13 @@ import com.baeksuescape.community.dto.PostRow;
 public interface BoardMapper {
 
     // N-06-1 목록: 삭제 글을 빼고 최신순. likePattern은 '%검색어%'(특수문자는 \로 막은 값)이고 null이면 전체.
-    // ownerUserId가 있으면 그 회원 글만, byComments면 댓글이 달린 보이는 글만 댓글 많은 순(같으면 최신순)으로 준다.
+    // ownerUserId가 있으면 그 회원 글만 준다.
     // category가 있으면 그 카테고리의 보이는 글만 준다.
     List<PostRow> selectPosts(@Param("likePattern") String likePattern, @Param("ownerUserId") Long ownerUserId,
-            @Param("byComments") boolean byComments, @Param("category") String category, @Param("offset") int offset,
-            @Param("limit") int limit);
+            @Param("category") String category, @Param("offset") int offset, @Param("limit") int limit);
 
     int countPosts(@Param("likePattern") String likePattern, @Param("ownerUserId") Long ownerUserId,
-            @Param("byComments") boolean byComments, @Param("category") String category);
+            @Param("category") String category);
 
     // 글 한 개(상태와 상관없이). 없으면 null
     PostRow selectPost(@Param("postId") long postId);

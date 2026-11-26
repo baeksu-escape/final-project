@@ -13,13 +13,12 @@ export const BOARD_API = Object.freeze({
 })
 
 // N-06-1 글 목록·검색 — → { items: [{ postId, categoryCode, title, nickname, commentCount, createdAt, hidden, mine }], page, size, totalCount }
-// filter 'mine'은 내 글만, sort 'comments'는 전체 글에서 댓글 많은 순(같으면 최신순). 없으면 전체 글 최신순
+// filter 'mine'은 내 글만. 늘 최신순
 // category는 글 카테고리 코드(그 카테고리의 보이는 글만)
-export function fetchPosts({ page = 1, keyword = '', filter = '', sort = '', category = '' } = {}) {
+export function fetchPosts({ page = 1, keyword = '', filter = '', category = '' } = {}) {
   const params = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) })
   if (keyword.trim()) params.set('keyword', keyword.trim())
   if (filter) params.set('filter', filter)
-  if (sort) params.set('sort', sort)
   if (category) params.set('category', category)
   return apiGet(`${BOARD_API.POSTS}?${params}`)
 }

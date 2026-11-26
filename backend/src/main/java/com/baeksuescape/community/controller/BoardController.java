@@ -30,13 +30,12 @@ public class BoardController {
         this.boardService = boardService;
     }
 
-    // COMM-01 N-06-1 글 목록 (page는 1부터, 기본 10개, keyword는 제목·내용 검색, filter=mine은 내 글, sort=comments는 댓글 많은 순, category는 글 카테고리)
+    // COMM-01 N-06-1 글 목록 (page는 1부터, 기본 10개, keyword는 제목·내용 검색, filter=mine은 내 글, category는 글 카테고리. 늘 최신순)
     @GetMapping
     public BoardDtos.PostPage list(@AuthenticationPrincipal AuthUser user, @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size, @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String filter, @RequestParam(required = false) String sort,
-            @RequestParam(required = false) String category) {
-        return boardService.list(user.userId(), page, size, keyword, filter, sort, category);
+            @RequestParam(required = false) String filter, @RequestParam(required = false) String category) {
+        return boardService.list(user.userId(), page, size, keyword, filter, category);
     }
 
     // COMM-02 N-06-1 글 상세 + 댓글

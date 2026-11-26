@@ -14,7 +14,7 @@ public final class CommunityCodes {
 
     // 글 카테고리(FP-261, DDL C15 CK_BPT_CATEGORY와 같다). 고르지 않으면 자유로 저장한다.
     public static final String CATEGORY_FREE = "FREE";
-    public static final String CATEGORY_PATTERN = "CREDIT_SCORE|LOAN|CARD|EMPLOYEE|SELF_EMPLOYED|FREELANCER|" + CATEGORY_FREE;
+    public static final String CATEGORY_PATTERN = "CREDIT_SCORE|LOAN|CARD|" + CATEGORY_FREE;
 
     // 글·댓글 상태
     public static final String VISIBLE = "VISIBLE";

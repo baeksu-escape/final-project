@@ -65,8 +65,10 @@
 .lounge-search {
   display: flex;
   gap: 8px;
-  width: min(100%, 320px);
+  width: min(100%, 420px);
 }
+
+
 
 .lounge-table__no {
   width: 56px;
@@ -402,37 +404,46 @@
   padding: 32px;
 }
 
-.lounge-tabs {
+/* 조회 범위·카테고리 두 줄 — 제목 바로 아래 */
+.lounge-filters {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.lounge-tabs__btn {
-  padding: 9px 16px;
-  border: 1px solid var(--line2);
-  border-radius: 12px;
-  background: var(--panel);
-  color: var(--fg2);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
+/* 조회 범위 줄 */
+.lounge-view-row {
+  display: flex;
+  align-items: center;
 }
 
-.lounge-tabs__btn[aria-selected='true'] {
-  border-color: var(--fg);
-  background: var(--fg);
-  color: var(--panel);
-}
-
-/* 카테고리 작은 버튼 — 탭보다 작고 옅게, 고른 것은 옅은 파랑 */
+/* 카테고리 작은 버튼 — 조회 범위보다 작고 옅게, 고른 것은 옅은 파랑 */
 .lounge-cats {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 8px 0;
+}
+
+/* 공통 segmented의 회색 상자를 빼고 알약 버튼으로, 고른 것은 연한 파랑 바탕 + 파란 글씨 */
+.lounge-view-row .segmented {
+  flex: none;
+  padding: 0;
+  gap: 8px;
+  background: none;
+}
+
+.lounge-view-row .segmented__button {
+  min-height: 34px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--panel2);
+  font-size: 14px;
+}
+
+.lounge-view-row .segmented__button[aria-pressed='true'] {
+  background: var(--sel);
+  color: var(--acc);
+  box-shadow: none;
 }
 
 .lounge-cats__btn {
@@ -620,6 +631,17 @@
 .lounge-feed__date {
   color: var(--mut2);
   font-size: 13.5px;
+}
+
+/* 짧은 칸(카테고리·회원·쓴 날짜)은 열 제목과 함께 가운데 정렬. 제목·댓글은 왼쪽 그대로 */
+.lounge-feed__category,
+.lounge-feed__head > span:first-child,
+.lounge-feed__date {
+  text-align: center;
+}
+
+.lounge-feed__author {
+  justify-content: center;
 }
 
 .lounge-empty {
