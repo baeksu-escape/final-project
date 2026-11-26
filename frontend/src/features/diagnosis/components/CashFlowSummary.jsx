@@ -1,5 +1,3 @@
-import { OTHER_EXPENSE_CATEGORY_OPTIONS } from '../../dataInput/config/inputOptions.js'
-
 // N-21-9 예측 결과 요약 — 예측 기간 누적 여유 자금, 가장 빠듯한 달, 월 지출 구성(CASH-04). 예상 점수 카드는 11/25 팀 결정으로 뺐다.
 const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(Math.round(v)).toLocaleString('ko-KR')}`
 const monthLabel = (baseMonth) => `${Number(String(baseMonth).slice(5, 7))}월`
@@ -15,12 +13,12 @@ function BreakdownRow({ label, amount, items }) {
   return <details className="cf-hint"><summary>{summary}</summary><ul>{items.map((item, index) => <li key={index}>{item.text}</li>)}</ul></details>
 }
 
-// N-21-3 할부·정기결제·기타 항목 이름 — 분류가 코드면 OTHER_EXPENSE_CATEGORY_OPTIONS 라벨, 서버가 한글 이름(예: "의료비")으로 저장했으면 그대로, 비어 있으면 그룹 라벨 → "기타". 설명이 비어 있으면 괄호를 붙이지 않는다.
+// N-21-3 할부·정기결제·기타 항목 이름 — 서버 expenseCategory는 저장된 한글 이름(예: "의료비")이라 그대로 쓰고(할부·정기결제는 NULL), 비어 있으면 그룹 이름 → "기타"다. 설명이 비어 있으면 괄호를 붙이지 않는다.
 // 서버가 정한 순서(금액 큰 순)를 그대로 쓰며 화면에서 다시 정렬하지 않는다.
 const GROUP_LABELS = { INSTALLMENT: '할부', SUBSCRIPTION: '정기결제', OTHER: '기타' }
 const otherItemText = (item) => {
   const category = item.category?.trim()
-  const name = OTHER_EXPENSE_CATEGORY_OPTIONS.find((option) => option.value === category)?.label || category || GROUP_LABELS[item.groupCode] || '기타'
+  const name = category || GROUP_LABELS[item.groupCode] || '기타'
   const description = item.description?.trim()
   return `${name}${description ? `(${description})` : ''} ${won(item.monthlyAmount)}`
 }

@@ -6,8 +6,6 @@ import com.baeksuescape.finance.util.IncomeVolatilityCalculator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Transactional;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
 
@@ -98,19 +96,22 @@ public class IncomeVolatilityService {
     /**
      * N-21-1·N-21-5~7 저장된 소득·월 지출 합계·월 원리금에 전망 조건을 적용해 현금흐름을 전망한다.
      * 기준 소득은 최근 12개월 평균이고, 전망은 마지막 입력월 다음 달부터 시작한다.
-     * 합계와 항목 목록을 따로 조회하므로, 다른 기기에서 동시에 저장해도 모든 조회가 같은 시점의 데이터를 보게 SERIALIZABLE 읽기 전용 트랜잭션으로 묶는다(읽기만 해서 쓰기 충돌은 없다).
      */
-    @Transactional(readOnly = true, isolation = Isolation.SERIALIZABLE)
     public CashFlowForecastResponse forecastSavedCashFlow(long userId, CashFlowConditionRequest condition) {
         // 1) 조건을 하나도 안 보내면 모든 변화율 0, 기간 6개월로 본다.
         CashFlowConditionRequest cond = condition != null ? condition : new CashFlowConditionRequest();
         // 예측 기간(3·6·12)과 N-21-2 화면 조건(변동 폭·고정지출·납부 상태)은 DB를 읽기 전에 먼저 확인한다.
         int forecastMonths = resolveForecastMonths(cond.getForecastMonths());
         validateScreenConditions(cond);
-        // 2) DB에서 기준값을 읽는다: 월 지출 합계(모든 지출 그룹), 월 원리금 합계, 최근 12개월 소득
-        long monthlyTotalExpense = incomeVolatilityMapper.selectLatestTotalExpense(userId);
-        long monthlyLoanPayment = incomeVolatilityMapper.selectLatestLoanMonthlyPayment(userId);
+        // 2) DB에서 기준값을 읽는다: 고정지출, 기타 지출 항목, 대출 항목, 최근 12개월 소득.
+        // 합계와 항목 목록을 같은 조회 결과로 만들어 동시 저장에도 어긋나지 않게 한다(트랜잭션 격리 대신, 광희 의견).
         long storedFixedExpense = incomeVolatilityMapper.selectLatestFixedExpense(userId);
+        List<CashFlowForecastResponse.BaseOtherExpenseItem> otherExpenseItems =
+                orEmpty(incomeVolatilityMapper.selectLatestOtherExpenseItems(userId));
+        List<CashFlowForecastResponse.BaseLoanItem> loanItems = orEmpty(incomeVolatilityMapper.selectLatestLoanItems(userId));
+        long otherExpenseAmount = otherExpenseItems.stream().mapToLong(CashFlowForecastResponse.BaseOtherExpenseItem::getMonthlyAmount).sum();
+        long monthlyLoanPayment = loanItems.stream().mapToLong(CashFlowForecastResponse.BaseLoanItem::getMonthlyPaymentAmount).sum();
+        long monthlyTotalExpense = storedFixedExpense + otherExpenseAmount;
         List<MonthlyIncomeItem> history = loadIncomeHistory(userId, monthlyTotalExpense);
 
         // N-21-2 고정지출을 직접 입력하면 저장된 고정지출(FIXED) 자리만 그 값으로 바꾼다. 과거 실적(months)의 지출은 저장값 그대로다.
@@ -139,11 +140,11 @@ public class IncomeVolatilityService {
         );
         // N-21-1·2 화면 조건의 처음 값: 저장된 고정지출, 나머지 지출(할부·정기결제·기타), 월 원리금 (조건을 적용하기 전 값)
         response.setBaseFixedExpenseAmount(storedFixedExpense);
-        response.setBaseOtherExpenseAmount(monthlyTotalExpense - storedFixedExpense);
+        response.setBaseOtherExpenseAmount(otherExpenseAmount);
         response.setBaseMonthlyLoanPayment(monthlyLoanPayment);
         // N-21-3·5 기타 지출·대출의 항목별 내역(합이 위 두 기준값과 같다). 항목이 없으면 빈 리스트다.
-        response.setBaseOtherExpenseItems(orEmpty(incomeVolatilityMapper.selectLatestOtherExpenseItems(userId)));
-        response.setBaseLoanItems(orEmpty(incomeVolatilityMapper.selectLatestLoanItems(userId)));
+        response.setBaseOtherExpenseItems(otherExpenseItems);
+        response.setBaseLoanItems(loanItems);
         return response;
     }
 
