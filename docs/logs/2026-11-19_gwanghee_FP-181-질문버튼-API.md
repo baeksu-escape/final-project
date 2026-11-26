@@ -1,10 +1,11 @@
-# FP-181 (1부) 용어 도우미 질문 버튼 조회 API(HELP-02)와 기준 데이터 SQL 추가
+# FP-181 용어 도우미 질문 버튼(HELP-02)·자유 질문(HELP-03)·AI 요약(RPT-04) API와 기준 데이터 SQL 추가
 
 - **날짜:** 2026-11-19
 - **작성자:** 광희 (C조) / Claude Code
 - **브랜치:** `feature-C/FP-181-chatbot-presets` (최신 develop a3be014에서 새로 만듦)
-- **관련 N-ID:** N-32-1
-- **관련 결정:** D-21(자유 질문에 넘길 정보, 미정)은 이번 범위 밖. 구조는 FP-180과 같다(`help` 패키지, 별도 시드 SQL, 화면은 api·mock)
+- **관련 N-ID:** N-32-1, 🆕 11/26 N-32-2, N-31-2
+- **관련 결정:** 구조는 FP-180과 같다(`help` 패키지, 별도 시드 SQL, 화면은 api·mock). 🆕 11/26 decisions.md 1-1 AI 서비스(OpenAI)·D-18(연결 2초/응답 15초) 확정, D-21(질문 글만 넘김)은 그대로 따른다
+- **범위:** 처음에는 1부(HELP-02)만 PR하려 했으나, 11/26 팀 규칙(Jira 카드 1개 = PR 1개)에 따라 2부(HELP-03·RPT-04)까지 이 PR 하나로 낸다(아래 11/26 2부 절)
 
 ## 무엇을, 왜 바꿨나
 - 팀원 확인대로 `CHATBOT_PRESET_QUESTION` 표는 DDL에 이미 있어 DDL은 바꾸지 않았다. 비어 있던 질문 버튼 4개의 문구(데이터)와 API를 채웠다.
@@ -72,13 +73,63 @@
   - DB 통합 테스트(로컬 Oracle, 키는 일회용 값) 9종 중 `ChatbotMapperIT`·`GlossaryMapperIT` 포함 8종 통과. `ScoreBandOfferMapperIT` 2건 실패는 로컬 DB가 아직 CUT-0.1 등급 구간이라서(기대 CUT-0.3·654, 실제 CUT-0.1·665)이며 이 PR과 무관하다. 로컬에 `activate_cutoff_cut_0_3.sql`을 실행하면 맞춰진다.
   - `npm run lint`(`features/ai`) 오류 0, `npm run build` 성공
   - FP-181 파일 공백 오류 0, 충돌 표시 검사 0건
-- AI 제공사: 11/26 OpenAI 키를 받았다는 이야기가 있었으나 `decisions.md` 확정 사항은 Gemini 무료 등급이다. 바꾸려면 팀 결정과 decisions.md 수정이 먼저다. 이 PR은 AI를 부르지 않는다.
+- AI 제공사: 11/26 OpenAI 키를 받았다는 이야기가 있었으나 `decisions.md` 확정 사항은 Gemini 무료 등급이다. 바꾸려면 팀 결정과 decisions.md 수정이 먼저다. → 같은 날 강사 안내로 OpenAI로 정해져 아래 2부에서 decisions.md를 고쳤다.
+
+## 11/26 2부 — 자유 질문(HELP-03)·AI 요약(RPT-04), 한 PR로 합침
+### 무엇을, 왜
+- 강사 안내: 챗봇·요약 담당은 강사가 주는 OpenAI 키를 쓴다(광희 확인: 요약에도 사용 가능). decisions.md 1-1의 Gemini 무료 등급을 OpenAI로 바꿨다.
+- Spring AI 1.0은 Spring Boot 3.4 이상만 공식 지원한다. 우리는 3.2.5라 팀 전체 버전을 올려야 해서 쓰지 않고, FastAPI 호출(`PredictionClient`)과 같은 **RestClient 직접 호출**로 했다(광희 선택, pom 변경 없음).
+- 키가 없는 팀원 PC에서도 백엔드가 켜지도록, 키가 비면 두 API만 503 `AI_UNAVAILABLE`로 답한다.
+- 범영 님 `ReportController`·`ReportService`·`AssessmentMapper`는 고치지 않았다. RPT-04는 `help` 패키지에 새 컨트롤러로 두고, 본인 확인은 `ReportService.byRequestId`(RPT-03)를 호출해 그대로 쓴다.
+
+### 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `backend/.../help/client/OpenAiProperties.java` | 새 파일. `avenue.ai.openai.*`(키·모델 기본 `gpt-4o-mini`·주소·연결 2초/응답 15초) |
+| `backend/.../help/client/OpenAiClient.java` | 새 파일. `POST /chat/completions`, 키 없음 503, 실패·시간 초과·빈 답 502 `AI_FAILED`, 로그에 글·키 없음 |
+| `backend/.../help/controller/ChatbotController.java` | HELP-02에 로그인 사용자 번호, `POST /api/chatbot/questions` 추가 |
+| `backend/.../help/service/ChatbotService.java` | 남은 횟수 계산, `ask()`: 한도 429, 성공 Y·실패 N 기록(시각은 서버 Clock) |
+| `backend/.../help/dto/ChatbotPresetResponse.java` | `remainingCount`·`dailyLimit` 추가 |
+| `backend/.../help/dto/ChatbotQuestionRequest·Response.java` | 새 파일. 1~200자 검사, 응답 `answer`·`remainingCount`·`dailyLimit` |
+| `backend/.../help/mapper/ChatbotMapper.java·xml` | `countSuccessSince`(Y만), `insertQuestionLog`(시각·성공 여부만) |
+| `backend/.../help/controller/AiSummaryController.java` | 새 파일. `POST /api/report/{requestId}/ai-summary` |
+| `backend/.../help/service/AiSummaryService.java` | 새 파일. 저장된 요약 재사용, 산출 안 됨 409, 계산값만 넣은 글, 1000자 자르기, 빈 경우만 저장 |
+| `backend/.../help/mapper/AiSummaryMapper.java·xml`, `dto/AiSummaryResponse.java` | 새 파일. `AI_SUMMARY IS NULL`일 때만 UPDATE, 조회 |
+| `backend/src/main/resources/application.properties.example` | `avenue.ai.openai.api-key=`(빈 값)와 설명 |
+| 테스트 | `OpenAiClientTest`(새, JDK HttpServer로 가짜 응답), `AiSummaryServiceTest`(새), `AiSummaryMapperIT`(새), `ChatbotServiceTest`·`ChatbotControllerTest`·`ChatbotMapperIT` 보강 |
+| `frontend/src/features/ai/api/chatbotApi.js`, `mocks/chatbotMockHandlers.js` | `askChatbotQuestion()`, mock 입력 검사·10회 초과 429·남은 횟수 |
+| `frontend/src/features/ai/api/aiSummaryApi.js`, `mocks/aiSummaryMockHandlers.js` | 새 파일. `requestAiSummary(requestId)`, mock 리포트 한 건 |
+| `docs/ai/decisions.md` | 1-1 AI 서비스 OpenAI, 외부 호출 타임아웃(D-18) 확정, 2장 미정에서 D-18 삭제 |
+| `AGENTS.md` | 1장·5장 "Gemini" → "서비스 AI(OpenAI)" (넘길 정보 규칙은 그대로) |
+| `docs/spec/api/api_definition.md` | 1-2 오류 code 4개(`NOT_SCORED`·`DAILY_LIMIT_EXCEEDED`·`AI_FAILED`·`AI_UNAVAILABLE`), RPT-04·HELP-03 ✅, HELP-02 설명, Q-7 |
+| `docs/spec/api/api_spec_c.md` | HELP-02 응답 필드, 새 절 N-32-2(HELP-03)·N-31-2(RPT-04), 공용 DB 실행 주체 문구 |
+| `docs/ai/features.md` | N-31-2·N-32-2에 API·AI 제공사 메모 |
+
+### DB·API 변경
+- DB: 표 구조 변경 없음, 새 SQL 없음. `CHATBOT_QUESTION_LOG`·`APP_SETTING.CHATBOT_DAILY_LIMIT`(10)·`ASSESSMENT.AI_SUMMARY`는 DDL에 이미 있다(행이 없어도 기본 10).
+- API: HELP-03 추가, RPT-04 추가, HELP-02 응답에 `remainingCount`·`dailyLimit` 추가(기존 필드는 그대로라 FP-207 화면은 그대로 동작)
+- 영향을 받는 팀원
+  - 전원: 백엔드는 키 없이도 켜진다. AI 기능을 시연할 PC에만 `avenue.ai.openai.api-key`를 넣는다(값은 커밋 금지).
+  - AGENTS.md·decisions.md는 팀 공통 문서라 PR 본문과 팀 채널에 알린다.
+  - 범영 님: RPT 경로에 광희 API가 생긴다(`/api/report/{requestId}/ai-summary`). 저장한 요약은 RPT-02·03 `aiSummary`로 나간다.
+  - FP-207(용어 도우미 화면)·FP-182(AI 요약 카드)가 이 API를 쓴다.
+
+### 확인
+- 확인함
+  - `./mvnw clean compile` 성공, `./mvnw test` **547개 통과**(실패 0). 새 테스트: `OpenAiClientTest` 6, `AiSummaryServiceTest` 7, `ChatbotServiceTest` 6, `ChatbotControllerTest` 7
+  - DB 통합 테스트(로컬 Oracle, 키는 일회용 값): `ChatbotMapperIT` 2·`AiSummaryMapperIT` 1·`GlossaryMapperIT` 1 통과
+  - `npm run lint` 오류 0, `npm run build` 성공, mock 직접 호출(남은 횟수 10 → 질문 후 9, 빈 질문 400, 요약 generated true → false)
+- 확인 못 함 / 남은 것
+  - 실제 OpenAI 호출: 광희 님이 자기 `application.properties`에 키를 넣은 뒤 확인한다(아래 「실제 호출 확인」에 결과를 적는다).
+  - 기본 모델 `gpt-4o-mini`가 강사 키에서 쓸 수 있는지는 실제 호출로 확인한다. 안 되면 `avenue.ai.openai.model`만 바꾼다.
 
 ## 다음 사람이 알아야 할 것
 - FP-180(용어 사전, `feature-C/FP-180-glossary`)과 같은 `help` 패키지에 다른 파일을 추가했다. 코드 충돌은 없지만 `api_spec_c.md`의 「최근 변경」 줄과 문서 끝 절이 같은 자리라, 나중에 병합하는 쪽에서 두 쪽 내용을 모두 남긴다.
   - 🆕 11/20 FP-180(#108)이 먼저 병합되어 이 브랜치에서 develop을 반영하며 정리했다. 「최근 변경」 두 줄을 모두 두고, 문서 끝은 N-30-1 절(FP-180) 다음에 N-32-1 절(FP-181)을 두었다. 어느 쪽 내용도 지우지 않았다.
 - 🆕 11/20 FP-180 리뷰와 같은 형식으로 SQL의 `WHENEVER SQLERROR`·`OSERROR`에 `ROLLBACK`을 붙였다(FP-139 e33120d와 같음).
-- HELP-03(자유 질문)은 `ChatbotMapper`·`ChatbotService`·`ChatbotController`에 이어서 추가한다. 하루 횟수는 `APP_SETTING.CHATBOT_DAILY_LIMIT`(10)을 쓰고, `CHATBOT_QUESTION_LOG`에는 질문 글을 저장하지 않으며 `SUCCESS_YN = 'Y'`만 센다.
+- HELP-03(자유 질문)은 `ChatbotMapper`·`ChatbotService`·`ChatbotController`에 이어서 추가한다. 하루 횟수는 `APP_SETTING.CHATBOT_DAILY_LIMIT`(10)을 쓰고, `CHATBOT_QUESTION_LOG`에는 질문 글을 저장하지 않으며 `SUCCESS_YN = 'Y'`만 센다. → 🆕 11/26 그대로 만들었다.
+- 🆕 11/26 같은 사용자가 동시에 질문을 여러 번 보내면 하루 횟수를 1회쯤 넘을 수 있다(세고 → 부르고 → 기록 순서라서). 시연 범위라 잠금은 두지 않았다.
+- 🆕 11/26 AI 지시 문장은 `ChatbotService.SYSTEM_PROMPT`·`AiSummaryService.SYSTEM_PROMPT`에 있다. 바꾸면 명세서 지시 문장 설명도 함께 고친다.
 
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)

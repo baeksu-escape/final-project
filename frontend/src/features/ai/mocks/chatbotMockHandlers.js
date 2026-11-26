@@ -1,4 +1,6 @@
-// N-32-1 용어 도우미 질문 버튼 mock 핸들러 — 응답 모양은 실제 HELP-02(GET /api/chatbot/presets)와 같고, 문구는 시드 SQL(add_chatbot_preset_question.sql)과 같다.
+// N-32 용어 도우미 mock 핸들러 — 응답 모양은 실제 HELP-02(GET /api/chatbot/presets)·HELP-03(POST /api/chatbot/questions)과 같고,
+// 질문 버튼 문구는 시드 SQL(add_chatbot_preset_question.sql)과 같다.
+import { ApiError } from '../../../common/api/ApiError.js'
 import { registerMockHandlers, requireMockUser } from '../../../common/mocks/mockHandlers.js'
 
 // 시드와 같은 질문 버튼 4개 (표시 순서대로)
@@ -29,12 +31,41 @@ const SAMPLE_CHATBOT_PRESETS = Object.freeze([
   },
 ])
 
-// N-32-1 HELP-02 mock — 실제 API처럼 로그인하지 않았으면 401이다. 질문 횟수는 다루지 않는다.
+// N-32-2 하루 자유 질문 횟수(APP_SETTING CHATBOT_DAILY_LIMIT 기본값). mock은 새로고침하면 다시 10회가 된다.
+const MOCK_DAILY_LIMIT = 10
+let mockUsedCount = 0
+
+// N-32-1 HELP-02 mock — 실제 API처럼 로그인하지 않았으면 401이다. 버튼을 눌러도 횟수는 줄지 않고, 남은 자유 질문 횟수를 함께 준다.
 function handleChatbotPresets({ token }) {
   requireMockUser(token)
-  return { presets: SAMPLE_CHATBOT_PRESETS.map((item) => ({ ...item })) }
+  return {
+    presets: SAMPLE_CHATBOT_PRESETS.map((item) => ({ ...item })),
+    remainingCount: Math.max(0, MOCK_DAILY_LIMIT - mockUsedCount),
+    dailyLimit: MOCK_DAILY_LIMIT,
+  }
+}
+
+// N-32-2 HELP-03 mock — 실제 API와 같은 입력 검사·하루 횟수(429)를 흉내 낸다. 답은 AI가 아니라 고정 예시 문장이다.
+function handleChatbotQuestion({ body, token }) {
+  requireMockUser(token)
+  const question = typeof body?.question === 'string' ? body.question.trim() : ''
+  if (!question || question.length > 200) {
+    const message = question ? '질문은 200자까지 쓸 수 있습니다.' : '질문을 입력해 주세요.'
+    throw new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors: [{ field: 'question', message }] })
+  }
+  if (mockUsedCount >= MOCK_DAILY_LIMIT) {
+    const message = `자유 질문은 하루 ${MOCK_DAILY_LIMIT}번까지 할 수 있습니다. 내일 다시 이용해 주세요.`
+    throw new ApiError(429, message, { code: 'DAILY_LIMIT_EXCEEDED', message, fieldErrors: [] })
+  }
+  mockUsedCount += 1
+  return {
+    answer: `(예시 답) "${question}"에 대한 설명입니다. 실제 서버에서는 AI가 쉬운 말로 3~5문장 안에서 답합니다. 이 답은 교육용 예시이며 개인 재무 상담이 아닙니다.`,
+    remainingCount: MOCK_DAILY_LIMIT - mockUsedCount,
+    dailyLimit: MOCK_DAILY_LIMIT,
+  }
 }
 
 registerMockHandlers({
   'GET /api/chatbot/presets': handleChatbotPresets,
+  'POST /api/chatbot/questions': handleChatbotQuestion,
 })
