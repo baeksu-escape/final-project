@@ -58,8 +58,11 @@ public interface BoardMapper {
     // 댓글 저장. 저장하면 row.commentId에 새 번호가 채워진다.
     int insertComment(CommentRow row);
 
-    // 보이는 댓글만 고친다. 그 사이 숨겨졌거나 지워졌으면 0
+    // 보이는 글의 보이는 댓글만 고친다. 그 사이 댓글이나 글이 숨겨졌거나 지워졌으면 0
     int updateCommentContent(@Param("commentId") long commentId, @Param("content") String content, @Param("now") LocalDateTime now);
+
+    // COMM-11 작성자 댓글 삭제 — 보이는 글의 보이는 댓글만 DELETED로. 그 사이 댓글이나 글이 숨겨졌거나 지워졌으면 0
+    int deleteMyComment(@Param("commentId") long commentId, @Param("now") LocalDateTime now);
 
     // 상태가 fromStatus일 때만 바꾼다. 그 사이 다른 처리로 바뀌었으면 0
     int updateCommentStatus(@Param("commentId") long commentId, @Param("fromStatus") String fromStatus,

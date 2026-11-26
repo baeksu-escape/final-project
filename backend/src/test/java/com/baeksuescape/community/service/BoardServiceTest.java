@@ -298,7 +298,7 @@ class BoardServiceTest {
         assertError(() -> service.updateComment(ME, 1L, 21L, new BoardDtos.CommentWrite("새 댓글")), status, code);
         assertError(() -> service.deleteComment(ME, 1L, 21L), status, code);
         verify(boardMapper, never()).updateCommentContent(anyLong(), anyString(), any());
-        verify(boardMapper, never()).updateCommentStatus(anyLong(), anyString(), anyString(), any());
+        verify(boardMapper, never()).deleteMyComment(anyLong(), any());
     }
 
     @Test
@@ -316,11 +316,11 @@ class BoardServiceTest {
     @DisplayName("내 댓글을 지우면 상태만 DELETED로 바꾼다")
     void deleteComment_ok() {
         givenComment("VISIBLE", ME, 1L, "VISIBLE");
-        given(boardMapper.updateCommentStatus(21L, "VISIBLE", "DELETED", NOW)).willReturn(1);
+        given(boardMapper.deleteMyComment(21L, NOW)).willReturn(1);
 
         service.deleteComment(ME, 1L, 21L);
 
-        verify(boardMapper).updateCommentStatus(21L, "VISIBLE", "DELETED", NOW);
+        verify(boardMapper).deleteMyComment(21L, NOW);
     }
 
     @Test
@@ -377,7 +377,7 @@ class BoardServiceTest {
     void comment_changedMeanwhile_conflict() {
         givenComment("VISIBLE", ME, 1L, "VISIBLE");
         given(boardMapper.updateCommentContent(21L, "새 댓글", NOW)).willReturn(0);
-        given(boardMapper.updateCommentStatus(21L, "VISIBLE", "DELETED", NOW)).willReturn(0);
+        given(boardMapper.deleteMyComment(21L, NOW)).willReturn(0);
 
         assertError(() -> service.updateComment(ME, 1L, 21L, new BoardDtos.CommentWrite("새 댓글")), 409, "STATUS_CHANGED");
         assertError(() -> service.deleteComment(ME, 1L, 21L), 409, "STATUS_CHANGED");

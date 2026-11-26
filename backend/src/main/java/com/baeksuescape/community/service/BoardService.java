@@ -5,7 +5,6 @@ import static com.baeksuescape.community.service.CommunityCodes.ACTION_DELETE;
 import static com.baeksuescape.community.service.CommunityCodes.ACTION_UPDATE;
 import static com.baeksuescape.community.service.CommunityCodes.ACTOR_USER;
 import static com.baeksuescape.community.service.CommunityCodes.CATEGORY_FREE;
-import static com.baeksuescape.community.service.CommunityCodes.COMMENT;
 import static com.baeksuescape.community.service.CommunityCodes.DELETED;
 import static com.baeksuescape.community.service.CommunityCodes.HIDDEN;
 import static com.baeksuescape.community.service.CommunityCodes.POST;
@@ -162,7 +161,8 @@ public class BoardService {
         return new BoardDtos.CommentCreated(row.getCommentId());
     }
 
-    // N-06 내 댓글 수정(COMM-10, FP-280) — 보이는 내 댓글만 고칠 수 있다.
+    // N-06 내 댓글 수정(COMM-10, FP-280) — 보이는 글의 보이는 내 댓글만 고칠 수 있다.
+    // 확인한 뒤 그사이 글이 숨겨져도 고쳐지지 않게 UPDATE 조건에도 글 상태를 건다(동시 요청 대비, PR 리뷰).
     @Transactional
     public void updateComment(long userId, long postId, long commentId, BoardDtos.CommentWrite request) {
         requireEditableComment(userId, postId, commentId);
@@ -171,13 +171,11 @@ public class BoardService {
         }
     }
 
-    // N-06 내 댓글 삭제(COMM-11, FP-280) — 행은 지우지 않고 상태만 DELETED로 바꾼다.
+    // N-06 내 댓글 삭제(COMM-11, FP-280) — 행은 지우지 않고 상태만 DELETED로 바꾼다. 수정과 같이 UPDATE 조건에 글 상태를 건다.
     @Transactional
     public void deleteComment(long userId, long postId, long commentId) {
         requireEditableComment(userId, postId, commentId);
-        boolean changed = contentStatus.change(COMMENT, commentId, VISIBLE, DELETED, ACTION_DELETE, ACTOR_USER, userId, null,
-                LocalDateTime.now(clock));
-        if (!changed) {
+        if (boardMapper.deleteMyComment(commentId, LocalDateTime.now(clock)) == 0) {
             throw commentChanged();
         }
     }

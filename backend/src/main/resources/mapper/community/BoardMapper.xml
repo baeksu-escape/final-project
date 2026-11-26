@@ -146,12 +146,25 @@
         VALUES (#{postId}, #{userId}, #{content}, 'VISIBLE', #{createdAt})
     </insert>
 
-    <!-- N-06 내 댓글 수정(COMM-10): 보이는 댓글만 -->
+    <!-- 작성자가 고치거나 지울 수 있는 댓글: 댓글과 그 글이 모두 보이는 상태. 확인과 UPDATE 사이에 숨겨진 경우를 막는다(PR 리뷰) -->
+    <sql id="editableCommentWhere">
+         WHERE COMMENT_ID = #{commentId}
+           AND STATUS_CODE = 'VISIBLE'
+           AND EXISTS (SELECT 1 FROM BOARD_POST P WHERE P.POST_ID = BOARD_COMMENT.POST_ID AND P.STATUS_CODE = 'VISIBLE')
+    </sql>
+
+    <!-- N-06 내 댓글 수정(COMM-10) -->
     <update id="updateCommentContent">
         UPDATE BOARD_COMMENT
            SET CONTENT = #{content}, UPDATED_AT = #{now}
-         WHERE COMMENT_ID = #{commentId}
-           AND STATUS_CODE = 'VISIBLE'
+        <include refid="editableCommentWhere"/>
+    </update>
+
+    <!-- N-06 내 댓글 삭제(COMM-11): 행은 남기고 상태만 DELETED -->
+    <update id="deleteMyComment">
+        UPDATE BOARD_COMMENT
+           SET STATUS_CODE = 'DELETED', UPDATED_AT = #{now}
+        <include refid="editableCommentWhere"/>
     </update>
 
     <update id="updateCommentStatus">

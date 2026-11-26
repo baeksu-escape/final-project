@@ -49,7 +49,7 @@ export default function LoungePage() {
   const [page, setPage] = useState(1)
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
-  // 글 카테고리 필터(보기 4개가 함께 쓴다). ''이면 전체
+  // 글 카테고리 필터(조회 범위 3개가 함께 쓴다). ''이면 전체
   const [category, setCategory] = useState('')
   // key: 어떤 조건(탭·쪽·검색어·카테고리)으로 읽은 목록인지 — 지금 조건과 다르면 흐리게(누를 수 없게) 두고 '불러오는 중'을 보여 준다
   const [list, setList] = useState({ key: null, data: null, error: '' })
