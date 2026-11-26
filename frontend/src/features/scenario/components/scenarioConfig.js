@@ -15,15 +15,6 @@ export const BETTER_PRESETS = [
   { id: 'better', label: '호전 복합 (금리 −0.5%p · 소득 +10% · 지출 −10%)', ratePctPoint: -0.5, incomePct: 10, expensePct: -10 },
 ]
 
-// (시안) 쉬운 화면용 상황 버튼 5개 — 값은 위 프리셋 그대로 쓰고 이름만 쉬운 말로 바꾼다.
-export const EASY_PRESETS = [
-  { ...BASE_PRESET, label: '지금으로' },
-  { ...WORSE_PRESETS[0], label: '금리 오름 (+1%p)' },
-  { ...WORSE_PRESETS[2], label: '소득 줄어듦 (−20%)' },
-  { ...WORSE_PRESETS[3], label: '모두 나빠짐' },
-  { ...BETTER_PRESETS[3], label: '좋아짐' },
-]
-
 // 슬라이더 범위(slider*)와 직접 입력 범위(input*)는 다르다. 직접 입력은 더 넓게 받는다.
 // (시안) label은 쉬운 이름, help는 칸 아래 한 줄 설명이다.
 export const SCENARIO_FIELDS = [
@@ -34,6 +25,14 @@ export const SCENARIO_FIELDS = [
 ]
 
 const KEYS = SCENARIO_FIELDS.map((field) => field.key)
+
+// (시안 5차) 쉬운 화면용 상황 버튼 2개 — 슬라이더 범위의 끝값을 넣는다.
+// 최악: 금리·지출은 가장 많이 오르고 소득은 가장 많이 줄어든 값, 최적: 그 반대.
+const isCost = (field) => field.key !== 'incomePct'
+export const EASY_PRESETS = [
+  { id: 'worst', label: '최악의 시나리오', ...Object.fromEntries(SCENARIO_FIELDS.map((f) => [f.key, isCost(f) ? f.sliderMax : f.sliderMin])) },
+  { id: 'best', label: '최적의 시나리오', ...Object.fromEntries(SCENARIO_FIELDS.map((f) => [f.key, isCost(f) ? f.sliderMin : f.sliderMax])) },
+]
 
 // (시안 2차) 금액 칸을 쓸 수 있는 항목이면 지금 금액(원), 아니면 null.
 export const baseAmountOf = (field, baseline) => {
