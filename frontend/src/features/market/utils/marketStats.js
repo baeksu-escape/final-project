@@ -38,7 +38,7 @@ export function metricStats(categoryData, quarter, dongs, key) {
   const mean = values.reduce((a, b) => a + b, 0) / values.length
   const sd = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length) || 1
   const sorted = [...values].sort((a, b) => a - b)
-  const pick = (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]
+  const pick = percentilePicker(sorted)
   return {
     seoul,
     sd,
@@ -48,11 +48,40 @@ export function metricStats(categoryData, quarter, dongs, key) {
     low: pick(DIST_RANGE[0]),
     high: pick(DIST_RANGE[1]),
     // 지도 색 단계 경계 — 20·40·60·80% 백분위(동이 단계마다 비슷하게 나뉜다)
-    cuts: Array.from({ length: HEAT_STEPS - 1 }, (_, i) => pick((i + 1) / HEAT_STEPS)),
+    cuts: heatCuts(pick),
   }
 }
 
-// 지도 색 단계(1 연한 빨강 ~ 5 진한 빨강). 좋고 나쁨이 아니라 값의 크기다. 경계와 같은 값은 아래 단계에 넣는다
+// 정렬된 값에서 백분위 p(0~1)에 해당하는 값을 꺼내는 함수를 만든다.
+function percentilePicker(sorted) {
+  return (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]
+}
+
+// 지도 색 단계 경계(20·40·60·80% 백분위).
+function heatCuts(pick) {
+  return Array.from({ length: HEAT_STEPS - 1 }, (_, i) => pick((i + 1) / HEAT_STEPS))
+}
+
+// FP-278 서울 전체를 볼 때 지도의 구 색 단계 기준 — 25개 구 값(합계 기준)을 값 순서로 5등분한다.
+// 구 값은 동보다 평균에 몰려 있어 동 경계를 그대로 쓰면 거의 한 색이 되므로 구끼리 따로 나눈다(11/26 동주).
+export function guHeatStats(categoryData, quarter, key) {
+  const values = Object.values(categoryData.gu).map((byQuarter) => byQuarter[quarter]?.[key]).filter((v) => v != null)
+  if (values.length === 0) return { min: null, max: null, cuts: [] }
+  const sorted = [...values].sort((a, b) => a - b)
+  return { min: sorted[0], max: sorted[sorted.length - 1], cuts: heatCuts(percentilePicker(sorted)) }
+}
+
+// 구 이름 → { value, heat } (지도 구 색·구 툴팁용).
+export function guHeatRows(categoryData, quarter, key, guStats) {
+  return Object.fromEntries(
+    Object.entries(categoryData.gu).map(([gu, byQuarter]) => {
+      const value = byQuarter[quarter]?.[key] ?? null
+      return [gu, { value, heat: heatOf(value, guStats) }]
+    }),
+  )
+}
+
+// 지도 색 단계(1 연함 ~ 5 진함, 색은 지표마다 다름 — market.css FP-278). 좋고 나쁨이 아니라 값의 크기다. 경계와 같은 값은 아래 단계에 넣는다
 // (폐업률 0%처럼 같은 값이 많아도 가장 낮은 값이 가장 연하게 보이게). 값이 없으면 'none'.
 export function heatOf(value, stats) {
   if (value == null || !stats.cuts || stats.cuts.length === 0) return 'none'

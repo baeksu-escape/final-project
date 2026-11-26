@@ -103,10 +103,15 @@ public class IncomeVolatilityService {
         // 예측 기간(3·6·12)과 N-21-2 화면 조건(변동 폭·고정지출·납부 상태)은 DB를 읽기 전에 먼저 확인한다.
         int forecastMonths = resolveForecastMonths(cond.getForecastMonths());
         validateScreenConditions(cond);
-        // 2) DB에서 기준값을 읽는다: 월 지출 합계(모든 지출 그룹), 월 원리금 합계, 최근 12개월 소득
-        long monthlyTotalExpense = incomeVolatilityMapper.selectLatestTotalExpense(userId);
-        long monthlyLoanPayment = incomeVolatilityMapper.selectLatestLoanMonthlyPayment(userId);
+        // 2) DB에서 기준값을 읽는다: 고정지출, 기타 지출 항목, 대출 항목, 최근 12개월 소득.
+        // 합계와 항목 목록을 같은 조회 결과로 만들어 동시 저장에도 어긋나지 않게 한다(트랜잭션 격리 대신, 광희 의견).
         long storedFixedExpense = incomeVolatilityMapper.selectLatestFixedExpense(userId);
+        List<CashFlowForecastResponse.BaseOtherExpenseItem> otherExpenseItems =
+                orEmpty(incomeVolatilityMapper.selectLatestOtherExpenseItems(userId));
+        List<CashFlowForecastResponse.BaseLoanItem> loanItems = orEmpty(incomeVolatilityMapper.selectLatestLoanItems(userId));
+        long otherExpenseAmount = otherExpenseItems.stream().mapToLong(CashFlowForecastResponse.BaseOtherExpenseItem::getMonthlyAmount).sum();
+        long monthlyLoanPayment = loanItems.stream().mapToLong(CashFlowForecastResponse.BaseLoanItem::getMonthlyPaymentAmount).sum();
+        long monthlyTotalExpense = storedFixedExpense + otherExpenseAmount;
         List<MonthlyIncomeItem> history = loadIncomeHistory(userId, monthlyTotalExpense);
 
         // N-21-2 고정지출을 직접 입력하면 저장된 고정지출(FIXED) 자리만 그 값으로 바꾼다. 과거 실적(months)의 지출은 저장값 그대로다.
@@ -135,8 +140,11 @@ public class IncomeVolatilityService {
         );
         // N-21-1·2 화면 조건의 처음 값: 저장된 고정지출, 나머지 지출(할부·정기결제·기타), 월 원리금 (조건을 적용하기 전 값)
         response.setBaseFixedExpenseAmount(storedFixedExpense);
-        response.setBaseOtherExpenseAmount(monthlyTotalExpense - storedFixedExpense);
+        response.setBaseOtherExpenseAmount(otherExpenseAmount);
         response.setBaseMonthlyLoanPayment(monthlyLoanPayment);
+        // N-21-3·5 기타 지출·대출의 항목별 내역(합이 위 두 기준값과 같다). 항목이 없으면 빈 리스트다.
+        response.setBaseOtherExpenseItems(otherExpenseItems);
+        response.setBaseLoanItems(loanItems);
         return response;
     }
 
@@ -185,6 +193,11 @@ public class IncomeVolatilityService {
             history.add(toItem(row.getYearMonth(), row.getIncome(), monthlyExpense));
         }
         return history;
+    }
+
+    /** 조회 결과가 null이면 빈 리스트로 바꾼다(항목 목록은 항상 배열로 내려간다). */
+    private static <T> List<T> orEmpty(List<T> items) {
+        return items == null ? List.of() : items;
     }
 
     /** 기준월·소득·지출 값을 계산 입력 단위(MonthlyIncomeItem) 하나로 만든다. */

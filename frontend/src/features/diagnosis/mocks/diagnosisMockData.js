@@ -62,7 +62,7 @@ export const SAMPLE_CASH_FLOW_BASE = Object.freeze({
   monthlyLoanPayment: 0,
 })
 
-// N-21-8 DIAG-09 예상 점수 mock의 현재 점수(점수가 나온 최근 평가 예시, 시뮬레이터 mock과 같은 588점).
+// N-21-8 DIAG-09 예상 점수 mock의 현재 점수(11/25 팀 결정으로 현금흐름 화면은 쓰지 않으며 API·mock만 남겨 둠. 점수가 나온 최근 평가 예시, 시뮬레이터 mock과 같은 588점).
 // 등급 경계는 CUT-0.3(654·727). 예상 점수는 mock 규칙으로만 계산하며 진짜 모델 점수가 아니다.
 export const SAMPLE_EXPECTED_SCORE_BASE = Object.freeze({
   baseRequestId: '00000000-0000-4000-8000-000000000588',

@@ -15,6 +15,15 @@ import {
   SAMPLE_MEMBER_FINANCIAL_HEALTH,
 } from './diagnosisMockData.js'
 
+// N-21-3 월 지출 구성 mock 예시 — 실제 서버처럼 할부·정기결제는 expenseCategory가 NULL이고 기타(OTHER)는 저장된 한글 이름이다.
+const MOCK_OTHER_EXPENSE_ITEMS = [
+  { expenseGroupCode: 'INSTALLMENT', expenseCategory: null, description: '노트북', monthlyAmount: 150000 },
+  { expenseGroupCode: 'SUBSCRIPTION', expenseCategory: null, description: '넷플릭스', monthlyAmount: 15000 },
+  { expenseGroupCode: 'OTHER', expenseCategory: '의료비', description: '', monthlyAmount: 9000 },
+]
+// 대출 목록은 같은 mock 회원의 자산·부채·시나리오 mock 대출(SAMPLE_MEMBER_FINANCIAL_HEALTH)과 같은 종류·월 상환액·순서다(월 35만 원).
+const MOCK_LOAN_ITEMS = SAMPLE_MEMBER_FINANCIAL_HEALTH.loans.map(({ loanId, loanTypeName, monthlyPaymentAmount }) => ({ loanId, loanTypeName, monthlyPaymentAmount }))
+
 // N-20-4 DSR(연소득 대비 연원리금 상환비율) 및 위험 단계 계산
 function handleDsrCalculate({ body }) {
   const annualIncome = Number(body?.annualIncome ?? 0)
@@ -169,7 +178,11 @@ function handleCashFlowForecast({ query, token }) {
     throw invalid('paymentStatus', '납부 상태를 선택해 주세요.')
   }
 
-  const { baseMonthlyIncome, monthlyTotalExpense, monthlyFixedExpense, monthlyLoanPayment } = SAMPLE_CASH_FLOW_BASE
+  // N-21-3 월 지출 구성 예시(서버 정렬 규칙대로: 할부·정기결제는 금액 큰 순, 대출은 LOAN_ID 순). 기타 지출·월 원리금은 이 목록의 합이다.
+  const { baseMonthlyIncome, monthlyFixedExpense } = SAMPLE_CASH_FLOW_BASE
+  const monthlyOtherExpense = MOCK_OTHER_EXPENSE_ITEMS.reduce((sum, item) => sum + item.monthlyAmount, 0)
+  const monthlyLoanPayment = MOCK_LOAN_ITEMS.reduce((sum, item) => sum + item.monthlyPaymentAmount, 0)
+  const monthlyTotalExpense = monthlyFixedExpense + monthlyOtherExpense
   // 고정지출을 보내면 저장된 고정지출(FIXED) 자리만 그 값으로 바꾼다.
   const baseExpense = fixedExpenseAmount === null ? monthlyTotalExpense : fixedExpenseAmount + (monthlyTotalExpense - monthlyFixedExpense)
   const forecastExpense = Math.round(baseExpense * (1 + expenseChangePercent / 100))
@@ -227,10 +240,13 @@ function handleCashFlowForecast({ query, token }) {
     baseFixedExpenseAmount: monthlyFixedExpense,
     baseOtherExpenseAmount: monthlyTotalExpense - monthlyFixedExpense,
     baseMonthlyLoanPayment: monthlyLoanPayment,
+    // N-21-3 월 지출 구성 목록 — 실제 응답처럼 항목 합이 위 기타 지출·월 원리금과 같다.
+    baseOtherExpenseItems: MOCK_OTHER_EXPENSE_ITEMS,
+    baseLoanItems: MOCK_LOAN_ITEMS,
   }
 }
 
-// N-21-8 DIAG-09 예상 대안 점수 mock — 본문은 현금흐름 전망 조건과 같은 이름이다. 검사·문구는 실제 API와 같다.
+// 11/25 팀 결정으로 현금흐름 화면 미사용(핸들러는 남겨 둠). N-21-8 DIAG-09 예상 대안 점수 mock — 본문은 현금흐름 전망 조건과 같은 이름이다. 검사·문구는 실제 API와 같다.
 // 점수는 "평균 소득 변화율 × 1점 − 월 지출 변화율 × 0.5점"의 mock 규칙이다(진짜 모델 아님). 납부 상태는 실제 API처럼 점수에 쓰지 않는다.
 function handleExpectedScore({ body, token }) {
   requireMockUser(token) // 실제 API처럼 로그인하지 않았으면 401
@@ -285,7 +301,7 @@ function handleExpectedScore({ body, token }) {
   }
 }
 
-// N-15-3 로그인 회원의 직군별 시연 평균을 회원 평균 API 형태로 제공한다.
+// N-15-3 로그인 회원의 직군별·연령대별 시연 평균을 회원 평균 API 형태로 제공한다.
 function handlePeerBenchmark({ token }) {
   const user = requireMockUser(token)
   if (user.role === ROLES.ADMIN) throw new ApiError(403, '일반 회원만 이용할 수 있습니다.')
@@ -294,7 +310,13 @@ function handlePeerBenchmark({ token }) {
   const sameWorkerType = counts[user.jobType]
     ? { memberCount: counts[user.jobType], ...createFinanceMockData(user.jobType).asset.peer }
     : { ...empty }
-  return { workerTypeCode: user.jobType, ageBandCode: null, sameWorkerType, sameAgeBand: { ...empty } }
+  const sameAgeBand = {
+    memberCount: 105,
+    annualIncomeAmount: 40_000_000,
+    totalAssetAmount: 76_000_000,
+    totalDebtAmount: 37_000_000,
+  }
+  return { workerTypeCode: user.jobType, ageBandCode: null, sameWorkerType, sameAgeBand }
 }
 
 // FP-239 N-16 DIAG-03-1 자산·부채 저장값 mock — 실제 API처럼 로그인하지 않았으면 401, 응답 모양은 실제와 같다.

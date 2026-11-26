@@ -33,7 +33,7 @@ export function getCashFlowForecast(condition = {}) {
   return apiGet(query ? `${DIAGNOSIS_API.CASH_FLOW_FORECAST}?${query}` : DIAGNOSIS_API.CASH_FLOW_FORECAST)
 }
 
-// N-21-8 전망 조건(소득 변동 폭·소득 변화율·월 고정 지출·지출 변화율)으로 예상 대안 점수를 다시 구한다(DIAG-09, 저장 안 함).
+// 11/25 팀 결정으로 현금흐름 화면 미사용(함수·경로는 남겨 둠). N-21-8 전망 조건(소득 변동 폭·소득 변화율·월 고정 지출·지출 변화율)으로 예상 대안 점수를 다시 구한다(DIAG-09, 저장 안 함).
 // condition은 getCashFlowForecast와 같은 이름의 값이다. FP-239: paymentStatus가 'DELAYED'(밀림)면 최근 1년 30일 이상 연체를 1회 더해 계산하고
 // paymentStatusApplied: true, assumedDelinquencyCount: 넣은 연체 건수(저장값 + 1)다. 제때·생략이면 false와 null. 화면 문구: "최근 1년 30일 이상 연체 1회 추가로 가정".
 // 응답: { currentScore, currentGradeBandCode, expectedScore, expectedGradeBandCode, scoreDiff, modelVersion, baseModelVersion, baseRequestId, paymentStatusApplied, assumedDelinquencyCount }

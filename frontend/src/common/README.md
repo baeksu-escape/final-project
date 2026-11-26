@@ -26,6 +26,7 @@ A팀이 만든 공통 프론트입니다. 다른 팀은 이 틀과 부품 위에
 - **공통 컴포넌트:** `import { Card, MoneyInput, Button } from '../../common/components/index.js'`. 사용법은 각 파일 맨 위 주석에 있습니다. 버튼·입력·모달·알림 같은 UI는 새로 만들기 전에 여기에 이미 있는지 먼저 확인합니다.
 - **차트 컴포넌트 (FP-156):** 외부 라이브러리 없이 가벼운 SVG로 렌더링되며, 테마 변수(`var(--mint)` 등)를 자동 지원합니다.
   - `CompareBar`: 나와 동년배/직군 평균 수평 비교 (`myValue`, `avgValue`, `unit`, `label`) — N-15-3
+    - 선택 prop `averages={[{ label, value }]}`로 평균 줄을 여러 개 표시합니다. 생략하면 기존처럼 `avgValue`·`avgLabel`로 평균 한 줄을 표시합니다.
   - `TrendLineChart`: 4분기/12개월 추이선 및 기준선 (`data: [{ label, value }]`, `baseline`, `unit`) — N-24-3, N-10-2
   - `BarChart`: 항목별 수치 비교 및 0 기준 상하 증감(±) 막대 (`data: [{ label, value, color, tag }]`, `unit`) — N-24-3, N-12-8
   - `HeatmapGrid`: 직군 × 연령 매트릭스 히트맵 (`rows`, `columns`, `data`, `myCell`, `selectedCell`, `onSelectCell`, `unit`, `rowSummary`·`colSummary`·`totalSummary`, `formatValue`) — N-26-3, N-26-6 · 값이 `null`(인원이 적어 숨긴 값 등)이면 '—'로 보이고 색 범위에서 빠진다. `formatValue`로 "+42점"·"56%"처럼 표시를 바꾼다(11/23 FP-164)

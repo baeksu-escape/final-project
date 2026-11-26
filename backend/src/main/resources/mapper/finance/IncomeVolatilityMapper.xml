@@ -45,4 +45,25 @@
          WHERE USER_ID = #{userId}
            AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
     </select>
+
+    <!-- N-21-3 소득 기준월의 기타 지출(FIXED 제외) 항목. 금액 큰 순, 같으면 EXPENSE_ID 순. 0원 항목도 거르지 않는다 -->
+    <select id="selectLatestOtherExpenseItems" resultType="com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse$BaseOtherExpenseItem">
+        SELECT EXPENSE_GROUP_CODE AS expenseGroupCode, EXPENSE_CATEGORY AS expenseCategory,
+               DESCRIPTION AS description, MONTHLY_AMT AS monthlyAmount
+          FROM USER_EXPENSE_ITEM
+         WHERE USER_ID = #{userId}
+           AND EXPENSE_GROUP_CODE != 'FIXED'
+           AND BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
+         ORDER BY MONTHLY_AMT DESC, EXPENSE_ID
+    </select>
+
+    <!-- N-21-5 소득 기준월의 대출별 월 원리금. 종류 이름은 자산·부채 API(FinancialHealthMapper.selectLatestLoans)와 같이 DIM_LOAN_TYPE을 이어 붙인다 -->
+    <select id="selectLatestLoanItems" resultType="com.baeksuescape.finance.dto.cashflow.CashFlowForecastResponse$BaseLoanItem">
+        SELECT L.LOAN_ID AS loanId, T.LOAN_TYPE_NAME AS loanTypeName, L.MONTHLY_PAYMENT_AMT AS monthlyPaymentAmount
+          FROM USER_LOAN L
+          JOIN DIM_LOAN_TYPE T ON T.LOAN_TYPE_CODE = L.LOAN_TYPE_CODE
+         WHERE L.USER_ID = #{userId}
+           AND L.BASE_MONTH = (SELECT MAX(BASE_MONTH) FROM USER_INCOME_MONTH WHERE USER_ID = #{userId})
+         ORDER BY L.LOAN_ID
+    </select>
 </mapper>

@@ -4,7 +4,7 @@ import { formatMetric, heatOf, histogram } from '../utils/marketStats.js'
 
 const W = 300
 const H = 120
-const LABEL_GAP = 70
+const LABEL_GAP = 100
 
 // N-24-3 행정동 분포 — 고른 범위의 동 값을 14구간으로 나눠 막대로 그리고 서울 평균을 점선으로 표시한다.
 export default function DongDistribution({ metric, stats, rows }) {
@@ -22,7 +22,8 @@ export default function DongDistribution({ metric, stats, rows }) {
 
   return (
     <Card title="행정동 분포" className="market-side-card">
-      <svg viewBox={`0 0 ${W} ${H + 22}`} width="100%" role="img" aria-label={`행정동 ${metric.name} 분포`}>
+      {/* 축 글자가 작게 보인다는 의견(11/26)으로 10 → 13 */}
+      <svg viewBox={`0 0 ${W} ${H + 26}`} width="100%" role="img" aria-label={`행정동 ${metric.name} 분포`}>
         {bins.map((bin, i) => {
           const bh = (bin.count / cmax) * H
           const center = (bin.from + bin.to) / 2
@@ -41,18 +42,18 @@ export default function DongDistribution({ metric, stats, rows }) {
           )
         })}
         <line x1={avgX} x2={avgX} y1="0" y2={H} strokeDasharray="3 3" className="market-chart__avg" />
-        <text x={avgX} y={H + 14} fontSize="10" textAnchor="middle" className="market-chart__avg-text">
+        <text x={avgX} y={H + 18} fontSize="13" textAnchor="middle" className="market-chart__avg-text">
           평균 {formatMetric(metric, stats.seoul)}
         </text>
         {/* 평균 글자와 겹치면 양 끝 값은 숨긴다 */}
         {avgX > LABEL_GAP && (
-          <text x="0" y={H + 14} fontSize="10" className="market-chart__tick">
+          <text x="0" y={H + 18} fontSize="13" className="market-chart__tick">
             {formatMetric(metric, stats.low)}
             {stats.min < stats.low ? ' 이하' : ''}
           </text>
         )}
         {avgX < W - LABEL_GAP && (
-          <text x={W} y={H + 14} fontSize="10" textAnchor="end" className="market-chart__tick">
+          <text x={W} y={H + 18} fontSize="13" textAnchor="end" className="market-chart__tick">
             {formatMetric(metric, stats.high)}
             {stats.max > stats.high ? ' 이상' : ''}
           </text>
