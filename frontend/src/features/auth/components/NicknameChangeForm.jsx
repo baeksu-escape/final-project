@@ -3,6 +3,7 @@ import { Button, TextInput } from '../../../common/components/index.js'
 import { checkNicknameAvailability } from '../api/authFeatureApi.js'
 import { requestNicknameChange } from '../api/myPageApi.js'
 import { AUTH_ERROR_CODES, SAME_NICKNAME_MESSAGE } from '../authConstants.js'
+import useImeSafeFilter from '../useImeSafeFilter.js'
 import { NICKNAME_MAX, filterNickname, validateNickname } from '../validation.js'
 
 // FP-222 N-04-3 닉네임 바꾸기 폼 — 규칙은 가입과 같고(validateNickname), [중복 확인](AUTH-13)에서 쓸 수 있다고 나온 닉네임만 저장한다(MEM-08).
@@ -21,10 +22,11 @@ export default function NicknameChangeForm({ currentNickname, onSaved, onCancel 
 
   // 칸 값을 바꾸면 지난 안내를 지운다.
   // FP-258 2차 입력·붙여넣기는 가입과 같은 걸러내기(filterNickname: 한글·영문·숫자 7자)를 거친다.
-  const handleChange = (value) => {
-    setNickname(filterNickname(value))
+  // FP-258 3차 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(useImeSafeFilter, 감싼 div가 조합 이벤트를 받는다).
+  const nicknameInput = useImeSafeFilter()((value) => {
+    setNickname(value)
     setError('')
-  }
+  }, filterNickname)
 
   // 형식이 맞고 지금 닉네임과 다른 값만 서버에 묻는다.
   const handleCheck = async () => {
@@ -63,15 +65,17 @@ export default function NicknameChangeForm({ currentNickname, onSaved, onCancel 
 
   return (
     <form className="account-form nickname-change-form" onSubmit={handleSubmit} noValidate>
-      <TextInput
-        label="새 닉네임"
-        value={nickname}
-        onChange={handleChange}
-        error={formatError || (sameAsCurrent ? SAME_NICKNAME_MESSAGE : '') || error}
-        hint={checked ? '사용할 수 있는 닉네임입니다.' : `한글·영문·숫자 2~${NICKNAME_MAX}자, 신용 라운지에 작성자로 보입니다`}
-        maxLength={NICKNAME_MAX}
-        autoComplete="nickname"
-      />
+      <div {...nicknameInput.compositionProps}>
+        <TextInput
+          label="새 닉네임"
+          value={nickname}
+          onChange={nicknameInput.onChange}
+          error={formatError || (sameAsCurrent ? SAME_NICKNAME_MESSAGE : '') || error}
+          hint={checked ? '사용할 수 있는 닉네임입니다.' : `한글·영문·숫자 2~${NICKNAME_MAX}자, 신용 라운지에 작성자로 보입니다`}
+          maxLength={NICKNAME_MAX}
+          autoComplete="nickname"
+        />
+      </div>
       <Button onClick={handleCheck} disabled={pending || !text || formatError !== '' || sameAsCurrent || checked}>
         중복 확인
       </Button>

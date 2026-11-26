@@ -44,7 +44,6 @@ export default function WithdrawalCard() {
     }
     setPasswordError('')
     setPending(true)
-    hideAll()
     try {
       await requestWithdrawal(password)
     } catch (error) {
@@ -54,6 +53,8 @@ export default function WithdrawalCard() {
       setPending(false)
       return
     }
+    // FP-258 2차 탈퇴에 성공해 로그아웃·이동하기 직전에만 가린다. 실패하면 보기 상태를 그대로 둔다.
+    hideAll()
     // 알림은 로그아웃 상태와 함께 AuthProvider에 맡긴다. 라우트 가드가 먼저 로그인 화면으로 보내도 알림이 남는다.
     await logout({ notice: WITHDRAWAL_DONE_MESSAGE })
     navigate(AUTH_PATHS.LOGIN, { replace: true })

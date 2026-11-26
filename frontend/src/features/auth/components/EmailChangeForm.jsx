@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { TextInput } from '../../../common/components/index.js'
 import { requestEmailChange } from '../api/myPageApi.js'
 import { EMAIL_PURPOSES } from '../authConstants.js'
+import useImeSafeFilter from '../useImeSafeFilter.js'
 import { filterEmail } from '../validation.js'
 import EmailVerification from './EmailVerification.jsx'
 
@@ -12,6 +13,8 @@ export default function EmailChangeForm({ onSaved, onCancel }) {
   const [verification, setVerification] = useState(null) // { email, verificationToken }
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
+  // FP-258 3차 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(useImeSafeFilter). 공통 TextInput 대신 감싼 div가 조합 이벤트를 받는다.
+  const emailInput = useImeSafeFilter()(setEmail, filterEmail)
 
   // 인증받은 뒤 이메일을 고치면 인증이 풀린 것으로 본다.
   const verified = verification !== null && verification.email === email
@@ -38,7 +41,9 @@ export default function EmailChangeForm({ onSaved, onCancel }) {
   return (
     <form className="account-form email-change-form" onSubmit={handleSubmit} noValidate>
       {/* FP-258 2차 입력·붙여넣기를 가입과 같은 이메일 규칙으로 거른다(소문자, 앞부분 a-z0-9._- · 도메인 a-z0-9.-). */}
-      <TextInput label="새 이메일" type="email" value={email} onChange={(value) => setEmail(filterEmail(value))} autoComplete="email" />
+      <div {...emailInput.compositionProps}>
+        <TextInput label="새 이메일" type="email" value={email} onChange={emailInput.onChange} autoComplete="email" />
+      </div>
       <EmailVerification
         email={email}
         purpose={EMAIL_PURPOSES.CHANGE_EMAIL}

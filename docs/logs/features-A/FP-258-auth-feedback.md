@@ -88,6 +88,8 @@
 - **비밀번호 보기:** Edge 기본 눈 모양은 값을 고치면 사라졌다.
   - 새 `PasswordField`([보기]/[숨기기], `aria-pressed`)와 `usePasswordReveal`(요청 직전 `hideAll`)을 만들었다.
   - `auth.css`에는 `.password-field`의 `::-ms-reveal` 숨김 한 줄만 넣었다.
+- **보기 유지(2차 보완) 🆕 11/26:** `hideAll()`을 요청 앞에서 성공 뒤(저장·화면 이동 직전)로 옮겼다. 실패하면 보기 상태가 그대로다(로그인·가입·재설정·마이페이지 3곳).
+- **FP-259 MYPAGE-06 🆕 11/26:** `PasswordChangeForm`에서 칸을 고치면 그 칸 오류와 폼 오류를 지운다. 새 비밀번호를 고치면 확인 칸 오류, 현재 비밀번호를 고치면 "지금 쓰는 비밀번호와 같습니다"도 지운다.
 
 ### 바뀐 파일
 | 파일 | 변경 내용 (1줄) |
@@ -128,6 +130,139 @@
   - 공통 `TextInput`에 `autoCapitalize`·`spellCheck` 속성 추가(프론트 공통 담당).
   - 관리자 업무 이메일 규칙을 일반 회원과 같게 둘지.
   - [보기] 버튼 모양·위치(UI 담당).
+
+## 3차 — 한글 입력 중 값 지워짐·선택 표시·비밀번호 눈 모양 (2026-11-26) 🆕 11/26
+- **관련 N-ID:** N-01-1, N-02-1
+
+### 원인
+- **값 지워짐**
+  - 한글 조합 중 `onChange`에서 걸러내기가 조합 글자를 빼고 값을 되돌렸다.
+  - 그러면 Windows 한글 IME가 들고 있던 조합 범위와 칸 값이 어긋나 써 둔 글자를 덮어썼다.
+  - 헤드리스 Edge(CDP)의 IME 흉내로는 지워지는 현상까지는 재현되지 않았다. 실제 IME에서만 생기는 것으로 본다.
+- **선택이 안 되는 것처럼 보임**
+  - 선택 자체는 된다. 드래그와 Shift+Home 모두 CDP로 범위가 잡히는 것을 확인했다.
+  - 공통 `layout.css`의 `::selection { background: var(--sel) }`(`#e8f1fe`)가 흰 입력 칸(`--inp` `#ffffff`) 위에서 거의 보이지 않는다.
+  - 가입·로그인·찾기·마이페이지 칸이 모두 같다. 공통 파일이라 고치지 않았다.
+
+### 무엇을 바꿨나
+- 새 `useImeSafeFilter`
+  - 조합 중(compositionstart~compositionend)에는 값을 그대로 두고, compositionend에서 한 번 거른 뒤 커서를 제자리에 놓는다.
+  - 공통 `TextInput`은 조합 이벤트를 넘기지 않아서 감싼 div가 받는다. `SplitEmailField`는 input에 직접 단다.
+  - 적용 칸
+    - 아이디: 로그인·가입·비밀번호 찾기
+    - 이메일 앞부분·직접 입력 도메인: 가입·아이디 찾기·비밀번호 찾기
+    - 마이페이지 이메일 변경
+    - 이름: 가입·아이디 찾기·비밀번호 찾기
+    - 닉네임: 가입·마이페이지
+  - 걸러내기 규칙은 2차 그대로다.
+- `PasswordField`
+  - 글자 버튼 대신 칸 안 오른쪽에 눈 모양 아이콘 버튼(인라인 SVG)을 둔다.
+  - `aria-pressed`는 그대로이고, `aria-label`은 상태에 따라 "비밀번호 보기"/"비밀번호 숨기기"로 바뀐다.
+  - 칸 안에 버튼을 두려고 공통 클래스로 직접 그린다(`TextInput`과 같은 `useId`·`aria-describedby`). 부르는 화면 6곳은 그대로다.
+  - 동작(값을 고쳐도 유지, 성공할 때만 가림)과 Edge 기본 눈 모양 숨김은 그대로다.
+
+### 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `frontend/src/features/auth/useImeSafeFilter.js` (새 파일) | 조합 중 거르지 않고 조합 끝에 한 번 거르기, 커서 유지 |
+| `frontend/src/features/auth/pages/LoginPage.jsx`·`SignupPage.jsx`·`FindIdPage.jsx`·`FindPasswordPage.jsx` | 아이디·이름·닉네임 칸에 적용(로그인·찾기는 칸을 클래스 없는 div로 감쌈) |
+| `frontend/src/features/auth/components/SplitEmailField.jsx`·`EmailChangeForm.jsx`·`NicknameChangeForm.jsx` | 이메일·닉네임 칸에 적용 |
+| `frontend/src/features/auth/components/PasswordField.jsx` | 칸 안 눈 모양 버튼 |
+| `frontend/src/features/auth/auth.css` | `.password-field__box`·`__toggle`, 입력 칸 오른쪽 여백(색은 토큰만) |
+| `docs/ai/features.md` | N-01-1 눈 모양, N-02-1 조합 처리 |
+
+### 확인
+- 확인함
+  - `npm run lint` 오류 0, `npm run build` 성공.
+  - mock 개발 서버 + 헤드리스 Edge(CDP)로 확인했다.
+    - 조합 중 값 유지, 조합 끝에 한글만 빠지고 커서가 제자리에 오는 것(로그인 아이디 가운데, 가입 아이디·이메일 앞부분, 이름은 한글 유지).
+    - 눈 버튼이 입력 칸 안에 있고 오류 문구가 떠도 칸 안에 머무는 것.
+    - 누르면 `type`·`aria-label`·`aria-pressed`가 바뀌는 것.
+- 확인 못 함
+  - 실제 Windows 한글 IME로 치는 것은 사람이 화면에서 본다.
+- 팀 확인 필요
+  - 입력 칸 선택 색: 공통 `::selection`(`--sel`)이 흰 칸에서 거의 안 보인다. 입력 칸 선택색을 진하게 하거나 `--sel` 조정이 필요하다(프론트 공통 담당).
+  - 눈 버튼 모양·크기(UI 담당).
+
+## 4차 — 눈 버튼 표시 조건·비밀번호 한글 막기·이름 자모 오류 (2026-11-26) 🆕 11/26
+- **관련 N-ID:** N-01-1, N-02-1, N-03-1, N-03-2
+
+### 무엇을 바꿨나
+- **눈 버튼:** `PasswordField`는 값이 있을 때만 눈 버튼과 오른쪽 여백(`password-field--filled`)을 둔다. 보기 상태는 부모가 들고 있어서, 값을 지웠다 다시 치면 직전 상태로 나타난다.
+- **비밀번호 한글 막기:** `validation.js`에 `filterPassword`를 추가했다.
+  - ASCII 출력 문자와 공백만 남긴다. 공백은 지금 규칙이 막지 않아 남긴다.
+  - `PasswordField` 안에서 `useImeSafeFilter`로 조합이 끝날 때·붙여넣을 때 거른다.
+- **이름 자모 오류:** `validateName`이 자모가 남은 이름에 "이름을 완성해 입력해 주세요."(`NAME_INCOMPLETE_MESSAGE`)를 돌려준다. 가입·mock도 같은 함수를 쓴다.
+  - `PhoneVerification`·`SplitEmailField`에 선택 속성 `beforeRequest`를 추가했다. 아이디·비밀번호 찾기에서는 [받기]·[확인]·[다음] 요청 전에 이름을 검사한다.
+  - 이름 칸을 벗어날 때(값이 있을 때)도 검사한다. 가입 화면은 원래부터 칸을 벗어날 때·[가입하기] 때 검사한다.
+- **이름 한글 2~5자: 보류(사용자 결정).** 이름 규칙(2~20자)·서버·시험·API 문서는 그대로다.
+
+### 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `frontend/src/features/auth/validation.js` | `filterPassword`, `NAME_INCOMPLETE_MESSAGE`, `validateName` 자모 문구 |
+| `frontend/src/features/auth/components/PasswordField.jsx` | 값이 있을 때만 눈 버튼, 비밀번호 걸러내기 |
+| `frontend/src/features/auth/auth.css` | 오른쪽 여백을 `.password-field--filled`일 때만 |
+| `frontend/src/features/auth/components/PhoneVerification.jsx`·`SplitEmailField.jsx` | 선택 속성 `beforeRequest` |
+| `frontend/src/features/auth/pages/FindIdPage.jsx`·`FindPasswordPage.jsx` | 요청 전·칸을 벗어날 때 이름 검사, 고치면 오류 지움 |
+| `docs/ai/features.md` | N-01-1·N-02-1·N-03-1·N-03-2 |
+
+### 확인
+- 확인함
+  - `npm run lint` 오류 0, `npm run build` 성공. 서버 파일은 바꾸지 않아 `mvnw test`는 생략했다.
+  - mock 개발 서버 + 헤드리스 Edge(CDP)로 확인했다.
+    - 빈 칸에는 눈 버튼이 없다.
+    - 값을 지웠다 다시 치면 보기 상태가 유지된다.
+    - 보기 상태에서 한글을 조합하면 확정 때 빠지고, 영문·숫자·기호는 남는다.
+    - "홍길ㄷ"은 아이디 찾기·비밀번호 찾기·가입에서 칸을 벗어날 때 오류가 뜨고, [인증번호 받기]를 눌러도 요청 없이 오류만 뜬다.
+- 확인 못 함
+  - 실제 Windows 한글 IME로 보기 상태 비밀번호를 치는 것.
+- 팀 확인 필요
+  - **이름 2~5자 보류 사유:** 6자 이상 이름이 있다.
+    - dummy_db 시드의 일반 회원 `합성회원000001` 형식(`tools/build_db.py`)과 관리자 `시연 관리자`.
+    - 프론트 mock의 `데모 급여소득자`·`데모 자영업자`·`데모 프리랜서`·`데모 직군 미선택`·`데모 관리자`(`common/mocks/mockUsers.js`)와 `데모 잠긴 계정`(`authMockData.js`).
+    - 서버 시험에는 없다.
+  - **시드·mock 이름이 지금 규칙(한글 2~20자, 공백·숫자 불가)에도 맞지 않는다.** 그래서 2차 이후 이 계정들은 아이디 찾기·비밀번호 찾기에서 이름 형식 400에 걸린다. 새로 가입한 계정만 쓸 수 있다.
+  - **관리자 계정 만들기 이름(`AdminAccountService`)은 50자 이하만 본다.** 회원 이름 규칙을 바꿔도 함께 바뀌지 않는다.
+  - **서버 비밀번호 규칙(`AccountRules.isValidPassword`):** 8~64자에 영문·숫자가 하나씩만 있으면 통과라 한글 등 ASCII 밖 문자를 받는다.
+    - Spring Security 6.2의 BCrypt는 72바이트 뒤를 조용히 버린다. 한글이 섞이면 64자 안에서도 잘릴 수 있다.
+    - 화면에서만 막았다. ASCII 밖 문자가 든 비밀번호를 이미 쓰는 계정이 있다면, 그 계정은 로그인 칸에서 그 글자를 칠 수 없다.
+  - **자모 문구 차이:** 서버 `nameError`는 자모가 남은 이름에도 `NAME_RULE_MESSAGE`를 돌려줘 화면 문구와 다르다.
+
+## 5차 — 비밀번호 보기 상태의 한글 자판 입력을 영문 키로 (2026-11-26) 🆕 11/26
+- **관련 N-ID:** N-01-1, N-02-1
+
+### 무엇을, 왜 바꿨나
+- 가린 비밀번호 칸(`type=password`)은 브라우저가 한글 IME를 꺼서, 한글 자판으로 쳐도 영문 키가 들어간다(ㅂ→q).
+- 보기 상태(`type=text`)는 4차에서 한글을 빼서, 같은 키를 쳐도 두 상태의 값이 달랐다.
+- `validation.js`에 `hangulToQwerty`(두벌식: 완성형 음절은 초·중·종성으로 나눠 키로, 낱자 자모·겹모음·겹받침도 표대로)를 추가했다.
+- `useImeSafeFilter`는 조합이 끝날 때만 쓰는 변환 함수(선택 인자 `finish`)를 받는다. 다른 칸은 넘기지 않아 동작이 같다.
+- `PasswordField`는 조합이 끝날 때 `filterPassword(hangulToQwerty(값))`를 쓰고, 커서를 늘어난 길이만큼 뒤로 둔다.
+  - 붙여넣기와 조합 없는 입력은 지금처럼 `filterPassword`만 거친다. 그래서 한글은 빠진다.
+  - 적용: 로그인, 가입 비밀번호·확인, 재설정 2칸, 마이페이지 3곳. 부르는 화면은 고치지 않았다.
+
+### 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `frontend/src/features/auth/validation.js` | `hangulToQwerty`와 두벌식 키 표 |
+| `frontend/src/features/auth/useImeSafeFilter.js` | 조합이 끝날 때만 쓰는 선택 인자 `finish` |
+| `frontend/src/features/auth/components/PasswordField.jsx` | 조합 끝에 영문 키로 바꾼 뒤 거르기 |
+| `docs/ai/features.md` | N-01-1·N-02-1 |
+
+### 확인
+- 확인함
+  - node로 `hangulToQwerty` 13건이 모두 기대값과 같았다.
+    - ㅂㅈㄷㄱ→qwer, 가나다→rkskek, 값→rkqt, ㅃ→Q, 뷁→qnpfr, 의→dml, abc1!→abc1!
+    - ㅘ→hk, ㄳ→rt, 힣→glg 등
+  - `npm run lint` 오류 0, `npm run build` 성공. 서버 파일은 바꾸지 않았다.
+  - mock 개발 서버 + 헤드리스 Edge(CDP)로 확인했다.
+    - 로그인 보기 상태에서 `ab` 가운데에 "가"를 조합하면 `arkb`가 되고 커서는 3이다.
+    - "뷁"을 조합하면 `qnpfr`가 붙는다.
+    - 조합 없이 넣은 "값"은 빠진다.
+    - 가입 비밀번호에서 "의"를 조합하면 `dml`이 된다.
+    - 이름 칸 한글은 그대로 남고, 아이디 칸 한글은 그대로 빠진다.
+- 확인 못 함
+  - 실제 Windows 한글 IME로 연달아 칠 때. 음절이 넘어가는 순간에 조합이 끝나고 바로 다음 조합이 시작된다.
 
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)

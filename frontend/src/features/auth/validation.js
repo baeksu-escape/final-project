@@ -44,6 +44,33 @@ export function normalizeLoginId(value) {
 // ===== FP-258 2차 칸별 걸러내기 — 입력·붙여넣기 모두 onChange에서 이 함수를 거친다. 판정(isValid…·validate…)은 따로 한다. =====
 // 한글 칸은 조합 중인 자모(ㄱ-ㅎ, ㅏ-ㅣ)를 남기므로 값이 바뀌지 않아 한글 조합이 끊기지 않는다.
 
+// FP-258 4차 비밀번호: ASCII 출력 문자(영문·숫자·키보드 기호)와 공백만 남긴다. 보기 상태(type=text)에서 켜진 한글 IME 입력·붙여넣기를 막는다.
+// 공백은 지금 비밀번호 규칙(PASSWORD_RULES, 서버 isValidPassword)이 막지 않으므로 남긴다.
+export function filterPassword(value) {
+  return String(value ?? '').replace(/[^\x20-\x7E]/g, '')
+}
+// FP-258 5차 두벌식 자판 기준으로 한글을 그 자리의 영문 키로 바꾼다(예: 가→rk, ㅂ→q). 가린 비밀번호 칸은 브라우저가 한글 IME를 꺼서
+// 같은 키가 영문으로 들어가므로, 보기 상태(type=text)에서 조합이 끝난 한글도 이 함수로 바꿔 두 상태의 값을 같게 한다. 나머지 글자는 그대로 둔다.
+const CHO_KEYS = ['r', 'R', 's', 'e', 'E', 'f', 'a', 'q', 'Q', 't', 'T', 'd', 'w', 'W', 'c', 'z', 'x', 'v', 'g']
+const JUNG_KEYS = ['k', 'o', 'i', 'O', 'j', 'p', 'u', 'P', 'h', 'hk', 'ho', 'hl', 'y', 'n', 'nj', 'np', 'nl', 'b', 'm', 'ml', 'l']
+const JONG_KEYS = ['', 'r', 'R', 'rt', 's', 'sw', 'sg', 'e', 'f', 'fr', 'fa', 'fq', 'ft', 'fx', 'fv', 'fg', 'a', 'q', 'qt', 't', 'T', 'd', 'w', 'c', 'z', 'x', 'v', 'g']
+// 낱자 자모 ㄱ(U+3131)~ㅣ(U+3163) 순서. 자음 30자(겹받침 포함) 뒤에 모음 21자(중성 순서와 같음)가 온다.
+const JAMO_KEYS = [
+  'r', 'R', 'rt', 's', 'sw', 'sg', 'e', 'E', 'f', 'fr', 'fa', 'fq', 'ft', 'fx', 'fv', 'fg',
+  'a', 'q', 'Q', 'qt', 't', 'T', 'd', 'w', 'W', 'c', 'z', 'x', 'v', 'g',
+  ...JUNG_KEYS,
+]
+export function hangulToQwerty(value) {
+  return Array.from(String(value ?? ''), (char) => {
+    const code = char.codePointAt(0)
+    if (code >= 0xac00 && code <= 0xd7a3) {
+      const index = code - 0xac00
+      return CHO_KEYS[Math.floor(index / 588)] + JUNG_KEYS[Math.floor(index / 28) % 21] + JONG_KEYS[index % 28]
+    }
+    if (code >= 0x3131 && code <= 0x3163) return JAMO_KEYS[code - 0x3131]
+    return char
+  }).join('')
+}
 // 가입 아이디: 소문자로 바꾸고 a-z0-9만, 20자.
 export function filterSignupLoginId(value) {
   return String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)
@@ -152,9 +179,12 @@ export function validateLoginId(value) {
 // 입력 칸은 filterName으로 한글(조합 중 자모 포함) 외를 지우고, 규칙에 맞지 않는 값(자모만 등)은 문구로 알린다.
 export const NAME_PATTERN = /^[가-힣]{2,20}$/
 export const NAME_RULE_MESSAGE = '이름은 한글 2~20자로 입력해 주세요. (숫자·영문·기호 불가)'
+// FP-258 4차 "홍길ㄷ"처럼 조합 중 자모가 남은 이름은 따로 알린다(서버 AccountRules.nameError는 같은 경우 NAME_RULE_MESSAGE).
+export const NAME_INCOMPLETE_MESSAGE = '이름을 완성해 입력해 주세요.'
 export function validateName(value) {
   const text = String(value ?? '')
   if (!text.trim()) return '이름을 입력해 주세요.'
+  if (/[ㄱ-ㅎㅏ-ㅣ]/.test(text)) return NAME_INCOMPLETE_MESSAGE
   if (!NAME_PATTERN.test(text)) return NAME_RULE_MESSAGE
   return ''
 }

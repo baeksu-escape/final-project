@@ -24,8 +24,9 @@ const IDLE_FLOW = { target: null, status: 'idle', message: '', codeOpen: false }
 //     error={errors.phone}
 //   />
 //   번호가 바뀌면 발송·코드·오류·안내를 모두 비운다(인증 상태는 부모의 verified 계산으로 풀린다).
+//   FP-258 4차 beforeRequest: [받기]·[확인] 요청 전에 부른다. false를 돌려주면 보내지 않는다(아이디·비밀번호 찾기의 이름 검사). 없으면 그대로 보낸다.
 //   문구는 한 번에 하나만 보인다: 완료 / (실패 > 부모 오류 > 발송 안내).
-export default function PhoneVerification({ middle, last, onChange, purpose, verified = false, onVerified, error }) {
+export default function PhoneVerification({ middle, last, onChange, purpose, verified = false, onVerified, error, beforeRequest }) {
   const id = useId()
   const middleRef = useRef(null)
   const lastRef = useRef(null)
@@ -58,6 +59,7 @@ export default function PhoneVerification({ middle, last, onChange, purpose, ver
   }
 
   const handleSend = async () => {
+    if (beforeRequest && !beforeRequest()) return
     setPending(true)
     try {
       const { expiresInSeconds } = await requestPhoneCode({ phone, purpose })
@@ -76,6 +78,7 @@ export default function PhoneVerification({ middle, last, onChange, purpose, ver
   }
 
   const handleVerify = async () => {
+    if (beforeRequest && !beforeRequest()) return
     if (!/^\d{6}$/.test(code)) {
       setFlow({ ...current, status: 'error', message: '6자리 인증번호를 입력해 주세요.' })
       return

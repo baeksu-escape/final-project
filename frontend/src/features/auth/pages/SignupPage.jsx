@@ -10,6 +10,7 @@ import PasswordRuleList from '../components/PasswordRuleList.jsx'
 import PhoneVerification from '../components/PhoneVerification.jsx'
 import SplitEmailField from '../components/SplitEmailField.jsx'
 import { resolveEmailDomain, splitEmail } from '../emailParts.js'
+import useImeSafeFilter from '../useImeSafeFilter.js'
 import usePasswordReveal from '../usePasswordReveal.js'
 import {
   NICKNAME_MAX,
@@ -93,6 +94,7 @@ export default function SignupPage() {
   const [completed, setCompleted] = useState(false)
   // FP-258 2차 비밀번호·확인 칸 [보기] 상태. 가입 요청 직전에 가린다.
   const { reveal, hideAll } = usePasswordReveal()
+  const bindFilter = useImeSafeFilter()
 
   const email = joinEmail(form.emailLocal, resolveEmailDomain(form.emailDomainChoice, form.emailCustomDomain))
   const phone = joinPhone(form.phoneMiddle, form.phoneLast)
@@ -135,7 +137,11 @@ export default function SignupPage() {
   }
   const update = (field) => (value) => patchForm({ [field]: value })
   // FP-258 2차 입력·붙여넣기를 칸별 걸러내기 함수(validation.js)에 통과시킨 뒤 넣는다.
-  const updateFiltered = (field, filter) => (value) => patchForm({ [field]: filter(value) })
+  // FP-258 3차 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(useImeSafeFilter). 공통 TextInput 대신 감싼 div가 조합 이벤트를 받는다.
+  const filteredInput = (field, filter) => bindFilter((value) => patchForm({ [field]: value }), filter)
+  const loginIdInput = filteredInput('loginId', filterSignupLoginId)
+  const nameInput = filteredInput('name', filterName)
+  const nicknameInput = filteredInput('nickname', filterNickname)
 
   // 칸을 감싼 요소. 안쪽 입력에서 포커스가 빠져나가면(blur는 감싼 요소까지 올라온다) 손댄 칸으로 표시한다.
   const fieldProps = (key) => ({ id: fieldWrapperId(key), onBlur: () => markTouched(key) })
@@ -166,7 +172,6 @@ export default function SignupPage() {
 
     const birthYear = Number(form.birthDate.slice(0, 4))
     setPending(true)
-    hideAll()
     try {
       await requestSignup({
         loginId: form.loginId,
@@ -182,6 +187,8 @@ export default function SignupPage() {
         phoneVerificationToken: phoneVerification.verificationToken,
         ...(socialSignup?.linkKey ? { socialLinkKey: socialSignup.linkKey } : {}),
       })
+      // FP-258 2차 가입이 끝나 완료 화면으로 바뀌기 직전에만 가린다. 실패하면 보기 상태를 그대로 둔다.
+      hideAll()
       setCompleted(true)
     } catch (error) {
       const code = error?.data?.code
@@ -228,22 +235,22 @@ export default function SignupPage() {
     <section className="auth-page signup-page">
       <h1 className="auth-page__title">회원가입</h1>
       <form className="auth-form signup-form" onSubmit={handleSubmit} noValidate>
-        <div {...fieldProps('loginId')}>
+        <div {...fieldProps('loginId')} {...loginIdInput.compositionProps}>
           <TextInput
             label="아이디"
             value={form.loginId}
-            onChange={updateFiltered('loginId', filterSignupLoginId)}
+            onChange={loginIdInput.onChange}
             error={errorOf('loginId')}
             placeholder="영문 소문자로 시작, 4~20자"
             autoComplete="username"
             maxLength={20}
           />
         </div>
-        <div {...fieldProps('name')}>
+        <div {...fieldProps('name')} {...nameInput.compositionProps}>
           <TextInput
             label="이름"
             value={form.name}
-            onChange={updateFiltered('name', filterName)}
+            onChange={nameInput.onChange}
             error={errorOf('name')}
             placeholder="한글 이름"
             autoComplete="name"
@@ -252,12 +259,12 @@ export default function SignupPage() {
         </div>
         {/* N-02-1 닉네임 — 한글·영문·숫자 2~7자(DDL 2~12자보다 좁게, 새 가입에만), 중복 불가. [중복 확인]은 형식이 맞을 때만 눌린다. 가입할 때 서버가 한 번 더 막는다. */}
         {/* auth-field: 칸 밖의 성공·오류 문구가 TextInput 안 오류와 같은 간격(5px)에 놓이게 묶는다. */}
-        <div {...fieldProps('nickname')} className="auth-field">
+        <div {...fieldProps('nickname')} {...nicknameInput.compositionProps} className="auth-field">
           <div className="signup-form__row">
             <TextInput
               label="닉네임"
               value={form.nickname}
-              onChange={updateFiltered('nickname', filterNickname)}
+              onChange={nicknameInput.onChange}
               placeholder={`2~${NICKNAME_MAX}자`}
               autoComplete="nickname"
               maxLength={NICKNAME_MAX}

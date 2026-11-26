@@ -219,6 +219,48 @@
   display: none;
 }
 
+/* FP-258 3차 눈 모양 버튼을 칸 안 오른쪽에 둔다. 상자가 입력 칸만 감싸서 아래 오류 문구가 떠도 버튼은 칸 안에 머문다. */
+.password-field__box {
+  position: relative;
+}
+
+/* FP-258 4차 눈 버튼은 값이 있을 때만 보이므로 오른쪽 여백도 그때만 둔다. */
+.password-field--filled .text-input__control {
+  padding-right: 48px;
+}
+
+.password-field__toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--mut);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.password-field__toggle:hover {
+  color: var(--fg);
+}
+
+.password-field__toggle:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
+
+.password-field__toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* 비밀번호 규칙 — 지킨 규칙은 초록 */
 .password-rules {
   display: flex;

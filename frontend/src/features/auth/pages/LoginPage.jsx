@@ -13,6 +13,7 @@ import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
 import PasswordField from '../components/PasswordField.jsx'
 import SocialLoginButtons from '../components/SocialLoginButtons.jsx'
+import useImeSafeFilter from '../useImeSafeFilter.js'
 import usePasswordReveal from '../usePasswordReveal.js'
 import { filterLoginId } from '../validation.js'
 import '../auth.css'
@@ -50,6 +51,8 @@ export default function LoginPage() {
   const [passwordSetupToken, setPasswordSetupToken] = useState(null)
   // FP-258 2차 비밀번호 [보기] 상태. 로그인 요청 직전에 가린다.
   const { reveal, hideAll } = usePasswordReveal()
+  // FP-258 3차 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(useImeSafeFilter). 공통 TextInput 대신 감싼 div가 조합 이벤트를 받는다.
+  const loginIdInput = useImeSafeFilter()(setLoginId, filterLoginId)
 
   // 맡아 둔 알림은 한 번만 쓴다. 꺼낸 뒤 바로 비워서 다음 로그아웃 때 다시 뜨지 않게 한다.
   useEffect(() => {
@@ -66,9 +69,10 @@ export default function LoginPage() {
     if (Object.keys(errors).length > 0) return
 
     setPending(true)
-    hideAll()
     try {
       const result = await requestLogin(loginId.trim(), password)
+      // FP-258 2차 성공해 다음 화면(관리자 2단계 인증·첫 화면)으로 넘어가기 직전에만 가린다. 실패하면 보기 상태를 그대로 둔다.
+      hideAll()
       if (result.twoFactorRequired) {
         setChallenge({ challengeToken: result.challengeToken, maskedEmail: result.maskedEmail })
         setPending(false)
@@ -149,13 +153,15 @@ export default function LoginPage() {
         </p>
       )}
       <form className="auth-form login-form" onSubmit={handleSubmit} noValidate>
-        <TextInput
-          label="아이디"
-          value={loginId}
-          onChange={(value) => setLoginId(filterLoginId(value))}
-          error={fieldErrors.loginId}
-          autoComplete="username"
-        />
+        <div {...loginIdInput.compositionProps}>
+          <TextInput
+            label="아이디"
+            value={loginId}
+            onChange={loginIdInput.onChange}
+            error={fieldErrors.loginId}
+            autoComplete="username"
+          />
+        </div>
         <PasswordField
           label="비밀번호"
           value={password}

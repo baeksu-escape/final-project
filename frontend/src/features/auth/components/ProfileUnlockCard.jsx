@@ -20,9 +20,10 @@ export default function ProfileUnlockCard({ onUnlock }) {
     }
     setPending(true)
     setError('')
-    hideAll()
     try {
       await onUnlock(password)
+      // FP-258 2차 확인에 성공해 내 정보가 열리기 직전에만 가린다. 실패하면 보기 상태를 그대로 둔다.
+      hideAll()
     } catch (unlockError) {
       setError(unlockError.message)
       setPending(false)

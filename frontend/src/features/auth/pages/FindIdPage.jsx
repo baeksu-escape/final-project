@@ -8,6 +8,7 @@ import AuthLinks from '../components/AuthLinks.jsx'
 import PhoneVerification from '../components/PhoneVerification.jsx'
 import SplitEmailField from '../components/SplitEmailField.jsx'
 import { resolveEmailDomain } from '../emailParts.js'
+import useImeSafeFilter from '../useImeSafeFilter.js'
 import { filterName, joinEmail, joinPhone, normalizePhone, validateName } from '../validation.js'
 import '../auth.css'
 
@@ -30,6 +31,22 @@ export default function FindIdPage() {
   const [formError, setFormError] = useState('')
   const [loginId, setLoginId] = useState(null)
   const [pending, setPending] = useState(false)
+  // FP-258 3차 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(useImeSafeFilter). 공통 TextInput 대신 감싼 div가 조합 이벤트를 받는다.
+  const nameInput = useImeSafeFilter()((value) => {
+    setName(value)
+    setFieldErrors((prev) => (prev.name ? { ...prev, name: undefined } : prev))
+  }, filterName)
+  // FP-258 4차 다음 단계 요청([받기]·[확인]·[찾기]·[다음]) 전과 칸을 벗어날 때 이름을 가입과 같은 규칙(validateName)으로 본다.
+  // "홍길ㄷ"처럼 자모가 남았거나 형식이 틀리면 이름 칸 아래에 오류를 보여 주고 요청을 보내지 않는다. 고치면 오류를 지운다.
+  const checkName = (value = name) => {
+    const nameError = validateName(value)
+    setFieldErrors((prev) => ({ ...prev, name: nameError || undefined }))
+    return nameError === ''
+  }
+  // 칸을 벗어날 때는 친 값이 있을 때만 알린다(빈 칸은 버튼을 누를 때 알린다).
+  const handleNameBlur = (event) => {
+    if (event.target.value) checkName(event.target.value)
+  }
 
   const phone = joinPhone(phoneParts.middle, phoneParts.last)
   const email = joinEmail(emailParts.emailLocal, resolveEmailDomain(emailParts.emailDomainChoice, emailParts.emailCustomDomain))
@@ -81,14 +98,16 @@ export default function FindIdPage() {
       <h1 className="auth-page__title">아이디 찾기</h1>
       <form className="auth-form find-id-form" onSubmit={handleSubmit} noValidate>
         <SegmentedControl label="아이디 찾기 방법" options={METHOD_OPTIONS} value={method} onChange={changeMethod} />
-        <TextInput
-          label="이름"
-          value={name}
-          onChange={(value) => setName(filterName(value))}
-          error={fieldErrors.name}
-          autoComplete="name"
-          hint="가입할 때 입력한 이름"
-        />
+        <div {...nameInput.compositionProps} onBlur={handleNameBlur}>
+          <TextInput
+            label="이름"
+            value={name}
+            onChange={nameInput.onChange}
+            error={fieldErrors.name}
+            autoComplete="name"
+            hint="가입할 때 입력한 이름"
+          />
+        </div>
         {method === FIND_ID_METHODS.PHONE ? (
           <PhoneVerification
             middle={phoneParts.middle}
@@ -96,6 +115,7 @@ export default function FindIdPage() {
             onChange={setPhoneParts}
             purpose={PHONE_PURPOSES.FIND_ID}
             verified={verified}
+            beforeRequest={() => checkName()}
             onVerified={({ verificationToken }) => setVerification({ method, target, verificationToken })}
           />
         ) : (
@@ -106,6 +126,7 @@ export default function FindIdPage() {
             onChange={(patch) => setEmailParts((prev) => ({ ...prev, ...patch }))}
             purpose={EMAIL_PURPOSES.FIND_ID}
             verified={verified}
+            beforeRequest={() => checkName()}
             onVerified={({ verificationToken }) => setVerification({ method, target, verificationToken })}
           />
         )}
