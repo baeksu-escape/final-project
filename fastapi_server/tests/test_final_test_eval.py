@@ -388,23 +388,24 @@ class EvaluationSmokeTests(unittest.TestCase):
         self.assertIn("CUT-0.3", text)
 
 
-C34_ROW = next(line for line in DEFINITION.splitlines() if line.startswith("| C34 |"))
-C35_ROW = next(line for line in DEFINITION.splitlines() if line.startswith("| C35 |"))
+C37_ROW = next(line for line in DEFINITION.splitlines() if line.startswith("| C37 |"))
+C38_ROW = next(line for line in DEFINITION.splitlines() if line.startswith("| C38 |"))
 
 
 class Plan03CriteriaTests(unittest.TestCase):
-    def test_ranges_match_c35_text_and_reference_values_match_c34(self):
-        for pair, (reference, low, high) in fte.C35_CRITERIA.items():
+    def test_ranges_match_c38_text_and_reference_values_match_c37(self):
+        for pair, (reference, low, high) in fte.C38_CRITERIA.items():
             with self.subTest(pair=pair):
-                self.assertIn(f"{reference:.4f}이면 {low:.4f}~{high:.4f}", C35_ROW)
-                self.assertIn(f"{reference:.4f}", C34_ROW)
+                self.assertIn(f"{reference:.4f}이면 {low:.4f}~{high:.4f}", C38_ROW)
+                self.assertIn(f"{reference:.4f}", C37_ROW)
                 self.assertAlmostEqual(high - reference, 0.02)
                 self.assertAlmostEqual(reference - low, 0.02)
 
     def test_plan_settings(self):
         self.assertEqual(fte.PLAN_03.version, "LGBM-BASE-0.3")
         self.assertEqual(fte.PLAN_03.diff_limit, 0.02)
-        self.assertIn("−0.02에서 +0.02", C35_ROW)
+        self.assertIn("−0.02에서 +0.02", C38_ROW)
+        self.assertEqual((fte.PLAN_03.criteria_source, fte.PLAN_03.hash_row, fte.PLAN_02.hash_row), ("C38", "C37", None))
         self.assertEqual(fte.PLAN_03.monotone, config.MONOTONE_CONSTRAINTS_V03)
         self.assertEqual(fte.PLAN_02.monotone, config.MONOTONE_CONSTRAINTS)
         self.assertEqual(fte.PLAN_02.criteria, fte.C26_CRITERIA)
@@ -414,12 +415,12 @@ class Plan03CriteriaTests(unittest.TestCase):
         for name in (fte.PLAN_03.record_name, f"{fte.PLAN_03.stem}.json", f"{fte.PLAN_03.stem}.md"):
             self.assertIn(f"docs/spec/{name}", fte.RUN_OUTPUT_PATHS)
 
-    def test_cut_0_4_candidate_matches_c34_and_covers_all_scores(self):
-        self.assertIn("CAUTION ≤645, GOOD ≥711", C34_ROW)
+    def test_cut_0_4_candidate_matches_c37_and_covers_all_scores(self):
+        self.assertIn("CAUTION ≤644, GOOD ≥712", C37_ROW)
         bands = fte.CUT_0_4_BANDS
-        self.assertEqual((bands[0]["minScore"], bands[0]["maxScore"], bands[2]["minScore"], bands[2]["maxScore"]), (0, 645, 711, 1000))
+        self.assertEqual((bands[0]["minScore"], bands[0]["maxScore"], bands[2]["minScore"], bands[2]["maxScore"]), (0, 644, 712, 1000))
         self.assertTrue(all(a["maxScore"] + 1 == b["minScore"] for a, b in zip(bands, bands[1:])))
-        ratio = fte.grade_ratio([0, 645, 646, 710, 711, 1000], bands)
+        ratio = fte.grade_ratio([0, 644, 645, 711, 712, 1000], bands)
         self.assertEqual([ratio[code]["count"] for code in ("CAUTION", "STANDARD", "GOOD")], [2, 2, 2])
 
     def test_judgement_uses_the_plan(self):
@@ -431,14 +432,14 @@ class Plan03CriteriaTests(unittest.TestCase):
         self.assertEqual(fte.judge_diff("delinq", 0.021, fte.PLAN_03), "대안 높음(+0.02 초과)")
 
     def test_reference_check(self):
-        group = {"five_seed_auc": {fte.pair_key(pair): {"mean": values[0]} for pair, values in fte.C35_CRITERIA.items()}}
+        group = {"five_seed_auc": {fte.pair_key(pair): {"mean": values[0]} for pair, values in fte.C38_CRITERIA.items()}}
         self.assertEqual(set(fte.reference_check(group, fte.PLAN_03).values()), {"같음"})
         group["five_seed_auc"]["legacy_delinq"] = {"mean": 0.6700}
         self.assertEqual(fte.reference_check(group, fte.PLAN_03)["legacy_delinq"], "다름(0.67)")
 
 
 class VerifyRecordedTests(unittest.TestCase):
-    """모델 0.3 파일을 정의서 C34에 적은 해시와 비교하는 검사. 가짜 파일·가짜 정의서로 확인한다."""
+    """모델 0.3 파일을 정의서 C37에 적은 해시와 비교하는 검사. 가짜 파일·가짜 정의서로 확인한다."""
 
     def build(self, folder: Path, version: str = "LGBM-BASE-0.3", wrong_file: bool = False, wrong_table: bool = False, wrong_meta_table: bool = False):
         table = folder / "table.csv"
@@ -452,7 +453,7 @@ class VerifyRecordedTests(unittest.TestCase):
             digest = hashlib.sha256(body).hexdigest()
             parts.append(f"`{name}` `{'f' * 64 if wrong_file and name == 'legacy.joblib' else digest}`")
         definition = folder / "definition.md"
-        definition.write_text(f"| C34 | 표 SHA `{'0' * 8 if wrong_table else table_sha[:8]}` " + ", ".join(parts) + " |\n", encoding="utf-8")
+        definition.write_text(f"| C37 | 표 SHA `{'0' * 8 if wrong_table else table_sha[:8]}` " + ", ".join(parts) + " |\n", encoding="utf-8")
         return table, definition
 
     def test_matching_files_pass(self):
@@ -469,9 +470,9 @@ class VerifyRecordedTests(unittest.TestCase):
                     fte.verify_recorded(Path(folder), table, fte.PLAN_03, definition)
 
     def test_real_definition_has_four_hashes_and_table_sha(self):
-        recorded = {match["file"] for match in fte.RECORDED_HASH.finditer(C34_ROW)}
+        recorded = {match["file"] for match in fte.RECORDED_HASH.finditer(C37_ROW)}
         self.assertEqual(recorded, set(fte.SHIPPED_FILES))
-        self.assertIsNotNone(fte.RECORDED_TABLE.search(C34_ROW))
+        self.assertIsNotNone(fte.RECORDED_TABLE.search(C37_ROW))
 
 
 class Plan03MainTests(unittest.TestCase):
@@ -498,7 +499,7 @@ class Plan03MainTests(unittest.TestCase):
         output = io.StringIO()
         with mock.patch.object(sys, "argv", argv), contextlib.redirect_stdout(output):
             fte.main()
-        self.assertIn("C35", output.getvalue())
+        self.assertIn("C38", output.getvalue())
         self.assertIn("읽지 않고 끝낸다", output.getvalue())
 
     def test_report_names_the_plan(self):
@@ -510,7 +511,7 @@ class Plan03MainTests(unittest.TestCase):
                   "thinfile": fte.thinfile_report(frame, models, shipped, fte.PLAN_03),
                   "reproduction_on_valid": {"legacy_delinq": "같음", "alt_nonfin": "같음"}}
         text = fte.render_markdown(result, fte.PLAN_03)
-        for expected in ("LGBM-BASE-0.3", "C35", "CUT-0.4 후보", "0~645 / 646~710 / 711~1000", "이전에 본 고객"):
+        for expected in ("LGBM-BASE-0.3", "C38", "CUT-0.4 후보", "0~644 / 645~711 / 712~1000", "이전에 본 고객"):
             self.assertIn(expected, text)
         self.assertNotIn("C26", text)
 

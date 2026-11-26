@@ -1,6 +1,6 @@
-# FP-144 N-12 최종 성능 지표 — TEST 평가를 한 번만 실행하고, 사전 기준(정의서 10장, 모델 0.2는 C26·0.3은 C35)과 비교해 결과를 있는 그대로 기록한다.
+# FP-144 N-12 최종 성능 지표 — TEST 평가를 한 번만 실행하고, 사전 기준(정의서 10장, 모델 0.2는 C26·0.3은 C38)과 비교해 결과를 있는 그대로 기록한다.
 # 평가 대상: 서버 모델 파일(legacy.joblib·alternative.joblib)과 같은 설정의 비교용 실험 모델(단조 제약, 시드 5개). 모델 버전은 --version으로 고른다.
-# 규칙(C26·C35): 버전마다 TEST는 한 번만 본다. 범위를 벗어나도 모델은 고치지 않고 그대로 보고한다. 결과를 본 뒤에 모델·지표·기준·등급 경계를 바꾸지 않는다.
+# 규칙(C26·C38): 버전마다 TEST는 한 번만 본다. 범위를 벗어나도 모델은 고치지 않고 그대로 보고한다. 결과를 본 뒤에 모델·지표·기준·등급 경계를 바꾸지 않는다.
 # 학습·내보내기 스크립트(train.py 등)는 TEST를 읽자마자 버린다. TEST 행은 이 파일의 load_eval_split만 읽으며, --confirm-test-once를 줄 때만 읽는다.
 # 실행(fastapi_server 폴더에서):
 #   리허설(VALID, 기본): python -m training.final_test_eval        # 알려진 VALID 값과 맞는지 먼저 본다. 파일은 만들지 않는다(--out-dir를 주면 저장)
@@ -39,7 +39,7 @@ REGISTER_SQL_PATH = REPO_ROOT / "docs" / "spec" / "sql" / "register_model_lgbm_b
 # 작업 트리 검사에서 뺄 파일: TEST 실행이 만드는 기록·결과 파일(첫 실행 뒤 재실행을 막지 않게)
 RUN_OUTPUT_PATHS = ["docs/spec/final_test_eval_run.json", "docs/spec/final_test_eval_result.json", "docs/spec/final_test_eval_result.md",
                     "docs/spec/final_test_eval_run_v03.json", "docs/spec/final_test_eval_result_v03.json", "docs/spec/final_test_eval_result_v03.md"]
-# 모델 0.3은 아직 DB에 등록하지 않아, 모델 파일 해시를 TEST 전에 적어 둔 정의서 C34와 비교한다.
+# 모델 0.3은 아직 DB에 등록하지 않아, 모델 파일 해시를 TEST 전에 적어 둔 정의서의 VALID 결과 행(C37)과 비교한다.
 DEFINITION_PATH = REPO_ROOT / "docs" / "spec" / "feature_definition.md"
 RECORDED_HASH = re.compile(r"`(?P<file>(?:legacy|alternative)\.(?:joblib|meta\.json))` `(?P<sha>[0-9a-f]{64})`")
 RECORDED_TABLE = re.compile(r"표 SHA `(?P<sha>[0-9a-f]{8})`")
@@ -63,18 +63,18 @@ PAIR_NAMES = {("legacy", "delinq"): "기존 모델·연체 라벨", ("alt", "non
               ("alt", "delinq"): "대안 모델·연체 라벨", ("legacy", "nonfin"): "기존 모델·비금융 효과 라벨"}
 SYNTHETIC_NOTICE = "합성 데이터와 합성 라벨 기준이며, 실제 신용평가·대출 심사 결과나 실제 개선을 뜻하지 않는다."
 
-# 정의서 10장 C35 사전 기준(모델 0.3, TEST를 보기 전에 기록). 범위는 VALID 5개 시드 평균 ±0.02이며 TEST 결과를 본 뒤에 바꾸지 않는다.
-C35_CRITERIA = {
+# 정의서 10장 C38 사전 기준(모델 0.3 제약 19개, TEST를 보기 전에 기록). 범위는 VALID 5개 시드 평균 ±0.02이며 TEST 결과를 본 뒤에 바꾸지 않는다.
+C38_CRITERIA = {
     ("legacy", "delinq"): (0.6749, 0.6549, 0.6949),
-    ("alt", "nonfin"): (0.7386, 0.7186, 0.7586),
-    ("alt", "delinq"): (0.6739, 0.6539, 0.6939),
+    ("alt", "nonfin"): (0.7383, 0.7183, 0.7583),
+    ("alt", "delinq"): (0.6750, 0.6550, 0.6950),
     ("legacy", "nonfin"): (0.7193, 0.6993, 0.7393),
 }
-# 모델 0.3의 등급 경계 후보 CUT-0.4(C34, VALID 대안 점수 25·75%). 서비스 구간(feature_catalog)은 아직 CUT-0.3이다.
+# 모델 0.3의 등급 경계 후보 CUT-0.4(C37, VALID 대안 점수 25·75%). 서비스 구간(feature_catalog)은 아직 CUT-0.3이다.
 CUT_0_4_BANDS = [
-    {"gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 645},
-    {"gradeBandCode": "STANDARD", "minScore": 646, "maxScore": 710},
-    {"gradeBandCode": "GOOD", "minScore": 711, "maxScore": 1000},
+    {"gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 644},
+    {"gradeBandCode": "STANDARD", "minScore": 645, "maxScore": 711},
+    {"gradeBandCode": "GOOD", "minScore": 712, "maxScore": 1000},
 ]
 
 
@@ -92,14 +92,15 @@ class Plan:
     record_name: str | None      # None이면 RUN_RECORD_PATH(0.2)를 쓰고 공용 등록 SQL로 해시를 확인한다
     data_dir: Path
     model_dir: Path
+    hash_row: str | None = None  # 모델 파일·표 해시를 적어 둔 정의서 행(0.2는 공용 등록 SQL을 써서 None)
     notes: tuple = ()
 
 
 PLAN_02 = Plan(EXPECTED_MODEL_VERSION, "C26", C26_CRITERIA, DELINQ_DIFF_LIMIT, config.MONOTONE_CONSTRAINTS, "CUT-0.3", GRADE_BANDS,
                RESULT_STEM, None, config.DEFAULT_DATA_DIR, config.DEFAULT_OUT_DIR)
-PLAN_03 = Plan("LGBM-BASE-0.3", "C35", C35_CRITERIA, 0.02, config.MONOTONE_CONSTRAINTS_V03, "CUT-0.4 후보", CUT_0_4_BANDS,
+PLAN_03 = Plan("LGBM-BASE-0.3", "C38", C38_CRITERIA, 0.02, config.MONOTONE_CONSTRAINTS_V03, "CUT-0.4 후보", CUT_0_4_BANDS,
                f"{RESULT_STEM}_v03", "final_test_eval_run_v03.json", config.FASTAPI_ROOT / "data" / "training_v3.7.0",
-               config.FASTAPI_ROOT / "data" / "model_v03",
+               config.FASTAPI_ROOT / "data" / "model_v03", "C37",
                ("씬파일 TEST는 이전 데이터 버전과 같은 분할이라 이전에 본 고객이다(판정하지 않는 참고 값).",
                 "0.2의 TEST를 본 뒤 데이터와 라벨을 바꿔 만든 모델이다. 0.2 수치와 직접 비교하지 않는다."))
 PLANS = {"0.2": PLAN_02, "0.3": PLAN_03}
@@ -205,12 +206,12 @@ def verify_shipped(model_dir: Path, registry_path: Path = REGISTER_SQL_PATH) -> 
 
 
 def verify_recorded(model_dir: Path, table_path: Path, plan: Plan = PLAN_03, definition_path: Path = DEFINITION_PATH) -> dict:
-    """모델 0.3 파일 4개의 해시가 정의서 C34에 적은 값과 같고, meta.json의 버전·학습 표 해시가 평가할 표와 맞는지 확인한다. 다르면 TEST를 열기 전에 멈춘다."""
-    row = next((line for line in definition_path.read_text(encoding="utf-8").splitlines() if line.startswith("| C34 |")), "")
+    """모델 0.3 파일 4개의 해시가 정의서의 해시 행(plan.hash_row)에 적은 값과 같고, meta.json의 버전·학습 표 해시가 평가할 표와 맞는지 확인한다. 다르면 TEST를 열기 전에 멈춘다."""
+    row = next((line for line in definition_path.read_text(encoding="utf-8").splitlines() if line.startswith(f"| {plan.hash_row} |")), "")
     recorded = {match["file"]: match["sha"] for match in RECORDED_HASH.finditer(row)}
     table = RECORDED_TABLE.search(row)
     if set(recorded) != set(SHIPPED_FILES) or not table:
-        sys.exit(f"정의서 C34에서 모델 파일 해시 4개와 표 해시를 읽지 못했다(읽은 파일: {sorted(recorded)}): {definition_path}")
+        sys.exit(f"정의서 {plan.hash_row}에서 모델 파일 해시 4개와 표 해시를 읽지 못했다(읽은 파일: {sorted(recorded)}): {definition_path}")
     hashes = {}
     for name in SHIPPED_FILES:
         path = model_dir / name
@@ -218,10 +219,10 @@ def verify_recorded(model_dir: Path, table_path: Path, plan: Plan = PLAN_03, def
             sys.exit(f"모델 파일이 없다: {path}")
         hashes[name] = sha256_of(path)
         if hashes[name] != recorded[name]:
-            sys.exit(f"{name}의 해시가 정의서 C34에 적은 값과 다르다. C34의 모델 파일인지 확인하기 전에는 평가하지 않는다")
+            sys.exit(f"{name}의 해시가 정의서 {plan.hash_row}에 적은 값과 다르다. 그 행의 모델 파일인지 확인하기 전에는 평가하지 않는다")
     table_sha = sha256_of(table_path)
     if not table_sha.startswith(table["sha"]):
-        sys.exit(f"학습 표 해시({table_sha[:8]})가 정의서 C34의 값({table['sha']})과 다르다. 데이터 버전을 확인하기 전에는 평가하지 않는다")
+        sys.exit(f"학습 표 해시({table_sha[:8]})가 정의서 {plan.hash_row}의 값({table['sha']})과 다르다. 데이터 버전을 확인하기 전에는 평가하지 않는다")
     for name in ("legacy.meta.json", "alternative.meta.json"):
         meta = json.loads((model_dir / name).read_text(encoding="utf-8"))
         if meta.get("model_version") != plan.version or meta.get("data", {}).get("table_sha256") != table_sha:
@@ -418,7 +419,7 @@ def render_markdown(result: dict, plan: Plan = PLAN_02) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="FP-144 TEST 평가(정의서 C26·C35 사전 기준). 기본은 VALID 리허설이고, TEST는 --confirm-test-once를 줄 때 한 번만 읽는다")
+    parser = argparse.ArgumentParser(description="FP-144 TEST 평가(정의서 C26·C38 사전 기준). 기본은 VALID 리허설이고, TEST는 --confirm-test-once를 줄 때 한 번만 읽는다")
     parser.add_argument("--split", choices=["VALID", TEST_SPLIT], default="VALID", help="평가할 분할(기본 VALID = 리허설)")
     parser.add_argument("--confirm-test-once", action="store_true", help="TEST를 한 번만 읽겠다는 확인(TEST에만 필요)")
     parser.add_argument("--rerun-reason", default=None, help="TEST 결과가 이미 있을 때, 평가 코드 오류를 고쳐 같은 모델·코드로 다시 돌리는 이유")

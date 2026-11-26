@@ -9,14 +9,19 @@ from tests.test_training_options import DataDirCase, make_table
 
 
 class ConfigTests(unittest.TestCase):
-    def test_v03_adds_seven_increasing_features_and_keeps_v02(self):
+    def test_v03_adds_c33_and_c36_features_and_keeps_v02(self):
         added = set(config.MONOTONE_CONSTRAINTS_V03) - set(config.MONOTONE_CONSTRAINTS)
-        self.assertEqual(added, {"debt_balance_krw", "debt_service_current_krw", "L00000001", "L22000900", "LA0099212", "CF1231605", "zero_income_months_svc_12m"})
-        self.assertTrue(all(config.MONOTONE_CONSTRAINTS_V03[name] == 1 for name in added))
+        c33 = {"debt_balance_krw", "debt_service_current_krw", "L00000001", "L22000900", "LA0099212", "CF1231605", "zero_income_months_svc_12m"}
+        c36 = {"telecom_late_months": 1, "telecom_on_time_streak": -1, "utility_late_months": 1, "dp_payment_count_12m": -1}
+        self.assertEqual(added, c33 | set(c36))
+        self.assertTrue(all(config.MONOTONE_CONSTRAINTS_V03[name] == 1 for name in c33))
+        for name, sign in c36.items():
+            self.assertEqual(config.MONOTONE_CONSTRAINTS_V03[name], sign, name)
+        self.assertTrue(set(c36) <= set(config.ALTERNATIVE_EXTRA_FEATURES))    # 기존 모델에는 영향이 없다
         for name, sign in config.MONOTONE_CONSTRAINTS.items():
             self.assertEqual(config.MONOTONE_CONSTRAINTS_V03[name], sign, name)
-        self.assertEqual(len(config.MONOTONE_CONSTRAINTS), 8)
-        self.assertTrue(set(config.MONOTONE_CONSTRAINTS_V03) <= set(config.LEGACY_FEATURES))
+        self.assertEqual((len(config.MONOTONE_CONSTRAINTS), len(config.MONOTONE_CONSTRAINTS_V03)), (8, 19))
+        self.assertTrue((set(config.MONOTONE_CONSTRAINTS_V03) - set(c36)) <= set(config.LEGACY_FEATURES))
 
 
 class CaseTests(unittest.TestCase):

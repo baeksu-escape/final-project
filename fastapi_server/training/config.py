@@ -94,8 +94,9 @@ MONOTONE_CONSTRAINTS = {
     "expense_avg_month_krw": 1,
 }
 
-# 모델 0.3의 단조 제약(정의서 C33, 데이터 v3.7.0). 0.2의 8개에, 새 연체 라벨에 효과를 넣은 방향(모두 +1) 7개를 더한다.
-# --monotone-set v03 옵션으로만 켠다. 0.2를 다시 만들 수 있게 위 목록은 바꾸지 않는다.
+# 모델 0.3의 단조 제약(정의서 C33·C36, 데이터 v3.7.0). 0.2의 8개에, 새 연체 라벨에 효과를 넣은 방향(모두 +1) 7개를 더한다(C33).
+# C36(11/26)에서 시뮬레이터가 상식과 반대로 움직이지 않게 대안 모델에만 있는 4개(아래 마지막 4줄)를 더해 19개가 됐다.
+# 간편결제 건수는 라벨에 방향을 설계하지 않은 정책 결정이다. --monotone-set v03 옵션으로만 켠다. 0.2를 다시 만들 수 있게 위 목록은 바꾸지 않는다.
 MONOTONE_CONSTRAINTS_V03 = {
     **MONOTONE_CONSTRAINTS,
     "debt_balance_krw": 1,
@@ -105,5 +106,9 @@ MONOTONE_CONSTRAINTS_V03 = {
     "LA0099212": 1,
     "CF1231605": 1,
     "zero_income_months_svc_12m": 1,
+    "telecom_late_months": 1,
+    "telecom_on_time_streak": -1,
+    "utility_late_months": 1,
+    "dp_payment_count_12m": -1,
 }
 MONOTONE_SETS = {"v02": MONOTONE_CONSTRAINTS, "v03": MONOTONE_CONSTRAINTS_V03}
