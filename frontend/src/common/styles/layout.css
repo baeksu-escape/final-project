@@ -339,6 +339,17 @@ p {
   font-weight: 800;
 }
 
+/* FP-307 큰 분류가 6개가 되어 961~1060px에서 로고·메뉴·알림이 겹치지 않게 메뉴 간격을 줄인다(11/27 범영 확인) */
+@media (min-width: 961px) and (max-width: 1060px) {
+  .mega__bar {
+    gap: 4px;
+  }
+
+  .mega__link {
+    padding-inline: 12px;
+  }
+}
+
 @media (max-width: 960px) {
   .app-header__inner,
   .public-bar__inner {

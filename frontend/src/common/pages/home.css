@@ -170,11 +170,11 @@ a.dash-card:hover {
   font-size: 14px;
 }
 
-/* 분류 바로가기 — 큰 글자 타일 */
+/* 분류 바로가기 — 큰 글자 타일. FP-307 분류가 5개가 되어 한 줄 5칸에 맞게 타일을 줄였다(11/27) */
 .dash-groups {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
   margin-top: 16px;
 }
 
@@ -183,10 +183,10 @@ a.dash-card:hover {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-height: 230px;
-  padding: 28px;
-  border-radius: 28px;
+  gap: 8px;
+  min-height: 180px;
+  padding: 22px;
+  border-radius: 22px;
   background: color-mix(in srgb, var(--tone) 9%, var(--panel));
   color: var(--fg);
   text-decoration: none;
@@ -200,6 +200,7 @@ a.dash-card:hover {
 
 .dash-group--finance { --tone: var(--mint); }
 .dash-group--loans { --tone: var(--c-violet); }
+.dash-group--market { --tone: var(--c-pink); }
 .dash-group--lounge { --tone: var(--c-orange); }
 
 .dash-group__label {
@@ -209,7 +210,7 @@ a.dash-card:hover {
 }
 
 .dash-group b {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 800;
   line-height: 1.4;
   letter-spacing: -0.03em;
@@ -223,10 +224,10 @@ a.dash-card:hover {
 
 .dash-group__arrow {
   position: absolute;
-  top: 26px;
-  right: 28px;
+  top: 20px;
+  right: 22px;
   color: var(--tone);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   transition: transform 0.2s;
 }
