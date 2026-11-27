@@ -73,15 +73,16 @@ export const NAV_GROUPS = Object.freeze([
   },
   {
     key: 'finance', label: '재무 진단', path: PATHS.FINANCE,
-    description: '빚·현금흐름·위기 상황·상권까지 내 살림 점검',
+    description: '빚·현금흐름·위기 상황까지 내 살림 점검',
     items: [
       item('asset-debt', '자산 대비 빚, 상환 부담률 점검'),
       item('cash-flow', '월별 수입·지출과 소득 흔들림'),
       item('scenario', '금리·소득이 바뀌면 어떻게 될까'),
-      item('market', '서울 동네별 업종 개폐업 흐름'),
     ],
   },
   { key: 'loans', label: '대출', path: PATHS.LOANS, description: '내 점수로 알아볼 수 있는 대출 상품', items: [item('loans', '조건·금리·한도 비교')] },
+  // FP-307 상권 분석을 재무 진단에서 빼 위쪽 메뉴의 별도 분류로 뒀다(11/27 동주 결정, 큰 분류 6개). 대출처럼 누르면 바로 간다.
+  { key: 'market', label: '상권 분석', path: PATHS.MARKET, description: '창업 전 동네 상권 살펴보기', items: [item('market', '서울 동네별 업종 개폐업 흐름')] },
   { key: 'lounge', label: '라운지', path: PATHS.LOUNGE, description: '같은 고민을 가진 사람들과 이야기', items: [item('lounge', '익명 게시판')] },
 ].map((group) => Object.freeze(group)))
 
