@@ -1,0 +1,1029 @@
+/* 핀테크형 입력 화면(.fin-form) — 로그인·회원가입·계정 찾기(AuthSplitLayout), 직군 선택, 데이터 입력에 입힌다.
+   입력 칸: 높이 48px, 연한 바탕·1px 테두리·12px 모서리, 포커스 때만 강조색. 라벨은 작게 500. 색은 모두 tokens.css 토큰.
+   주 버튼만 파란(--pri) 알약형, 오류는 칸 아래 12px 글자. */
+
+.fin-form {
+  --ff-navy: var(--pri);
+  --ff-bg: var(--panel2);
+  --ff-line: var(--line);
+  --ff-white: var(--panel);
+}
+
+/* 입력 칸 — 공통 기본 모양(흰 바탕·1px 테두리, 포커스 때 파란 테두리)에 모서리만 조금 각지게(8px) */
+.fin-form .text-input__control,
+.fin-form .number-input__control,
+.fin-form .money-input__control,
+.fin-form .select__control {
+  border-radius: 8px;
+}
+
+.fin-form .form-field__label {
+  color: var(--fg2);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* 오류 — 빨간 상자 없이 칸 아래 차분한 12px 글자 */
+.fin-form .field-error,
+.fin-form .auth-form__error,
+.fin-form .login-page__social-message {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+}
+
+
+/* 주 버튼 — 파란 알약형 하나만 강조 */
+:root .fin-form .auth-form__submit,
+:root .fin-form .job-select-form__submit,
+.fin-form .fin-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  cursor: pointer;
+  font-family: inherit;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ff-navy);
+  color: var(--pri-fg);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+:root .fin-form .auth-form__submit:hover:not(:disabled),
+:root .fin-form .job-select-form__submit:hover:not(:disabled),
+.fin-form .fin-submit:hover:not(:disabled) {
+  background: var(--pri2);
+  color: var(--pri-fg);
+}
+
+:root .fin-form .auth-form__submit:disabled,
+.fin-form .fin-submit:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* 데이터 입력의 주 버튼은 카드 폭 가득(회원가입과 같다) */
+.fin-form .fin-submit {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* 일반 버튼 — 흰 바탕 얇은 테두리 알약, 주 버튼만 딥 네이비 채움 */
+:root .fin-form .button {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid var(--ff-line);
+  border-radius: 999px;
+  background: var(--ff-white);
+  color: var(--fg);
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+:root .fin-form .button:hover:not(:disabled) {
+  border-color: var(--line2);
+  background: var(--ff-bg);
+}
+
+:root .fin-form .button--primary,
+.fin-form .data-input-page__calculate {
+  border: 0;
+  border-radius: 999px;
+  background: var(--ff-navy);
+  color: var(--pri-fg);
+}
+
+:root .fin-form .button--primary:hover:not(:disabled) {
+  background: var(--pri2);
+  color: var(--pri-fg);
+}
+
+:root .fin-form .button--sm {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+/* 데이터 입력 — 왼쪽 입력 열을 흰 카드 하나로 묶고, 안의 섹션은 1px 선으로만 나눈다. [이전]/[다음]은 카드 안 오른쪽 아래 */
+.fin-form .data-input-form {
+  gap: 0;
+  padding: 32px;
+  border: 1px solid var(--ff-line);
+  border-radius: 20px;
+  background: var(--ff-white);
+}
+
+.fin-form .data-input-form .step-slide > .card {
+  padding: 0 0 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.fin-form .data-input-form .step-slide > .card + .card {
+  padding-top: 28px;
+  border-top: 1px solid var(--ff-line);
+}
+
+.fin-form .data-input-form .step-slide > .notice {
+  margin-bottom: 24px;
+}
+
+/* 6단계 대안 데이터 — 카드 안에서 겹테두리가 되지 않게 */
+.fin-form .data-input-form .step-slide > .alt-data {
+  padding: 0 0 28px;
+  border: 0;
+  background: transparent;
+}
+
+/* 오른쪽 진행 단계 카드 — 같은 흰 카드 톤 */
+.fin-form .input-status {
+  border: 1px solid var(--ff-line);
+  border-radius: 20px;
+  background: var(--ff-white);
+}
+
+/* 인증번호·중복 확인 버튼 — 칸 안쪽 오른쪽의 슬림한 인라인 버튼 */
+.fin-form .signup-form__check,
+.fin-form .email-verification__send,
+.fin-form .email-verification__verify {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--ff-line);
+  border-radius: 999px;
+  background: var(--ff-white);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.fin-form .signup-form__check:disabled,
+.fin-form .email-verification__send:disabled {
+  color: var(--mut2);
+  opacity: 0.7;
+}
+
+/* ① 칸이 줄에 바로 놓인 묶음(휴대폰 010-0000-0000, 이메일 아이디@도메인) — 줄 전체를 입력 칸 한 개처럼 보이게 하고 버튼을 안쪽 오른쪽에 둔다 */
+.fin-form .signup-form__row:has(> input, > select) {
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+  padding: 0 6px 0 14px;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--inp);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.fin-form .signup-form__row:has(> input, > select):hover {
+  border-color: var(--mut2);
+}
+
+.fin-form .signup-form__row:has(> input, > select):focus-within {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 22%, transparent);
+}
+
+.fin-form .signup-form__row:has(> input, > select) > .text-input__control,
+.fin-form .signup-form__row:has(> input, > select) > .select__control {
+  min-height: 46px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.fin-form .signup-form__row:has(> input, > select) > button {
+  margin-left: auto;
+}
+
+/* 한 줄 안에 다 들어가게(이메일: 아이디 @ 도메인 [인증코드 받기]) — 줄바꿈하지 않고 칸이 줄어든다 */
+.fin-form .signup-form__row:has(> input, > select) {
+  flex-wrap: nowrap;
+}
+
+.fin-form .signup-form__row:has(> input, > select) > * {
+  min-width: 0;
+}
+
+.fin-form .signup-form__row:has(> input, > select) > .select__control {
+  flex: 0 1 128px;
+}
+
+.fin-form .signup-form__row:has(> input, > select) > button {
+  flex: none;
+}
+
+/* ② 라벨 있는 입력 칸(닉네임·인증번호 6자리) 옆 버튼 — 칸 안쪽 오른쪽으로 겹쳐 놓는다(라벨 20px + 간격 6px + 위 여백 7px) */
+.fin-form .signup-form__row:has(> .form-field) {
+  position: relative;
+  display: block;
+}
+
+.fin-form .signup-form__row:has(> .form-field) .text-input__control {
+  padding-right: 104px;
+}
+
+.fin-form .signup-form__row:has(> .form-field) > button {
+  position: absolute;
+  top: 33px;
+  right: 7px;
+}
+
+/* 가입 여정 진행률(JourneySteps) */
+.journey {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: var(--sp-6);
+}
+
+.journey__bar {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.journey__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ff-navy, var(--fg));
+  transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.journey__steps {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  color: var(--mut2);
+  font-size: 12.5px;
+  list-style: none;
+}
+
+.journey__steps b {
+  font-weight: 600;
+}
+
+.journey__steps .is-on {
+  color: var(--fg);
+}
+
+.journey__steps .is-done {
+  color: var(--mut);
+}
+
+/* 단계 머리(회원가입·데이터 입력 공통) — 왼쪽 [← 이전], 오른쪽 n / 전체, 아래 질문형 두 줄 제목 */
+.step-head {
+  margin-bottom: 8px;
+}
+
+.step-head__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  margin-bottom: 16px;
+}
+
+.step-head__back {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mut);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.step-head__back:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+.step-head__count {
+  color: var(--mut2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fin-form .step-head__title {
+  margin: 0 0 12px;
+  color: var(--fg);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.03em;
+  text-align: left;
+}
+
+/* 주 버튼 아래 보조 글자 링크(예: 처음으로 되돌아가기) */
+.fin-sublink {
+  align-self: center;
+  margin-top: 14px;
+}
+
+/* 비밀번호 보기·숨기기 — 칸 안 오른쪽 눈 아이콘 */
+.fin-form .signup-form__eye {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--mut2);
+  cursor: pointer;
+}
+
+.fin-form .signup-form__eye:hover {
+  color: var(--fg);
+}
+
+.fin-form .signup-form__row:has(> .signup-form__eye) .text-input__control {
+  padding-right: 52px;
+}
+
+/* 대안 데이터 동의 목록(토스 약관 방식) — 전체 동의 한 줄, 구분선, 기관별 줄(체크 · 선택 · 이름 · 보기) */
+.alt-consent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.alt-consent__all,
+.alt-consent__pick {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--mut);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.alt-consent__all {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ff-line);
+}
+
+.alt-consent__all b,
+.alt-consent__pick em {
+  flex: none;
+  color: var(--fg);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.alt-consent__pick em {
+  color: var(--mut);
+}
+
+.alt-consent__check {
+  flex: none;
+  margin-top: 1px;
+  color: var(--line2);
+  transition: color 0.15s;
+}
+
+.alt-consent__check.is-on {
+  color: var(--ff-navy);
+}
+
+.alt-consent__list {
+  display: flex;
+  flex-direction: column;
+  margin: 6px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.alt-consent__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.alt-consent__view {
+  flex: none;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--mut);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.alt-consent__view:hover,
+.alt-consent__view[aria-expanded='true'] {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+.alt-consent__terms {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 2px 0 8px 26px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--ff-bg);
+  color: var(--mut);
+  font-size: 13px;
+}
+
+.alt-consent__terms dt {
+  color: var(--fg2);
+  font-weight: 500;
+}
+
+.alt-consent__terms dd {
+  margin: 0;
+}
+
+.fin-form .alt-consent__submit {
+  width: 100%;
+}
+
+/* 동의 목록은 카드 폭 가득(예전 전체 불러오기 줄의 왼쪽 정렬을 덮는다) */
+.alt-data__bulk.alt-consent {
+  align-items: stretch;
+}
+
+/* 기관별 카드의 [불러오기]·[연결 해제] — 흰 바탕 얇은 테두리 알약(주 버튼과 겹치지 않게) */
+.fin-form .alt-data-source__import,
+.fin-form .alt-data-source__disconnect {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--ff-line);
+  border-radius: 999px;
+  background: var(--ff-white);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.fin-form .alt-data-source__import:hover:not(:disabled),
+.fin-form .alt-data-source__disconnect:hover:not(:disabled) {
+  border-color: var(--line2);
+  background: var(--ff-bg);
+}
+
+/* 데이터 입력 버튼 줄 — 왼쪽 [이전](흰 테두리 알약), 오른쪽 주 버튼(남은 폭 전부) */
+.fin-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* [다음]은 [이전]과 같은 크기로 오른쪽 끝. [이전]이 없어도 오른쪽에 둔다 */
+.fin-actions .fin-submit {
+  flex: 0 0 140px;
+  width: auto;
+  margin: 0 0 0 auto;
+}
+
+/* [점수 산출하기]는 글자가 길어 조금 넓게 */
+.fin-actions .data-input-page__calculate {
+  flex-basis: 180px;
+}
+
+.fin-back {
+  flex: 0 0 140px;
+  min-height: 52px;
+  border: 1px solid var(--ff-line);
+  border-radius: 999px;
+  background: var(--ff-white);
+  color: var(--fg);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.fin-back:hover {
+  border-color: var(--line2);
+  background: var(--ff-bg);
+}
+
+/* 7단계 — [점수 산출하기] 하나를 가운데에 */
+.fin-actions--center {
+  justify-content: center;
+}
+
+.fin-actions--center .fin-submit {
+  margin: 0;
+}
+
+.data-input-page__score-hint {
+  margin: 0;
+}
+
+/* 대안 데이터 동의 목록 — 카드 가운데에 알맞은 폭으로, [동의하고 불러오기]는 작게 가운데 */
+.alt-data__bulk.alt-consent {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.fin-form .alt-consent__submit {
+  align-self: center;
+  width: 220px;
+  min-height: 44px;
+  font-size: 14.5px;
+}
+
+/* ===== 데이터 입력 1~7단계 공통(11/26 화이트 테마 통일) =====
+   단일 질문형 흰 카드(최대 560px), 위 테두리 파란 진행 막대, 2열 입력 그리드, 숫자는 왼쪽·단위는 칸 안쪽 오른쪽(연한 글자),
+   빠른 금액 칩(연한 면). 색은 모두 tokens.css 토큰(주 색 --pri, 연한 글자 --mut2, 연한 면 --panel2). */
+
+/* 화면 배치: 머리(제목·직군)와 두 카드(입력 620px + 진행 단계 280px)를 최대 960px 묶음으로 화면 가운데에 */
+.fin-form.data-input-page {
+  grid-template-columns: minmax(0, 620px) 280px;
+  justify-content: center;
+  column-gap: 24px;
+  width: 100%;
+  max-width: 960px;
+  margin-inline: auto;
+}
+
+@media (max-width: 960px) {
+  .fin-form.data-input-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 카드: 위 테두리 진행 막대(--progress는 DataInputPage가 단계마다 넘긴다) */
+.data-input-page .data-input-form {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+.data-input-page .data-input-form::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--progress, 0%);
+  height: 3px;
+  background: var(--pri);
+  transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* 제목: 단계 질문은 가운데, 카드 소제목·소개 글은 입력 칸 왼쪽 선에 맞춰 왼쪽 */
+.data-input-page .step-head__title,
+.data-input-page .data-input-page__score-hint {
+  text-align: center;
+}
+
+.data-input-page .data-input-form .step-slide > .card > .card__title,
+.data-input-page .input-section__description,
+.data-input-page .alt-data__title,
+.data-input-page .alt-data__notice {
+  text-align: left;
+}
+
+/* 섹션 사이는 선 없이 여백만 */
+.data-input-page .data-input-form .step-slide > .card + .card {
+  padding-top: 12px;
+  border-top: 0;
+}
+
+/* 2열 입력 그리드(간격 16px) — 칸 섹션의 칸들, 줄 섹션 카드 안의 칸들, 월별 소득 12줄. 설명·체크·합계처럼 칸이 아닌 것은 두 칸 너비 */
+.data-input-page .data-input-form .step-slide > .card > .card__body,
+.data-input-page .data-input-form .panel-sunk,
+.data-input-page .editable-list__item,
+.data-input-page .input-section__month-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.data-input-page .data-input-form .step-slide > .card > .card__body > :not(.form-field, .money-quick, fieldset.date-select),
+.data-input-page .data-input-form .panel-sunk > :not(.form-field, .money-quick),
+.data-input-page .editable-list__item > :not(.form-field, .money-quick),
+.data-input-page .data-input-form .step-slide > .card > .card__body > .period-input {
+  grid-column: 1 / -1;
+}
+
+.data-input-page .input-section__month-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 입력 칸 글자는 모두 오른쪽(자릿수 고정폭) — 칸 안쪽 오른쪽 끝 단위 바로 옆에 숫자가 붙어 보이게. 안내 글자('0')도 오른쪽 */
+.data-input-page :is(.text-input__control, .money-input__control, .number-input__control) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 글자를 고르는 선택 상자(대출 종류·고정/변동 등)는 왼쪽 — 오른쪽 화살표와 떨어지게 */
+.data-input-page .select__control {
+  text-align: left;
+  text-align-last: left;
+}
+
+.data-input-page ::placeholder {
+  color: var(--mut2);
+  text-align: right;
+}
+
+/* 단위(원·년·월·개월·회·건)는 칸 안쪽 오른쪽 끝에 연한 글자로 */
+.data-input-page :is(.money-input, .number-input) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.data-input-page :is(.money-input__control, .number-input__control) {
+  grid-row: 2;
+  grid-column: 1;
+  /* 단위 글자 수(--unit-len, NumberInput이 넘긴다. 금액은 '원' 1글자)만큼만 비워 숫자가 단위 바로 옆에 붙게 */
+  padding-right: calc(22px + 1em * var(--unit-len, 1));
+}
+
+.data-input-page :is(.money-input__unit, .number-input__unit) {
+  grid-row: 2;
+  grid-column: 1;
+  justify-self: end;
+  padding-right: 14px;
+  color: var(--mut2);
+  pointer-events: none;
+}
+
+.data-input-page .date-select__part {
+  position: relative;
+}
+
+.data-input-page .date-select__part .text-input__control {
+  padding-right: 34px;
+}
+
+.data-input-page .date-select__part > span {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  color: var(--mut2);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.data-input-page .date-select > .form-field__label {
+  margin-bottom: 6px;
+}
+
+/* 기간(년 | 개월)도 2열 */
+.data-input-page .period-input__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* 금액 빠른 입력 칩(연한 면)과 한글 금액 */
+.money-quick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* 한글 금액 — 칸 바로 아래 오른쪽 끝에 한 줄(비어 있어도 높이를 잡아 칩이 들썩이지 않게) */
+.money-quick__korean {
+  min-height: 1.4em;
+  color: var(--mut);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* 빠른 입력 칩 — 작게(11px), 한 줄 고정 */
+.money-quick__chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.money-quick__chip {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel2);
+  color: var(--fg2);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.money-quick__chip:hover:not(:disabled) {
+  border-color: var(--pri);
+  color: var(--pri);
+}
+
+/* 요약 바(예: 4단계 총 자산 합계) — 칸들 아래 폭 가득, 연한 면, 왼쪽 이름·오른쪽 굵은 금액 */
+.data-input-page .input-section__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--panel2);
+  color: var(--mut);
+  font-size: 14px;
+}
+
+.data-input-page .input-section__summary b {
+  color: var(--fg);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 5단계 월 고정 지출 — 칸이 하나뿐이라 두 칸 너비로(아래 할부·정기결제와 좌우 끝선을 맞춘다) */
+.data-input-page .input-section--fixedExpense .card__body > * {
+  grid-column: 1 / -1;
+}
+
+/* 이미 저장한 기준월로 다시 저장할 때의 안내 — 경고가 아닌 일반 안내라 선택 바탕(연한 파랑)과 주 색 글자 */
+.data-input-page .data-input-form__overwrite-notice {
+  border-color: transparent;
+  background: var(--sel);
+  color: var(--pri);
+}
+
+/* ===== 6단계 대안 데이터 — 불러온 뒤에는 화면을 넓혀 5개 기관을 2열 카드로 한눈에 ===== */
+.fin-form.data-input-page:has(.alt-data-source.is-imported) {
+  grid-template-columns: minmax(0, 1fr) 280px;
+  max-width: 1200px;
+}
+
+.fin-form .alt-data {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* 불러온 기관 카드 — 흰 카드, 얇은 테두리 */
+.fin-form .alt-data .alt-data-source.is-imported {
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.fin-form .alt-data-source.is-imported .card__body {
+  gap: 10px;
+  overflow: visible;
+}
+
+/* 머리 한 줄: 왼쪽 기관명 + 연동 완료 배지, 오른쪽 작은 글자 버튼 */
+.alt-data-source__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.alt-data-source__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.alt-data-source__name b {
+  overflow: hidden;
+  color: var(--fg);
+  font-size: 14.5px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alt-data-source__badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ok-bg);
+  color: var(--mint);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.alt-data-source__links {
+  display: flex;
+  flex: none;
+  gap: 10px;
+}
+
+.alt-data-source__text-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pri);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.alt-data-source__text-btn.is-muted {
+  color: var(--mut2);
+}
+
+.alt-data-source__text-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.alt-data-source__text-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 요약 박스(연한 면) */
+.alt-data-source__summary {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel2);
+  color: var(--fg2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 월별 표 — 높이 180px 고정, 안에서 위아래로만 스크롤(머리줄은 고정) */
+.alt-data-source__scroll {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.alt-data-source__scroll .alt-data-table {
+  font-size: 12.5px;
+}
+
+.alt-data-source__scroll .alt-data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel);
+}
+
+.alt-data-source__scroll .alt-data-table td,
+.alt-data-source__scroll .alt-data-table th {
+  white-space: nowrap;
+}
+
+/* 납부 상태 의미 색 — 정상 초록·연체/미납 빨강·그 밖 주황 */
+.alt-data-status.is-ok { color: var(--mint); font-weight: 600; }
+.alt-data-status.is-bad { color: var(--bad); font-weight: 600; }
+.alt-data-status.is-warn { color: var(--warn); font-weight: 600; }
+.alt-data-status.is-muted { color: var(--mut2); }
+
+@media (max-width: 960px) {
+  .fin-form .alt-data {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ===== 단계 이동 애니메이션(토스처럼 빠르고 짧게, 280ms) — [다음]은 오른쪽에서, [이전]은 왼쪽에서 살짝 밀려 들어오며 나타난다 ===== */
+.step-slide {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+  animation: step-in-next 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.step-slide--prev {
+  animation-name: step-in-prev;
+}
+
+@keyframes step-in-next {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes step-in-prev {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 진행 막대는 300ms에 걸쳐 스르륵 */
+.data-input-page .data-input-form::before {
+  transition: width 300ms ease-out;
+}
+
+/* 누를 때 살짝 눌리는 느낌(0.98배, 150ms) — 주 버튼·이전 버튼·빠른 금액 칩 */
+.fin-form :is(.fin-submit, .fin-back, .auth-form__submit, .money-quick__chip, .alt-consent__submit) {
+  transition: transform 150ms ease-out, background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.fin-form :is(.fin-submit, .fin-back, .auth-form__submit, .money-quick__chip, .alt-consent__submit):active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-slide,
+  .step-slide--prev {
+    animation: none;
+  }
+
+  .data-input-page .data-input-form::before {
+    transition: none;
+  }
+}
+
+/* 두 칸 너비 칸(대출 잔액·월 상환액·할부 월 금액) */
+.data-input-page .money-quick.is-wide {
+  grid-column: 1 / -1;
+}
+
+/* 연한 면 카드(대출 1·할부 1·카드·신용 묶음) 안의 빠른 금액 칩은 흰 바탕 + 테두리로 또렷하게 */
+.data-input-page :is(.editable-list__item, .panel-sunk) .money-quick__chip {
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+/* 줄 추가 버튼(+ 대출 추가하기 등) — 카드 아래 폭 가득, 연한 점선 테두리·연한 면 */
+.data-input-page .editable-list__add {
+  align-self: stretch;
+  width: 100%;
+  min-height: 48px;
+  border: 1px dashed var(--line2);
+  border-radius: 12px;
+  background: var(--panel2);
+  color: var(--fg2);
+  font-size: 14.5px;
+  font-weight: 500;
+}
+
+.data-input-page .editable-list__add:hover:not(:disabled) {
+  border-color: var(--pri);
+  background: var(--sel);
+  color: var(--pri);
+}
+
+/* 글자 칸(할부 '내용' 등)은 왼쪽 정렬 — 숫자 칸만 오른쪽(기준월 년·월 칸은 숫자라 오른쪽 유지) */
+.data-input-page .text-input__control,
+.data-input-page .text-input__control::placeholder {
+  text-align: left;
+}
+
+.data-input-page .date-select__part .text-input__control,
+.data-input-page .date-select__part .text-input__control::placeholder {
+  text-align: right;
+}
+
+/* 회원가입 생일(년·월·일) — 단위를 칸 안쪽 오른쪽 끝에, 숫자는 오른쪽 정렬(데이터 입력 기준월과 같다) */
+.auth-split .date-select__part {
+  position: relative;
+}
+
+.auth-split .date-select__part .text-input__control {
+  padding-right: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.auth-split .date-select__part .text-input__control::placeholder {
+  color: var(--mut2);
+  text-align: right;
+}
+
+.auth-split .date-select__part > span {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  color: var(--mut2);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.auth-split .auth-form ::placeholder {
+  color: var(--mut2);
+}

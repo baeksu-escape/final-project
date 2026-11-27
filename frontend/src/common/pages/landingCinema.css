@@ -1,0 +1,204 @@
+/* N-10 메인 ① 히어로(LandingCinema) — 스크롤 축소 + 뒷모습 사진 → 손에 든 폰 사진 + 흰 액정 위 문구.
+   진행률 값(--shrink·--title·--swap·--screen)은 LandingCinema가 매 프레임 넘긴다.
+   화면 변화는 clip-path·transform·opacity로만 그려 리플로우가 없다. 높이는 100dvh(없으면 100vh). */
+
+.cinema {
+  --shrink: 0;
+  --title: 0;
+  --swap: 0;
+  --screen: 0;
+  --screen-out: 0;
+  --fade: 0;
+  /* 축소가 끝났을 때 바깥 여백·모서리 — 넓은 화면. 모바일 값은 아래 @media(767px)에서 바꾼다 */
+  --hero-edge-x: clamp(16px, 3vw, 40px);
+  --hero-edge-y: clamp(12px, 2.5vh, 28px);
+  --hero-radius: clamp(20px, 2.2vw, 32px);
+  position: relative;
+  /* 페이지 실제 폭(스크롤 막대 제외)만큼 화면 끝까지 — 본문 여백을 벗어난다(--page-w는 LandingPage가 넘긴다) */
+  width: var(--page-w, 100vw);
+  height: 400vh;
+  height: 400dvh;
+  margin: calc(-1 * var(--sp-7)) calc(50% - var(--page-w, 100vw) / 2) 0;
+  background: var(--bg);
+}
+
+.cinema__sticky {
+  position: sticky;
+  top: var(--bar-h, 68px);
+  height: calc(100vh - var(--bar-h, 68px));
+  height: calc(100dvh - var(--bar-h, 68px));
+  overflow: hidden;
+}
+
+/* 사진 카드 — 진행률에 비례해 안쪽으로 줄며(inset) 둥근 모서리가 생긴다 */
+.cinema__frame {
+  /* 좁은 화면에서 사진의 어느 가로 지점을 가운데 둘지(0.5 = 사진 가운데) */
+  --focus-back: 0.5;
+  --focus-hand: 0.5;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  container-type: size;
+  background: #0b1530;
+  /* 마지막: 카드 전체가 부드럽게 사라져 밝은 바탕만 남는다(아래 구간이 그 자리에서 나타남) */
+  opacity: calc(1 - var(--fade));
+  clip-path: inset(
+    calc(var(--shrink) * var(--hero-edge-y))
+    calc(var(--shrink) * var(--hero-edge-x))
+    round calc(var(--shrink) * var(--hero-radius))
+  );
+  will-change: clip-path;
+}
+
+/* 사진 판 — 16:9로 카드를 덮는다(cover). 판 크기를 컨테이너 단위로 정해 액정 칸이 사진과 같이 움직인다.
+   폭 변수는 --plane-w(--w는 폰 화면 막대 애니메이션용으로 등록돼 있다) */
+.cinema__plane {
+  --plane-w: max(100cqw, calc(100cqh * 16 / 9));
+  --focus-x: 0.5;
+  position: absolute;
+  top: 50%;
+  left: calc(50cqw + var(--plane-w) * (0.5 - var(--focus-x)));
+  width: var(--plane-w);
+  aspect-ratio: 16 / 9;
+  translate: -50% -50%;
+  will-change: transform, opacity;
+}
+
+/* 뒷모습 → 손: 앞 사진은 살짝 커지며 사라지고, 뒤 사진은 살짝 큰 상태에서 제자리로 오며 나타난다 */
+.cinema__plane--back {
+  --focus-x: var(--focus-back);
+  opacity: calc(1 - var(--swap));
+  transform: scale(calc(1 + var(--swap) * 0.06));
+}
+
+.cinema__plane--hand {
+  --focus-x: var(--focus-hand);
+  opacity: var(--swap);
+  /* 사라질 때 폰 쪽으로 천천히 다가간다(최대 1.08배) */
+  transform: scale(calc((1.06 - var(--swap) * 0.06) * (1 + var(--fade) * 0.08)));
+}
+
+.cinema__media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cinema__media--empty {
+  background: radial-gradient(120% 90% at 70% 10%, #1f4fd6 0%, #0f2a7a 38%, #070d22 75%);
+}
+
+/* 흰 액정 칸 — 문구 크기는 액정 폭(cqw)에 맞춘다 */
+.cinema__screen {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5cqw;
+  padding-bottom: 18%;
+  container-type: inline-size;
+  /* 흰 액정 위 문구 — 테마와 상관없이 진한 글자색 고정(흰 화면과 겹쳐 흐려 보이지 않게) */
+  color: #191f28;
+  text-align: center;
+  opacity: var(--screen);
+  /* 나타날 때는 아래에서 올라오고, 사라질 때는 위로 빠진다 */
+  transform: translateY(calc((1 - var(--screen)) * 16px * (1 - var(--screen-out)) - var(--screen-out) * 16px));
+  pointer-events: none;
+}
+
+.cinema__screen-tag {
+  padding: 2.4cqw 5cqw;
+  border-radius: 999px;
+  background: #e8f1fe;
+  color: #3478f6;
+  font-size: 5.2cqw;
+  font-weight: 700;
+}
+
+.cinema__screen-title {
+  font-size: 9.6cqw;
+  font-weight: 800;
+  line-height: 1.32;
+  letter-spacing: -0.04em;
+}
+
+/* 첫 문구가 잘 읽히도록 아래쪽만 어둡게 */
+.cinema__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(6, 12, 28, 0.7), rgba(6, 12, 28, 0.15) 45%, transparent 70%);
+  opacity: calc(1 - var(--title));
+  pointer-events: none;
+}
+
+.cinema__intro {
+  position: absolute;
+  inset: auto 0 clamp(56px, 11vh, 130px);
+  color: #ffffff;
+  text-align: center;
+  opacity: calc(1 - var(--title));
+  transform: translateY(calc(var(--title) * -24px));
+  pointer-events: none;
+}
+
+.cinema__eyebrow {
+  font-size: clamp(15px, 1.4vw, 20px);
+  font-weight: 700;
+  opacity: 0.85;
+  animation: cinema-in 1s 0.1s both;
+}
+
+.cinema__title {
+  margin: 16px 0 12px;
+  font-size: clamp(38px, 6vw, 96px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.05em;
+  animation: cinema-in 1.1s 0.25s both;
+}
+
+.cinema__brand {
+  font-size: clamp(20px, 2vw, 28px);
+  font-weight: 800;
+  opacity: 0.85;
+  animation: cinema-in 1s 0.5s both;
+}
+
+@keyframes cinema-in {
+  from { opacity: 0; transform: translateY(24px); }
+}
+
+.cinema__credit {
+  position: absolute;
+  right: calc(var(--shrink) * var(--hero-edge-x) + 20px);
+  bottom: calc(var(--shrink) * var(--hero-edge-y) + 12px);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cinema__eyebrow,
+  .cinema__title,
+  .cinema__brand {
+    animation: none;
+  }
+}
+
+/* 모바일(767px 이하) — 축소가 끝났을 때 바깥 여백 10px. 여백을 바꾸려면 이 두 값만 고친다 */
+@media (max-width: 767px) {
+  .cinema {
+    --hero-edge-x: 10px;
+    --hero-edge-y: 10px;
+    --hero-radius: 20px;
+  }
+
+  /* 세로 화면 — 뒷모습은 사람(가로 80%), 손 사진은 액정(가로 50%)을 가운데 둔다 */
+  .cinema__frame {
+    --focus-back: 0.8;
+    --focus-hand: 0.5;
+  }
+}

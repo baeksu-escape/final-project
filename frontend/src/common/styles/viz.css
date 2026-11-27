@@ -207,3 +207,51 @@
   .viz-bars__label { white-space: normal; }
   .viz-bars__track { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* UI 시안 — 내 신용의 길(ScoreRoad): 도로·배경 없이 캐릭터 아비의 얼굴을 연한 회색 상자에 크게(가까이서 본 구도) 보여 준다. 점수 구간에 따라 표정이 바뀐다 */
+.road { position: relative; display: flex; flex-direction: column; gap: var(--sp-3); }
+.road-art { position: relative; aspect-ratio: 2 / 1; border-radius: 20px; background: var(--panel2); overflow: hidden; }
+.road__head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.road__side { display: flex; flex: none; flex-direction: column; align-items: flex-end; gap: var(--sp-2); text-align: right; }
+.road__grade { padding: 4px 14px; border-radius: 999px; font-size: 14px; font-weight: 800; color: var(--tone); background: color-mix(in srgb, var(--tone) 14%, transparent); }
+.road__grade--caution { --tone: var(--warn); }
+.road__grade--standard { --tone: var(--acc); }
+.road__grade--good { --tone: var(--mint); }
+.road__delta { display: flex; flex-direction: column; align-items: flex-end; color: var(--mut); font-size: 12px; }
+.road__delta b { color: var(--fg); font-size: 16px; }
+.road__delta.is-up b { color: var(--mint); }
+.road__delta.is-down b { color: var(--bad); }
+.road__title { display: flex; flex-direction: column; gap: 2px; margin: 0; font-size: 16px; font-weight: 700; color: var(--fg); }
+.road__title b { color: var(--acc); font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+.road__score { font-size: 15px; color: var(--mut); }
+.road__score b { color: var(--fg); font-size: 40px; }
+.road__stage { margin: 0; color: var(--mut); font-size: 13px; }
+.road__stage b { color: var(--fg); }
+
+/* 캐릭터 아비 */
+.road-mascot { width: 100%; animation: road-bob 1.8s ease-in-out infinite; }
+.road-mascot img { display: block; width: 100%; height: auto; }
+.road-mascot svg { display: block; width: 46%; height: auto; margin: 0 auto; overflow: visible; }
+.road-mascot__body { fill: #fff; stroke: var(--fg); stroke-width: 2; }
+.road-mascot__eye { fill: var(--fg); }
+.road-mascot__cheek { fill: var(--bad); opacity: .28; }
+.road-mascot__mouth { fill: none; stroke: var(--fg); stroke-width: 1.6; stroke-linecap: round; }
+.road-mascot__stem { fill: none; stroke: var(--mint); stroke-width: 2.2; stroke-linecap: round; }
+.road-mascot__leaf { fill: var(--mint); }
+.road-mascot__flower circle { fill: var(--c-pink); }
+.road-mascot__flower .road-mascot__core { fill: var(--c-gold); }
+.road-mascot__foot { fill: var(--fg); transform-box: fill-box; transform-origin: center; animation: road-step .6s ease-in-out infinite alternate; }
+.road-mascot__foot--b { animation-direction: alternate-reverse; }
+@keyframes road-step { from { transform: translateY(0); } to { transform: translateY(-2px); } }
+@keyframes road-bob { 50% { transform: translateY(-6px); } }
+
+/* 점수가 오르면 한 번 뜨는 축하 화면 */
+.road-up { position: absolute; inset: 0; z-index: 1; border-radius: 20px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--panel) 78%, transparent); }
+.road-up__card { position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-5) var(--sp-6); border-radius: var(--r); background: var(--panel); box-shadow: var(--shadow); text-align: center; animation: road-up-in .35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.road-up__card b { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+.road-up__card p { max-width: 220px; margin: 0; color: var(--mut); font-size: 14px; }
+.road-up__bit { position: absolute; top: 46%; left: 50%; width: 8px; height: 12px; border-radius: 2px; background: var(--c); opacity: 0; animation: road-pop 1.3s ease-out both; }
+@keyframes road-up-in { from { opacity: 0; transform: scale(.9); } }
+@keyframes road-pop { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.4); } 100% { opacity: 0; transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y) + 36px)) rotate(420deg); } }
+
+@media (prefers-reduced-motion: reduce) { .road-mascot, .road-mascot__foot, .road-up__card { animation: none; } .road-up__bit { display: none; } }
