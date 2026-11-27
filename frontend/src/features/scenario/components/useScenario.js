@@ -14,6 +14,7 @@ export function useScenario(userId, workerTypeCode) {
   const [calculation, setCalculation] = useState({ key: null, result: null, applied: null, version: -1, error: '' })
   // N-17-3 요청 버전으로 계산·초기화를 구분하고, 처음에는 현재 조건을 한 번 계산한다.
   const [request, setRequest] = useState({ key: null, values: INITIAL, version: 0 })
+  const [resetPending, setResetPending] = useState(false)
   const [retryVersion, setRetryVersion] = useState(0)
   const seq = useRef(0)
   const key = `${userId}:${workerTypeCode}:${revision}`
@@ -42,8 +43,8 @@ export function useScenario(userId, workerTypeCode) {
     if (!ready || !load.baseline || scenarioInputError(requested.values, load.baseline)) return undefined
     const { values, version } = requested
     recalculateMemberScenario(values).then(adaptResponse).then(
-      (result) => { if (seq.current === requestId) setCalculation({ key, result, applied: values, version, error: '' }) },
-      (error) => { if (seq.current === requestId) setCalculation((prev) => ({ key, result: prev.key === key ? prev.result : null, applied: prev.key === key ? prev.applied : null, version, error: error.data?.fieldErrors?.[0]?.message || error.message })) },
+      (result) => { if (seq.current === requestId) { setCalculation({ key, result, applied: values, version, error: '' }); setResetPending(false) } },
+      (error) => { if (seq.current === requestId) { setCalculation((prev) => ({ key, result: prev.key === key ? prev.result : null, applied: prev.key === key ? prev.applied : null, version, error: error.data?.fieldErrors?.[0]?.message || error.message })); setResetPending(false) } },
     )
     return () => { seq.current += 1 }
   }, [key, ready, load.baseline, requested.values, requested.version, retryVersion]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -60,13 +61,13 @@ export function useScenario(userId, workerTypeCode) {
   const calculating = ready && !inputError && (calculation.key !== key || calculation.version !== requested.version)
   // N-17-2 입력이 올바를 때만 현재 조건으로 계산을 요청한다.
   const calculate = () => { if (!inputError) setRequest({ key, values: current.values, version: requested.version + 1 }) }
-  // N-17-2 초기화는 기본 조건으로 되돌린 뒤 같은 요청 경로로 재계산한다. 이미 그 조건의 결과가 있으면 중복 요청하지 않는다.
+  // N-17-2 초기화 요청 중에는 stale 안내 대신 계산 중 상태를 보여 준다. 이미 기본 조건 결과가 있으면 상태도 바꾸지 않는다.
   const reset = () => {
     const values = INITIAL
+    if (calculation.key === key && calculation.applied === values) return
     setDraft({ key, values, presetId: BASE_PRESET.id, lastValid: values })
-    if (calculation.key !== key || calculation.applied !== values) {
-      setRequest({ key, values, version: requested.version + 1 })
-    }
+    setResetPending(true)
+    setRequest({ key, values, version: requested.version + 1 })
   }
 
   return {
@@ -80,8 +81,8 @@ export function useScenario(userId, workerTypeCode) {
     result,
     calcError,
     // 결과가 지금 입력과 다른 조건으로 계산된 것인지(버튼을 아직 안 누름)
-    stale: Boolean(result) && calculation.applied !== current.values,
-    calculating,
+    stale: Boolean(result) && calculation.applied !== current.values && !resetPending,
+    calculating: calculating || resetPending,
     setValue,
     selectPreset,
     calculate,
