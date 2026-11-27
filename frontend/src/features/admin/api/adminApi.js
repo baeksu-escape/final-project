@@ -25,7 +25,7 @@ function toQuery(params) {
 
 // N-27-1 계정 목록 조회·검색(ADM-05) — { q, role, status, workerType, page(0부터), size } →
 //   { items: [{ userId, loginId, maskedName, role, workerTypeCode, latestAltScore, status, reportedPostCount, createdAt, lastLoginAt, nickname }], page, size, totalCount }
-//   FP-273 workerType(직군 코드, 선택)·nickname(탈퇴 회원은 '탈퇴'+회원 번호 표시값) 추가. 틀린 직군 값은 400 INVALID_INPUT.
+//   FP-273 workerType은 직군 코드(선택, 틀리면 400 INVALID_INPUT), nickname은 탈퇴 회원이면 '탈퇴'+회원 번호 표시값.
 //   maskedName은 "(복호화 불가)"일 수 있다.
 export function fetchAdminUsers({ q, role, status, workerType, page, size }) {
   return apiGet(`${ADMIN_API.USERS}${toQuery({ q, role, status, workerType, page, size })}`)

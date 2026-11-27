@@ -21,19 +21,18 @@ import LockReasonModal from '../components/LockReasonModal.jsx'
 import MemberDetailPanel from '../components/MemberDetailPanel.jsx'
 import { useAdminErrorHandler } from '../useAdminErrorHandler.js'
 
-// 표의 열 수 — 열람 사유 줄이 표 전체 너비를 차지하게 할 때 쓴다. FP-273 [닉네임] 열을 더해 10열.
+// 표의 열 수 — 열람 사유 줄이 표 전체 너비를 차지하게 할 때 쓴다.
 const COLUMN_COUNT = 10
 
 // N-27·N-35-1 계정·권한 관리(/admin/accounts) — 회원 목록 검색·필터(권한·상태·직군)·쪽 넘기기, 사유를 남기고 회원 상세 열람, 계정 잠금·해제.
 // 회원 정보는 서버가 가린 값만 보여 준다. 회원을 관리자로 바꾸는 기능은 두지 않는다(N-27-2).
-// FP-273 ACCT-04 통합 관리자로 운영하기로 해(11/26) 관리자 계정 추가(N-27-4) 카드는 화면에서 감췄다.
-// AddAdminForm.jsx·createAdminAccount(ADM-07)·서버 코드는 그대로 남겨 두었다.
+// FP-273 ACCT-04 통합 관리자 운영(11/26)이라 관리자 계정 추가(N-27-4) 카드는 두지 않는다(AddAdminForm·ADM-07은 남겨 둔다).
 export default function AdminAccountsPage() {
   const { user } = useAuth()
   const handleAdminError = useAdminErrorHandler()
   const [searchText, setSearchText] = useState('')
-  // 서버에 보낼 조건. reloadKey는 같은 조건으로 다시 부를 때 올린다.
-  const [query, setQuery] = useState({ q: '', role: '', status: '', workerType: '', page: ADMIN_FIRST_PAGE, reloadKey: 0 })
+  // 서버에 보낼 조건.
+  const [query, setQuery] = useState({ q: '', role: '', status: '', workerType: '', page: ADMIN_FIRST_PAGE })
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [reasonFor, setReasonFor] = useState(null) // 열람 사유를 고르는 중인 회원 userId
@@ -202,7 +201,6 @@ export default function AdminAccountsPage() {
                     <tr>
                       <td>{row.loginId}</td>
                       <td>{row.maskedName}</td>
-                      {/* FP-273 닉네임 — 탈퇴 회원은 서버가 준 표시값('탈퇴'+회원 번호) 그대로 */}
                       <td>{row.nickname ?? EMPTY_TEXT}</td>
                       <td>{row.role === ROLES.ADMIN ? <Chip accent>관리자</Chip> : '일반'}</td>
                       <td>{JOB_TYPE_LABELS[row.workerTypeCode] ?? EMPTY_TEXT}</td>

@@ -138,7 +138,6 @@ class AdminAccountServiceTest {
 
         AdminDtos.PageResponse<AdminDtos.UserRow> page = service.list(null, null, null, "SELF_EMPLOYED", 0, 20);
 
-        // 탈퇴 회원 닉네임은 DB 표시값 그대로 내보낸다.
         assertThat(page.items()).extracting(AdminDtos.UserRow::nickname).containsExactly("닉네임7", "탈퇴9");
         verify(adminMapper).selectUsers(isNull(), isNull(), isNull(), eq("SELF_EMPLOYED"), eq(false), eq(0), eq(20));
         verify(adminMapper).countUsers(isNull(), isNull(), isNull(), eq("SELF_EMPLOYED"), eq(false));

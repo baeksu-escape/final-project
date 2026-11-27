@@ -31,7 +31,7 @@ public class AdminAccountController {
         this.members = members;
     }
 
-    // ADM-05 N-27-1 계정 목록·검색 → { items, page, size, totalCount }. FP-273 직군 조건 workerType(선택) 추가.
+    // ADM-05 N-27-1 계정 목록·검색 → { items, page, size, totalCount }. workerType(직군, 선택)은 FP-273.
     @GetMapping("/users")
     public AdminDtos.PageResponse<AdminDtos.UserRow> users(@RequestParam(required = false) String q, @RequestParam(required = false) String role,
             @RequestParam(required = false) String status, @RequestParam(required = false) String workerType,
