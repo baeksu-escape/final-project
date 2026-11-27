@@ -1,23 +1,18 @@
-import { useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { canSeeMainMenu } from '../auth/accessRules.js'
 import { useAuth } from '../auth/useAuth.js'
 import ThemeToggle from '../components/ThemeToggle.jsx'
-import Toast from '../components/Toast.jsx'
 import { ADMIN_TABS, NAV_GROUPS, PATHS, findNavGroup } from '../config/navigation.js'
 import { ROLE_LABELS, isAdmin } from '../config/roles.js'
 import MegaNav from './MegaNav.jsx'
 import { ADMIN_PATHS } from '../../features/admin/adminConstants.js'
-
-// TODO(D-23) 알림 범위가 정해지기 전까지 [알림]을 누르면 이 안내만 보여 준다.
-const NOTIFICATION_PENDING_MESSAGE = '알림 기능은 준비 중입니다.'
+import NotificationBell from '../../features/notification/components/NotificationBell.jsx'
 
 // N-08-1 로그인 후 공통 위쪽 바 — 로고(메인 페이지로), 큰 분류 메뉴(마우스를 올리면 세부 메뉴 판), 계정 버튼, 분류 안 세부 기능 줄.
 // 사용자 메뉴는 점수가 나온 뒤에만 보이고(canSeeMainMenu), 관리자 메뉴 5개는 늘 보인다.
 export default function AppHeader() {
   const { user, logout } = useAuth()
   const { pathname } = useLocation()
-  const [toastMessage, setToastMessage] = useState('')
   const admin = isAdmin(user)
   const showMenu = canSeeMainMenu(user)
   // 관리자는 분류 없이 메뉴 5개를 그대로 쓴다
@@ -48,8 +43,8 @@ export default function AppHeader() {
             {admin && <NavLink to={ADMIN_PATHS.PASSWORD} className="app-header__text-btn">비밀번호 변경</NavLink>}
             {!admin && (
               <>
-                {/* TODO(D-23) 알림 자리 — 알림 내용과 범위는 팀 결정 전이라 안내만 띄운다. */}
-                <button type="button" className="app-header__text-btn" onClick={() => setToastMessage(NOTIFICATION_PENDING_MESSAGE)}>알림</button>
+                {/* D-23 헤더 알림은 읽지 않은 개수와 최근 알림 목록을 보여 준다. */}
+                <NotificationBell />
                 <NavLink to={PATHS.MY_PAGE} className="app-header__text-btn">마이페이지</NavLink>
               </>
             )}
@@ -67,7 +62,6 @@ export default function AppHeader() {
           </nav>
         )}
       </header>
-      <Toast message={toastMessage} onClose={() => setToastMessage('')} />
     </>
   )
 }
