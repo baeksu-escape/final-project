@@ -8,7 +8,9 @@ import java.util.Optional;
 public enum EmailPurpose {
     SIGNUP("SIGNUP"),
     RESET_PASSWORD("FIND_PASSWORD"),
-    CHANGE_EMAIL("CHANGE_EMAIL");
+    CHANGE_EMAIL("CHANGE_EMAIL"),
+    // FP-258 아이디 찾기(이메일 인증). 가입 여부를 알려 주지 않도록 항상 보낸다.
+    FIND_ID("FIND_ID");
 
     private final String dbCode;
 
@@ -23,6 +25,11 @@ public enum EmailPurpose {
     // 프론트가 보낸 값으로 찾는다. 모르는 값이면 빈 값.
     public static Optional<EmailPurpose> fromRequest(String value) {
         return Arrays.stream(values()).filter(purpose -> purpose.name().equals(value)).findFirst();
+    }
+
+    // FP-258 새 이메일 규칙(AccountRules.isValidEmail)을 쓰는 목적(가입·이메일 변경). 찾기·재설정은 기존 이메일도 받도록 기본 형식만 본다.
+    public boolean usesNewEmailRule() {
+        return this == SIGNUP || this == CHANGE_EMAIL;
     }
 
     // 이미 가입된 이메일로는 코드를 보내지 않는 목적(가입·이메일 변경).

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, TextInput } from '../../../common/components/index.js'
-import { isValidEmail } from '../../auth/validation.js'
+import { isBasicEmail } from '../../auth/validation.js'
 import { createAdminAccount } from '../api/adminApi.js'
 import { ADMIN_ERROR_CODES, ADMIN_LOGIN_ID_PATTERN, ADMIN_LOGIN_ID_RULE_TEXT, adminErrorMessage } from '../adminConstants.js'
 import { useAdminErrorHandler } from '../useAdminErrorHandler.js'
@@ -34,7 +34,7 @@ export default function AddAdminForm({ onCreated }) {
     const nextErrors = {}
     if (!ADMIN_LOGIN_ID_PATTERN.test(form.loginId.trim())) nextErrors.loginId = `아이디는 ${ADMIN_LOGIN_ID_RULE_TEXT}로 넣어 주세요.`
     if (!form.name.trim()) nextErrors.name = '이름을 넣어 주세요.'
-    if (!isValidEmail(form.workEmail.trim())) nextErrors.workEmail = '업무 이메일 형식이 올바르지 않습니다. 예) name@avenue.example'
+    if (!isBasicEmail(form.workEmail.trim())) nextErrors.workEmail = '업무 이메일 형식이 올바르지 않습니다. 예) name@avenue.example'
     setErrors(nextErrors)
     setFormError('')
     if (Object.keys(nextErrors).length === 0) setStepUpOpen(true)

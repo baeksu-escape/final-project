@@ -50,6 +50,10 @@ public final class AuthResponses {
     public record NicknameAvailability(boolean available) {
     }
 
+    // FP-258 N-02-1 아이디 중복 확인(AUTH-16) — 닉네임 확인과 같은 모양
+    public record LoginIdAvailability(boolean available) {
+    }
+
     // N-02 휴대폰 인증번호 발송 — 이메일 발송 응답과 같은 모양
     public record PhoneSent(int expiresInSeconds) {
     }
@@ -59,7 +63,8 @@ public final class AuthResponses {
     }
 
     // AUTH-09 아이디 찾기
-    public record FoundId(String maskedLoginId) {
+    // FP-258 본인 인증을 마쳤으므로 가리지 않은 loginId도 준다(maskedLoginId는 그대로 둔다).
+    public record FoundId(String maskedLoginId, String loginId) {
     }
 
     // AUTH-04 간편 로그인 교환. result가 LINKED면 accessToken·user, LINK_REQUIRED면 linkKey·provider·profile이 온다.

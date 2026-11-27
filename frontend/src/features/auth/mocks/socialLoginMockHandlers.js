@@ -2,7 +2,7 @@ import { ApiError } from '../../../common/api/ApiError.js'
 import { ROLES } from '../../../common/config/roles.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { toMockToken } from '../../../common/mocks/mockUsers.js'
-import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, LOGIN_FAILED_MESSAGE } from '../authConstants.js'
+import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES } from '../authConstants.js'
 import {
   SOCIAL_ADMIN_BLOCKED_MESSAGE,
   SOCIAL_CANCEL_ERROR,
@@ -10,7 +10,8 @@ import {
   SOCIAL_EXCHANGE_RESULTS,
   SOCIAL_PATHS,
 } from '../socialLoginConfig.js'
-import { findMockAccount, findMockAccountByUserId } from './authMockHandlers.js'
+import { authenticateMockAccount, findMockAccountByUserId } from './authMockHandlers.js'
+import { countMockFailures } from './authMockRateLimits.js'
 import { MOCK_SOCIAL_PROFILE, mockLinkKeys, mockSocialLinks, mockSocialSettings } from './socialLoginMockData.js'
 
 // 내준 일회용 코드 → 제공자 key. 교환하면 지운다.
@@ -66,17 +67,16 @@ registerMockHandlers({
     }
   },
 
-  // N-01-6 기존 계정에 연결 — 아이디·비밀번호가 틀리면 일반 로그인과 같은 문구로 401을 돌려준다.
+  // N-01-6 기존 계정에 연결 — 아이디·비밀번호는 일반 로그인과 같은 규칙(authenticateMockAccount: 실패 횟수·5분 제한·10회 잠금)으로 본다(FP-258).
   'POST /api/auth/social/link': ({ body }) => {
     if (!mockLinkKeys.has(body?.linkKey)) {
       throw new ApiError(400, '소셜 로그인을 처음부터 다시 진행해 주세요.', { code: SOCIAL_ERROR_CODES.LINK_EXPIRED })
     }
-    const account = findMockAccount(body.loginId)
-    if (!account || (account.password !== null && account.password !== body.password)) {
-      throw new ApiError(401, LOGIN_FAILED_MESSAGE)
-    }
-    if (account.locked) throw lockedError()
+    // FP-258 로그인과 같은 접속지별 실패 제한을 함께 센다.
+    const account = countMockFailures(() => authenticateMockAccount(body.loginId, body.password))
     if (account.user.role === ROLES.ADMIN) throw adminBlockedError()
+    account.loginFailCount = 0
+    account.lastLoginFailureAt = null
     mockLinkKeys.delete(body.linkKey)
     return toLoginResponse(account)
   },

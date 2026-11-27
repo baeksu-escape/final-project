@@ -3,7 +3,8 @@ import { Button, TextInput } from '../../../common/components/index.js'
 import { checkNicknameAvailability } from '../api/authFeatureApi.js'
 import { requestNicknameChange } from '../api/myPageApi.js'
 import { AUTH_ERROR_CODES, SAME_NICKNAME_MESSAGE } from '../authConstants.js'
-import { NICKNAME_MAX, validateNickname } from '../validation.js'
+import useImeSafeFilter from '../useImeSafeFilter.js'
+import { NICKNAME_MAX, filterNickname, validateNickname } from '../validation.js'
 
 // FP-222 N-04-3 닉네임 바꾸기 폼 — 규칙은 가입과 같고(validateNickname), [중복 확인](AUTH-13)에서 쓸 수 있다고 나온 닉네임만 저장한다(MEM-08).
 // 저장에 성공하면 onSaved(안내 문구)를 부르고, [취소]는 onCancel을 부른다. 서버가 같은 값·중복으로 막으면 칸 아래에 보여 준다.
@@ -20,10 +21,11 @@ export default function NicknameChangeForm({ currentNickname, onSaved, onCancel 
   const checked = check?.nickname === text && check.available
 
   // 칸 값을 바꾸면 지난 안내를 지운다.
-  const handleChange = (value) => {
+  // FP-258 가입과 같은 filterNickname으로 거른다(한글 조합은 끝날 때, useImeSafeFilter).
+  const nicknameInput = useImeSafeFilter()((value) => {
     setNickname(value)
     setError('')
-  }
+  }, filterNickname)
 
   // 형식이 맞고 지금 닉네임과 다른 값만 서버에 묻는다.
   const handleCheck = async () => {
@@ -62,15 +64,17 @@ export default function NicknameChangeForm({ currentNickname, onSaved, onCancel 
 
   return (
     <form className="account-form nickname-change-form" onSubmit={handleSubmit} noValidate>
-      <TextInput
-        label="새 닉네임"
-        value={nickname}
-        onChange={handleChange}
-        error={formatError || (sameAsCurrent ? SAME_NICKNAME_MESSAGE : '') || error}
-        hint={checked ? '사용할 수 있는 닉네임입니다.' : `한글·영문·숫자 2~${NICKNAME_MAX}자, 신용 라운지에 작성자로 보입니다`}
-        maxLength={NICKNAME_MAX}
-        autoComplete="nickname"
-      />
+      <div {...nicknameInput.compositionProps}>
+        <TextInput
+          label="새 닉네임"
+          value={nickname}
+          onChange={nicknameInput.onChange}
+          error={formatError || (sameAsCurrent ? SAME_NICKNAME_MESSAGE : '') || error}
+          hint={checked ? '사용할 수 있는 닉네임입니다.' : `한글·영문·숫자 2~${NICKNAME_MAX}자, 신용 라운지에 작성자로 보입니다`}
+          maxLength={NICKNAME_MAX}
+          autoComplete="nickname"
+        />
+      </div>
       <Button onClick={handleCheck} disabled={pending || !text || formatError !== '' || sameAsCurrent || checked}>
         중복 확인
       </Button>

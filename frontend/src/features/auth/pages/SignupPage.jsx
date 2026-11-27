@@ -3,20 +3,28 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { PATHS } from '../../../common/config/navigation.js'
 import { Checkbox, DateSelect, FieldError, TextInput } from '../../../common/components/index.js'
-import { checkNicknameAvailability, requestSignup } from '../api/authFeatureApi.js'
-import { AUTH_ERROR_CODES, CREDIT_INFO_AGREEMENT_LABEL, EMAIL_PURPOSES, PHONE_PURPOSES, toAgeGroup } from '../authConstants.js'
+import { checkLoginIdAvailability, checkNicknameAvailability, requestSignup } from '../api/authFeatureApi.js'
+import { AUTH_ERROR_CODES, EMAIL_PURPOSES, PHONE_PURPOSES, SIGNUP_CONSENT_ITEMS, toAgeGroup } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
+import PasswordField from '../components/PasswordField.jsx'
 import PasswordRuleList from '../components/PasswordRuleList.jsx'
 import PhoneVerification from '../components/PhoneVerification.jsx'
 import SplitEmailField from '../components/SplitEmailField.jsx'
 import { resolveEmailDomain, splitEmail } from '../emailParts.js'
+import useAvailabilityCheck from '../useAvailabilityCheck.js'
+import useImeSafeFilter from '../useImeSafeFilter.js'
+import usePasswordReveal from '../usePasswordReveal.js'
 import {
   NICKNAME_MAX,
   SIGNUP_PENDING_MESSAGES,
+  filterName,
+  filterNickname,
+  filterSignupLoginId,
   joinEmail,
   joinPhone,
   normalizePhone,
+  validateLoginId,
   validateNickname,
   validateSignup,
 } from '../validation.js'
@@ -35,11 +43,14 @@ const EMPTY_FORM = {
   password: '',
   passwordConfirm: '',
   birthDate: '',
-  agreeCreditInfo: false,
+  // FP-258 N-02-2 필수 동의 2개(이용약관·개인정보 수집·이용)와 선택 동의 1개(점수 변동 알림·혜택 안내)
+  agreeTerms: false,
+  agreePrivacy: false,
+  agreeMarketing: false,
 }
 
 // 칸 순서(validateSignup 오류 키). [가입하기]에서 오류가 있으면 이 순서로 첫 오류 칸을 찾아 옮겨 간다.
-const FIELD_ORDER = ['loginId', 'name', 'nickname', 'phone', 'email', 'password', 'passwordConfirm', 'birthDate', 'agreeCreditInfo']
+const FIELD_ORDER = ['loginId', 'name', 'nickname', 'phone', 'email', 'password', 'passwordConfirm', 'birthDate', 'agreements']
 // 폼 값 키 → 검사 오류 키(휴대폰·이메일은 여러 칸이 오류 하나를 같이 쓴다).
 const ERROR_KEY_OF = {
   phoneMiddle: 'phone',
@@ -49,7 +60,8 @@ const ERROR_KEY_OF = {
   emailCustomDomain: 'email',
 }
 // 서버 칸별 오류 field → 화면 오류 키. 서버는 생일 대신 출생연도(birthYear)로 검사한다.
-const SERVER_FIELD_KEY = { birthYear: 'birthDate' }
+// FP-258 필수 동의 칸 오류(agreeTerms·agreePrivacy)는 동의 묶음(agreements) 아래에 보인다.
+const SERVER_FIELD_KEY = { birthYear: 'birthDate', agreeTerms: 'agreements', agreePrivacy: 'agreements' }
 
 // 칸을 감싸는 요소의 id. 첫 오류 칸으로 옮겨 갈 때 이 id로 찾는다.
 const fieldWrapperId = (key) => `signup-field-${key}`
@@ -57,28 +69,15 @@ const fieldWrapperId = (key) => `signup-field-${key}`
 // 단계형 가입(토스 방식) — 한 화면에 한 가지 일. 제목은 질문형 두 줄, 칸은 그 단계에 필요한 것만.
 // fields는 검사 오류 키(FIELD_ORDER와 같은 이름)이고, [다음]은 그 단계 칸만 검사한다. 가입 요청은 마지막 단계에서 한 번만 보낸다.
 const SIGNUP_STEPS = [
-  { key: 'terms', title: ['Avenue를 시작하려면', '동의가 필요해요'], fields: ['agreeCreditInfo'], next: '동의하고 시작하기' },
+  { key: 'terms', title: ['Avenue를 시작하려면', '동의가 필요해요'], fields: ['agreements'], next: '동의하고 시작하기' },
   { key: 'identity', title: ['본인 확인을 위해', '휴대폰 인증을 시작할게요'], fields: ['name', 'birthDate', 'phone'], next: '다음' },
   { key: 'email', title: ['계정 안내를 받을', '이메일을 인증해 주세요'], fields: ['email'], next: '다음' },
   { key: 'account', title: ['로그인에 사용할', '아이디와 닉네임을 정해 주세요'], fields: ['loginId', 'nickname'], next: '다음' },
   { key: 'password', title: ['로그인에 사용할', '비밀번호를 입력해 주세요'], fields: ['password', 'passwordConfirm'], next: '가입하기' },
 ]
-// 칸 안 오른쪽의 비밀번호 보기·숨기기 눈 아이콘 버튼
-function PasswordEye({ shown, onToggle }) {
-  return (
-    <button type="button" className="signup-form__eye" onClick={onToggle} aria-label={shown ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={shown}>
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
-        <circle cx="12" cy="12" r="3" />
-        {!shown && <path d="M4 4l16 16" />}
-      </svg>
-    </button>
-  )
-}
-
 const stepIndexOf = (key) => SIGNUP_STEPS.findIndex((item) => item.fields.includes(key))
 
-// N-02 회원가입 화면 — 형식 검사·닉네임 중복 확인·휴대폰 인증·이메일 인증·필수 동의를 거쳐 계정을 만든다. 직군은 가입 후 직군 선택 화면(FP-85)에서 받는다.
+// N-02 회원가입 화면 — 형식 검사·아이디·닉네임 중복 확인·휴대폰 인증·이메일 인증·필수 동의를 거쳐 계정을 만든다. 직군은 가입 후 직군 선택 화면(FP-85)에서 받는다.
 // 11/18 1차 시연 후속: 칸마다 한 번 입력했거나 칸을 벗어난 뒤부터 입력할 때마다 검사해 칸 아래에 바로 보여 준다(손대지 않은 칸은 [가입하기] 전까지 조용하다).
 //   중복 확인·인증을 아직 안 했다는 문구(SIGNUP_PENDING_MESSAGES)는 [가입하기]를 누른 뒤에만 보인다.
 export default function SignupPage() {
@@ -95,10 +94,9 @@ export default function SignupPage() {
   const [touched, setTouched] = useState(() => ({ name: Boolean(socialSignup?.name), email: Boolean(socialSignup?.email) }))
   const [emailVerification, setEmailVerification] = useState(null)
   const [phoneVerification, setPhoneVerification] = useState(null)
-  // 닉네임 중복 확인 결과 { nickname, available }. 닉네임을 고치면 nickname이 달라져 확인이 풀린 것으로 본다.
-  const [nicknameCheck, setNicknameCheck] = useState(null)
-  const [nicknameCheckError, setNicknameCheckError] = useState('')
-  const [nicknameChecking, setNicknameChecking] = useState(false)
+  // N-02-1 닉네임·아이디(FP-258) [중복 확인] — 결과는 확인한 값에만 유효해서, 고치면 확인이 풀린 것으로 본다.
+  const nicknameCheck = useAvailabilityCheck(checkNicknameAvailability)
+  const loginIdCheck = useAvailabilityCheck(checkLoginIdAvailability)
   const [submitted, setSubmitted] = useState(false)
   const [serverErrors, setServerErrors] = useState({})
   const [formError, setFormError] = useState('')
@@ -109,17 +107,20 @@ export default function SignupPage() {
   const [shownKeys, setShownKeys] = useState([])
   // 단계를 옮길 때 포커스를 줄 칸(없으면 그 단계 첫 입력)
   const [focusKey, setFocusKey] = useState(null)
-  // 비밀번호 보기·숨기기(두 칸이 함께 바뀐다)
-  const [showPassword, setShowPassword] = useState(false)
+  // FP-258 [보기]로 펼친 동의 항목(약관 전문 자리)
+  const [openConsent, setOpenConsent] = useState(null)
+  // FP-258 비밀번호 보기·숨기기는 칸마다 따로 바뀐다(usePasswordReveal). 실패하면 보기 상태를 그대로 둔다.
+  const { reveal, hideAll } = usePasswordReveal()
+  const bindFilter = useImeSafeFilter()
 
   const email = joinEmail(form.emailLocal, resolveEmailDomain(form.emailDomainChoice, form.emailCustomDomain))
   const phone = joinPhone(form.phoneMiddle, form.phoneLast)
   const nickname = form.nickname.trim()
   const emailVerified = emailVerification !== null && emailVerification.email === email
   const phoneVerified = phoneVerification !== null && phoneVerification.phone === phone
-  const nicknameChecked = nicknameCheck?.nickname === nickname && nicknameCheck.available
-  const nicknameTaken = nicknameCheck?.nickname === nickname && !nicknameCheck.available
-  const checkContext = { emailVerified, phoneVerified, nicknameChecked }
+  const nicknameChecked = nicknameCheck.checked(nickname)
+  const loginIdChecked = loginIdCheck.checked(form.loginId)
+  const checkContext = { emailVerified, phoneVerified, nicknameChecked, loginIdChecked }
   const validation = validateSignup(
     { ...form, emailDomain: resolveEmailDomain(form.emailDomainChoice, form.emailCustomDomain) },
     checkContext,
@@ -128,7 +129,8 @@ export default function SignupPage() {
   // 칸 하나에 보여 줄 오류. 서버 오류(중복 등)가 먼저이고, 검사 오류는 손댄 칸이거나 [가입하기]를 누른 뒤에만 보인다.
   const errorOf = (key) => {
     if (serverErrors[key]) return serverErrors[key]
-    if (key === 'nickname' && nicknameTaken) return '이미 사용 중인 닉네임입니다.'
+    if (key === 'nickname' && nicknameCheck.taken(nickname)) return '이미 사용 중인 닉네임입니다.'
+    if (key === 'loginId' && loginIdCheck.taken(form.loginId)) return '이미 사용 중인 아이디입니다.'
     const forced = submitted || shownKeys.includes(key)
     if (!touched[key] && !forced) return ''
     const message = validation[key] ?? ''
@@ -153,6 +155,15 @@ export default function SignupPage() {
     })
   }
   const update = (field) => (value) => patchForm({ [field]: value })
+  // FP-258 칸별 걸러내기(validation.js)를 거친 값만 넣는다(한글 조합은 끝날 때, useImeSafeFilter).
+  const filteredInput = (field, filter) => bindFilter((value) => patchForm({ [field]: value }), filter)
+  // 아이디를 고치면 지난 [중복 확인]의 요청 오류(형식 400 등)도 지운다.
+  const loginIdInput = bindFilter((value) => {
+    loginIdCheck.clearError()
+    patchForm({ loginId: value })
+  }, filterSignupLoginId)
+  const nameInput = filteredInput('name', filterName)
+  const nicknameInput = filteredInput('nickname', filterNickname)
 
   // 칸을 감싼 요소. 안쪽 입력에서 포커스가 빠져나가면(blur는 감싼 요소까지 올라온다) 손댄 칸으로 표시한다.
   const fieldProps = (key) => ({ id: fieldWrapperId(key), onBlur: () => markTouched(key) })
@@ -175,21 +186,6 @@ export default function SignupPage() {
     setFormError('')
     setFocusKey(null)
     setStep((prev) => Math.max(0, prev - 1))
-  }
-
-  // N-02-1 [중복 확인] — 형식 검사를 통과한 닉네임만 서버에 묻는다. 결과는 그 닉네임에만 유효하다.
-  const handleNicknameCheck = async () => {
-    setNicknameChecking(true)
-    setNicknameCheckError('')
-    try {
-      const { available } = await checkNicknameAvailability(nickname)
-      setNicknameCheck({ nickname, available })
-    } catch (error) {
-      setNicknameCheck(null)
-      setNicknameCheckError(error.message)
-    } finally {
-      setNicknameChecking(false)
-    }
   }
 
   const handleSubmit = async (event) => {
@@ -226,11 +222,15 @@ export default function SignupPage() {
         password: form.password,
         birthYear,
         ageGroup: toAgeGroup(birthYear),
-        agreeCreditInfo: form.agreeCreditInfo,
+        agreeTerms: form.agreeTerms,
+        agreePrivacy: form.agreePrivacy,
+        agreeMarketing: form.agreeMarketing,
         emailVerificationToken: emailVerification.verificationToken,
         phoneVerificationToken: phoneVerification.verificationToken,
         ...(socialSignup?.linkKey ? { socialLinkKey: socialSignup.linkKey } : {}),
       })
+      // FP-258 가입이 성공했으니 자동 로그인·화면 이동 전에 비밀번호를 가린다.
+      hideAll()
       // 가입하자마자 같은 아이디·비밀번호로 로그인해 직군 선택(가입 여정 2단계)으로 보낸다. 소셜 가입은 비밀번호 로그인 대상이 아니라 완료 화면을 그대로 보여 준다.
       if (!socialSignup?.linkKey) {
         try {
@@ -247,11 +247,14 @@ export default function SignupPage() {
       const code = error?.data?.code
       const fieldErrors = error?.data?.fieldErrors
       let nextErrors = null
-      if (code === AUTH_ERROR_CODES.DUPLICATE_LOGIN_ID) nextErrors = { loginId: error.message }
-      else if (code === AUTH_ERROR_CODES.DUPLICATE_EMAIL) nextErrors = { email: error.message }
+      if (code === AUTH_ERROR_CODES.DUPLICATE_LOGIN_ID) {
+        // FP-258 확인한 뒤 다른 사람이 같은 아이디로 먼저 가입한 경우 — 닉네임처럼 확인 결과를 풀어 다시 확인하게 한다.
+        loginIdCheck.reset()
+        nextErrors = { loginId: error.message }
+      } else if (code === AUTH_ERROR_CODES.DUPLICATE_EMAIL) nextErrors = { email: error.message }
       else if (code === AUTH_ERROR_CODES.DUPLICATE_NICKNAME) {
         // 확인한 뒤 다른 사람이 같은 닉네임으로 먼저 가입한 경우 — 확인 결과도 풀어서 다시 확인하게 한다.
-        setNicknameCheck(null)
+        nicknameCheck.reset()
         nextErrors = { nickname: error.message }
       }
       // 서버가 칸별 오류(fieldErrors [{ field, message }])를 주면 그 칸 아래에 보여 준다(예: 출생연도 → 생일 칸).
@@ -278,34 +281,54 @@ export default function SignupPage() {
   // 단계 칸 하나를 그린다(칸 모양·검사·인증은 예전 한 화면 가입과 같다)
   const renderField = (key) => {
     switch (key) {
-      case 'agreeCreditInfo':
+      case 'agreements': {
+        const allAgreed = SIGNUP_CONSENT_ITEMS.every((item) => form[item.key])
         return (
           <>
-            <div {...fieldProps('agreeCreditInfo')}>
-              <Checkbox
-                label={CREDIT_INFO_AGREEMENT_LABEL}
-                checked={form.agreeCreditInfo}
-                onChange={update('agreeCreditInfo')}
-                error={errorOf('agreeCreditInfo')}
-              />
+            {/* FP-258 N-02-2 가입 동의 — [전체 동의] + 필수 2·선택 1. 필수 둘을 모두 체크해야 [동의하고 시작하기]가 켜진다.
+                칸을 오가는 중에는 안내를 띄우지 않으려고 손댄 칸 표시(onBlur)를 달지 않는다. 약관 전문은 아직 없어 [보기]는 자리만 있다. */}
+            <div id={fieldWrapperId('agreements')} className="signup-consent">
+              <div className="signup-consent__all">
+                <Checkbox
+                  label="전체 동의"
+                  checked={allAgreed}
+                  onChange={(checked) => patchForm(Object.fromEntries(SIGNUP_CONSENT_ITEMS.map((item) => [item.key, checked])))}
+                />
+              </div>
+              {SIGNUP_CONSENT_ITEMS.map((item) => (
+                <div key={item.key} className="signup-consent__item">
+                  <div className="signup-consent__row">
+                    <Checkbox label={item.label} checked={form[item.key]} onChange={update(item.key)} />
+                    <button
+                      type="button"
+                      className="signup-consent__view"
+                      aria-expanded={openConsent === item.key}
+                      onClick={() => setOpenConsent((prev) => (prev === item.key ? null : item.key))}
+                    >
+                      보기
+                    </button>
+                  </div>
+                  {openConsent === item.key && <p className="form-field__hint">약관 전문은 준비 중입니다.</p>}
+                </div>
+              ))}
+              <FieldError message={errorOf('agreements')} />
             </div>
           </>
         )
+      }
       case 'name':
         return (
-          <>
-            <div {...fieldProps('name')}>
-              <TextInput
-                label="이름"
-                value={form.name}
-                onChange={update('name')}
-                error={errorOf('name')}
-                placeholder="한글 이름"
-                autoComplete="name"
-                maxLength={20}
-              />
-            </div>
-          </>
+          <div {...fieldProps('name')} {...nameInput.compositionProps}>
+            <TextInput
+              label="이름"
+              value={form.name}
+              onChange={nameInput.onChange}
+              error={errorOf('name')}
+              placeholder="한글 이름"
+              autoComplete="name"
+              maxLength={20}
+            />
+          </div>
         )
       case 'birthDate':
         return (
@@ -325,50 +348,62 @@ export default function SignupPage() {
         )
       case 'phone':
         return (
-          <>
-            <div {...fieldProps('phone')}>
-              <PhoneVerification
-                middle={form.phoneMiddle}
-                last={form.phoneLast}
-                onChange={({ middle, last }) => patchForm({ phoneMiddle: middle, phoneLast: last })}
-                purpose={PHONE_PURPOSES.SIGNUP}
-                verified={phoneVerified}
-                onVerified={setPhoneVerification}
-                error={errorOf('phone')}
-              />
-            </div>
-          </>
+          <div {...fieldProps('phone')}>
+            <PhoneVerification
+              middle={form.phoneMiddle}
+              last={form.phoneLast}
+              onChange={({ middle, last }) => patchForm({ phoneMiddle: middle, phoneLast: last })}
+              purpose={PHONE_PURPOSES.SIGNUP}
+              verified={phoneVerified}
+              onVerified={setPhoneVerification}
+              error={errorOf('phone')}
+            />
+          </div>
         )
       case 'email':
         return (
-          <>
-            <div {...fieldProps('email')}>
-              <SplitEmailField
-                local={form.emailLocal}
-                domainChoice={form.emailDomainChoice}
-                customDomain={form.emailCustomDomain}
-                onChange={patchForm}
-                purpose={EMAIL_PURPOSES.SIGNUP}
-                verified={emailVerified}
-                onVerified={setEmailVerification}
-                error={errorOf('email')}
-              />
-            </div>
-          </>
+          <div {...fieldProps('email')}>
+            <SplitEmailField
+              local={form.emailLocal}
+              domainChoice={form.emailDomainChoice}
+              customDomain={form.emailCustomDomain}
+              onChange={patchForm}
+              purpose={EMAIL_PURPOSES.SIGNUP}
+              verified={emailVerified}
+              onVerified={setEmailVerification}
+              error={errorOf('email')}
+            />
+          </div>
         )
       case 'loginId':
         return (
           <>
-            <div {...fieldProps('loginId')}>
-              <TextInput
-                label="아이디"
-                value={form.loginId}
-                onChange={update('loginId')}
-                error={errorOf('loginId')}
-                placeholder="영문 소문자로 시작, 4~20자"
-                autoComplete="username"
-                maxLength={20}
-              />
+            {/* FP-258 N-02-1 아이디 — 닉네임과 같은 [중복 확인](AUTH-16). 형식이 맞을 때만 눌리고, 중복이면 칸 테두리와 칸 아래 문구로 알린다. */}
+            <div {...fieldProps('loginId')} {...loginIdInput.compositionProps} className="auth-field">
+              <div className="signup-form__row">
+                <TextInput
+                  label="아이디"
+                  value={form.loginId}
+                  onChange={loginIdInput.onChange}
+                  error={errorOf('loginId') || loginIdCheck.error}
+                  placeholder="영문 소문자로 시작, 4~20자"
+                  autoComplete="username"
+                  maxLength={20}
+                />
+                <button
+                  type="button"
+                  className="signup-form__check"
+                  onClick={() => loginIdCheck.run(form.loginId)}
+                  disabled={loginIdCheck.checking || validateLoginId(form.loginId) !== ''}
+                >
+                  중복 확인
+                </button>
+              </div>
+              {loginIdChecked && (
+                <p className="auth-message auth-message--success" role="status">
+                  사용할 수 있는 아이디입니다.
+                </p>
+              )}
             </div>
           </>
         )
@@ -377,12 +412,12 @@ export default function SignupPage() {
           <>
             {/* N-02-1 닉네임 — 한글·영문·숫자 2~7자(DDL 2~12자보다 좁게, 새 가입에만), 중복 불가. [중복 확인]은 형식이 맞을 때만 눌린다. 가입할 때 서버가 한 번 더 막는다. */}
             {/* auth-field: 칸 밖의 성공·오류 문구가 TextInput 안 오류와 같은 간격(5px)에 놓이게 묶는다. */}
-            <div {...fieldProps('nickname')} className="auth-field">
+            <div {...fieldProps('nickname')} {...nicknameInput.compositionProps} className="auth-field">
               <div className="signup-form__row">
                 <TextInput
                   label="닉네임"
                   value={form.nickname}
-                  onChange={update('nickname')}
+                  onChange={nicknameInput.onChange}
                   placeholder={`2~${NICKNAME_MAX}자`}
                   autoComplete="nickname"
                   maxLength={NICKNAME_MAX}
@@ -390,8 +425,8 @@ export default function SignupPage() {
                 <button
                   type="button"
                   className="signup-form__check"
-                  onClick={handleNicknameCheck}
-                  disabled={nicknameChecking || validateNickname(form.nickname) !== ''}
+                  onClick={() => nicknameCheck.run(nickname)}
+                  disabled={nicknameCheck.checking || validateNickname(form.nickname) !== ''}
                 >
                   중복 확인
                 </button>
@@ -403,7 +438,7 @@ export default function SignupPage() {
                 </p>
               )}
               <FieldError message={errorOf('nickname')} />
-              <FieldError message={nicknameCheckError} />
+              <FieldError message={nicknameCheck.error} />
             </div>
           </>
         )
@@ -411,45 +446,39 @@ export default function SignupPage() {
         return (
           <>
             <div {...fieldProps('password')}>
-              <div className="signup-form__row">
-                <TextInput
-                  label="비밀번호"
-                  type={showPassword ? 'text' : 'password'}
-                  value={form.password}
-                  onChange={update('password')}
-                  error={errorOf('password')}
-                  placeholder="비밀번호"
-                  autoComplete="new-password"
-                />
-                <PasswordEye shown={showPassword} onToggle={() => setShowPassword((prev) => !prev)} />
-              </div>
+              <PasswordField
+                label="비밀번호"
+                rule="new"
+                value={form.password}
+                onChange={update('password')}
+                error={errorOf('password')}
+                placeholder="비밀번호"
+                autoComplete="new-password"
+                {...reveal('password')}
+              />
             </div>
             <PasswordRuleList password={form.password} />
           </>
         )
       case 'passwordConfirm':
         return (
-          <>
-            <div {...fieldProps('passwordConfirm')} className="auth-field">
-              <div className="signup-form__row">
-                <TextInput
-                  label="비밀번호 확인"
-                  type={showPassword ? 'text' : 'password'}
-                  value={form.passwordConfirm}
-                  onChange={update('passwordConfirm')}
-                  error={errorOf('passwordConfirm')}
-                  placeholder="비밀번호 다시 입력"
-                  autoComplete="new-password"
-                />
-                <PasswordEye shown={showPassword} onToggle={() => setShowPassword((prev) => !prev)} />
-              </div>
-              {form.passwordConfirm && form.password === form.passwordConfirm && (
-                <p className="auth-message auth-message--success" role="status">
-                  비밀번호가 일치합니다.
-                </p>
-              )}
-            </div>
-          </>
+          <div {...fieldProps('passwordConfirm')} className="auth-field">
+            <PasswordField
+              label="비밀번호 확인"
+              rule="new"
+              value={form.passwordConfirm}
+              onChange={update('passwordConfirm')}
+              error={errorOf('passwordConfirm')}
+              placeholder="비밀번호 다시 입력"
+              autoComplete="new-password"
+              {...reveal('passwordConfirm')}
+            />
+            {form.passwordConfirm && form.password === form.passwordConfirm && (
+              <p className="auth-message auth-message--success" role="status">
+                비밀번호가 일치합니다.
+              </p>
+            )}
+          </div>
         )
       default:
         return null

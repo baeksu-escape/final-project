@@ -124,7 +124,7 @@ class WithdrawalApiTest {
     // 가입 화면이 보내는 본문(합성 값). 이메일·휴대폰 인증 토큰 확인은 mock으로 대신한다.
     private static String signupBody(String email) {
         return "{\"loginId\":\"" + LOGIN_ID + "\",\"name\":\"홍길동\",\"nickname\":\"새닉네임\",\"phone\":\"01012345678\",\"email\":\"" + email
-                + "\",\"password\":\"newpass99\",\"birthYear\":1990,\"agreeCreditInfo\":true,\"agreeMarketing\":false,"
+                + "\",\"password\":\"newpass99\",\"birthYear\":1990,\"agreeTerms\":true,\"agreePrivacy\":true,\"agreeMarketing\":false,"
                 + "\"emailVerificationToken\":\"verified-1\",\"phoneVerificationToken\":\"phone-verified-1\"}";
     }
 

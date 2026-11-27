@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { TextInput } from '../../../common/components/index.js'
 import { requestPasswordChange } from '../api/myPageApi.js'
 import { AUTH_ERROR_CODES, SAME_PASSWORD_MESSAGE } from '../authConstants.js'
-import { validateNewPassword } from '../validation.js'
+import usePasswordReveal from '../usePasswordReveal.js'
+import { passwordTooLongError, validateNewPassword } from '../validation.js'
+import PasswordField from './PasswordField.jsx'
 import PasswordRuleList from './PasswordRuleList.jsx'
 
 // N-04-3 비밀번호 바꾸기 폼 — 현재 비밀번호와 새 비밀번호를 받는다. 새 비밀번호 규칙은 FP-87 가입과 같은 validateNewPassword로 검사한다.
@@ -12,9 +13,22 @@ export default function PasswordChangeForm({ onSaved, onCancel }) {
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
+  const { reveal, hideAll } = usePasswordReveal()
 
   // 항목 하나를 바꾸는 함수를 만든다.
-  const update = (field) => (value) => setForm((prev) => ({ ...prev, [field]: value }))
+  // FP-259 MYPAGE-06 값을 바꾸면 그 칸의 지난 오류와 폼 오류를 지운다. 새 비밀번호를 바꾸면 확인 칸 오류도,
+  // 현재 비밀번호를 바꾸면 새 비밀번호 칸의 "지금 쓰는 비밀번호와 같습니다"도 지운다(고친 뒤 남지 않게).
+  const update = (field) => (value) => {
+    setForm((prev) => ({ ...prev, [field]: value }))
+    setErrors((prev) => {
+      const next = { ...prev }
+      delete next[field]
+      if (field === 'password') delete next.passwordConfirm
+      if (field === 'currentPassword' && next.password === SAME_PASSWORD_MESSAGE) delete next.password
+      return next
+    })
+    setFormError('')
+  }
 
   // 입력을 검사한 뒤 저장을 요청한다. 현재 비밀번호가 틀리면 서버 안내를 그대로 보여 준다.
   // FP-222 새 비밀번호가 현재 비밀번호 칸과 같으면 보내지 않고, 서버가 SAME_PASSWORD로 막아도 같은 문구를 새 비밀번호 칸 아래에 보여 준다.
@@ -30,6 +44,7 @@ export default function PasswordChangeForm({ onSaved, onCancel }) {
     setPending(true)
     try {
       await requestPasswordChange({ currentPassword: form.currentPassword, newPassword: form.password })
+      hideAll()
       onSaved('비밀번호를 바꿨습니다.')
     } catch (saveError) {
       if (saveError.data?.code === AUTH_ERROR_CODES.SAME_PASSWORD) setErrors({ password: SAME_PASSWORD_MESSAGE })
@@ -40,30 +55,32 @@ export default function PasswordChangeForm({ onSaved, onCancel }) {
 
   return (
     <form className="account-form password-change-form" onSubmit={handleSubmit} noValidate>
-      <TextInput
+      <PasswordField
         label="현재 비밀번호"
-        type="password"
         value={form.currentPassword}
         onChange={update('currentPassword')}
         error={errors.currentPassword}
         autoComplete="current-password"
+        {...reveal('currentPassword')}
       />
-      <TextInput
+      <PasswordField
         label="새 비밀번호"
-        type="password"
+        rule="new"
         value={form.password}
         onChange={update('password')}
-        error={errors.password}
+        error={passwordTooLongError(form.password) || errors.password}
         autoComplete="new-password"
+        {...reveal('password')}
       />
       <PasswordRuleList password={form.password} />
-      <TextInput
+      <PasswordField
         label="새 비밀번호 확인"
-        type="password"
+        rule="new"
         value={form.passwordConfirm}
         onChange={update('passwordConfirm')}
         error={errors.passwordConfirm}
         autoComplete="new-password"
+        {...reveal('passwordConfirm')}
       />
       {formError && (
         <p className="account-form__error" role="alert">

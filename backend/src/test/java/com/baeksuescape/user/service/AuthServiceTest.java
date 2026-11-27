@@ -14,8 +14,10 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -25,10 +27,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.support.TransactionOperations;
 
 import com.baeksuescape.admin.service.AdminAuthService;
@@ -76,7 +80,8 @@ class AuthServiceTest {
     void setUp() {
         service = new AuthService(userMapper, consentMapper, socialMapper, emailVerification, phoneVerification, socialStore,
                 new UserViewFactory(userMapper, CRYPTO), tokenProvider, ENCODER, CRYPTO, HMAC, CLOCK, adminAuth,
-                new SystemLogService(systemLogMapper, TransactionOperations.withoutTransaction(), CLOCK), notificationService);
+                new SystemLogService(systemLogMapper, TransactionOperations.withoutTransaction(), CLOCK),
+                new LoginAttemptService(userMapper, ENCODER, CLOCK), notificationService);
     }
 
     private static String codeOf(Runnable action) {
@@ -103,6 +108,21 @@ class AuthServiceTest {
         assertThat(result.user()).isEqualTo(new AuthResponses.UserView(7L, "홍*동", "ROLE_USER", "EMPLOYEE", true));
         assertThat(result.devMode()).isNull();
         verify(userMapper).updateLoginSuccess(eq(7L), any());
+        // FP-258 성공 처리는 확인과 같은 행 잠금 안에서 한 번만 한다(잠금을 푼 뒤 다시 0으로 만들지 않는다).
+        InOrder order = inOrder(userMapper);
+        order.verify(userMapper).lockUser(7L);
+        order.verify(userMapper).updateLoginSuccess(eq(7L), any());
+    }
+
+    // FP-258 로그인 아이디는 앞뒤 공백을 빼고 소문자로 바꿔 조회한다(시드 demo_employee처럼 밑줄이 있는 아이디 포함).
+    @Test
+    void 로그인_아이디는_대문자로_입력해도_소문자로_조회한다() {
+        given(userMapper.selectByLoginId("demo_employee")).willReturn(UserFixtures.user(7L, "demo_employee"));
+        AuthResponses.Login result = (AuthResponses.Login) service.login(new AuthRequests.Login(" Demo_Employee ", PASSWORD));
+        assertThat(tokenProvider.parse(result.accessToken())).isPresent();
+        // FP-258 행을 잠근 뒤 한 번 더 읽으므로 두 번 모두 소문자 아이디로 조회한다.
+        verify(userMapper, org.mockito.Mockito.times(2)).selectByLoginId("demo_employee");
+        verify(userMapper, never()).selectByLoginId(" Demo_Employee ");
     }
 
     @Test
@@ -112,13 +132,109 @@ class AuthServiceTest {
         verify(userMapper).updateLoginFailure(eq(7L), eq(1), eq(false), any());
     }
 
+    // FP-258 단계적 제한 — 5회째 실패하면 429(5분), 제한 중에는 맞는 비밀번호도 429이고 횟수를 올리지 않는다.
     @Test
-    void 다섯_번째로_틀리면_잠그고_423() {
+    void 다섯_번째로_틀리면_5분_제한_429이고_잠그지_않는다() {
         UserAccount account = UserFixtures.user(7L, "employee");
         account.setLoginFailCount(4);
         given(userMapper.selectByLoginId("employee")).willReturn(account);
+        assertThatThrownBy(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getStatus().value()).isEqualTo(429);
+                    assertThat(e.getCode()).isEqualTo("LOGIN_TEMPORARILY_BLOCKED");
+                    assertThat(e.getMessage()).contains("5분");
+                });
+        verify(userMapper).updateLoginFailure(eq(7L), eq(5), eq(false), any());
+    }
+
+    // FP-290 동시 로그인 순서 재현 — 잠그기 전에 읽은 횟수(3회)는 다른 요청이 그사이 올렸을 수 있다.
+    // 행을 잠근(lockUser) 뒤 다시 읽은 횟수(앞선 요청이 커밋한 4회)에 1을 더해 5회째 429가 되어야 한다(예전에는 3+1=4로 덜 올라갔다).
+    @Test
+    void 동시에_보낸_실패는_행을_잠근_뒤_다시_읽은_횟수로_센다() {
+        UserAccount readBeforeLock = UserFixtures.user(7L, "employee");
+        readBeforeLock.setLoginFailCount(3);
+        UserAccount readAfterLock = UserFixtures.user(7L, "employee");
+        readAfterLock.setLoginFailCount(4);
+        given(userMapper.selectByLoginId("employee")).willReturn(readBeforeLock, readAfterLock);
+
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))).isEqualTo("429 LOGIN_TEMPORARILY_BLOCKED");
+        InOrder order = inOrder(userMapper);
+        order.verify(userMapper).selectByLoginId("employee");
+        order.verify(userMapper).lockUser(7L);
+        order.verify(userMapper).selectByLoginId("employee");
+        order.verify(userMapper).updateLoginFailure(eq(7L), eq(5), eq(false), any());
+    }
+
+    // FP-258 앞선 요청이 5회째로 제한을 건 뒤 잠금이 풀린 요청은, 다시 읽은 값으로 제한 중임을 알고 횟수를 올리지 않는다.
+    @Test
+    void 잠금을_기다린_요청은_앞선_요청이_건_5분_제한을_보고_횟수를_올리지_않는다() {
+        UserAccount readBeforeLock = UserFixtures.user(7L, "employee");
+        readBeforeLock.setLoginFailCount(4);
+        UserAccount readAfterLock = UserFixtures.user(7L, "employee");
+        readAfterLock.setLoginFailCount(5);
+        readAfterLock.setLastLoginFailAt(java.time.LocalDateTime.now(CLOCK));
+        given(userMapper.selectByLoginId("employee")).willReturn(readBeforeLock, readAfterLock);
+
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))).isEqualTo("429 LOGIN_TEMPORARILY_BLOCKED");
+        verify(userMapper, never()).updateLoginFailure(anyLong(), anyInt(), anyBoolean(), any());
+    }
+
+    @Test
+    void 제한_중에는_맞는_비밀번호도_429이고_횟수를_올리지_않으며_남은_분을_올림해_알린다() {
+        UserAccount account = UserFixtures.user(7L, "employee");
+        account.setLoginFailCount(5);
+        account.setLastLoginFailAt(java.time.LocalDateTime.now(CLOCK).minusSeconds(61));
+        given(userMapper.selectByLoginId("employee")).willReturn(account);
+
+        assertThatThrownBy(() -> service.login(new AuthRequests.Login("employee", PASSWORD)))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("LOGIN_TEMPORARILY_BLOCKED");
+                    assertThat(e.getMessage()).contains("4분");
+                });
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))).isEqualTo("429 LOGIN_TEMPORARILY_BLOCKED");
+        verify(userMapper, never()).updateLoginFailure(anyLong(), anyInt(), anyBoolean(), any());
+        verify(userMapper, never()).updateLoginSuccess(anyLong(), any());
+    }
+
+    @Test
+    void 제한이_끝나면_맞는_비밀번호로_로그인되고_틀리면_6회째는_401() {
+        UserAccount account = UserFixtures.user(7L, "employee");
+        account.setLoginFailCount(5);
+        account.setLastLoginFailAt(java.time.LocalDateTime.now(CLOCK).minusMinutes(5));
+        given(userMapper.selectByLoginId("employee")).willReturn(account);
+
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))).isEqualTo("401 LOGIN_FAILED");
+        verify(userMapper).updateLoginFailure(eq(7L), eq(6), eq(false), any());
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", PASSWORD)))).isEqualTo("no error");
+    }
+
+    // FP-258 5분 제한은 마지막 실패 시각으로만 잰다. 닉네임·이메일 변경으로 UPDATED_AT이 바뀌어도 늘어나거나 다시 시작되지 않는다.
+    @Test
+    void 다섯_번_실패_뒤_다른_정보를_고쳐도_제한은_마지막_실패_5분_뒤에_끝난다() {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(CLOCK);
+        UserAccount changedAfterFailure = UserFixtures.user(7L, "employee");
+        changedAfterFailure.setLoginFailCount(5);
+        changedAfterFailure.setLastLoginFailAt(now.minusMinutes(5));
+        changedAfterFailure.setUpdatedAt(now); // 방금 닉네임을 바꿈
+        given(userMapper.selectByLoginId("employee")).willReturn(changedAfterFailure);
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", PASSWORD)))).isEqualTo("no error");
+
+        UserAccount recentFailure = UserFixtures.user(8L, "seconduser");
+        recentFailure.setLoginFailCount(5);
+        recentFailure.setLastLoginFailAt(now.minusSeconds(61));
+        recentFailure.setUpdatedAt(now.minusDays(1));
+        given(userMapper.selectByLoginId("seconduser")).willReturn(recentFailure);
+        assertThatThrownBy(() -> service.login(new AuthRequests.Login("seconduser", PASSWORD)))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("4분"));
+    }
+
+    @Test
+    void 열_번째로_틀리면_잠그고_423() {
+        UserAccount account = UserFixtures.user(7L, "employee");
+        account.setLoginFailCount(9);
+        given(userMapper.selectByLoginId("employee")).willReturn(account);
         assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))).isEqualTo("423 ACCOUNT_LOCKED");
-        verify(userMapper).updateLoginFailure(eq(7L), eq(5), eq(true), any());
+        verify(userMapper).updateLoginFailure(eq(7L), eq(10), eq(true), any());
     }
 
     @Test
@@ -128,6 +244,37 @@ class AuthServiceTest {
         assertThat(codeOf(() -> service.login(new AuthRequests.Login("locked", "wrong1234")))).isEqualTo("401 LOGIN_FAILED");
         verify(userMapper, never()).updateLoginFailure(anyLong(), anyInt(), anyBoolean(), any());
         verify(userMapper, never()).updateLoginSuccess(anyLong(), any());
+    }
+
+    // FP-258 관리자는 비밀번호 찾기로 잠금을 풀 수 없어, 잠긴 관리자가 맞는 비밀번호를 넣으면 다른 code·문구(423 ADMIN_ACCOUNT_LOCKED)다.
+    @Test
+    void 잠긴_관리자는_비밀번호가_맞으면_423_ADMIN_ACCOUNT_LOCKED이고_틀리면_401() {
+        given(userMapper.selectByLoginId("admin")).willReturn(UserFixtures.account(1L, "admin", UserAccount.ROLE_ADMIN, UserAccount.LOCKED));
+        assertThatThrownBy(() -> service.login(new AuthRequests.Login("admin", PASSWORD)))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getStatus().value()).isEqualTo(423);
+                    assertThat(e.getCode()).isEqualTo("ADMIN_ACCOUNT_LOCKED");
+                    assertThat(e.getMessage()).isEqualTo("잠긴 관리자 계정입니다. 다른 관리자에게 잠금 해제를 요청해 주세요.");
+                });
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("admin", "wrong1234")))).isEqualTo("401 LOGIN_FAILED");
+        verify(adminAuth, never()).startLogin(any());
+        verify(userMapper, never()).updateLoginFailure(anyLong(), anyInt(), anyBoolean(), any());
+    }
+
+    // FP-258 관리자가 10회째 실패로 잠기는 순간에도 회원용(비밀번호 찾기) 안내가 아니라 관리자 안내다. 잠금 기록은 회원과 같다.
+    @Test
+    void 관리자가_10회째_실패로_잠기면_423_ADMIN_ACCOUNT_LOCKED() {
+        UserAccount admin = UserFixtures.account(1L, "admin", UserAccount.ROLE_ADMIN, UserAccount.ACTIVE);
+        admin.setLoginFailCount(9);
+        given(userMapper.selectByLoginId("admin")).willReturn(admin);
+        assertThatThrownBy(() -> service.login(new AuthRequests.Login("admin", "wrong1234")))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getStatus().value()).isEqualTo(423);
+                    assertThat(e.getCode()).isEqualTo("ADMIN_ACCOUNT_LOCKED");
+                });
+        verify(userMapper).updateLoginFailure(eq(1L), eq(10), eq(true), any());
+        verify(systemLogMapper).insertLog(eq("WARN"), eq("auth-service"), eq("로그인 10회 실패로 계정 자동 잠금 (ad***)"), eq(1L), any());
+        verify(adminAuth, never()).startLogin(any());
     }
 
     // FP-80 관리자는 비밀번호가 맞아도 토큰을 주지 않고 2단계 인증 대기 응답(AdminAuthService.startLogin)으로 넘어간다.
@@ -143,18 +290,23 @@ class AuthServiceTest {
         verify(userMapper, never()).updateLoginSuccess(anyLong(), any());
     }
 
-    // FP-80 N-28-1 로그인 성공(AUTH)·실패 n/5회(WARN)·자동 잠금(WARN)을 남긴다. 아이디는 앞 2자 + *** 만.
+    // FP-80 N-28-1 로그인 성공(AUTH)·실패 n/10회(WARN)·5분 제한(WARN, FP-258)·자동 잠금(WARN)을 남긴다. 아이디는 앞 2자 + *** 만.
     @Test
-    void 로그인_성공_실패_자동_잠금을_시스템_로그에_가린_아이디로_남긴다() {
+    void 로그인_성공_실패_제한_자동_잠금을_시스템_로그에_가린_아이디로_남긴다() {
         UserAccount account = UserFixtures.user(7L, "employee");
         given(userMapper.selectByLoginId("employee")).willReturn(account);
         service.login(new AuthRequests.Login("employee", PASSWORD));
         verify(systemLogMapper).insertLog(eq("AUTH"), eq("auth-service"), eq("로그인 성공 (em***)"), eq(7L), any());
 
         account.setLoginFailCount(4);
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))).isEqualTo("429 LOGIN_TEMPORARILY_BLOCKED");
+        verify(systemLogMapper).insertLog(eq("WARN"), eq("auth-service"), eq("로그인 실패 5/10회 (em***)"), eq(7L), any());
+        verify(systemLogMapper).insertLog(eq("WARN"), eq("auth-service"), eq("로그인 5회 실패로 5분 제한 (em***)"), eq(7L), any());
+
+        account.setLoginFailCount(9);
         assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))).isEqualTo("423 ACCOUNT_LOCKED");
-        verify(systemLogMapper).insertLog(eq("WARN"), eq("auth-service"), eq("로그인 실패 5/5회 (em***)"), eq(7L), any());
-        verify(systemLogMapper).insertLog(eq("WARN"), eq("auth-service"), eq("로그인 5회 실패로 계정 자동 잠금 (em***)"), eq(7L), any());
+        verify(systemLogMapper).insertLog(eq("WARN"), eq("auth-service"), eq("로그인 실패 10/10회 (em***)"), eq(7L), any());
+        verify(systemLogMapper).insertLog(eq("WARN"), eq("auth-service"), eq("로그인 10회 실패로 계정 자동 잠금 (em***)"), eq(7L), any());
     }
 
     // FP-80 시스템 로그 저장이 실패해도 로그인은 성공한다(별도 트랜잭션, 예외를 삼키고 앱 로그에 경고만).
@@ -201,7 +353,7 @@ class AuthServiceTest {
     private static AuthRequests.Signup signup(String name, String nickname, Integer birthYear, String phone, Boolean agree, String socialLinkKey,
             String phoneToken) {
         return new AuthRequests.Signup("newbie01", name, nickname, phone, "Newbie@Example.com", "abcd1234", birthYear, "AGE_30S",
-                agree, null, "token", socialLinkKey, phoneToken);
+                null, "token", socialLinkKey, phoneToken, agree, agree);
     }
 
     private void givenInsertReturnsId(long userId) {
@@ -212,7 +364,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void 가입하면_암호문_HMAC_동의_3행을_저장하고_인증_토큰을_쓴다() {
+    void 가입하면_암호문_HMAC_필수_동의를_저장하고_인증_토큰을_쓴다() {
         givenInsertReturnsId(100L);
         AuthResponses.Signup result = service.signup(signup("  새닉네임  ", 1990, PHONE, true, null));
 
@@ -224,15 +376,54 @@ class AuthServiceTest {
         UserAccount account = saved.getValue();
         assertThat(account.getNickname()).isEqualTo("새닉네임");
         assertThat(account.getNameEnc()).startsWith("v1:").doesNotContain("홍길동");
-        assertThat(CRYPTO.decrypt(account.getEmailEnc())).isEqualTo("Newbie@Example.com");
+        // FP-258 대문자로 보낸 이메일(Newbie@Example.com)은 소문자로 바꿔 암호문·HMAC·토큰 확인에 쓴다.
+        assertThat(CRYPTO.decrypt(account.getEmailEnc())).isEqualTo("newbie@example.com");
         assertThat(account.getEmailHmac()).isEqualTo(HMAC.email("newbie@example.com"));
         assertThat(account.getPhoneHmac()).isEqualTo(HMAC.phone("01012345678"));
         assertThat(ENCODER.matches("abcd1234", account.getPasswordHash())).isTrue();
-        verify(emailVerification).consume("token", EmailPurpose.SIGNUP, "Newbie@Example.com", null);
+        verify(emailVerification).consume("token", EmailPurpose.SIGNUP, "newbie@example.com", null);
         verify(phoneVerification).consume(PHONE_TOKEN, PhonePurpose.SIGNUP, "01012345678");
         verify(consentMapper).insertSignupConsent(eq(100L), eq("TERMS_OF_SERVICE"), eq("Y"), eq("Y"), any(), any());
         verify(consentMapper).insertSignupConsent(eq(100L), eq("PRIVACY_COLLECTION"), eq("Y"), eq("Y"), any(), any());
+        // 선택 동의는 체크하지 않아도 N·동의 시각 없음으로 한 행을 남긴다(시드 3행 모양).
         verify(consentMapper).insertSignupConsent(eq(100L), eq("NOTIFICATION_MARKETING"), eq("N"), eq("N"), isNull(), any());
+    }
+
+    // FP-258 N-02-2 필수 동의 2개·선택 1개를 따로 받는다 — 필수가 빠지면 그 칸 400, 모두 체크하면 3행(선택은 Y·동의 시각 있음).
+    @Test
+    void 필수_동의를_따로_받아_빠진_칸을_알리고_선택_동의를_기록한다() {
+        AuthRequests.Signup noPrivacy = consentSignup(true, false, false);
+        assertThat(fieldOf(() -> service.signup(noPrivacy))).isEqualTo("agreePrivacy");
+        AuthRequests.Signup noTerms = consentSignup(false, true, true);
+        assertThat(fieldOf(() -> service.signup(noTerms))).isEqualTo("agreeTerms");
+        verify(userMapper, never()).insertUser(any());
+
+        givenInsertReturnsId(100L);
+        service.signup(consentSignup(true, true, true));
+        verify(consentMapper).insertSignupConsent(eq(100L), eq("TERMS_OF_SERVICE"), eq("Y"), eq("Y"), any(), any());
+        verify(consentMapper).insertSignupConsent(eq(100L), eq("PRIVACY_COLLECTION"), eq("Y"), eq("Y"), any(), any());
+        verify(consentMapper).insertSignupConsent(eq(100L), eq("NOTIFICATION_MARKETING"), eq("N"), eq("Y"), notNull(), any());
+    }
+
+    private static AuthRequests.Signup consentSignup(boolean terms, boolean privacy, boolean marketing) {
+        return new AuthRequests.Signup("newbie01", "홍길동", "새닉네임", PHONE, "newbie@example.com", "abcd1234", 1990, "AGE_30S",
+                marketing, "token", null, PHONE_TOKEN, terms, privacy);
+    }
+
+    // FP-258 N-02-4 서버도 새 비밀번호를 화면과 같은 규칙으로 본다 — 한글·이모지 같은 ASCII 밖 글자, 64자 초과는 password 칸 400. 공백·기호는 된다.
+    @Test
+    void 새_비밀번호는_ASCII_출력_문자_64자_이하만_받는다() {
+        for (String password : new String[] { "abcd1234한", "abcd1234é", "abcd1234	", "a1" + "b".repeat(63) }) {
+            AuthRequests.Signup request = new AuthRequests.Signup("newbie01", "홍길동", "새닉네임", PHONE, "newbie@example.com", password, 1990,
+                    "AGE_30S", null, "token", null, PHONE_TOKEN, true, true);
+            assertThat(fieldOf(() -> service.signup(request))).as(password).isEqualTo("password");
+        }
+        // FP-258 64자를 넘으면 길이 안내 문구(화면 validation.js와 같음), 그 밖의 위반은 지금 문구.
+        assertThat(AccountRules.newPasswordError("a1" + "b".repeat(63), "규칙")).isEqualTo("비밀번호는 64자 이하로 입력해 주세요.");
+        assertThat(AccountRules.newPasswordError("abcd1234한", "규칙")).isEqualTo("규칙");
+        assertThat(AccountRules.newPasswordError("a1" + "b".repeat(62), "규칙")).isNull();
+        assertThat(AccountRules.isValidPassword("ab cd!@#1234")).isTrue();
+        assertThat(AccountRules.isValidPassword("a1" + "b".repeat(62))).isTrue();
     }
 
     @Test
@@ -321,8 +512,20 @@ class AuthServiceTest {
 
     @Test
     void 필수_동의가_없거나_휴대폰_형식이_틀리면_칸별_오류() {
-        assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, PHONE, false, null)))).isEqualTo("agreeCreditInfo");
+        assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, PHONE, false, null)))).isEqualTo("agreeTerms");
         assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, "02-123-4567", true, null)))).isEqualTo("phone");
+    }
+
+    // FP-258 예전 화면처럼 agreeCreditInfo만 보내면(agreeTerms·agreePrivacy 없음) 필수 동의 두 칸 모두 400이고 가입하지 않는다.
+    @Test
+    void 필수_동의_두_항목이_없으면_agreeCreditInfo를_보내도_두_칸_모두_400() {
+        assertThatThrownBy(() -> service.signup(signup("새닉네임", 1990, PHONE, null, null)))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(e.getCode()).isEqualTo("INVALID_INPUT");
+                    assertThat(e.getFieldErrors()).extracting(item -> item.field()).containsExactly("agreeTerms", "agreePrivacy");
+                });
+        verify(userMapper, never()).insertUser(any());
     }
 
     // ---- 11/18 1차 시연 후속: 휴대폰 필수·인증, 이름 한글, 닉네임 중복 확인 ----
@@ -350,6 +553,18 @@ class AuthServiceTest {
                 .when(phoneVerification).consume(any(), any(), any());
     }
 
+    // FP-258 이메일 규칙 — 한글·기호·점 연속·처음/끝 점·밑줄 도메인·숫자 최상위 도메인은 email 칸 400이고 가입하지 않는다.
+    @Test
+    void 한글이나_규칙에_맞지_않는_이메일은_가입_email_칸_오류() {
+        for (String email : new String[] { "홍길동@example.com", "a..b@example.com", ".ab@example.com", "ab.@example.com", "a+b@example.com",
+                "ab@ex_ample.com", "ab@-example.com", "ab@example.c", "ab@example.c1", "ab@example" }) {
+            AuthRequests.Signup request = new AuthRequests.Signup("newbie01", "홍길동", "새닉네임", PHONE, email, "abcd1234", 1990, "AGE_30S",
+                    null, "token", null, PHONE_TOKEN, true, true);
+            assertThat(fieldOf(() -> service.signup(request))).as(email).isEqualTo("email");
+        }
+        verify(userMapper, never()).insertUser(any());
+    }
+
     @Test
     void 이름은_완성형_한글_2에서_20자만_통과한다() {
         givenInsertReturnsId(100L);
@@ -369,6 +584,22 @@ class AuthServiceTest {
             assertThat(fieldOf(() -> service.checkNickname(new AuthRequests.NicknameCheck(nickname)))).as(nickname).isEqualTo("nickname");
         }
         assertThat(fieldOf(() -> service.checkNickname(new AuthRequests.NicknameCheck(null)))).isEqualTo("nickname");
+    }
+
+    // FP-258 AUTH-16 아이디 중복 확인 — 가입과 같은 중복 기준(countByLoginId)·형식 문구, 형식이 틀리면 DB를 보지 않고 400(loginId 칸)
+    @Test
+    void 아이디_확인은_쓸_수_있음_이미_있음_형식_오류_400() {
+        given(userMapper.countByLoginId("newbie01")).willReturn(0);
+        given(userMapper.countByLoginId("employee")).willReturn(1);
+        assertThat(service.checkLoginId(new AuthRequests.LoginIdCheck("newbie01")).available()).isTrue();
+        assertThat(service.checkLoginId(new AuthRequests.LoginIdCheck("employee")).available()).isFalse();
+        for (String loginId : new String[] { "1abc", "abc", "Abcd", "abc_d", "abc d", "a".repeat(21) }) {
+            assertThat(fieldOf(() -> service.checkLoginId(new AuthRequests.LoginIdCheck(loginId)))).as(loginId).isEqualTo("loginId");
+            assertThat(codeOf(() -> service.checkLoginId(new AuthRequests.LoginIdCheck(loginId)))).as(loginId).isEqualTo("400 INVALID_INPUT");
+            verify(userMapper, never()).countByLoginId(loginId);
+        }
+        assertThat(fieldOf(() -> service.checkLoginId(new AuthRequests.LoginIdCheck("")))).isEqualTo("loginId");
+        assertThat(fieldOf(() -> service.checkLoginId(new AuthRequests.LoginIdCheck(null)))).isEqualTo("loginId");
     }
 
     @Test
@@ -395,24 +626,92 @@ class AuthServiceTest {
 
     // ---- AUTH-09 아이디 찾기, AUTH-10 비밀번호 재설정 ----
 
+    // FP-258 아이디 찾기는 이름 + 휴대폰·이메일 인증 토큰(FIND_ID). 토큰을 먼저 쓰고, 통과하면 가리지 않은 아이디도 준다.
     @Test
-    void 이름과_휴대폰이_맞으면_가린_아이디를_준다() {
+    void 휴대폰_인증을_마치고_이름이_맞으면_가리지_않은_아이디를_준다() {
         given(userMapper.selectUsersByPhoneHmac(HMAC.phone("01012345678"))).willReturn(List.of(UserFixtures.user(7L, "jwc1226")));
-        assertThat(service.findId(new AuthRequests.FindId("홍길동", "010-1234-5678")).maskedLoginId()).isEqualTo("jwc****");
-        assertThat(codeOf(() -> service.findId(new AuthRequests.FindId("김철수", "010-1234-5678")))).isEqualTo("404 ACCOUNT_NOT_FOUND");
+        AuthResponses.FoundId found = service.findId(new AuthRequests.FindId("홍길동", "010-1234-5678", "PHONE", null, "phone-token"));
+        assertThat(found.maskedLoginId()).isEqualTo("jwc****");
+        assertThat(found.loginId()).isEqualTo("jwc1226");
+        verify(phoneVerification).consume("phone-token", PhonePurpose.FIND_ID, "01012345678");
+
+        assertThat(codeOf(() -> service.findId(new AuthRequests.FindId("김철수", "010-1234-5678", "PHONE", null, "phone-token"))))
+                .isEqualTo("404 ACCOUNT_NOT_FOUND");
+    }
+
+    @Test
+    void 이메일_인증을_마치고_이름이_맞으면_아이디를_주고_없으면_같은_404() {
+        given(userMapper.selectUserByEmailHmac(HMAC.email("jwc1226@example.com"))).willReturn(UserFixtures.user(7L, "jwc1226"));
+        AuthResponses.FoundId found = service.findId(new AuthRequests.FindId("홍길동", null, "EMAIL", " jwc1226@example.com ", "email-token"));
+        assertThat(found.loginId()).isEqualTo("jwc1226");
+        verify(emailVerification).consume("email-token", EmailPurpose.FIND_ID, "jwc1226@example.com", null);
+
+        assertThat(codeOf(() -> service.findId(new AuthRequests.FindId("홍길동", null, "EMAIL", "nobody@example.com", "email-token"))))
+                .isEqualTo("404 ACCOUNT_NOT_FOUND");
+        assertThat(codeOf(() -> service.findId(new AuthRequests.FindId("김철수", null, "EMAIL", "jwc1226@example.com", "email-token"))))
+                .isEqualTo("404 ACCOUNT_NOT_FOUND");
+    }
+
+    @Test
+    void 인증_토큰이_없거나_방법을_모르면_400이고_회원을_찾지_않는다() {
+        assertThat(fieldOf(() -> service.findId(new AuthRequests.FindId("홍길동", "010-1234-5678", "PHONE", null, null)))).isEqualTo("phone");
+        assertThat(codeOf(() -> service.findId(new AuthRequests.FindId("홍길동", null, "EMAIL", "a@example.com", " "))))
+                .isEqualTo("400 EMAIL_VERIFICATION_REQUIRED");
+        assertThat(fieldOf(() -> service.findId(new AuthRequests.FindId("홍길동", "010-1234-5678", null, null, "token")))).isEqualTo("method");
+        verify(userMapper, never()).selectUsersByPhoneHmac(anyString());
+        verify(userMapper, never()).selectUserByEmailHmac(anyString());
     }
 
     @Test
     void 재설정은_인증_토큰을_계정과_함께_확인하고_잠금을_푼다() {
         given(userMapper.selectUserByLoginIdAndEmailHmac("employee", HMAC.email("employee@example.com"))).willReturn(UserFixtures.user(7L, "employee"));
-        service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "newpass99"));
+        service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "newpass99", "홍길동"));
         verify(emailVerification).consume("token", EmailPurpose.RESET_PASSWORD, "employee@example.com", 7L);
         verify(userMapper).updatePasswordAndUnlock(eq(7L), anyString(), any());
 
-        assertThat(codeOf(() -> service.resetPassword(new AuthRequests.PasswordReset("nobody", "employee@example.com", "token", "newpass99"))))
+        assertThat(codeOf(() -> service.resetPassword(new AuthRequests.PasswordReset("nobody", "employee@example.com", "token", "newpass99", "홍길동"))))
                 .isEqualTo("404 ACCOUNT_NOT_FOUND");
-        assertThatThrownBy(() -> service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "short")))
+        assertThatThrownBy(() -> service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "short", "홍길동")))
                 .isInstanceOf(ApiException.class);
+    }
+
+    // FP-258 아이디·이메일이 맞아도 이름이 다르면 같은 404이고, 인증 토큰을 쓰지 않는다(이름이 없거나 형식이 틀리면 400, 아래 시험).
+    @Test
+    void 재설정은_이름까지_같아야_하고_다르면_404() {
+        given(userMapper.selectUserByLoginIdAndEmailHmac("employee", HMAC.email("employee@example.com"))).willReturn(UserFixtures.user(7L, "employee"));
+        assertThat(codeOf(() -> service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "newpass99", "김철수"))))
+                .isEqualTo("404 ACCOUNT_NOT_FOUND");
+        verify(emailVerification, never()).consume(anyString(), any(), anyString(), anyLong());
+        verify(userMapper, never()).updatePasswordAndUnlock(anyLong(), anyString(), any());
+    }
+
+    // FP-258 찾기 화면의 이름은 가입과 같은 규칙 — 형식이 틀리거나 없으면 400 name 칸이고, 계정을 찾거나 토큰을 쓰지 않는다.
+    @Test
+    void 아이디_찾기와_재설정의_이름_형식이_틀리면_400_name_칸() {
+        for (String name : new String[] { "hong", "홍길동1", "홍 길동", "ㄱㄴ", "홍", "" }) {
+            assertThat(fieldOf(() -> service.findId(new AuthRequests.FindId(name, "010-1234-5678", "PHONE", null, "phone-token")))).as(name)
+                    .isEqualTo("name");
+            assertThat(fieldOf(() -> service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "newpass99", name))))
+                    .as(name).isEqualTo("name");
+        }
+        assertThat(fieldOf(() -> service.resetPassword(new AuthRequests.PasswordReset("employee", "employee@example.com", "token", "newpass99", null))))
+                .isEqualTo("name");
+        verify(phoneVerification, never()).consume(anyString(), any(), anyString());
+        verify(userMapper, never()).selectUsersByPhoneHmac(anyString());
+        verify(userMapper, never()).selectUserByLoginIdAndEmailHmac(anyString(), anyString());
+        verify(emailVerification, never()).consume(anyString(), any(), anyString(), anyLong());
+    }
+
+    // FP-258 아이디 찾기·재설정의 이메일과 재설정 아이디는 앞뒤 공백을 빼고 소문자로 바꿔 찾는다.
+    @Test
+    void 찾기와_재설정은_대문자_이메일과_아이디를_소문자로_바꿔_찾는다() {
+        given(userMapper.selectUserByEmailHmac(HMAC.email("jwc1226@example.com"))).willReturn(UserFixtures.user(7L, "jwc1226"));
+        service.findId(new AuthRequests.FindId("홍길동", null, "EMAIL", " JWC1226@Example.COM ", "email-token"));
+        verify(emailVerification).consume("email-token", EmailPurpose.FIND_ID, "jwc1226@example.com", null);
+
+        given(userMapper.selectUserByLoginIdAndEmailHmac("employee", HMAC.email("employee@example.com"))).willReturn(UserFixtures.user(7L, "employee"));
+        service.resetPassword(new AuthRequests.PasswordReset(" Employee ", "Employee@Example.com", "token", "newpass99", "홍길동"));
+        verify(emailVerification).consume("token", EmailPurpose.RESET_PASSWORD, "employee@example.com", 7L);
     }
 
     // FP-80 관리자는 공개 비밀번호 찾기(AUTH-10)·아이디 찾기(AUTH-09)를 쓸 수 없다 — 조회가 일반 회원만 찾으므로 "없는 계정"과 같은 응답이다.
@@ -420,15 +719,15 @@ class AuthServiceTest {
     void 관리자_아이디로_비밀번호_찾기를_하면_없는_계정과_같은_응답() throws java.io.IOException {
         // 매퍼 SQL이 일반 회원(ROLE_USER)만 찾는다 → 관리자 아이디면 조회 결과가 없다(mock은 기본 null).
         String xml = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/mapper/user/UserAccountMapper.xml"));
-        for (String id : new String[] { "selectUserByLoginIdAndEmailHmac", "selectUsersByPhoneHmac" }) {
+        for (String id : new String[] { "selectUserByLoginIdAndEmailHmac", "selectUsersByPhoneHmac", "selectUserByEmailHmac" }) {
             java.util.regex.Matcher m = java.util.regex.Pattern.compile("<select id=\"" + id + "\"[^>]*>(.*?)</select>", java.util.regex.Pattern.DOTALL)
                     .matcher(xml);
             assertThat(m.find()).isTrue();
             assertThat(m.group(1)).contains("ROLE_CODE = 'ROLE_USER'");
         }
 
-        String admin = codeOf(() -> service.resetPassword(new AuthRequests.PasswordReset("admin01", "admin01@example.com", "token", "newpass99")));
-        String unknown = codeOf(() -> service.resetPassword(new AuthRequests.PasswordReset("nobody", "nobody@example.com", "token", "newpass99")));
+        String admin = codeOf(() -> service.resetPassword(new AuthRequests.PasswordReset("admin01", "admin01@example.com", "token", "newpass99", "홍길동")));
+        String unknown = codeOf(() -> service.resetPassword(new AuthRequests.PasswordReset("nobody", "nobody@example.com", "token", "newpass99", "홍길동")));
         assertThat(admin).isEqualTo(unknown).isEqualTo("404 ACCOUNT_NOT_FOUND");
         verify(emailVerification, never()).consume(anyString(), any(), anyString(), anyLong());
     }

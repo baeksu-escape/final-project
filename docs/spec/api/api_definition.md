@@ -95,8 +95,9 @@
 | 409 | `CREDIT_PROFILE_IMPORTED` | 같은 기준일에 불러온 신용 정보가 있어 직접 입력 저장 불가 |
 | 409 | `SOCIAL_ALREADY_LINKED` | 이미 연결된 간편 로그인 |
 | 409 | `CANNOT_CHANGE_SELF`, `ACCOUNT_WITHDRAWN`, `ADMIN_EMAIL_UNAVAILABLE` | 본인 잠금, 탈퇴 계정 잠금, 관리자 업무 이메일 복호화 불가 |
-| 423 | `ACCOUNT_LOCKED` | 잠긴 계정 로그인 시도 |
+| 423 | `ACCOUNT_LOCKED` | 잠긴 계정 로그인 시도(누적 10회 실패 자동 잠금 포함, FP-258) 🆕 11/26 |
 | 429 | `CODE_RESEND_TOO_SOON` | 인증번호 1분 안에 재요청 |
+| 429 | `LOGIN_TEMPORARILY_BLOCKED` | 로그인 5회 실패 뒤 5분 제한(AUTH-01·05, 문구에 남은 분, FP-258) 🆕 11/26 |
 | 503 | `ALT_DATA_SOURCE_UNAVAILABLE` | 기관 응답 파일 폴더 없음 |
 
 - B팀 점수 산출 오류(`INPUT_INCOMPLETE`, `REQUEST_ID_CONFLICT`, `ASSESSMENT_NOT_FOUND` 등)는 B팀 명세서 3장에 있다.
@@ -129,24 +130,25 @@
 
 | ID | 메서드 · 경로 | 기능 | 주요 표 | 인증 | 상태 |
 |---|---|---|---|---|---|
-| AUTH-01 | `POST /api/auth/login` | N-01-1 로그인 (관리자는 `{ twoFactorRequired, challengeToken, maskedEmail }`로 2단계 인증 시작, [다시 보내기]도 이 경로·1분 1번) | `APP_USER` | 없음 | ✅ |
+| AUTH-01 | `POST /api/auth/login` | N-01-1 로그인 (관리자는 `{ twoFactorRequired, challengeToken, maskedEmail }`로 2단계 인증 시작, [다시 보내기]도 이 경로·1분 1번). 🆕 11/26 FP-258 5회째 실패하면 5분 동안 429 `LOGIN_TEMPORARILY_BLOCKED`, 누적 10회째 잠금 423 | `APP_USER` | 없음 | ✅ |
 | AUTH-02 | `POST /api/auth/logout` | N-01-4 로그아웃 | — | USER·ADMIN | ✅ |
 | AUTH-03 | `GET /api/auth/me` | N-01-2 역할별 첫 화면 이동 (로그인 정보) | `APP_USER` | USER·ADMIN | ✅ |
 | AUTH-04 | `POST /api/auth/social/exchange` | N-01-6 소셜 로그인 (코드 교환) | `USER_SOCIAL_ACCOUNT` | 없음 | ✅ |
 | AUTH-05 | `POST /api/auth/social/link` | N-01-6 소셜 로그인 (계정 연결) | `USER_SOCIAL_ACCOUNT` | 없음 | ✅ |
 | AUTH-06 | `POST /api/auth/signup` | N-02-1 가입 정보 입력·형식 검사, N-02-2 필수 동의, N-02-4 계정 생성·개인정보 암호화 저장. 휴대폰 인증 필수(`phoneVerificationToken`), 이름 한글 2~20자, 닉네임 2~7자 | `APP_USER`, `USER_CONSENT` | 없음 | ✅ |
-| AUTH-07 | `POST /api/auth/email/send` | N-02-3 이메일 인증코드 발송·확인 (발송) | `VERIFICATION_CODE` | 없음 | ✅ |
-| AUTH-08 | `POST /api/auth/email/verify` | N-02-3 이메일 인증코드 발송·확인 (확인) | `VERIFICATION_CODE` | 없음 | ✅ |
-| AUTH-09 | `POST /api/auth/find-id` | N-03-1 아이디 찾기 (관리자 계정은 찾지 않음) | `APP_USER`(HMAC 조회) | 없음 | ✅ |
-| AUTH-10 | `POST /api/auth/password/reset` | N-03-2 비밀번호 찾기 본인 확인, N-03-3 비밀번호 재설정 (관리자 아이디는 "없는 계정"과 같은 404) | `APP_USER`, `VERIFICATION_CODE` | 없음 | ✅ |
+| AUTH-07 | `POST /api/auth/email/send` | N-02-3 이메일 인증코드 발송·확인 (발송. 🆕 11/26 `purpose`에 `FIND_ID` 추가 — 가입 여부와 상관없이 보냄, FP-258) | `VERIFICATION_CODE` | 없음 | ✅ |
+| AUTH-08 | `POST /api/auth/email/verify` | N-02-3 이메일 인증코드 발송·확인 (확인. 🆕 11/26 재설정 목적은 `name`도 받아 아이디·이메일·이름이 같은 계정만 통과, 아니면 404) | `VERIFICATION_CODE` | 없음 | ✅ |
+| AUTH-09 | `POST /api/auth/find-id` | N-03-1 아이디 찾기 (관리자 계정은 찾지 않음). 🆕 11/26 FP-258 `{ method: PHONE\|EMAIL, name, phone 또는 email, verificationToken }` → `{ maskedLoginId, loginId }` — 휴대폰(AUTH-14·15)·이메일(AUTH-07·08) `FIND_ID` 인증 토큰 필수, 통과하면 가리지 않은 아이디 | `APP_USER`(HMAC 조회), `VERIFICATION_CODE` | 없음 | ✅ |
+| AUTH-10 | `POST /api/auth/password/reset` | N-03-2 비밀번호 찾기 본인 확인, N-03-3 비밀번호 재설정 (관리자 아이디는 "없는 계정"과 같은 404). 🆕 11/26 `name` 추가 — 아이디·이메일·이름이 같은 계정만, 아니면 같은 404 | `APP_USER`, `VERIFICATION_CODE` | 없음 | ✅ |
 | AUTH-11 | `POST /api/auth/admin/verify-code` | 관리자 로그인 2단계 인증 (6자리 번호). 통과 `{ token, user }`, 임시 비밀번호면 `{ passwordChangeRequired, passwordSetupToken }` | `VERIFICATION_CODE`(`ADMIN_LOGIN`) | 없음(challengeToken) | ✅ |
 | AUTH-12 | `POST /api/auth/admin/password-setup` | 관리자 첫 비밀번호 설정 `{ passwordSetupToken, newPassword }` → `{ token, user }` | `APP_USER` | 없음(setup 토큰) | ✅ (새 경로) |
 | AUTH-13 | `POST /api/auth/nickname/check` | N-02-1 닉네임 중복 확인 `{ nickname }` → `{ available }` (주소에 닉네임을 남기지 않으려고 POST, 가입 때 서버가 다시 막음) | `APP_USER` | 없음 | ✅ (FP-219, PR #89) |
-| AUTH-14 | `POST /api/auth/phone/send` | N-02-3 휴대폰 인증번호 발송 `{ phone, purpose }` → `{ expiresInSeconds }` (`purpose`는 `SIGNUP`만, 실제 문자 발송 없음 — 개발용 로그·고정 번호) | `VERIFICATION_CODE`(`PHONE`) | 없음 | ✅ (FP-219, PR #89) |
-| AUTH-15 | `POST /api/auth/phone/verify` | N-02-3 휴대폰 인증번호 확인 `{ phone, code, purpose }` → `{ verificationToken }` (10분, AUTH-06 `phoneVerificationToken`에 넣음) | `VERIFICATION_CODE`(`PHONE`) | 없음 | ✅ (FP-219, PR #89) |
+| AUTH-14 | `POST /api/auth/phone/send` | N-02-3 휴대폰 인증번호 발송 `{ phone, purpose }` → `{ expiresInSeconds }` (`purpose`는 `SIGNUP`·`FIND_ID`(🆕 11/26 아이디 찾기, FP-258), 실제 문자 발송 없음 — 개발용 로그·고정 번호) | `VERIFICATION_CODE`(`PHONE`) | 없음 | ✅ (FP-219, PR #89) |
+| AUTH-15 | `POST /api/auth/phone/verify` | N-02-3 휴대폰 인증번호 확인 `{ phone, code, purpose }` → `{ verificationToken }` (10분, AUTH-06 `phoneVerificationToken`에 넣음. 🆕 11/26 `FIND_ID` 목적 토큰은 AUTH-09 `verificationToken`) | `VERIFICATION_CODE`(`PHONE`) | 없음 | ✅ (FP-219, PR #89) |
+| AUTH-16 🆕 11/27 | `POST /api/auth/login-id/check` | N-02-1 아이디 중복 확인 `{ loginId }` → `{ available }` (AUTH-13과 같은 모양, 형식이 틀리면 400 `loginId` 칸, 가입 때 서버가 다시 막음) | `APP_USER` | 없음 | ✅ (FP-258) |
 
 - `user` = `{ userId, name, role, jobType, hasScore }`. AUTH-11·12의 토큰 필드 이름은 `token`(AUTH-01은 `accessToken`), 화면은 둘 다 받는다.
-- AUTH-13~15 요청·응답·오류 상세는 [A팀 명세서](api_spec_a.md) 1장. 휴대폰 번호는 원문 없이 HMAC과 인증번호 해시만 저장한다.
+- AUTH-13~16(🆕 11/27 AUTH-16 추가) 요청·응답·오류 상세는 [A팀 명세서](api_spec_a.md) 1장. 휴대폰 번호는 원문 없이 HMAC과 인증번호 해시만 저장한다.
 
 ### 2-2. 마이페이지 — 담당 우찬 (FP-77)
 
