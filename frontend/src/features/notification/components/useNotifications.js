@@ -6,6 +6,9 @@ import { adaptNotifications } from '../adapters/notificationAdapter.js'
 import { readNotificationEvents } from '../adapters/sseReader.js'
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../api/notificationApi.js'
 
+// D-23 알림 페이지에서 읽음 처리하면 이 이벤트로 헤더 드롭다운·배지를 다시 불러오게 한다.
+export const NOTIFICATIONS_CHANGED_EVENT = 'avenue:notifications-changed'
+
 const waitForReconnect = (signal, delay) => new Promise((resolve) => {
   const finish = () => { window.clearTimeout(timer); signal.removeEventListener('abort', finish); resolve() }
   const timer = window.setTimeout(finish, delay)
@@ -28,6 +31,12 @@ export function useNotifications(enabled = true) {
       .catch(() => { if (active) setState((current) => ({ ...current, loading: false, error: '알림을 불러오지 못했어요.' })) })
     return () => { active = false }
   }, [enabled])
+
+  useEffect(() => {
+    if (!enabled) return undefined
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh)
+    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh)
+  }, [enabled, refresh])
 
   const addNotification = useCallback((item) => {
     setState((current) => {

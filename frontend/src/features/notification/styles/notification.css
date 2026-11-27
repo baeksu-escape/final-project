@@ -9,6 +9,10 @@
 .nt-list { display: grid; gap: 2px; margin: 0; padding: 6px 0 0; list-style: none; }
 .nt-item { display: grid; width: 100%; gap: 3px; padding: 9px 7px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--fg); text-align: left; font: inherit; cursor: pointer; }
 .nt-item:hover { background: var(--panel2); }
+.nt-li { position: relative; }
+.nt-li .nt-item { padding-right: 32px; }
+.nt-dismiss { position: absolute; top: 7px; right: 4px; display: inline-flex; padding: 4px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--mut); cursor: pointer; }
+.nt-dismiss:hover { background: var(--panel); color: var(--fg); }
 .nt-item__heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .nt-item__title, .nt-item__content { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nt-item__title { flex: 1; }

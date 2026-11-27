@@ -12,6 +12,13 @@ const BellIcon = () => (
   </svg>
 )
 
+// D-23 드롭다운 알림의 읽음 처리(X) 아이콘.
+const CloseIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+    <path d="M6 6l12 12M18 6L6 18" />
+  </svg>
+)
+
 const relativeTime = (value) => {
   const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60000))
   if (minutes < 1) return '방금 전'
@@ -47,6 +54,11 @@ export default function NotificationBell({ enabled = true }) {
       if (item.linkUrl) navigate(item.linkUrl)
     } catch { setActionError('읽음 처리에 실패했어요.') }
   }
+  // D-23 X 버튼 — 이동하지 않고 읽음 처리만 해서 드롭다운에서 뺀다(알림 페이지에는 읽음으로 남음).
+  const dismissItem = async (item) => {
+    try { await notifications.markRead(item.notificationId); setActionError('') }
+    catch { setActionError('읽음 처리에 실패했어요.') }
+  }
   const readAll = async () => {
     try { await notifications.markAllRead(); setActionError('') }
     catch { setActionError('읽음 처리에 실패했어요.') }
@@ -62,7 +74,7 @@ export default function NotificationBell({ enabled = true }) {
         {notifications.loading ? <p className="hint">알림을 불러오는 중이에요.</p>
           : notifications.error ? <p className="hint" role="status">{notifications.error}</p>
             : notifications.items.length === 0 ? <p className="hint">새 알림이 없어요.</p>
-              : <ul className="nt-list">{notifications.items.slice(0, PANEL_LIMIT).map((item) => <li key={item.notificationId}>
+              : <ul className="nt-list">{notifications.items.slice(0, PANEL_LIMIT).map((item) => <li key={item.notificationId} className="nt-li">
                 <button type="button" className={item.read ? 'nt-item' : 'nt-item nt-item--unread'} onClick={() => selectItem(item)}>
                   <span className="nt-item__heading">
                     <strong className="nt-item__title">{item.title}</strong>
@@ -70,6 +82,7 @@ export default function NotificationBell({ enabled = true }) {
                   <span className="nt-item__content">{item.content}</span>
                   <time className="nt-item__time" dateTime={item.createdAt}>{relativeTime(item.createdAt)}</time>
                 </button>
+                <button type="button" className="nt-dismiss" aria-label={`${item.title} 읽음 처리`} title="읽음 처리" onClick={() => dismissItem(item)}><CloseIcon /></button>
               </li>)}</ul>}
         {actionError && <p className="hint" role="status">{actionError}</p>}
       </section>}

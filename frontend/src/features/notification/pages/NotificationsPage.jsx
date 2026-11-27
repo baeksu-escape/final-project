@@ -5,6 +5,7 @@ import { PATHS } from '../../../common/config/navigation.js'
 import { adaptNotifications } from '../adapters/notificationAdapter.js'
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../api/notificationApi.js'
 import '../styles/notification.css'
+import { NOTIFICATIONS_CHANGED_EVENT } from '../components/useNotifications.js'
 
 const PAGE_SIZE = 20
 const TABS = [
@@ -60,7 +61,10 @@ export default function NotificationsPage() {
   }
   const selectItem = async (item) => {
     try {
-      if (!item.read) await markNotificationRead(item.notificationId)
+      if (!item.read) {
+        await markNotificationRead(item.notificationId)
+        window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT))
+      }
       setHistory((current) => current.type === type
         ? { ...current, items: current.items.map((row) => row.notificationId === item.notificationId ? { ...row, read: true } : row), unreadCount: Math.max(0, current.unreadCount - Number(!item.read)) }
         : current)
@@ -70,6 +74,7 @@ export default function NotificationsPage() {
   const readAll = async () => {
     try {
       await markAllNotificationsRead()
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT))
       setHistory((current) => ({ ...current, items: current.items.map((item) => ({ ...item, read: true })), unreadCount: 0 }))
       setActionError('')
     } catch { setActionError('읽음 처리에 실패했어요.') }
@@ -93,7 +98,7 @@ export default function NotificationsPage() {
     <main className="nt-page">
       <div className="page-head">
         <div>
-          <span className="page-head__tag">D-23</span>
+          <span className="page-head__tag">내 알림</span>
           <h1 className="page-head__title">알림</h1>
           <p className="page-head__lead">새 점수와 댓글, 처리 안내를 모아 봅니다.</p>
         </div>
