@@ -1,6 +1,6 @@
 import { ApiError } from '../../../common/api/ApiError.js'
 
-// FP-258 13차 N-01-3·N-02-1·N-02-3 서버의 반복 시도 제한(ClientRateLimiter)과 하루 인증코드 발송 상한(AuthErrors.DAILY_CODE_SEND_LIMIT)을 mock에서 흉내 낸다.
+// FP-258 N-01-3·N-02-1·N-02-3 서버의 반복 시도 제한(ClientRateLimiter)과 하루 인증코드 발송 상한(AuthErrors.DAILY_CODE_SEND_LIMIT)을 mock에서 흉내 낸다.
 // mock에는 접속 IP가 없어 브라우저 탭 하나를 한 접속지로 보고, 새로고침하면 초기화된다. 숫자·문구는 서버와 같다.
 export const MOCK_RATE_RULES = Object.freeze({
   LOGIN_FAILURE: { limit: 20, windowMs: 10 * 60 * 1000, message: '로그인 시도가 너무 많습니다.' },

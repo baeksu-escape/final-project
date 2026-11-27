@@ -175,7 +175,7 @@ class UserApiContractTest {
                 .andExpect(jsonPath("$.available").value(false));
     }
 
-    // FP-258 13차 같은 IP가 중복 확인을 1분에 30회 넘게 부르면 31회째는 429 TOO_MANY_REQUESTS이고 문구를 그대로 준다(다른 시험과 섞이지 않게 IP를 따로 쓴다).
+    // FP-258 같은 IP가 중복 확인을 1분에 30회 넘게 부르면 31회째는 429 TOO_MANY_REQUESTS이고 문구를 그대로 준다(다른 시험과 섞이지 않게 IP를 따로 쓴다).
     @Test
     void 같은_IP의_중복_확인이_1분에_30회를_넘으면_429() throws Exception {
         given(authService.checkLoginId(any())).willReturn(new AuthResponses.LoginIdAvailability(true));

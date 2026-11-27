@@ -1,708 +1,130 @@
-# 로그인·회원가입 1차 테스트 반영 — 단계적 로그인 제한·잠금 안내·아이디 찾기 본인 인증·비밀번호 찾기 이름 확인
+# 로그인·회원가입·찾기 피드백 반영 — 단계적 로그인 제한, 입력 규칙, 본인 확인, 인증 보안 고도화
 
-- **날짜:** 2026-11-26
+- **날짜:** 2026-11-26 ~ 2026-11-27
 - **작성자:** JWC1226 / Claude Code
-- **브랜치:** `feature-A/FP-258-auth-feedback` (develop `d7f5e5d`에서 시작)
-- **관련 N-ID:** N-01-3, N-03-1, N-03-2
-- **관련 결정:** 1차 테스트 피드백(Jira FP-258). 시험 번호 AUTH-07(단계적 잠금)·AUTH-17(아이디 찾기)·AUTH-18(비밀번호 찾기)·AUTH-19(잠긴 계정)는 API 번호와 다르다.
+- **브랜치:** `feature-A/FP-258-auth-feedback` (develop `d7f5e5d`에서 시작, 마지막 develop 반영 `f1f8d48`)
+- **관련 N-ID:** N-01-1, N-01-3, N-01-6, N-02-1, N-02-2, N-02-3, N-02-4, N-03-1, N-03-2, N-04-3
+- **관련 결정:** 1차 테스트 피드백(Jira FP-258), 멘토링 반영(FP-290·FP-294·FP-295·FP-296 일부), PR #164·#173 검수. 시험 번호 AUTH-07·17·18·19는 API 번호와 다르다.
 
 ## 무엇을, 왜 바꿨나
-- **단계적 로그인 제한(N-01-3, 시험 AUTH-07):** 5회 실패하면 바로 잠기던 것을 바꿨다.
-  - 5회째 실패하면 그때부터 5분 동안 비밀번호와 상관없이 로그인을 거절한다(429 `LOGIN_TEMPORARILY_BLOCKED`, 문구에 남은 분).
-  - 제한 중에는 실패 횟수를 올리지 않는다. 제한은 5회째에 한 번만 걸고(11/26 결정), 5분 뒤 6~9회째 실패는 401이다.
-  - 누적 10회째에 잠근다(423). 마지막 실패 시각은 `APP_USER.UPDATED_AT`(로그인 실패가 고치는 열)을 쓴다.
-- **잠금 안내(N-01-3):** 문구를 "잠긴 계정입니다. 비밀번호 찾기에서 이메일 인증 후 비밀번호를 재설정하면 풀립니다."로 바꾸고, 로그인 화면 안내 아래에 [비밀번호 찾기] 링크를 뒀다.
-  - 잠긴 계정의 동작(틀린 비밀번호 401, 맞는 비밀번호 423)은 그대로다(시험 AUTH-19).
-- **아이디 찾기 본인 인증(N-03-1, 시험 AUTH-17):** 이름·휴대폰만 맞으면 보여 주던 것을 바꿨다.
-  - 이름 + [휴대폰 | 이메일] 중 하나의 인증코드(목적 `FIND_ID`)를 통과해야 찾고, 가리지 않은 아이디를 보여 준다.
+### 로그인(N-01-1·N-01-3·N-01-6)
+- **단계적 제한:** 5회째 실패하면 5분 동안 비밀번호와 상관없이 429 `LOGIN_TEMPORARILY_BLOCKED`(남은 분 문구, 제한 중 횟수 그대로)이고, 누적 10회째에 잠근다(423). 5분 제한은 정확히 5회째에 한 번만 건다(11/26 결정).
+  - 기준 시각은 새 열 `APP_USER.LAST_LOGIN_FAIL_AT`이다. 처음에는 `UPDATED_AT`을 썼는데, 닉네임 변경 같은 다른 수정이 제한을 늘려 바꿨다(PR #164 검수).
+  - 실패 횟수를 0으로 돌리는 곳(로그인 성공, 재설정, 관리자 잠금 해제·임시 비밀번호)은 이 시각도 비운다.
+- **잠금 안내:** 회원은 "잠긴 계정입니다. 비밀번호 찾기에서 이메일 인증 후 비밀번호를 재설정하면 풀립니다."와 [비밀번호 찾기] 링크를 본다. 관리자는 423 `ADMIN_ACCOUNT_LOCKED`(다른 관리자에게 해제 요청)를 보고 링크는 없다. 관리자 안내는 잠긴 상태에서 맞는 비밀번호, 10회째 잠금, 2단계 인증 중 잠금에 모두 해당한다.
+- 간편 로그인 연결(AUTH-05)도 같은 `authenticate`를 거쳐 같은 제한을 받고, 화면은 429 서버 문구를 그대로 보인다.
+- **비밀번호 보기:** 칸 안 눈 버튼(`PasswordField`, 값이 있을 때만)을 둔다. 보기 상태는 칸마다 따로이고(`usePasswordReveal`), 요청이 성공했을 때만 가린다.
+
+### 입력 규칙(N-02-1·N-02-4)
+- 칸마다 허용하지 않는 글자를 입력·붙여넣기 때 지운다(`validation.js` filter 함수들). 판정 규칙은 따로 둔다.
+- 한글 조합 중에는 거르지 않고 조합이 끝날 때 한 번 거른다(`useImeSafeFilter`). 조합 중에 값을 바꾸면 Windows 한글 IME가 써 둔 글자를 덮어썼기 때문이다. 커서는 "입력 위치 − 앞쪽에서 빠진 글자 수"로 되돌린다.
+- **이메일:** 새 규칙(앞부분 `a-z0-9._-`, 도메인 덩어리 규칙, 소문자로 저장)은 가입·이메일 변경에만 쓴다. 아이디·비밀번호 찾기는 기존 이메일도 찾도록 기본 형식만 본다(칸은 공백·@만 지움). 관리자 업무 이메일(ADM-07)은 develop처럼 기본 형식이다.
+- **새 비밀번호:** 영문·숫자를 섞어 8~64자, ASCII 출력 문자만(서버도 같음, BCrypt 72바이트 안). 64자를 넘으면 자르지 않고 "비밀번호는 64자 이하로 입력해 주세요."로 막는다. 보기 상태에서 친 한글은 두벌식 영문 키로 바꾼다(`hangulToQwerty`). 로그인·현재 비밀번호·탈퇴 칸은 거르지 않는다.
+- **이름:** 자모가 남으면 "이름을 완성해 입력해 주세요."이다(화면만, 서버는 `NAME_RULE_MESSAGE`).
+- **가입 아이디 [중복 확인]:** AUTH-16 `POST /api/auth/login-id/check`를 새로 만들었다. 아이디·닉네임을 모두 확인해야 [다음]이 켜진다.
+
+### 가입 동의·인증코드(N-02-2·N-02-3)
+- 1단계는 [전체 동의] + 필수 2(이용약관, 개인정보 수집·이용) + 선택 1(점수 변동 알림·혜택 안내)이다.
+  - 서버는 `agreeTerms`·`agreePrivacy`가 각각 true여야 하고, 빠진 칸마다 400이다. 예전 `agreeCreditInfo`는 읽지 않는다(PR #173 검수).
+  - `USER_CONSENT`는 develop과 같게 늘 3행이다. 선택 동의를 안 했으면 `N`이고 동의 시각이 없다.
+- 같은 이메일·휴대폰으로 하루(0시부터) 10회까지 보낸다(429 `CODE_SEND_DAILY_LIMIT`, 목적 무관, 관리자 번호 제외).
+- 같은 접속지(IP) 반복 시도 제한(`ClientRateLimiter`, 서버 메모리):
+  - 로그인·연결 실패: 10분 20회
+  - 닉네임·아이디 확인: 1분 30회
+  - 이메일·휴대폰 발송: 1시간 20회
+
+### 찾기(N-03-1·N-03-2)
+- **아이디 찾기:** 이름 + [휴대폰 | 이메일] 인증(목적 `FIND_ID`)을 마쳐야 하고, 가리지 않은 아이디를 보여 준다.
   - 코드는 가입 여부와 상관없이 보낸다.
-- **비밀번호 찾기 이름 확인(N-03-2, 시험 AUTH-18):** 인증코드 확인과 재설정 모두 아이디·이름·이메일이 같은 계정만 통과한다. [아이디 확인] 버튼은 만들지 않았다.
+  - 찾은 뒤와 토큰 오류 뒤에는 인증을 비워 다시 인증할 수 있다.
+- **비밀번호 찾기:** 인증코드 확인과 재설정 모두 아이디·이름·이메일이 같은 계정만 통과한다(다르면 같은 404).
+  - 재설정 중 토큰이 만료되면(400 `EMAIL_VERIFICATION_REQUIRED`) 인증 단계로 돌아가 안내한다.
+- 두 화면 모두 이름을 가입과 같은 규칙으로 요청 전·칸을 벗어날 때 본다. 휴대폰·이메일 묶음은 벗어날 때 검사한다(`useBlurCheck`).
+
+## 원인이 있던 버그와 고친 방법
+- **동시 로그인 실패 횟수가 덜 오름(FP-290)**
+  - 처음 원인: 같은 계정의 동시 요청이 같은 횟수를 읽었다. → `lockUser`(FOR UPDATE)로 잠근 뒤 다시 읽게 했다. SQL `+1`은 5를 건너뛸 수 있어 쓰지 않았다.
+  - 그래도 로컬 DB에서는 동시 5회에 횟수가 1만 올랐다. MyBatis 1차 캐시가 잠근 뒤 다시 읽는 조회에 잠그기 전 값을 돌려줬기 때문이다. → `lockUser`에 `flushCache="true"`를 붙였다(단위 시험은 가짜 매퍼라 잡지 못했다).
+- **로그인 실패 로그가 커넥션 풀을 바닥냄(PR #173)**
+  - 원인: 잠근 트랜잭션 안의 `systemLog.record`(REQUIRES_NEW)가 커넥션을 하나 더 요청했다. 같은 아이디로 풀 크기(10) 이상 몰리면 서로 기다리며 막혔다.
+  - 고친 방법: `LoginAttemptService.attempt`가 자기 트랜잭션에서 조회·잠금·갱신만 하고 결과를 돌려준다. `authenticate`는 트랜잭션 없이 받은 뒤 로그를 남기고 오류를 던진다. `login`·`SocialLoginService.link`의 `@Transactional`은 뺐고, `AdminAuthService.startLogin`에는 달았다.
+  - 달라진 점: 성공 처리가 잠금과 따로 커밋된다. 맞는·틀린 비밀번호가 정확히 동시에 오면 틀린 1회가 지워질 수 있다.
+- **인증코드 하루 상한을 동시 요청으로 넘김(PR #173)**
+  - 원인: 같은 트랜잭션 안에서 "세기 → 비교 → 기록"을 해서 동시 요청이 같은 수를 읽었다.
+  - 고친 방법: `CodeSendGuard`(서버 메모리 잠금 64개)가 대상(채널 + HMAC) 잠금을 트랜잭션 밖에서 잡는다. `TransactionTemplate`으로 세기 → 비교 → 기록 → 발송 → 커밋을 끝낸 뒤 푼다.
+- **IP 로그인 실패 20회 제한을 동시 요청으로 넘김(PR #173):** 요청 전에 `compute`로 한 자리를 원자적으로 잡고, 401로 끝나지 않으면 돌려준다.
 
 ## 바뀐 파일
 | 파일 | 변경 내용 (1줄) |
 |------|-----------------|
-| `backend/.../user/service/AuthService.java` | `authenticate` 단계적 제한(상수 5회·5분·10회, 주입 Clock), `findId` 방법별 토큰 소비 + 이름 비교 + `loginId`, `resetPassword` 이름 비교 |
-| `backend/.../user/service/AuthErrors.java` | 잠금 문구 변경, `loginTemporarilyBlocked(minutes)` 429 추가 |
-| `backend/.../user/service/EmailVerificationService.java` | 재설정 목적 확인에서 이름 비교(`PiiCrypto` 주입) |
-| `backend/.../user/service/AccountRules.java` | 이름 비교 `nameMatches` |
-| `backend/.../user/service/EmailPurpose.java`, `PhonePurpose.java` | `FIND_ID` 추가 |
-| `backend/.../user/dto/AuthRequests.java` | `FindId`에 `method`·`email`·`verificationToken`(`phone` 필수 해제), `EmailVerify`·`PasswordReset`에 `name` |
-| `backend/.../user/dto/AuthResponses.java` | `FoundId`에 `loginId` |
-| `backend/.../user/dto/UserAccount.java` | `updatedAt` 필드 |
-| `backend/.../user/mapper/UserAccountMapper.java`·`.xml` | 조회 열에 `UPDATED_AT`, `selectUserByEmailHmac` 추가, 잠금 사유 '비밀번호 10회 실패' |
-| `backend/src/test/.../AuthServiceTest.java` 등 시험 5개 | 단계적 제한·아이디 찾기·이름 확인 시험 추가, 바뀐 문구·생성자 반영 |
-| `frontend/src/features/auth/authConstants.js` | 잠금 문구, 제한 상수·문구, `LOGIN_TEMPORARILY_BLOCKED`, `FIND_ID_METHODS`, 인증 목적 `FIND_ID` |
-| `frontend/src/features/auth/pages/LoginPage.jsx` | 잠금 안내 아래 [비밀번호 찾기] 글자 링크(`text-link`) |
-| `frontend/src/features/auth/pages/FindIdPage.jsx` | 공통 `SegmentedControl` [휴대폰 \| 이메일], `PhoneVerification`·`SplitEmailField`(FIND_ID), 결과는 가리지 않은 아이디 |
-| `frontend/src/features/auth/pages/FindPasswordPage.jsx` | 이름 칸, 인증·재설정 요청에 `name` |
-| `frontend/src/features/auth/api/authFeatureApi.js`, `components/PhoneVerification.jsx` | 주석만 |
-| `frontend/src/features/auth/mocks/authMockHandlers.js` | 서버와 같은 순서·응답(실패 횟수·5분 제한·10회 잠금, `FIND_ID`, 이름 비교, 재설정 시 잠금 해제) |
-| `docs/spec/sql/avenue_ddl.sql`, `dummy_db/01_create_tables.sql` | `CK_VCD_PURPOSE`에 `'FIND_ID'`, 변경 기록 C16 |
-| `docs/spec/sql/alter_verification_code_find_id.sql` (새 파일) | 기존 DB의 제약 다시 만들기 + 확인 조회 |
-| `docs/spec/sql/README.md` | 기존 DB 변경 표 한 줄 |
-| `docs/ai/features.md`, `docs/spec/api/api_definition.md`, `docs/spec/api/api_spec_a.md` | 해당 줄 `🆕 11/26` |
+| `backend/.../user/service/AuthService.java` | 단계적 제한 결과 처리·로그, AUTH-16, 아이디 찾기 방법별 토큰, 찾기·재설정 이름 확인, 동의 각각 검사 |
+| `backend/.../user/service/LoginAttemptService.java`·`CodeSendGuard.java`·`ClientRateLimiter.java` (새 파일) | 로그인 시도 트랜잭션, 발송 잠금, IP 반복 시도 제한 |
+| `backend/.../user/service/AccountRules.java`·`AuthErrors.java` | 이메일 규칙 2종·정리, 새 비밀번호 규칙·64자 문구, 이름 비교, 잠금·제한·상한 오류 |
+| `backend/.../user/service/EmailVerificationService.java`·`PhoneVerificationService.java`·`EmailPurpose.java`·`PhonePurpose.java` | `FIND_ID`, 목적별 이메일 형식, 하루 상한(잠금 안) |
+| `backend/.../user/service/MyPageService.java`, `social/SocialLoginService.java`, `admin/service/AdminAuthService.java`·`AdminAccountService.java` | 이메일 소문자·비밀번호 문구, 트랜잭션 경계, 관리자 잠금 안내, 업무 이메일 기본 형식 |
+| `backend/.../user/controller/AuthController.java`·`SocialLoginController.java`, `global/security/SecurityConfig.java` | IP 제한 적용, AUTH-16 경로 |
+| `backend/.../user/dto/*`, `user/mapper/*`·`resources/mapper/user/*.xml`·`admin/AdminAccountMapper.xml` | 요청·응답 필드, `LAST_LOGIN_FAIL_AT`, `lockUser` `flushCache`, `countSentSince`, `selectUserByEmailHmac` |
+| `backend/src/test/.../user/**` | 단위 시험 추가, 통합 시험(db.it) 4개 클래스 |
+| `frontend/src/features/auth/validation.js`·`authConstants.js` | 걸러내기·판정·문구·상수 |
+| `frontend/src/features/auth/useImeSafeFilter.js`·`usePasswordReveal.js`·`useBlurCheck.js`, `components/PasswordField.jsx` (새 파일) | 한글 조합 안전 걸러내기, 보기 상태, 묶음 검사, 비밀번호 칸 |
+| `frontend/src/features/auth/pages/*`, `components/*` | 로그인·가입·찾기·마이페이지 화면에 위 규칙 적용 |
+| `frontend/src/features/auth/mocks/*`, `admin/mocks/adminLoginChallenges.js`·`adminMockHandlers.js` | 서버와 같은 순서·응답, `authMockRateLimits.js`(새 파일) |
+| `frontend/src/features/auth/auth.css` | 눈 버튼, 동의 화면, 이메일 직접 입력 줄바꿈, 묶음 오류 테두리 |
+| `docs/spec/sql/*` | C17·C18, alter 2개, README, `seed_report.json` 지문 |
+| `docs/ai/features.md`·`decisions.md`, `docs/spec/api/api_spec_a.md`·`api_definition.md` | 구현 현황·정책·API 설명 |
 
 ## DB·API 변경
-- **DB (DDL C16):** `VERIFICATION_CODE.CK_VCD_PURPOSE`에 `'FIND_ID'`를 추가했다. 열·표 수는 그대로다.
-  - 기존 DB는 `alter_verification_code_find_id.sql`로 고친다. **PR 작성자가 병합 후 공용 DB에 실행**하고, 로컬은 각자 실행한다.
-  - 이 제약이 없는 DB에서는 아이디 찾기 인증번호 발송이 ORA-02290으로 실패한다.
+- **DB (실행 순서)**
+  1. C17 `alter_verification_code_find_id.sql`: `CK_VCD_PURPOSE`에 `'FIND_ID'`를 넣는다. 없으면 아이디 찾기 발송이 ORA-02290으로 실패한다.
+  2. C18 `alter_app_user_last_login_fail_at.sql`: `APP_USER.LAST_LOGIN_FAIL_AT`과 열 주석(`LOGIN_FAIL_COUNT`·`ACCOUNT_STATUS_CODE`)을 바꾼다. 다시 실행해도 된다. **열이 없는 DB에서는 로그인이 ORA-00904로 실패**한다.
+  - 공용 DB는 PR 작성자가 병합 직후 실행하고, 로컬은 각자 실행한다. 처음에는 C16·C17이었는데, develop #171이 C16을 먼저 써서 번호를 옮겼다(내용 같음).
 - **API**
-  - AUTH-01·05: 429 `LOGIN_TEMPORARILY_BLOCKED` 추가, 423은 10회째.
-  - AUTH-07·14: `purpose`에 `FIND_ID`.
-  - AUTH-08: `name`(재설정 목적).
-  - AUTH-09: 요청 `{ method, name, phone|email, verificationToken }`, 응답 `{ maskedLoginId, loginId }`. 토큰이 없으면 400.
-  - AUTH-10: `name`.
-  - 기존 필드는 지우지 않았다.
-- **문서:** `api_spec_a.md`와 정의서 1-1 오류 표(429 줄, 423 설명)·2-1 해당 줄을 고쳤다. 정의서 1장은 범영 님 확인을 요청한다. 정의서 맨 위 「최근 변경」 블록은 고치지 않았다.
-- **영향을 받는 기능·팀원**
-  - 간편 로그인 연결(AUTH-05)과 관리자 로그인도 같은 `authenticate`를 거쳐 같은 제한을 받는다.
-  - 로그인한 뒤 잠긴 계정의 401 `ACCOUNT_LOCKED`(JWT 필터)도 같은 새 문구를 쓴다.
-  - 관리자 화면의 잠금 문구(`admin/adminConstants.js`)는 관리자가 비밀번호 찾기를 쓸 수 없어 그대로 뒀다.
-
-## 확인
-- 확인함
-  - `mvnw clean test`(`-Xmx512m -XX:+UseSerialGC` 등 이 PC 옵션) 525건 통과, 실패·오류 0.
-  - `npm run lint` 오류 0, `npm run build` 성공.
-  - SQL은 어느 DB에도 실행하지 않았다.
-- 확인 못 함
-  - 화면은 직접 열어 보지 않았다. mock으로 확인할 때 데모 계정은 비밀번호를 비교하지 않으므로, 로그인 제한은 새로 가입한 계정으로 본다.
-- 팀 확인 필요
-  - 5분 제한의 시작 시각으로 쓰는 `UPDATED_AT`은 다른 변경(예: 다른 곳에서 로그인한 상태로 닉네임 변경)에도 바뀐다. 제한 중에 그런 변경이 있으면 제한이 그만큼 늦게 끝난다.
-  - 비밀번호 재설정은 원래부터 사유와 상관없이 잠금을 푼다(관리자가 수동으로 잠근 계정 포함). 새 안내 문구가 이를 사용자에게 알린다.
-
-## 2차 — 입력 규칙 통일·비밀번호 보기 (2026-11-26, b505caf 위에서 이어서)
-- **관련 N-ID:** N-01-1, N-02-1, N-03-1, N-03-2, N-04-3
-
-### 무엇을, 왜 바꿨나
-- **입력 규칙:** 칸마다 허용 글자가 화면마다 달랐고, 대문자·한글 이메일이 통과·저장됐다.
-  - `validation.js`에 칸별 걸러내기 함수를 두고, 가입·로그인·찾기·마이페이지가 입력과 붙여넣기 모두 같은 함수를 거친다.
-  - 판정(`isValidLoginId`·`NAME_PATTERN`·`NICKNAME_PATTERN`)은 그대로다.
-- **이메일 규칙**
-  - 앞부분: `a-z0-9._-`, 처음·끝은 영문·숫자, 점 연속 불가, 64자.
-  - 도메인: 덩어리마다 영문·숫자로 시작·끝, 마지막은 영문 2자 이상.
-  - 서버 `AccountRules.isValidEmail`(이름 유지)도 같은 규칙이다. 소문자로 바꾼 값으로 판정하므로 대문자 때문에 거절하지는 않는다.
-  - 가입·이메일 변경·인증코드 발송·확인·아이디 찾기·재설정은 이메일을 strip + 소문자로 바꿔 쓰고, `EMAIL_ENC`도 소문자로 저장한다. HMAC은 원래부터 소문자 기준이었다.
-- **이름 확인:** 아이디 찾기·비밀번호 찾기(코드 확인·재설정)의 이름은 가입과 같은 규칙으로 먼저 검사한다(`AuthErrors.requireValidName`).
-  - 틀리면 400 `INVALID_INPUT`(`name` 칸). 형식은 맞는데 계정이 없으면 지금처럼 같은 404다.
-- **로그인 아이디:** strip + 소문자로 바꿔 조회한다(`AccountRules.normalizeLoginId`, 재설정 조회도 같음).
-- **비밀번호 보기:** Edge 기본 눈 모양은 값을 고치면 사라졌다.
-  - 새 `PasswordField`([보기]/[숨기기], `aria-pressed`)와 `usePasswordReveal`(요청 직전 `hideAll`)을 만들었다.
-  - `auth.css`에는 `.password-field`의 `::-ms-reveal` 숨김 한 줄만 넣었다.
-- **보기 유지(2차 보완) 🆕 11/26:** `hideAll()`을 요청 앞에서 성공 뒤(저장·화면 이동 직전)로 옮겼다. 실패하면 보기 상태가 그대로다(로그인·가입·재설정·마이페이지 3곳).
-- **FP-259 MYPAGE-06 🆕 11/26:** `PasswordChangeForm`에서 칸을 고치면 그 칸 오류와 폼 오류를 지운다. 새 비밀번호를 고치면 확인 칸 오류, 현재 비밀번호를 고치면 "지금 쓰는 비밀번호와 같습니다"도 지운다.
-
-### 바뀐 파일
-| 파일 | 변경 내용 (1줄) |
-|------|-----------------|
-| `backend/.../user/service/AccountRules.java` | 이메일 앞부분·도메인 규칙, `normalizeEmail`·`normalizeLoginId` |
-| `backend/.../user/service/AuthErrors.java` | `requireValidName`(400 `name` 칸) |
-| `backend/.../user/service/AuthService.java` | 로그인 아이디 소문자 조회, 가입·찾기·재설정 이메일 소문자, 찾기·재설정 이름 형식 검사 |
-| `backend/.../user/service/EmailVerificationService.java` | 발송·확인·토큰 사용 이메일 소문자, 재설정 확인 이름 형식 검사·아이디 소문자 |
-| `backend/.../user/service/MyPageService.java` | 이메일 변경 소문자 판정·저장 |
-| `backend/src/test/.../AuthServiceTest.java`, `EmailVerificationServiceTest.java`, `SocialAndMyPageServiceTest.java` | 시험 8건 추가, 가입 이메일 소문자·이름 없음 400으로 기대값 수정 |
-| `frontend/src/features/auth/validation.js` | 걸러내기 함수 7개, 이메일 판정(`isValidEmailLocal`·`isValidEmailDomain`), mock용 `normalizeEmail`·`normalizeLoginId` |
-| `frontend/src/features/auth/components/PasswordField.jsx`, `usePasswordReveal.js` (새 파일) | 비밀번호 보기 칸과 상태 |
-| `frontend/src/features/auth/pages/LoginPage.jsx`·`SignupPage.jsx`·`FindIdPage.jsx`·`FindPasswordPage.jsx` | 걸러내기 적용, 비밀번호 칸 교체, 요청 직전 가림. 아이디 찾기는 이름 검사와 서버 `name` 칸 오류 표시 |
-| `frontend/src/features/auth/components/SplitEmailField.jsx`·`EmailChangeForm.jsx`·`NicknameChangeForm.jsx` | 이메일·닉네임 걸러내기, 이메일 칸 `autoCapitalize`·`spellCheck`·`inputMode` |
-| `frontend/src/features/auth/components/PasswordChangeForm.jsx`·`ProfileUnlockCard.jsx`·`WithdrawalCard.jsx` | 비밀번호 칸 교체, 요청 직전 가림 |
-| `frontend/src/features/auth/auth.css` | `.password-field input::-ms-reveal` 숨김 |
-| `frontend/src/features/auth/mocks/authMockHandlers.js`·`myPageMockHandlers.js` | 서버와 같은 정리(소문자)·이름 형식 400 순서 |
-| `docs/ai/features.md`, `docs/spec/api/api_spec_a.md` | 해당 줄 `🆕 11/26` |
-
-### DB·API 변경
-- **DB:** 없음(DDL 그대로). 기존 행의 `EMAIL_ENC`는 대소문자가 섞여 있을 수 있지만 그대로 둔다. 조회는 HMAC이라 영향이 없다.
-- **API:** 필드는 그대로다. 바뀐 동작은 아래와 같다(`api_spec_a.md` 반영, 정의서는 고치지 않음).
-  - 이메일은 소문자로 저장한다.
-  - 규칙에 맞지 않는 이메일은 400이다.
-  - AUTH-08(재설정)·09·10은 이름 형식이 틀리면 400 `name` 칸이다.
-  - AUTH-01은 아이디를 소문자로 조회한다.
-- **영향을 받는 기능·팀원:** 관리자 계정 만들기(`AdminAccountService`, 프론트 `AddAdminForm`)도 같은 `isValidEmail`을 써서, 업무 이메일에 `+` 같은 기호를 쓸 수 없게 됐다(코드는 고치지 않음).
-
-### 확인
-- 확인함
-  - `mvnw clean test`(이 PC 옵션) 533건 통과, 실패·오류 0.
-  - `npm run lint` 오류 0, `npm run build` 성공.
-  - 걸러내기·이메일 판정 함수는 node로 예시 값을 넣어 확인했다.
-- 확인 못 함
-  - 화면을 직접 열어 보지 않았다(한글 조합 유지, 보기 버튼, Edge 눈 모양).
-  - 공통 `TextInput`이 `autoCapitalize`·`spellCheck`를 받지 못해 아이디 칸과 마이페이지 이메일 칸에는 넣지 못했다(공통 컴포넌트는 고치지 않음).
-- 팀 확인 필요
-  - 공통 `TextInput`에 `autoCapitalize`·`spellCheck` 속성 추가(프론트 공통 담당).
-  - 관리자 업무 이메일 규칙을 일반 회원과 같게 둘지.
-  - [보기] 버튼 모양·위치(UI 담당).
-
-## 3차 — 한글 입력 중 값 지워짐·선택 표시·비밀번호 눈 모양 (2026-11-26) 🆕 11/26
-- **관련 N-ID:** N-01-1, N-02-1
-
-### 원인
-- **값 지워짐**
-  - 한글 조합 중 `onChange`에서 걸러내기가 조합 글자를 빼고 값을 되돌렸다.
-  - 그러면 Windows 한글 IME가 들고 있던 조합 범위와 칸 값이 어긋나 써 둔 글자를 덮어썼다.
-  - 헤드리스 Edge(CDP)의 IME 흉내로는 지워지는 현상까지는 재현되지 않았다. 실제 IME에서만 생기는 것으로 본다.
-- **선택이 안 되는 것처럼 보임**
-  - 선택 자체는 된다. 드래그와 Shift+Home 모두 CDP로 범위가 잡히는 것을 확인했다.
-  - 공통 `layout.css`의 `::selection { background: var(--sel) }`(`#e8f1fe`)가 흰 입력 칸(`--inp` `#ffffff`) 위에서 거의 보이지 않는다.
-  - 가입·로그인·찾기·마이페이지 칸이 모두 같다. 공통 파일이라 고치지 않았다.
-
-### 무엇을 바꿨나
-- 새 `useImeSafeFilter`
-  - 조합 중(compositionstart~compositionend)에는 값을 그대로 두고, compositionend에서 한 번 거른 뒤 커서를 제자리에 놓는다.
-  - 공통 `TextInput`은 조합 이벤트를 넘기지 않아서 감싼 div가 받는다. `SplitEmailField`는 input에 직접 단다.
-  - 적용 칸
-    - 아이디: 로그인·가입·비밀번호 찾기
-    - 이메일 앞부분·직접 입력 도메인: 가입·아이디 찾기·비밀번호 찾기
-    - 마이페이지 이메일 변경
-    - 이름: 가입·아이디 찾기·비밀번호 찾기
-    - 닉네임: 가입·마이페이지
-  - 걸러내기 규칙은 2차 그대로다.
-- `PasswordField`
-  - 글자 버튼 대신 칸 안 오른쪽에 눈 모양 아이콘 버튼(인라인 SVG)을 둔다.
-  - `aria-pressed`는 그대로이고, `aria-label`은 상태에 따라 "비밀번호 보기"/"비밀번호 숨기기"로 바뀐다.
-  - 칸 안에 버튼을 두려고 공통 클래스로 직접 그린다(`TextInput`과 같은 `useId`·`aria-describedby`). 부르는 화면 6곳은 그대로다.
-  - 동작(값을 고쳐도 유지, 성공할 때만 가림)과 Edge 기본 눈 모양 숨김은 그대로다.
-
-### 바뀐 파일
-| 파일 | 변경 내용 (1줄) |
-|------|-----------------|
-| `frontend/src/features/auth/useImeSafeFilter.js` (새 파일) | 조합 중 거르지 않고 조합 끝에 한 번 거르기, 커서 유지 |
-| `frontend/src/features/auth/pages/LoginPage.jsx`·`SignupPage.jsx`·`FindIdPage.jsx`·`FindPasswordPage.jsx` | 아이디·이름·닉네임 칸에 적용(로그인·찾기는 칸을 클래스 없는 div로 감쌈) |
-| `frontend/src/features/auth/components/SplitEmailField.jsx`·`EmailChangeForm.jsx`·`NicknameChangeForm.jsx` | 이메일·닉네임 칸에 적용 |
-| `frontend/src/features/auth/components/PasswordField.jsx` | 칸 안 눈 모양 버튼 |
-| `frontend/src/features/auth/auth.css` | `.password-field__box`·`__toggle`, 입력 칸 오른쪽 여백(색은 토큰만) |
-| `docs/ai/features.md` | N-01-1 눈 모양, N-02-1 조합 처리 |
-
-### 확인
-- 확인함
-  - `npm run lint` 오류 0, `npm run build` 성공.
-  - mock 개발 서버 + 헤드리스 Edge(CDP)로 확인했다.
-    - 조합 중 값 유지, 조합 끝에 한글만 빠지고 커서가 제자리에 오는 것(로그인 아이디 가운데, 가입 아이디·이메일 앞부분, 이름은 한글 유지).
-    - 눈 버튼이 입력 칸 안에 있고 오류 문구가 떠도 칸 안에 머무는 것.
-    - 누르면 `type`·`aria-label`·`aria-pressed`가 바뀌는 것.
-- 확인 못 함
-  - 실제 Windows 한글 IME로 치는 것은 사람이 화면에서 본다.
-- 팀 확인 필요
-  - 입력 칸 선택 색: 공통 `::selection`(`--sel`)이 흰 칸에서 거의 안 보인다. 입력 칸 선택색을 진하게 하거나 `--sel` 조정이 필요하다(프론트 공통 담당).
-  - 눈 버튼 모양·크기(UI 담당).
-
-## 4차 — 눈 버튼 표시 조건·비밀번호 한글 막기·이름 자모 오류 (2026-11-26) 🆕 11/26
-- **관련 N-ID:** N-01-1, N-02-1, N-03-1, N-03-2
-
-### 무엇을 바꿨나
-- **눈 버튼:** `PasswordField`는 값이 있을 때만 눈 버튼과 오른쪽 여백(`password-field--filled`)을 둔다. 보기 상태는 부모가 들고 있어서, 값을 지웠다 다시 치면 직전 상태로 나타난다.
-- **비밀번호 한글 막기:** `validation.js`에 `filterPassword`를 추가했다.
-  - ASCII 출력 문자와 공백만 남긴다. 공백은 지금 규칙이 막지 않아 남긴다.
-  - `PasswordField` 안에서 `useImeSafeFilter`로 조합이 끝날 때·붙여넣을 때 거른다.
-- **이름 자모 오류:** `validateName`이 자모가 남은 이름에 "이름을 완성해 입력해 주세요."(`NAME_INCOMPLETE_MESSAGE`)를 돌려준다. 가입·mock도 같은 함수를 쓴다.
-  - `PhoneVerification`·`SplitEmailField`에 선택 속성 `beforeRequest`를 추가했다. 아이디·비밀번호 찾기에서는 [받기]·[확인]·[다음] 요청 전에 이름을 검사한다.
-  - 이름 칸을 벗어날 때(값이 있을 때)도 검사한다. 가입 화면은 원래부터 칸을 벗어날 때·[가입하기] 때 검사한다.
-- **이름 한글 2~5자: 보류(사용자 결정).** 이름 규칙(2~20자)·서버·시험·API 문서는 그대로다.
-
-### 바뀐 파일
-| 파일 | 변경 내용 (1줄) |
-|------|-----------------|
-| `frontend/src/features/auth/validation.js` | `filterPassword`, `NAME_INCOMPLETE_MESSAGE`, `validateName` 자모 문구 |
-| `frontend/src/features/auth/components/PasswordField.jsx` | 값이 있을 때만 눈 버튼, 비밀번호 걸러내기 |
-| `frontend/src/features/auth/auth.css` | 오른쪽 여백을 `.password-field--filled`일 때만 |
-| `frontend/src/features/auth/components/PhoneVerification.jsx`·`SplitEmailField.jsx` | 선택 속성 `beforeRequest` |
-| `frontend/src/features/auth/pages/FindIdPage.jsx`·`FindPasswordPage.jsx` | 요청 전·칸을 벗어날 때 이름 검사, 고치면 오류 지움 |
-| `docs/ai/features.md` | N-01-1·N-02-1·N-03-1·N-03-2 |
-
-### 확인
-- 확인함
-  - `npm run lint` 오류 0, `npm run build` 성공. 서버 파일은 바꾸지 않아 `mvnw test`는 생략했다.
-  - mock 개발 서버 + 헤드리스 Edge(CDP)로 확인했다.
-    - 빈 칸에는 눈 버튼이 없다.
-    - 값을 지웠다 다시 치면 보기 상태가 유지된다.
-    - 보기 상태에서 한글을 조합하면 확정 때 빠지고, 영문·숫자·기호는 남는다.
-    - "홍길ㄷ"은 아이디 찾기·비밀번호 찾기·가입에서 칸을 벗어날 때 오류가 뜨고, [인증번호 받기]를 눌러도 요청 없이 오류만 뜬다.
-- 확인 못 함
-  - 실제 Windows 한글 IME로 보기 상태 비밀번호를 치는 것.
-- 팀 확인 필요
-  - **이름 2~5자 보류 사유:** 6자 이상 이름이 있다.
-    - dummy_db 시드의 일반 회원 `합성회원000001` 형식(`tools/build_db.py`)과 관리자 `시연 관리자`.
-    - 프론트 mock의 `데모 급여소득자`·`데모 자영업자`·`데모 프리랜서`·`데모 직군 미선택`·`데모 관리자`(`common/mocks/mockUsers.js`)와 `데모 잠긴 계정`(`authMockData.js`).
-    - 서버 시험에는 없다.
-  - **시드·mock 이름이 지금 규칙(한글 2~20자, 공백·숫자 불가)에도 맞지 않는다.** 그래서 2차 이후 이 계정들은 아이디 찾기·비밀번호 찾기에서 이름 형식 400에 걸린다. 새로 가입한 계정만 쓸 수 있다.
-  - **관리자 계정 만들기 이름(`AdminAccountService`)은 50자 이하만 본다.** 회원 이름 규칙을 바꿔도 함께 바뀌지 않는다.
-  - **서버 비밀번호 규칙(`AccountRules.isValidPassword`):** 8~64자에 영문·숫자가 하나씩만 있으면 통과라 한글 등 ASCII 밖 문자를 받는다.
-    - Spring Security 6.2의 BCrypt는 72바이트 뒤를 조용히 버린다. 한글이 섞이면 64자 안에서도 잘릴 수 있다.
-    - 화면에서만 막았다. ASCII 밖 문자가 든 비밀번호를 이미 쓰는 계정이 있다면, 그 계정은 로그인 칸에서 그 글자를 칠 수 없다.
-  - **자모 문구 차이:** 서버 `nameError`는 자모가 남은 이름에도 `NAME_RULE_MESSAGE`를 돌려줘 화면 문구와 다르다.
-
-## 5차 — 비밀번호 보기 상태의 한글 자판 입력을 영문 키로 (2026-11-26) 🆕 11/26
-- **관련 N-ID:** N-01-1, N-02-1
-
-### 무엇을, 왜 바꿨나
-- 가린 비밀번호 칸(`type=password`)은 브라우저가 한글 IME를 꺼서, 한글 자판으로 쳐도 영문 키가 들어간다(ㅂ→q).
-- 보기 상태(`type=text`)는 4차에서 한글을 빼서, 같은 키를 쳐도 두 상태의 값이 달랐다.
-- `validation.js`에 `hangulToQwerty`(두벌식: 완성형 음절은 초·중·종성으로 나눠 키로, 낱자 자모·겹모음·겹받침도 표대로)를 추가했다.
-- `useImeSafeFilter`는 조합이 끝날 때만 쓰는 변환 함수(선택 인자 `finish`)를 받는다. 다른 칸은 넘기지 않아 동작이 같다.
-- `PasswordField`는 조합이 끝날 때 `filterPassword(hangulToQwerty(값))`를 쓰고, 커서를 늘어난 길이만큼 뒤로 둔다.
-  - 붙여넣기와 조합 없는 입력은 지금처럼 `filterPassword`만 거친다. 그래서 한글은 빠진다.
-  - 적용: 로그인, 가입 비밀번호·확인, 재설정 2칸, 마이페이지 3곳. 부르는 화면은 고치지 않았다.
-
-### 바뀐 파일
-| 파일 | 변경 내용 (1줄) |
-|------|-----------------|
-| `frontend/src/features/auth/validation.js` | `hangulToQwerty`와 두벌식 키 표 |
-| `frontend/src/features/auth/useImeSafeFilter.js` | 조합이 끝날 때만 쓰는 선택 인자 `finish` |
-| `frontend/src/features/auth/components/PasswordField.jsx` | 조합 끝에 영문 키로 바꾼 뒤 거르기 |
-| `docs/ai/features.md` | N-01-1·N-02-1 |
-
-### 확인
-- 확인함
-  - node로 `hangulToQwerty` 13건이 모두 기대값과 같았다.
-    - ㅂㅈㄷㄱ→qwer, 가나다→rkskek, 값→rkqt, ㅃ→Q, 뷁→qnpfr, 의→dml, abc1!→abc1!
-    - ㅘ→hk, ㄳ→rt, 힣→glg 등
-  - `npm run lint` 오류 0, `npm run build` 성공. 서버 파일은 바꾸지 않았다.
-  - mock 개발 서버 + 헤드리스 Edge(CDP)로 확인했다.
-    - 로그인 보기 상태에서 `ab` 가운데에 "가"를 조합하면 `arkb`가 되고 커서는 3이다.
-    - "뷁"을 조합하면 `qnpfr`가 붙는다.
-    - 조합 없이 넣은 "값"은 빠진다.
-    - 가입 비밀번호에서 "의"를 조합하면 `dml`이 된다.
-    - 이름 칸 한글은 그대로 남고, 아이디 칸 한글은 그대로 빠진다.
-- 확인 못 함
-  - 실제 Windows 한글 IME로 연달아 칠 때. 음절이 넘어가는 순간에 조합이 끝나고 바로 다음 조합이 시작된다.
-
-## 8차 — PR #164 검수 반영: 로그인 제한 시각, 기존 비밀번호 칸 거르지 않기 (2026-11-27) 🆕 11/27
-- **관련 N-ID:** N-01-1, N-01-3, N-02-1, N-03-3, N-04-3
-
-### 무엇을, 왜 바꿨나
-- **로그인 5분 제한 시각(N-01-3):** 마지막 실패 시각을 `APP_USER.UPDATED_AT`으로 재서, 닉네임·이메일 변경 같은 다른 수정이 제한을 늘리거나 다시 시작시켰다.
-  - 로그인 실패만 기록하는 시각 열이 없어 `LAST_LOGIN_FAIL_AT`(TIMESTAMP, NULL 허용, DDL C17)을 더했다.
-  - 실패할 때마다 실패 횟수와 함께 이 시각을 지금으로 남긴다.
-  - 실패 횟수를 0으로 돌리는 곳은 모두 이 시각도 비운다: 로그인 성공(관리자 포함), 비밀번호 재설정, 관리자 잠금 해제, 관리자 임시 비밀번호 재발급.
-  - 제한 조건(정확히 5회째 실패에만, 11/26 결정 그대로), 10회 잠금(423) 등 다른 동작은 바꾸지 않았다.
-  - mock도 맞췄다: 로그인 성공·재설정 때 시각을 비우고, 관리자 잠금 해제는 실패 횟수와 시각을 비운다.
-- **기존 비밀번호 칸은 거르지 않음(N-01-1·N-02-1):** `PasswordField`가 모든 칸에서 입력을 거르고 한글을 영문 키로 바꿨다.
-  - `rule="new"`일 때만 `filterPassword`와 `hangulToQwerty`를 쓴다. 붙이는 곳은 가입·재설정·비밀번호 변경의 새 비밀번호와 확인 칸이다.
-  - 로그인, 현재 비밀번호(비밀번호 변경·내정보 확인), 탈퇴 비밀번호는 친 값을 그대로 보낸다.
-  - 서버는 로그인·현재 비밀번호·탈퇴 비밀번호를 받은 그대로 `passwordEncoder.matches`에 넘긴다(확인만 함).
-- `validation.js`에서 이 브랜치가 더한 함수 머리 주석에 세부 N-ID를 붙였다.
-
-### 바뀐 파일
-| 파일 | 변경 내용 (1줄) |
-|------|-----------------|
-| `docs/spec/sql/alter_app_user_last_login_fail_at.sql` | 새 파일. 기존 DB에 `LAST_LOGIN_FAIL_AT` 추가(다시 실행 가능) |
-| `docs/spec/sql/avenue_ddl.sql`, `dummy_db/01_create_tables.sql` | APP_USER 열·열 주석, 변경 이력 C17 |
-| `docs/spec/sql/dummy_db/seed_report.json` | `ddl_sha256` 새 값 |
-| `docs/spec/sql/README.md` | 기존 DB 적용 표에 alter 1행 |
-| `backend/.../user/mapper/UserAccountMapper.xml`, `admin/AdminAccountMapper.xml` | 실패 때 시각 기록, 실패 횟수 0인 곳마다 시각 NULL |
-| `backend/.../user/dto/UserAccount.java`, `user/mapper/UserAccountMapper.java` | `lastLoginFailAt`, 주석 |
-| `backend/.../user/service/AuthService.java` | 제한 계산을 `lastLoginFailAt`으로 |
-| `backend/src/test/.../user/service/AuthServiceTest.java` | 기존 2개를 새 시각으로, 다른 수정과 상관없음 1개 추가 |
-| `backend/src/test/.../user/mapper/UserAccountMapperLoginFailXmlTest.java` | 새 파일. 매퍼 XML에서 시각 기록·비우기 확인(DB 없음) |
-| `backend/src/test/.../user/mapper/UserAccountLoginFailIT.java` | 새 파일. 실제 DB 확인(`-Ddb.it=true`일 때만) |
-| `frontend/src/features/auth/mocks/authMockHandlers.js`, `admin/mocks/adminMockHandlers.js` | 실패 시각 비우기, 잠금 해제 때 실패 횟수 0 |
-| `frontend/src/features/auth/components/PasswordField.jsx` | `rule="new"`일 때만 걸러내기·영문 키 변환 |
-| `SignupPage.jsx`, `FindPasswordPage.jsx`, `PasswordChangeForm.jsx` | 새 비밀번호·확인 칸에 `rule="new"` |
-| `frontend/src/features/auth/validation.js` | 주석에 N-ID |
-| `docs/ai/features.md`, `docs/ai/decisions.md` | N-01-1·N-01-3·N-02-1, '가입 입력' 줄 |
-
-### DB·API 변경
-- DB: `APP_USER.LAST_LOGIN_FAIL_AT TIMESTAMP` 추가(C17). 기존 DB는 `alter_app_user_last_login_fail_at.sql`로 추가하고, 이미 있는 행은 NULL이다.
-  - **계정 조회 SQL이 이 열을 읽으므로, 열이 없는 DB에서 새 코드로 로그인하면 ORA-00904가 난다.** 공용 DB는 PR 작성자가 병합 직후 실행한다.
-- API: 경로·필드·응답은 그대로다.
-
-### 확인
-- 확인함
-  - `./mvnw test`(-s) 539개 통과. 새 테스트 3개 포함, IT는 `-Ddb.it` 없이 건너뜀.
-  - `python -B -m unittest discover -s docs/spec/sql/dummy_db/tools/tests`: 54개 중 오류 1건(`No module named 'bcrypt'`, README에 적힌 PC 환경 문제), 그 밖은 통과.
-  - `cmp`로 DDL 사본이 원본과 같음.
-  - `npm run lint` 오류 0, `npm run build` 성공.
-- 확인 못 함
-  - 로컬 DB(avenue_local) alter 실행. 사용자가 SQL Developer에서 실행한다.
-  - `UserAccountLoginFailIT` 실행(DB 필요).
-  - 화면 동작(mock 개발 서버로 직접 확인 필요).
-
-## 9차 — PR #164 2차 검수 반영 (2026-11-27, 기준 fdd9f45) 🆕 11/27
-- **관련 N-ID:** N-01-3, N-01-6, N-02-1, N-03-1, N-03-2
-
-### 무엇을, 왜 바꿨나
-- **커서(검수 1·5, `useImeSafeFilter`):**
-  - 한글 확정 직후 다음 조합 중에 커서가 앞으로 갔다. 이제 걸러낸 값이 같으면 커서를 건드리지 않고, 새 조합이 시작됐으면 커서 옮기기를 건너뛴다.
-  - 조합이 아닌 입력에서 글자가 걸러지면 커서가 끝으로 갔다. 이제 "입력 위치 − 앞쪽에서 빠진 글자 수"로 되돌린다.
-  - 새 비밀번호의 영문 키 변환 결과는 같다.
-- **소셜 계정 연결 5분 제한(검수 2):**
-  - 화면이 429 서버 문구(남은 분)를 그대로 보여 준다.
-  - mock 연결도 로그인과 같은 확인 함수(`authenticateMockAccount`)를 쓴다. 실패 횟수·5분 제한·10회 잠금이 같다.
-- **아이디 찾기 다시 하기(검수 3):** 아이디를 찾은 뒤와 토큰 오류(400) 뒤에는 인증을 비워 [받기]부터 다시 할 수 있다. 찾은 아이디는 그대로 보인다.
-- **잠긴 관리자 안내(검수 4):** 잠긴 관리자가 맞는 비밀번호를 넣으면 423 `ADMIN_ACCOUNT_LOCKED`("잠긴 관리자 계정입니다. 다른 관리자에게 잠금 해제를 요청해 주세요.")다.
-  - 로그인 화면은 [비밀번호 찾기] 링크를 숨긴다. 일반 회원의 `ACCOUNT_LOCKED`는 그대로다.
-- **기존 이메일 허용(검수 6):** 새 이메일 규칙은 가입(AUTH-06·SIGNUP 인증)과 이메일 변경(MEM-03·CHANGE_EMAIL 인증)에만 쓴다.
-  - 아이디·비밀번호 찾기의 인증(FIND_ID·RESET_PASSWORD)은 기본 형식만 본다. 화면 칸은 글자를 지우지 않는다(소문자·앞뒤 공백만, `SplitEmailField rule="existing"`).
-  - 이 브랜치가 새 규칙으로 바꿔 버린 관리자 업무 이메일(ADM-07)도 develop처럼 기본 형식으로 되돌렸다.
-- **옛 설명(검수 7):**
-  - api_spec_a의 휴대폰 인증 목적을 `SIGNUP`·`FIND_ID`로 고쳤다.
-  - `LOGIN_FAIL_COUNT` 열 주석을 "5회째 5분 제한, 누적 10회 잠금"으로 고쳤다(DDL·사본·지문, 기존 DB는 C17 alter 끝 한 줄).
-
-### 바뀐 파일
-| 파일 | 변경 내용 (1줄) |
-|------|-----------------|
-| `frontend/src/features/auth/useImeSafeFilter.js` | 커서 복원(값이 같으면 안 옮김, 새 조합 중이면 건너뜀, 일반 입력도 복원) |
-| `frontend/src/features/auth/socialLoginConfig.js` | 429 서버 문구, `ADMIN_ACCOUNT_LOCKED` 문구 |
-| `frontend/src/features/auth/mocks/authMockHandlers.js` | `authenticateMockAccount` 분리·관리자 잠금 code, 목적별 이메일 형식, 찾기 토큰 오류 code |
-| `frontend/src/features/auth/mocks/socialLoginMockHandlers.js` | 연결이 `authenticateMockAccount`를 씀 |
-| `frontend/src/features/auth/pages/FindIdPage.jsx` | 찾은 뒤·토큰 오류 뒤 인증 비우기, 이메일 `rule="existing"` |
-| `frontend/src/features/auth/pages/FindPasswordPage.jsx` | 이메일 `rule="existing"` |
-| `frontend/src/features/auth/components/SplitEmailField.jsx` | `rule="existing"`이면 소문자·앞뒤 공백만, 기본 형식 |
-| `frontend/src/features/auth/validation.js` | `isBasicEmail`, `filterExistingEmail`, `validateEmailParts`의 `rule` |
-| `frontend/src/features/auth/authConstants.js`, `pages/LoginPage.jsx` | `ADMIN_ACCOUNT_LOCKED` code·문구, 로그인 문구 분기 |
-| `frontend/src/features/admin/mocks/adminMockHandlers.js` | 업무 이메일 기본 형식 |
-| `backend/.../user/service/AuthErrors.java`, `AuthService.java` | `adminAccountLocked()`, 잠긴 관리자 분기 |
-| `backend/.../user/service/AccountRules.java`, `EmailPurpose.java`, `EmailVerificationService.java` | `isBasicEmail`, `usesNewEmailRule()`, 목적별 형식 검사 |
-| `backend/.../admin/service/AdminAccountService.java` | 업무 이메일 기본 형식 |
-| `backend/src/test/.../AuthServiceTest.java`, `EmailVerificationServiceTest.java` | 잠긴 관리자 1개, 목적별 이메일 형식 1개 |
-| `docs/spec/sql/avenue_ddl.sql`, 사본, `seed_report.json`, `alter_app_user_last_login_fail_at.sql`, sql `README.md` | `LOGIN_FAIL_COUNT` 주석 |
-| `docs/spec/api/api_spec_a.md` | AUTH-01·07, 휴대폰 목적, 5장 `ADMIN_ACCOUNT_LOCKED` |
-| `docs/ai/features.md`, `docs/ai/decisions.md` | N-01-3·N-02-1·N-03-1·N-03-2, 계정 잠금 줄 |
-
-### DB·API 변경
-- DB: 열·데이터는 그대로이고, `LOGIN_FAIL_COUNT` 열 주석만 바뀐다. 기존 DB는 C17 alter를 다시 실행하면 된다(이미 실행했어도 다시 실행 가능).
-- API
-  - AUTH-01·05: 잠긴 관리자 + 맞는 비밀번호 → 423 `ADMIN_ACCOUNT_LOCKED`(새 code).
-  - AUTH-07: `FIND_ID`·`RESET_PASSWORD`는 기본 이메일 형식만 본다. ADM-07 업무 이메일도 기본 형식이다.
-
-### 확인
-- 확인함
-  - `./mvnw test`(-s) 541개 통과.
-  - DB 도구 unittest는 오류 1건(`bcrypt`, PC 환경)뿐이다. `cmp`로 DDL 사본이 같음을 확인했다.
-  - `npm run lint` 오류 0, `npm run build` 성공.
-  - mock 개발 서버와 헤드리스 Edge로 고치기 전·후를 재현했다(`Input.imeSetComposition`·`insertText`).
-    - 이름 "홍" 확정 직후 "ㄱ" 조합: 커서 1 → 2
-    - 가입 아이디 ab|cd + XY: `abxcdy` → `abxycd`(커서 4)
-    - 로그인 아이디 ab|cd + `#`: 커서 4 → 2
-    - 새 비밀번호 보기 a|b + 가: `arkb`(커서 3), 전·후 같음
-    - 소셜 연결 5회째: 401 문구 → "로그인 시도가 너무 많습니다. 5분 뒤에 다시 시도해 주세요."
-    - 잠긴 관리자: 회원 문구 + 링크 → 관리자 문구, 링크 없음(잠긴 회원은 그대로)
-    - 아이디 찾기를 찾은 뒤: [받기]가 사라지고 다시 찾으면 오류 → [받기]가 다시 보이고 다시 인증해 찾을 수 있다(결과는 남음)
-    - 비밀번호 찾기 이메일 "Ab+C" → `ab+c`, 가입 이메일 "Ab+C" → `abc`
-  - 끝난 뒤 5199 개발 서버·헤드리스 Edge가 남지 않았다.
-- 확인 못 함
-  - 실제 Windows 한글 IME(사용자가 확인)
-  - `+`가 든 기존 이메일을 가진 DB 회원으로 찾기·재설정(로컬 DB)
-
-### 남은 것 (이번에 고치지 않음)
-- 시드·시연 회원 이름(예: 합성회원000001, mock "데모 급여소득자")이 이름 규칙(한글만)에 걸려 아이디·비밀번호 찾기를 할 수 없다. 팀 결정을 기다린다. 이름 규칙·시드·`build_db.py`는 그대로다.
-- 로그인을 동시에 보내면 실패 횟수가 덜 오른다. 기존부터 있던 문제이고 2차 개발로 넘긴다.
-- 관리자가 수동으로 잠근 회원도 비밀번호 재설정으로 풀린다. 기존부터 그렇고, 팀 확인이 필요하다.
-- 관리자 계정의 10회째 실패 자동 잠금 423과 2단계 인증 중 잠금(AdminAuthService)은 아직 회원과 같은 `ACCOUNT_LOCKED` 문구다. 이번 범위(잠긴 상태 + 맞는 비밀번호) 밖이다.
-- DDL `ACCOUNT_STATUS_CODE` 열 주석의 "LOCKED=비밀번호 5회 실패"도 옛 설명이다. 이번 지시 범위 밖이라 그대로 두었다.
-
-## 10차 — develop(#166 UI 개편) 반영 충돌 정리 (2026-11-27) 🆕 11/27
-- **관련 N-ID:** N-01-1, N-01-3, N-02-1
-- 병합 명령은 사용자가 실행했다(`git merge origin/develop`, #166 = FP-276·262: 단계형 가입, `AuthSplitLayout`).
-
-### 충돌 파일과 해결 원칙
-- 충돌은 `LoginPage.jsx` 3곳, `SignupPage.jsx` 5곳이다. `auth.css`·`validation.js`는 자동으로 합쳐졌다.
-- 화면 구조·배치·문구·디자인은 develop(#166)을 따랐다. 입력 검사·걸러내기·비밀번호 칸 동작은 이 브랜치를 그 위에 다시 얹었다.
-- #166이 새로 만든 동작은 그대로 두었다. 가입 직후 자동 로그인 → 직군 선택, 회원가입 전환은 분할 틀 탭이다.
-- 로그인
-  - 아이디 칸: 걸러내기(`useImeSafeFilter`·`filterLoginId`) + develop placeholder "아이디 입력"
-  - 비밀번호 칸: `PasswordField`(거르지 않음) + develop placeholder "비밀번호 입력"
-  - 잠금 안내 아래 [비밀번호 찾기] 링크는 남겼다. 주석은 develop의 분할 틀 탭 주석을 썼다.
-- 가입: 단계(`SIGNUP_STEPS`)·단계 머리·[이전]/[다음]·`DateSelect`·자동 로그인은 develop 그대로다. 단계별 칸(`renderField`)에 다음을 다시 얹었다.
-  - 아이디·이름·닉네임 걸러내기
-  - 비밀번호·확인 칸 `PasswordField rule="new"` + `usePasswordReveal`(칸마다 따로 보기)
-  - 가입 성공 시 자동 로그인 전 `hideAll()`
-- 지운 코드
-  - `SignupPage`의 `PasswordEye`·`showPassword`(두 칸이 함께 바뀌던 보기)
-  - 옛 생일 달력 칸과 `getBirthDateRange` import
-  - `LoginPage`의 `useNavigate` import와 옛 [회원가입] 버튼 주석
-- `auth.css`: `.fin-form` 안의 `PasswordField` 눈 버튼을 #166 모양(둥근 34px, `--mut2`, 오른쪽 7px, 칸 오른쪽 여백 52px)에 맞췄다.
-  - 마이페이지처럼 `.fin-form` 밖의 칸은 그대로다.
-  - 쓰지 않게 된 `.signup-form__eye` 규칙 3개는 공통 CSS(`common/styles/finForm.css`)에 있어 지우지 않았다(프론트 담당 결정).
-
-### 확인
-- `npm run lint` 오류 0, `npm run build` 성공, `./mvnw test`(-s) 541개 통과. 하나씩 돌렸다.
-- mock 개발 서버와 헤드리스 Edge로 가입 5단계를 끝까지 진행했다.
-  - 이름 "홍ㄱ" → 칸을 벗어나면 "이름을 완성해 입력해 주세요."
-  - 자모가 남으면 [다음]이 꺼진다(develop `stepReady`). 스크립트로 버튼을 켜고 눌러도 2단계에 머물고 같은 안내가 나온다.
-  - 아이디 `newid` + 한글 "무" → `newid` 유지
-  - 닉네임 "새별!" → `새별`
-  - 비밀번호 보기 + "ㅂ" → `q`. 확인 칸은 가린 채 그대로다(따로 보기).
-  - 눈 버튼: 34px·둥근 모양, 칸 가운데
-  - [가입하기] → `/select-job`
-- 로그인
-  - placeholder 2개
-  - 5회째 실패 → "로그인 시도가 너무 많습니다. 5분 뒤에 다시 시도해 주세요."
-  - 잠긴 회원 → 잠금 안내 + [비밀번호 찾기] 링크
-  - 비밀번호 칸 한글은 거르지 않음
-- 끝난 뒤 개발 서버·헤드리스 Edge가 남지 않았다.
-- 확인 못 함: 실제 Windows 한글 IME, 화면 모양의 눈 비교(수치만 봄)
-
-## 12차 — 찾기·가입 화면 테스트 반영 (2026-11-27, 기준 d21635b) 🆕 11/27
-- **관련 N-ID:** N-02-1, N-03-1, N-03-2
-- 사용자가 화면에서 찾은 5건을 고쳤다. 화면 구조·디자인은 UI v2(#166)를 따르고, 공통 컴포넌트·공통 CSS·데이터 입력 화면은 건드리지 않았다.
-
-### 무엇을, 왜 바꿨나
-- **1. 아이디 찾기 휴대폰:** 틀린 번호에 아무 표시가 없었다.
-  - 휴대폰 묶음을 벗어날 때 가입과 같은 `validatePhoneParts`로 보고, 결과를 PhoneVerification `error`로 넘긴다(가입과 같은 컴포넌트·문구).
-  - 새 훅 `useBlurCheck`가 묶음 밖으로 나갈 때만 검사를 켠다(가운데 → 끝 칸 이동은 무시).
-  - [인증번호 받기]는 형식이 맞을 때만 켜지므로, 버튼을 누를 때 따로 검사할 일은 없다.
-- **2. 찾기 이메일:** 9차 `rule="existing"`이 소문자·앞뒤 공백만 처리해 한글·기호가 들어갔다.
-  - 앞부분은 새 `filterExistingEmailLocal`(영문·숫자·`. _ % + -`, 소문자)로 거른다. 9차 `filterExistingEmail`은 이 브랜치에서만 쓰던 함수라 바꿨다.
-  - 직접 입력 도메인은 가입과 같은 `filterEmailDomain`이다.
-  - 판정(`isBasicEmail`)과 서버 규칙은 그대로다. 묶음을 벗어날 때 기본 형식으로 보고 문구를 보인다.
-- **3. 비밀번호 찾기 이름:** 헤드리스(클릭 시 compositionend → blur 순서)로는 재현되지 않았다.
-  - blur 뒤에 compositionend가 오는 순서를 만들면, 두 찾기 화면 모두 이름 setter가 오류를 지워 자모 안내가 사라졌다.
-  - 이제 오류가 보이는 동안은 지우지 않고 `validateName`으로 다시 본다(두 화면 같게).
-  - 요청 전 검사(`beforeRequest`)·[다음] 전 검사는 원래 있었다.
-- **4. 이메일 직접 입력 배치:** 한 줄에 몰려 선택 상자가 86px(1280)·40px(390)로 줄어 글자가 잘렸다.
-  - 직접 입력 칸(`signup-email__custom-domain`)을 같은 상자 안 다음 줄로 내렸다.
-  - 480px 이하에서는 목록 선택도 상자 안에서 줄을 바꾼다. 원래 390에서 "@ 도메인"이 잘렸다.
-  - 휴대폰·이메일 묶음에 오류가 있으면 상자 테두리를 빨갛게 한다. 분할 틀이 줄 안 칸 테두리를 없애 가입 화면도 빨갛지 않았다.
-  - 모두 `auth.css`에만 넣었다.
-- **5. 가입 4단계 아이디 중복 확인:** 중복 아이디로 4단계를 넘어갔다가 [가입하기] 뒤에야 4단계로 돌아와 중복을 알렸다.
-  - 닉네임과 같은 [중복 확인]과 AUTH-16 `POST /api/auth/login-id/check`를 더했다.
-  - 아이디·닉네임을 모두 확인해야 [다음]이 켜진다. 가입 때 409면 확인을 풀어 다시 확인하게 한다.
-
-### 바뀐 파일
-| 파일 | 변경 내용 (1줄) |
-|------|-----------------|
-| `frontend/src/features/auth/useBlurCheck.js` (새 파일) | 칸 묶음을 벗어날 때 검사를 켜는 훅 |
-| `frontend/src/features/auth/pages/FindIdPage.jsx` | 휴대폰·이메일 묶음 검사, 이름 오류 다시 검사 |
-| `frontend/src/features/auth/pages/FindPasswordPage.jsx` | 이메일 묶음 검사, 이름 오류 다시 검사 |
-| `frontend/src/features/auth/components/SplitEmailField.jsx` | `existing` 걸러내기 교체, 직접 입력 칸 클래스 |
-| `frontend/src/features/auth/validation.js` | `filterExistingEmailLocal`, 아이디 대기 문구·`loginIdChecked` |
-| `frontend/src/features/auth/pages/SignupPage.jsx` | 아이디 [중복 확인]·결과·409 처리 |
-| `frontend/src/features/auth/api/authFeatureApi.js`, `mocks/authMockHandlers.js` | `checkLoginIdAvailability`, mock AUTH-16 |
-| `frontend/src/features/auth/auth.css` | 묶음 오류 테두리, 직접 입력 다음 줄, 480px 이하 줄바꿈 |
-| `backend/.../user/controller/AuthController.java`, `service/AuthService.java`, `dto/AuthRequests.java`, `dto/AuthResponses.java` | AUTH-16 `checkLoginId`, 아이디 형식 문구 상수 |
-| `backend/.../global/security/SecurityConfig.java` | 인증 없이 허용하는 경로에 `/api/auth/login-id/check` |
-| `backend/src/test/.../AuthServiceTest.java`, `UserApiContractTest.java` | AUTH-16 사용 가능·중복·형식 400, 토큰 없이 호출 |
-| `docs/spec/api/api_spec_a.md`, `docs/ai/features.md` | AUTH-16, N-02-1·N-03-1·N-03-2 한 줄씩 |
-
-### DB·API 변경
-- DB: 없음(기존 `countByLoginId`를 쓴다).
-- API: AUTH-16 `POST /api/auth/login-id/check` `{ loginId }` → `{ available }`를 새로 만들었다.
-  - 인증은 필요 없다.
-  - 형식이 틀리면 400 `INVALID_INPUT`(`loginId` 칸)이다.
-  - 반복 조회 제한은 닉네임 확인(AUTH-13)처럼 없다.
-  - API 정의서(`api_definition.md`)의 ID 행은 아직 더하지 않았다.
-
-### 확인
-- `./mvnw test`(-s) 543개 통과(새 시험 2개), `npm run lint` 오류 0, `npm run build` 성공. 하나씩 돌렸다.
-- mock 개발 서버와 헤드리스 Edge로 고치기 전(HEAD를 임시 worktree로 꺼내 돌린 뒤 지움)과 고친 뒤를 비교했다.
-  - 1: 가운데 `12`로 벗어남 → 문구 없음 ⇒ 빨간 테두리 + "휴대폰 번호 가운데·끝 자리를 숫자 4자리씩 입력해 주세요."
-  - 2: 앞부분 `Ab+C`·한·`_x%y-z!#`·붙여넣기 ` 가나 q.r ` → `ab+c한_x%y-z!# 가나 q.r` ⇒ `ab+c_x%y-zq.r`. 도메인 `Ex@Am!ple.co_m`·가 → 그대로 ⇒ `example.com`
-  - 3: blur → compositionend 순서에서 자모 안내가 사라짐 ⇒ 남음(두 화면)
-  - 4: 직접 입력 선택 상자 86px(1280)·40px(390) ⇒ 128px, 직접 입력 칸 396px·242px. 390 목록 선택 61px ⇒ 128px. 스크린샷은 1280·390 둘 다 봤다.
-  - 5: 버튼 없음, [가입하기] 뒤 4단계로 돌아와 중복 ⇒ [중복 확인]에 중복 문구·[다음] 꺼짐, 고친 아이디 확인 뒤 [다음] 켜짐, 가입 뒤 `/select-job`
-- 끝난 뒤 5199 개발 서버·헤드리스 Edge가 남지 않았다(사용자의 5173 서버는 건드리지 않음).
-- 확인 못 함
-  - 실제 Windows 한글 IME에서 이름 자모 안내(3번)
-  - 실제 서버·DB로 AUTH-16 호출(시험은 mock 매퍼)
-
-## 13차-1 — 인증 보안 고도화(멘토링 반영) (2026-11-27, 기준 bfc6d4d) 🆕 11/27
-- **관련 N-ID:** N-01-3, N-02-1, N-02-2, N-02-3, N-02-4 (Jira FP-290, FP-294, FP-295·296 일부)
-- 조장 결정(11/27)으로 2차 개발에서 빠진 인증 고도화 중 팀 결정·DB 변경 없이 되는 것만 했다. DDL은 바꾸지 않았다.
-
-### 무엇을, 왜 바꿨나
-- **1. 동시 로그인 실패 횟수(FP-290):** 9차 "남은 것"의 동시 요청 문제다.
-  - `authenticate`가 계정을 찾은 뒤 기존 `lockUser`(SELECT … FOR UPDATE)로 행을 잠그고 다시 읽은 횟수로 판단한다.
-  - 같은 계정의 로그인은 커밋까지 줄을 서므로 횟수가 덜 오르지 않는다. 5회째 5분 제한·10회 잠금·`LAST_LOGIN_FAIL_AT` 규칙은 그대로다.
-  - SQL 한 문장 증가(`+ 1`) 방식은 쓰지 않았다. 동시에 올리면 5를 건너뛰어 "정확히 5회째" 5분 제한이 빠질 수 있어서다.
-- **2. 같은 IP 반복 시도 제한:** 새 `ClientRateLimiter`(서버 메모리, 숫자는 `Rule` 한 곳)를 만들었다.
-  - 로그인·간편 로그인 연결 실패(401)는 10분 20회, 닉네임·아이디 확인은 1분 30회, 이메일·휴대폰 발송은 1시간 20회다.
-  - 넘으면 429 `TOO_MANY_REQUESTS`와 남은 분 문구가 나간다. 화면은 서버 문구를 그대로 보인다.
-  - 서버를 다시 켜면 초기화되고, 서버가 여러 대면 대마다 따로 센다.
-  - IP는 `getRemoteAddr()`다(관리자 화면과 같음). 자바 설정과 `application.properties.example`에는 X-Forwarded-For 처리가 없다. `application.properties`는 열지 않아 확인하지 못했다.
-  - mock은 탭 하나를 한 접속지로 보고 같은 숫자로 센다(`authMockRateLimits.js`).
-- **3. 인증코드 하루 상한(FP-295 일부):** 같은 이메일·휴대폰으로 오늘 0시부터 10회 보냈으면 429 `CODE_SEND_DAILY_LIMIT`다.
-  - `VERIFICATION_CODE` 발송 기록을 `countSentSince`로 센다(목적 무관, 관리자 로그인 번호 제외).
-  - 서버의 일반 발송에는 원래 같은 대상 1분 1회 제한이 없었다. 관리자 번호에만 있다. 이번에도 더하지 않았다.
-- **4. 서버 비밀번호 규칙(FP-296 일부):** `isValidPassword`에 ASCII 출력 문자 제한을 더했다(64자 상한은 이미 있었다).
-  - 새 비밀번호(가입·재설정·변경·관리자 비밀번호 설정)에만 쓰고, 로그인·현재 비밀번호 확인·탈퇴는 검사하지 않는다.
-  - 화면은 64자에서 자르고 같은 규칙으로 본다.
-- **5. 가입 동의(FP-294):** 1단계를 [전체 동의] + 필수 2(이용약관, 개인정보 수집·이용) + 선택 1(점수 변동 알림·혜택 안내)로 나눴다.
-  - 서버는 `agreeTerms`·`agreePrivacy`·`agreeMarketing`을 따로 받는다. `USER_CONSENT`에는 develop과 같게 늘 3행을 남긴다. 필수 2개는 Y이고, 선택(`NOTIFICATION_MARKETING`)은 체크하면 Y, 안 하면 `AGREED_YN='N'`·`AGREED_AT` 없음이다(시드 3행 모양).
-    - 처음 커밋(b228974)은 체크한 선택 동의만 남겼는데, 시드·develop 모양과 맞추려고 되돌렸다(11/27).
-  - 예전 요청(`agreeCreditInfo` 하나)도 받는다.
-  - `USER_CONSENT`의 `CK_UCS_TYPE`이 세 종류를 이미 받아서 DDL 변경은 없다.
-  - 약관 전문·링크는 저장소에 없어 [보기]는 "약관 전문은 준비 중입니다."만 보인다.
-
-### 바뀐 파일
-| 파일 | 변경 내용 (1줄) |
-|------|-----------------|
-| `backend/.../user/service/ClientRateLimiter.java` (새 파일) | 같은 IP 반복 시도 제한(규칙 3개) |
-| `backend/.../user/controller/AuthController.java`, `SocialLoginController.java` | 로그인·연결 실패, 확인, 발송에 제한 적용 |
-| `backend/.../user/service/AuthService.java` | 행 잠금 뒤 다시 읽기, 필수 동의 따로 검사, 동의 3행 기록(선택 미동의는 N) |
-| `backend/.../user/dto/AuthRequests.java` | 가입 요청 `agreeTerms`·`agreePrivacy`(예전 `agreeCreditInfo` 호환) |
-| `backend/.../user/service/AuthErrors.java`, `EmailVerificationService.java`, `PhoneVerificationService.java` | 하루 발송 상한 |
-| `backend/.../user/mapper/VerificationCodeMapper.java`, `resources/mapper/user/VerificationCodeMapper.xml` | `countSentSince` |
-| `backend/.../user/service/AccountRules.java` | 새 비밀번호 ASCII 출력 문자만 |
-| `backend/src/test/.../ClientRateLimiterTest.java` (새 파일), `AuthServiceTest.java`, `EmailVerificationServiceTest.java`, `PhoneVerificationServiceTest.java`, `UserApiContractTest.java` | 새 시험 10개, 조회 횟수 시험 1개 고침 |
-| `frontend/src/features/auth/pages/SignupPage.jsx`, `authConstants.js`, `auth.css` | 동의 화면 |
-| `frontend/src/features/auth/validation.js` | 비밀번호 64자·ASCII, 필수 동의 검사 |
-| `frontend/src/features/auth/mocks/authMockRateLimits.js` (새 파일), `authMockHandlers.js`, `socialLoginMockHandlers.js`, `api/authFeatureApi.js` | mock 제한·상한·동의, 요청 설명 |
-| `docs/spec/api/api_definition.md`, `api_spec_a.md`, `docs/ai/features.md` | AUTH-16 행, 13차-1 설명, 오류 code 2개 |
-
-### DB·API 변경
-- DB: 없음. `VERIFICATION_CODE`·`USER_CONSENT`·`APP_USER`의 기존 열·제약으로 했다.
-- API
+  - AUTH-01·05: 429 `LOGIN_TEMPORARILY_BLOCKED`, 423은 10회째, 423 `ADMIN_ACCOUNT_LOCKED`
+  - AUTH-06: `agreeTerms`·`agreePrivacy`·`agreeMarketing`(`agreeCreditInfo`는 읽지 않음), 새 비밀번호 64자·ASCII
+  - AUTH-07·14: `purpose` `FIND_ID`, 목적별 이메일 형식
+  - AUTH-08·10: `name`
+  - AUTH-09: `{ method, name, phone|email, verificationToken }` → `{ maskedLoginId, loginId }`
+  - AUTH-16: 새로 만듦
   - 새 오류 code: 429 `TOO_MANY_REQUESTS`, 429 `CODE_SEND_DAILY_LIMIT`
-  - AUTH-06: `agreeTerms`·`agreePrivacy` 요청 필드를 더했다.
-  - 새 비밀번호에 ASCII 출력 문자 규칙을 더했다.
+  - 기존 필드는 지우지 않았다.
+- **영향을 받는 기능·팀원:** 로그인한 뒤 잠긴 계정의 401 `ACCOUNT_LOCKED`(JWT 필터)도 새 문구다. 관리자 화면 잠금 문구(`admin/adminConstants.js`)는 그대로다.
 
-### 확인
-- `./mvnw test`(-s) 553개 통과(새 시험 10개), `npm run lint` 오류 0, `npm run build` 성공. 하나씩 돌렸다.
-  - 동시 실패: 서비스 단위로 순서를 재현했다(잠그기 전 3회 → 잠근 뒤 4회를 읽어 5회째 429). DB에서 실제로 동시에 보내는 시험은 하지 않았다.
-- mock 개발 서버와 헤드리스 Edge로 확인했다.
-  - 동의: 처음 꺼짐 → 이용약관만 꺼짐 → 필수 둘 켜짐 → [전체 동의]로 네 칸 모두 체크·해제 → [보기]에 준비 중 문구 → 2단계로 이동
-  - 429 문구: "인증코드 요청이 너무 많습니다. 60분 뒤에…", "오늘 이 번호로 받을 수 있는 인증코드 10회를 모두 받았습니다…", "확인 요청이 너무 많습니다. 1분 뒤에…", "로그인 시도가 너무 많습니다. 10분 뒤에…"
-- 끝난 뒤 5199 개발 서버·헤드리스 Edge가 남지 않았다(사용자의 5173 서버는 건드리지 않음).
+## 확인 (최신, 2026-11-27)
+- 확인함
+  - `./mvnw test`(-s, 시험 힙 512MB) 589개 통과.
+  - `-Ddb.it=true` 통합 시험 4개 클래스 6건 통과(로컬 Oracle C##AVENUE_LOCAL).
+    - `UserAccountLoginFailIT`
+    - `UserAccountLoginFailConcurrencyIT`: 동시 5회 → 횟수 5. 고치기 전에는 1이었다.
+    - `LoginFailPoolIT`: 15개 동시 → 1.1초. 고치기 전에는 5개가 커넥션을 못 받았다(5.6초).
+    - `CodeSendDailyLimitConcurrencyIT`: 9건 + 동시 5회 → 1건 성공. 고치기 전에는 이메일 4건, 휴대폰 5건이 성공했다.
+  - fastapi_server unittest 278개 통과(1개 건너뜀, seed_report 지문 포함). `cmp`로 DDL 사본이 같다.
+  - `npm run lint` 오류 0, `npm run build` 성공.
+  - 백엔드 LOG 모드 HTTP: `agreeCreditInfo`만 보낸 가입은 400, 하루 상한 동시 5회는 200 한 건, 동시 15회 틀린 로그인은 0.95초.
+  - mock 헤드리스 Edge: 가입 5단계 끝까지, 커서·한글 조합, 5분 제한·잠금 안내(관리자 포함), 찾기 다시 인증, o'brien 유지, 72자 비밀번호 오류, 재설정 토큰 만료 → 인증 단계.
+- 확인 못 함
+  - 실제 Windows 한글 IME(사람이 확인)
+  - `+`가 든 기존 이메일을 가진 DB 회원으로 찾기·재설정
+- 로컬 DB 시험 데이터: qa1127e·qa1127g 계정이 있고, qa1127h@test.local에 오늘 발송 기록 10건이 남아 있다.
 
-### 남은 것
-- 프록시 뒤 배포라면 `server.forward-headers-strategy` 같은 설정이 있어야 IP 제한이 접속지별로 동작한다(설정 파일은 열지 않음).
-- 약관 전문·버전(`TERMS_VERSION`)은 팀 확인이 필요하다.
-- 일반 인증코드의 같은 대상 1분 1회 제한은 아직 없다.
-- 실제 DB에서 동시 로그인을 보내는 통합 시험은 만들지 않았다. → 13-1차 보완에서 만들었다.
+## 다음 사람이 알아야 할 것 (팀 결정 대기)
+- 시드·mock 회원 이름(`합성회원000001`, "데모 급여소득자" 등)이 이름 규칙(한글만)에 걸려 아이디·비밀번호 찾기를 할 수 없다. 이름 2~5자 안도 보류다.
+- 다른 사람이 내 이메일·휴대폰의 하루 인증코드 한도(10회)를 다 써 버릴 수 있다.
+- 새 정책 값(IP 제한 숫자, 하루 10회, 64자, 5분·10회)을 `decisions.md`에 기록하는 일과 조장 동의
+- `WithdrawalService.withdraw`는 회원 행을 잠근 트랜잭션 안에서 `systemLog.record`를 부른다(풀 고갈 가능, 점검만 함). 잠금 안에서 로그를 남기는 곳은 여기 하나다.
+- 관리자가 수동으로 잠근 회원도 비밀번호 재설정으로 풀린다(원래부터).
+- IP 제한은 서버 메모리라 재시작하면 초기화되고, 서버가 여러 대면 대마다 따로 센다. 프록시 뒤라면 `server.forward-headers-strategy` 같은 설정이 필요하다.
+- 약관 전문·버전, 일반 인증코드의 같은 대상 1분 1회 제한(없음), 공통 `TextInput`의 `autoCapitalize`·`spellCheck`, 입력 칸 선택색(`--sel`)은 각 담당 확인이 필요하다.
 
-## 13-1차 보완 — FP-290 동시 로그인 실패 횟수 (2026-11-27, 기준 9e0b5f6) 🆕 11/27
-- **관련 N-ID:** N-01-3 (Jira FP-290)
-- 로컬 Oracle(C##AVENUE_LOCAL) 모의 시험 D-2에서 문제가 나와 고쳤다.
-  - 실패 0회 계정에 틀린 비밀번호 5회를 동시에 보내면 다섯 요청 모두 401이었고, `LOGIN_FAIL_COUNT`는 5가 아니라 1만 올랐다.
-  - 그 뒤 4번을 더 틀려서야 5분 제한(429)이 나왔다.
-
-### 원인
-- `authenticate`는 `selectByLoginId` → `lockUser`(SELECT … FOR UPDATE) → `selectByLoginId`(같은 값) 순서로 읽는다.
-- MyBatis 1차 캐시(local cache, 기본 SESSION)는 한 트랜잭션 안의 같은 조회를 캐시한다. 그래서 두 번째 조회가 DB 대신 잠그기 전 결과를 돌려줬다.
-- 행 잠금으로 줄은 섰지만(동시 5회가 약 480ms), 모두 옛 값 0을 읽어 `updateLoginFailure`로 0+1=1을 덮어썼다.
-- 13차-1 단위 시험은 매퍼를 가짜로 바꿔 써서 이 캐시를 거치지 않아 잡지 못했다.
-
-### 수정
-- `UserAccountMapper.xml` `lockUser`에 `flushCache="true"`를 붙이고 이유를 주석으로 남겼다. 잠근 뒤 다시 읽는 조회는 DB에서 최신 값을 읽는다.
-- `AuthService.authenticate` 위 주석에 근거를 한 줄 더했다.
-- `lockUser`를 부르는 다른 곳도 점검했다. 모두 잠근 뒤에 처음 읽으므로, 잠그기 전에 읽은 값을 잠근 뒤에 쓰는 곳은 없다.
-  - `MyPageService.selectJobType`, `WithdrawalService.withdraw`
-  - `DataInputUsers.lock`을 쓰는 `ConsentService.agree·withdraw`, `FinancialInputService.save`, `AltDataImportService.importData`, `ScoreCalculationService.calculate`
-
-### 시험
-- **새 통합 시험 `UserAccountLoginFailConcurrencyIT`**(-Ddb.it=true)
-  - 시험 안에서 qa1127it 계정을 만들고, 스레드 5개가 각자 트랜잭션으로 틀린 비밀번호를 동시에 보낸다.
-  - 기대: 횟수 5, 응답 중 429 하나, 다음 시도 429.
-  - 시험 메서드에는 `@Transactional`을 붙이지 않았다. 만든 계정은 앞뒤로 지운다.
-  - 로그인 실패 기록(SYSTEM_LOG, 수정·삭제 금지)은 가짜로 바꿔 행이 남지 않는다.
-  - 수정 전에는 실패했고(횟수 1, 응답 모두 401), 수정 후에는 통과했다.
-- `./mvnw test`(-s, 시험 힙 512MB) 553개 통과.
-- `-Ddb.it=true` 통합 시험 10개 클래스 22개: 21개 통과, 1개 건너뜀(`AdminStatsMapperIT.withdrawnExcluded`, 로컬 DB에 탈퇴 회원 없음).
-- **모의 시험 D-2 재확인(HTTP):** 새 계정 qa1127e로 동시 5회 틀렸다.
-  - 동시 5회 응답은 401 넷과 429 `LOGIN_TEMPORARILY_BLOCKED` 하나였다.
-  - 다음 시도는 틀린 비밀번호·맞는 비밀번호 모두 429였다.
-
-### 바뀐 파일
-| 파일 | 변경 내용 (1줄) |
-|------|-----------------|
-| `backend/src/main/resources/mapper/user/UserAccountMapper.xml` | `lockUser` `flushCache="true"`와 이유 주석 |
-| `backend/.../user/service/AuthService.java` | `authenticate` 주석 한 줄 |
-| `backend/src/test/.../user/mapper/UserAccountLoginFailConcurrencyIT.java` (새 파일) | 동시 로그인 실패 횟수 통합 시험 |
-
-### DB·API 변경
-- 없음(DDL·API 그대로).
-
-## develop 최신화(#169·#171) — DDL 변경 번호 C17·C18로 옮김 (2026-11-27) 🆕 11/27
-- FP-285(#171, 모델 0.3·CUT-0.4)가 DDL 변경 번호 C16을 먼저 써서, FIND_ID는 C17, LAST_LOGIN_FAIL_AT은 C18로 번호를 옮겼다. 내용은 바뀌지 않았다.
-  - 위 1차·8차·9차 기록의 C16·C17은 그때 번호 그대로 둔다.
-- **충돌 3개**
-  - `avenue_ddl.sql` 변경 기록: develop의 C16(B팀 재욱, CUT-0.4) 아래에 우리 C17(FIND_ID, 11/26)·C18(LAST_LOGIN_FAIL_AT, 11/27) 순서로 둔다.
-  - `dummy_db/01_create_tables.sql`: 정리한 DDL과 바이트 단위로 같은 사본이다.
-  - `dummy_db/seed_report.json`: develop 쪽 내용에 `ddl_sha256`만 새 DDL 지문으로 넣었다(CRLF→LF 뒤 SHA-256, `build_db.py`와 같은 방식). 행 수는 develop 그대로다.
-- **번호를 바꾼 곳**
-  - DDL·사본: 본문 주석 `APP_USER.LAST_LOGIN_FAIL_AT`·`LOGIN_FAIL_COUNT` 열 주석, `CK_VCD_PURPOSE` 주석
-  - `alter_verification_code_find_id.sql`(C17), `alter_app_user_last_login_fail_at.sql`(C18, COMMENT 문 포함)
-  - `docs/spec/sql/README.md` 두 행, `features.md` N-01-3·N-03-1, `decisions.md` 이메일 인증 행, `api_spec_a.md` 최근 변경 줄
-- DB: 구조 변경 없음. 이미 alter를 실행한 DB의 열 주석은 'v0.3.2 (C17)'로 남는다(동작에는 영향 없음, alter를 다시 실행하면 C18로 바뀐다).
-
-## PR #173 검수 반영 — 경환님 지적 2개 + 재검토 (2026-11-27, 기준 2a4dd5a) 🆕 11/27
-- **관련 N-ID:** N-01-3, N-02-2, N-02-3, N-02-4, N-03-1, N-03-2 (Jira FP-290·FP-294·FP-295)
-- 경환님 지적 2개: 아래 [2] 하루 상한 동시 요청, [3] 필수 동의 각각 검사.
-- 재검토로 [1]·[4]~[8]을 더 고쳤고, [9]는 문서다.
-
-### 무엇을, 왜 바꿨나
-- **[1] 로그인 실패 로그가 커넥션 풀을 바닥냄**
-  - 원인: 계정 행을 잠근(FOR UPDATE) 트랜잭션 안에서 `systemLog.record`(REQUIRES_NEW)가 커넥션을 하나 더 요청했다.
-    - 같은 아이디로 풀 크기(10) 이상 몰리면, 기다리는 요청들이 커넥션을 쥔 채 잠금을 기다렸다.
-    - 그동안 잠금을 쥔 요청은 로그용 커넥션을 못 받아 막혔고, 그사이 다른 API도 DB를 못 썼다.
-  - 고친 방법: 새 `LoginAttemptService.attempt`가 자기 트랜잭션에서 조회·잠금·실패 횟수 갱신만 하고, 결과(성공 / 거절 / 잠김 / 5분 제한 / 실패 n회 / 5회째 / 10회째)를 돌려준다.
-    - `AuthService.authenticate`는 트랜잭션 없이 이 결과를 받는다. 커밋으로 커넥션을 돌려준 뒤 로그를 남기고 오류를 던진다. afterCommit 콜백은 쓰지 않았다.
-    - 바깥 트랜잭션이 잠금을 오래 쥐지 않게 `login`과 간편 로그인 연결(`SocialLoginService.link`)의 `@Transactional`을 뺐다.
-    - 관리자 번호 발송(`AdminAuthService.startLogin`)에는 `@Transactional`을 달았다. 발송이 실패하면 번호 저장을 되돌리는 것은 예전과 같다.
-    - 응답 code·문구·실패 횟수 규칙은 그대로다. 단위 시험 기존 로그인 시험과 아래 통합 시험으로 확인했다.
-  - 달라진 점 하나: 성공 처리(실패 횟수 0)가 잠금 트랜잭션이 끝난 뒤에 따로 커밋된다.
-    - 같은 계정에 맞는 비밀번호와 틀린 비밀번호가 정확히 동시에 오면, 틀린 쪽 1회가 성공 처리에 지워질 수 있다.
-    - 혼자 보내는 요청의 동작은 같다.
-- **[2] 인증코드 하루 상한을 동시 요청으로 넘김(경환님 1)**
-  - 원인: `send`의 트랜잭션 안에서 "세기 → 비교 → 기록"을 해서 동시 요청이 같은 수를 읽었다.
-  - 고친 방법: 새 `CodeSendGuard`(줄무늬 잠금 64개, 서버 메모리)를 이메일·휴대폰 발송이 함께 쓴다.
-    - 대상(채널 + HMAC) 잠금을 트랜잭션 밖에서 잡는다.
-    - 그 안에서 `TransactionTemplate`으로 세기 → 비교 → 기록 → 발송 → 커밋을 끝낸 뒤 푼다.
-    - 서버가 여러 대면 대마다 따로 센다(주석에 적음). 발송이 실패하면 기록을 되돌리는 것은 그대로다.
-- **[3] 필수 동의 각각 검사(경환님 2)**
-  - `agreeCreditInfo` 하나로 필수 2개를 대신하던 분기를 없앴다. `agreeTerms`·`agreePrivacy`가 각각 true여야 하고, 빠진 칸마다 400이다.
-  - DTO에서 `agreeCreditInfo`를 뺐다. 보내도 읽지 않는다.
-  - mock·가입 화면의 서버 칸 매핑·API 주석·탈퇴 시험 본문도 맞췄다.
-- **[4] 64자를 넘는 새 비밀번호가 말없이 잘림**
-  - `filterPassword`에서 자르기를 없앴다. 규칙 목록에 "64자 이하"를 더했다.
-  - 64자를 넘으면 칸 오류 "비밀번호는 64자 이하로 입력해 주세요."를 보이고 제출을 막는다. 재설정·비밀번호 변경 칸은 입력하는 즉시 보인다.
-  - 서버도 가입·재설정·MEM-04에서 같은 문구를 준다(`AccountRules.newPasswordError`).
-- **[5] 관리자가 10회째 실패로 잠기는 순간 회원 안내가 나옴**
-  - 10회째 잠금과 2단계 인증 중 잠금 확인(`verifyLogin`)이 관리자면 423 `ADMIN_ACCOUNT_LOCKED`를 준다.
-  - mock(로그인 10회째, 2단계 인증)도 같게 맞췄다.
-- **[6] IP 로그인 실패 20회 제한을 동시 요청으로 넘김**
-  - `countFailures`가 요청 전에 `compute`로 한 자리를 원자적으로 잡는다. 이미 20이면 429다.
-  - 401로 끝나지 않으면(성공·429·423·400 등) 잡은 자리를 돌려준다.
-  - 쓰는 곳이 없어진 `check`·`record`는 지웠다.
-- **[7] 기호가 든 기존 이메일이 찾기 화면에서 지워짐**
-  - `filterExistingEmailLocal`이 공백과 @만 지운다(o'brien 유지). 새 이메일 규칙(가입·이메일 변경)은 그대로다.
-- **[8] 재설정 단계에서 토큰이 만료되면 되돌아갈 수 없음**
-  - 서버가 `EMAIL_VERIFICATION_REQUIRED`를 주면 인증을 비우고 인증 단계로 돌아가 안내한다. 입력한 아이디·이름·이메일은 그대로 둔다.
-  - mock의 토큰 확인에도 같은 code를 붙였다.
-- **[9] 문서**
-  - `features.md`: 96·160행의 붙은 항목을 나눴다. 215행에 실제로 지우는 글자를 적고, 1144행의 자동 잠금을 10회로 고쳤다. N-01-3·N-02-2·N-02-3·N-02-4·N-03-2 구현 현황도 고쳤다.
-  - `api_spec_a.md`: AUTH-06 요청 필드, 동의·비밀번호 설명, 오류 표, 최근 변경 줄을 고쳤다.
-  - DDL·사본: `ACCOUNT_STATUS_CODE` 열 주석을 "5회 실패" → "10회 실패"로 고치고, C18 변경 기록에 한 줄을 더했다. `seed_report.json`의 `ddl_sha256`도 갱신했다.
-  - C18 alter 끝에 같은 주석의 COMMENT ON COLUMN 한 줄을 더하고, sql README 행도 고쳤다. 새 DDL 번호는 만들지 않았다.
-
-### lockUser를 쓰는 다른 트랜잭션의 로그(점검만, 고치지 않음)
-- `WithdrawalService.withdraw`: 회원 행을 잠근 트랜잭션 안에서 `systemLog.record`(회원 탈퇴 INFO)를 부른다. 같은 회원의 탈퇴가 풀 크기 이상 동시에 오면 [1]과 같은 모양이 될 수 있다.
-- 잠금 안에서 로그를 남기는 곳은 이것 하나다. `MyPageService.selectJobType`, `ConsentService.agree·withdraw`, `FinancialInputService.save`, `AltDataImportService.importData`, `ScoreCalculationService.calculate`는 잠금 안에서 `systemLog.record`를 부르지 않는다.
-
-### 새 시험
-- **`LoginFailPoolIT`**(db.it): 실패 로그를 REQUIRES_NEW로 `SELECT 1 FROM DUAL`만 하는 대역으로 바꿨다(SYSTEM_LOG에 행을 남기지 않음). 커넥션 대기는 5초다.
-  - 풀(10)보다 많은 15개 스레드가 새 계정(qa1127it)에 틀린 비밀번호를 동시에 보낸다.
-  - 기대: 10초 안에 끝남, 대역의 커넥션 실패 0, 401 넷·429 열하나, 실패 횟수 5.
-  - 고치기 전에는 실패했다. 15개 중 5개가 `CannotCreateTransactionException`, 대역 커넥션 실패도 있었다(5.6초). 고친 뒤에는 통과했다(1.1초).
-- **`CodeSendDailyLimitConcurrencyIT`**(db.it): 시험 대상(qa1127it 이메일, 시험용 번호)의 오늘 발송 기록 9건을 넣고 스레드 5개가 동시에 보낸다(이메일·휴대폰 각 1개). 기록은 앞뒤로 지운다.
-  - 고치기 전에는 실패했다. 이메일은 4건, 휴대폰은 5건이 성공했다.
-  - 고친 뒤에는 통과했다. 1건 성공, 4건 429 `CODE_SEND_DAILY_LIMIT`, 오늘 기록 10건이다.
-- **단위 시험 추가**
-  - `ClientRateLimiterTest`: 동시 40개 중 20개만 확인에 들어감, 401이 아니면 자리를 돌려줌.
-  - `AuthServiceTest`: 관리자 10회째 423 `ADMIN_ACCOUNT_LOCKED`, `agreeCreditInfo`만이면 두 칸 400, 64자 초과 문구.
-
-### 확인
-- `./mvnw test`(-s, 시험 힙 512MB) 589개 통과.
-- `-Ddb.it=true`: 새 시험 2개, `UserAccountLoginFailConcurrencyIT`, `UserAccountLoginFailIT`로 4개 클래스 6건 통과.
-- fastapi_server `python -m unittest discover tests` 278개 통과(1개 건너뜀, seed_report 해시 검사 포함).
-- `npm run lint` 오류 0, `npm run build` 성공. 하나씩 돌렸다.
-- 백엔드 LOG 모드 HTTP 재확인
-  - `agreeCreditInfo`만 보낸 가입은 400(`agreeTerms`·`agreePrivacy`)이고 계정이 생기지 않았다.
-  - 오늘 9건인 새 이메일에 동시 5회 보내면 200은 1건이고, 11번째도 429다.
-  - 새 계정에 동시 15회 틀린 로그인은 0.95초에 끝났다(401 넷·429 열하나). 바로 뒤의 다른 API는 5ms였다.
-- mock 화면(헤드리스 Edge)
-  - 9회 실패한 새 관리자는 10회째에 관리자 안내를 보고, [비밀번호 찾기] 링크는 나오지 않는다.
-  - 2단계 인증 중 잠긴 관리자도 관리자 안내를 본다.
-  - 찾기 이메일에 "O'Brien"을 치면 "o'brien"으로 남는다.
-  - 72자를 붙여 넣으면 72자 그대로 남는다. "64자 이하: 미충족"과 칸 오류가 보이고 제출이 막힌다.
-  - 재설정 토큰을 써 버리면 인증 단계로 돌아가 안내가 나오고 [다음]은 꺼진다.
-- 시험 계정: DB에 qa1127e·qa1127g(가입)를 만들었다. qa1127f는 400이라 만들어지지 않았다. qa1127h@test.local에는 오늘 발송 기록 10건이 있다. mock 계정은 메모리에만 있었다.
-- 끝난 뒤 8080 백엔드, 5199 개발 서버, 헤드리스 Edge가 남지 않았다.
-
-### 남은 것(팀 결정 대기)
-- 시드·시연 회원의 이름으로는 아이디 찾기·비밀번호 재설정이 되지 않는다(시드 이름 규칙, 팀 결정).
-- 다른 사람이 내 이메일·휴대폰으로 하루 인증코드 한도(10회)를 다 써 버릴 수 있다.
-- 새 정책 값(IP 제한 숫자, 하루 10회, 64자, 5분·10회)을 `decisions.md`에 기록하는 일과 조장 동의.
-- `WithdrawalService.withdraw`의 잠금 안 로그(위 점검).
+## 간결화 (2026-11-27, 동작 변경 없음)
+- 작업 로그를 이 양식으로 줄였다(회차별 기록 → 기능별 요약). features.md는 N-ID마다 구현 현황을 1~2줄로 합쳤다. 코드 주석의 회차 표시("12차"·"13차"·"PR #173" 등)는 지웠다.
+- 중복을 모았다.
+  - 프론트: `useAvailabilityCheck`(가입 아이디·닉네임 [중복 확인]), `useFindNameField`·`useExistingEmailParts`(아이디·비밀번호 찾기 이름·이메일 칸), `validation.js` 걸러내기 공통 함수, `passwordTooLongError`, mock 오류 도우미
+  - 서버: `AuthErrors.invalidField`, `AuthService` 로그 한 줄 도우미
+  - 시험: db.it 시험 계정 도우미 `QaItAccounts`
+- 확인
+  - `./mvnw test` 589개 통과, db.it 4개 클래스 6건 통과, `npm run lint` 오류 0, `npm run build` 성공
+  - 걸러내기 함수 252개 입력이 전과 같은 결과
+  - mock 헤드리스 확인 스크립트 3개를 HEAD 사본과 고친 뒤에 각각 돌려 출력이 같았다(전환 중 테두리 색 2줄만 다름)
 
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)

@@ -6,7 +6,7 @@ export default function useImeSafeFilter() {
   // 한 화면에서 조합은 한 칸에서만 일어나므로 표시 하나를 함께 쓴다.
   const composing = useRef(false)
 
-  // 값이 바뀐 뒤 다시 그려지고 나서 커서를 pos로 옮긴다. 그사이 새 조합이 시작됐거나 칸을 벗어났으면 건드리지 않는다(FP-258 PR #164 검수).
+  // 값이 바뀐 뒤 다시 그려지고 나서 커서를 pos로 옮긴다. 그사이 새 조합이 시작됐거나 칸을 벗어났으면 건드리지 않는다(FP-258).
   const moveCaret = (input, pos) => {
     requestAnimationFrame(() => {
       if (!composing.current && document.activeElement === input) input.setSelectionRange(pos, pos)

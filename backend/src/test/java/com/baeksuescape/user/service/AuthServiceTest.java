@@ -113,7 +113,7 @@ class AuthServiceTest {
         given(userMapper.selectByLoginId("demo_employee")).willReturn(UserFixtures.user(7L, "demo_employee"));
         AuthResponses.Login result = (AuthResponses.Login) service.login(new AuthRequests.Login(" Demo_Employee ", PASSWORD));
         assertThat(tokenProvider.parse(result.accessToken())).isPresent();
-        // FP-258 13차 행을 잠근 뒤 한 번 더 읽으므로 두 번 모두 소문자 아이디로 조회한다.
+        // FP-258 행을 잠근 뒤 한 번 더 읽으므로 두 번 모두 소문자 아이디로 조회한다.
         verify(userMapper, org.mockito.Mockito.times(2)).selectByLoginId("demo_employee");
         verify(userMapper, never()).selectByLoginId(" Demo_Employee ");
     }
@@ -140,7 +140,7 @@ class AuthServiceTest {
         verify(userMapper).updateLoginFailure(eq(7L), eq(5), eq(false), any());
     }
 
-    // FP-258 13차 FP-290 동시 로그인 순서 재현 — 잠그기 전에 읽은 횟수(3회)는 다른 요청이 그사이 올렸을 수 있다.
+    // FP-290 동시 로그인 순서 재현 — 잠그기 전에 읽은 횟수(3회)는 다른 요청이 그사이 올렸을 수 있다.
     // 행을 잠근(lockUser) 뒤 다시 읽은 횟수(앞선 요청이 커밋한 4회)에 1을 더해 5회째 429가 되어야 한다(예전에는 3+1=4로 덜 올라갔다).
     @Test
     void 동시에_보낸_실패는_행을_잠근_뒤_다시_읽은_횟수로_센다() {
@@ -158,7 +158,7 @@ class AuthServiceTest {
         order.verify(userMapper).updateLoginFailure(eq(7L), eq(5), eq(false), any());
     }
 
-    // FP-258 13차 앞선 요청이 5회째로 제한을 건 뒤 잠금이 풀린 요청은, 다시 읽은 값으로 제한 중임을 알고 횟수를 올리지 않는다.
+    // FP-258 앞선 요청이 5회째로 제한을 건 뒤 잠금이 풀린 요청은, 다시 읽은 값으로 제한 중임을 알고 횟수를 올리지 않는다.
     @Test
     void 잠금을_기다린_요청은_앞선_요청이_건_5분_제한을_보고_횟수를_올리지_않는다() {
         UserAccount readBeforeLock = UserFixtures.user(7L, "employee");
@@ -201,7 +201,7 @@ class AuthServiceTest {
         assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", PASSWORD)))).isEqualTo("no error");
     }
 
-    // FP-258 PR #164 검수 — 5분 제한은 마지막 실패 시각으로만 잰다. 닉네임·이메일 변경으로 UPDATED_AT이 바뀌어도 늘어나거나 다시 시작되지 않는다.
+    // FP-258 5분 제한은 마지막 실패 시각으로만 잰다. 닉네임·이메일 변경으로 UPDATED_AT이 바뀌어도 늘어나거나 다시 시작되지 않는다.
     @Test
     void 다섯_번_실패_뒤_다른_정보를_고쳐도_제한은_마지막_실패_5분_뒤에_끝난다() {
         java.time.LocalDateTime now = java.time.LocalDateTime.now(CLOCK);
@@ -239,7 +239,7 @@ class AuthServiceTest {
         verify(userMapper, never()).updateLoginSuccess(anyLong(), any());
     }
 
-    // FP-258 PR #164 검수 — 관리자는 비밀번호 찾기로 잠금을 풀 수 없어, 잠긴 관리자가 맞는 비밀번호를 넣으면 다른 code·문구(423 ADMIN_ACCOUNT_LOCKED)다.
+    // FP-258 관리자는 비밀번호 찾기로 잠금을 풀 수 없어, 잠긴 관리자가 맞는 비밀번호를 넣으면 다른 code·문구(423 ADMIN_ACCOUNT_LOCKED)다.
     @Test
     void 잠긴_관리자는_비밀번호가_맞으면_423_ADMIN_ACCOUNT_LOCKED이고_틀리면_401() {
         given(userMapper.selectByLoginId("admin")).willReturn(UserFixtures.account(1L, "admin", UserAccount.ROLE_ADMIN, UserAccount.LOCKED));
@@ -254,7 +254,7 @@ class AuthServiceTest {
         verify(userMapper, never()).updateLoginFailure(anyLong(), anyInt(), anyBoolean(), any());
     }
 
-    // FP-258 PR #173 관리자가 10회째 실패로 잠기는 순간에도 회원용(비밀번호 찾기) 안내가 아니라 관리자 안내다. 잠금 기록은 회원과 같다.
+    // FP-258 관리자가 10회째 실패로 잠기는 순간에도 회원용(비밀번호 찾기) 안내가 아니라 관리자 안내다. 잠금 기록은 회원과 같다.
     @Test
     void 관리자가_10회째_실패로_잠기면_423_ADMIN_ACCOUNT_LOCKED() {
         UserAccount admin = UserFixtures.account(1L, "admin", UserAccount.ROLE_ADMIN, UserAccount.ACTIVE);
@@ -380,7 +380,7 @@ class AuthServiceTest {
         verify(consentMapper).insertSignupConsent(eq(100L), eq("NOTIFICATION_MARKETING"), eq("N"), eq("N"), isNull(), any());
     }
 
-    // FP-258 13차 N-02-2 필수 동의 2개·선택 1개를 따로 받는다 — 필수가 빠지면 그 칸 400, 모두 체크하면 3행(선택은 Y·동의 시각 있음).
+    // FP-258 N-02-2 필수 동의 2개·선택 1개를 따로 받는다 — 필수가 빠지면 그 칸 400, 모두 체크하면 3행(선택은 Y·동의 시각 있음).
     @Test
     void 필수_동의를_따로_받아_빠진_칸을_알리고_선택_동의를_기록한다() {
         AuthRequests.Signup noPrivacy = consentSignup(true, false, false);
@@ -401,7 +401,7 @@ class AuthServiceTest {
                 marketing, "token", null, PHONE_TOKEN, terms, privacy);
     }
 
-    // FP-258 13차 N-02-4 서버도 새 비밀번호를 화면과 같은 규칙으로 본다 — 한글·이모지 같은 ASCII 밖 글자, 64자 초과는 password 칸 400. 공백·기호는 된다.
+    // FP-258 N-02-4 서버도 새 비밀번호를 화면과 같은 규칙으로 본다 — 한글·이모지 같은 ASCII 밖 글자, 64자 초과는 password 칸 400. 공백·기호는 된다.
     @Test
     void 새_비밀번호는_ASCII_출력_문자_64자_이하만_받는다() {
         for (String password : new String[] { "abcd1234한", "abcd1234é", "abcd1234	", "a1" + "b".repeat(63) }) {
@@ -409,7 +409,7 @@ class AuthServiceTest {
                     "AGE_30S", null, "token", null, PHONE_TOKEN, true, true);
             assertThat(fieldOf(() -> service.signup(request))).as(password).isEqualTo("password");
         }
-        // FP-258 PR #173 64자를 넘으면 길이 안내 문구(화면 validation.js와 같음), 그 밖의 위반은 지금 문구.
+        // FP-258 64자를 넘으면 길이 안내 문구(화면 validation.js와 같음), 그 밖의 위반은 지금 문구.
         assertThat(AccountRules.newPasswordError("a1" + "b".repeat(63), "규칙")).isEqualTo("비밀번호는 64자 이하로 입력해 주세요.");
         assertThat(AccountRules.newPasswordError("abcd1234한", "규칙")).isEqualTo("규칙");
         assertThat(AccountRules.newPasswordError("a1" + "b".repeat(62), "규칙")).isNull();
@@ -507,7 +507,7 @@ class AuthServiceTest {
         assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, "02-123-4567", true, null)))).isEqualTo("phone");
     }
 
-    // FP-258 PR #173 예전 화면처럼 agreeCreditInfo만 보내면(agreeTerms·agreePrivacy 없음) 필수 동의 두 칸 모두 400이고 가입하지 않는다.
+    // FP-258 예전 화면처럼 agreeCreditInfo만 보내면(agreeTerms·agreePrivacy 없음) 필수 동의 두 칸 모두 400이고 가입하지 않는다.
     @Test
     void 필수_동의_두_항목이_없으면_agreeCreditInfo를_보내도_두_칸_모두_400() {
         assertThatThrownBy(() -> service.signup(signup("새닉네임", 1990, PHONE, null, null)))

@@ -16,9 +16,9 @@ public final class AuthRequests {
 
     // AUTH-06 회원가입. 칸별 검사는 AuthService가 한 번에 한다(프론트와 같은 문구).
     //   ageGroup: 프론트가 birthYear로 계산해 함께 보내지만 서버는 쓰지 않는다(프론트 TODO(D-20)와 같음).
-    //   FP-258 N-02-2 agreeTerms·agreePrivacy: 필수 동의 2개(서비스 이용약관, 개인정보 수집·이용). 각각 true여야 가입된다(PR #173).
+    //   FP-258 N-02-2 agreeTerms·agreePrivacy: 필수 동의 2개(서비스 이용약관, 개인정보 수집·이용). 각각 true여야 가입된다.
     //   agreeMarketing: 선택 동의(점수 변동 알림·혜택 안내). 보내지 않으면 미동의다.
-    //   예전 화면의 agreeCreditInfo(체크 하나)는 PR #173에서 뺐다. 보내도 읽지 않으므로 필수 동의를 대신하지 않는다.
+    //   예전 화면의 agreeCreditInfo(체크 하나)는 뺐다. 보내도 읽지 않으므로 필수 동의를 대신하지 않는다.
     //   phoneVerificationToken: 휴대폰 인증 확인(phone/verify)에서 받은 토큰. 필수(11/18 1차 시연 후속).
     public record Signup(
             String loginId,

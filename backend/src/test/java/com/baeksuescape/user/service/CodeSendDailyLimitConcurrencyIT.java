@@ -31,7 +31,7 @@ import com.baeksuescape.user.service.email.EmailCodeSender;
 import com.baeksuescape.user.service.phone.PhoneCodeSender;
 
 /**
- * FP-258 PR #173 N-02-3 같은 이메일·휴대폰에 인증코드 발송을 동시에 보내도 하루 상한(10회)을 넘지 않는지 실제 Oracle DB에서 확인하는 통합 테스트(-Ddb.it=true일 때만 실행).
+ * FP-258 N-02-3 같은 이메일·휴대폰에 인증코드 발송을 동시에 보내도 하루 상한(10회)을 넘지 않는지 실제 Oracle DB에서 확인하는 통합 테스트(-Ddb.it=true일 때만 실행).
  * 시험 대상(qa1127it 접두어 이메일, 시험용 번호)의 오늘 발송 기록 9건을 넣고 스레드 5개가 동시에 보낸다. 메일·문자는 보내지 않게 발송기만 가짜로 바꾼다.
  * 스레드마다 자기 트랜잭션을 써야 하므로 @Transactional을 붙이지 않고, 만든 발송 기록은 앞뒤로 지운다.
  */

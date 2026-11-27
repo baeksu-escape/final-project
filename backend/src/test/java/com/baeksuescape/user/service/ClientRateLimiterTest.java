@@ -23,7 +23,7 @@ import org.springframework.http.HttpStatus;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.user.service.ClientRateLimiter.Rule;
 
-// FP-258 13차 같은 IP의 반복 시도 제한(서버 메모리) — 규칙별 횟수·시간 창, 실패만 세는 로그인, IP끼리 따로 센다.
+// FP-258 같은 IP의 반복 시도 제한(서버 메모리) — 규칙별 횟수·시간 창, 실패만 세는 로그인, IP끼리 따로 센다.
 class ClientRateLimiterTest {
 
     private static final String IP = "10.0.0.1";
@@ -106,7 +106,7 @@ class ClientRateLimiterTest {
         assertThat(limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> "ok")).isEqualTo("ok");
     }
 
-    // FP-258 PR #173 동시에 몰린 로그인 실패도 limit(20)개까지만 비밀번호 확인에 들어가고, 나머지는 요청 전에 429.
+    // FP-258 동시에 몰린 로그인 실패도 limit(20)개까지만 비밀번호 확인에 들어가고, 나머지는 요청 전에 429.
     @Test
     void 동시에_몰린_로그인_실패도_20개까지만_확인하고_나머지는_요청_전에_429() throws Exception {
         int threads = 40;
@@ -148,7 +148,7 @@ class ClientRateLimiterTest {
         }
     }
 
-    // FP-258 PR #173 먼저 잡은 자리는 401이 아니면(성공·5분 제한 429·잠금 423) 돌려주므로, 그런 요청이 많아도 실패 한도를 쓰지 않는다.
+    // FP-258 먼저 잡은 자리는 401이 아니면(성공·5분 제한 429·잠금 423) 돌려주므로, 그런 요청이 많아도 실패 한도를 쓰지 않는다.
     @Test
     void 성공과_401이_아닌_오류는_먼저_잡은_자리를_돌려준다() {
         for (int i = 0; i < 30; i++) limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> "ok");

@@ -72,7 +72,7 @@ public class SocialLoginService {
     }
 
     // AUTH-05 기존 계정에 연결 — 아이디·비밀번호는 일반 로그인과 같은 규칙(실패 횟수·잠금)으로 확인한다. 관리자 계정은 연결하지 않는다.
-    // FP-258 PR #173 트랜잭션을 걸지 않는다 — authenticate가 계정 행 잠금을 자기 트랜잭션에서만 쥐고, 실패 로그는 커넥션을 돌려준 뒤 남기게 한다.
+    // FP-258 트랜잭션을 걸지 않는다 — authenticate가 계정 행 잠금을 자기 트랜잭션에서만 쥐고, 실패 로그는 커넥션을 돌려준 뒤 남기게 한다.
     //   연결 저장은 한 건 INSERT이고, 동시에 같은 연결을 넣으면 DB UNIQUE가 막아 409로 바꾼다.
     public AuthResponses.Login link(AuthRequests.SocialLink request) {
         requireDevMode();

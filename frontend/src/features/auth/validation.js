@@ -1,29 +1,34 @@
 // N-02 비밀번호 규칙 — 영문과 숫자를 섞어 8자 이상, 기호는 요구하지 않는다(decisions.md 1-2). 가입·비밀번호 찾기·마이페이지가 함께 쓴다.
 // 입력하는 동안 PasswordRuleList가 이 목록으로 충족 여부를 보여 준다.
-// FP-258 13차 N-02-4 새 비밀번호 최대 길이 — 서버 AccountRules.PASSWORD_MAX와 같다(BCrypt 72바이트 안).
+// FP-258 N-02-4 새 비밀번호 최대 길이 — 서버 AccountRules.PASSWORD_MAX와 같다(BCrypt 72바이트 안).
 export const PASSWORD_MAX = 64
-// FP-258 PR #173 64자를 넘은 새 비밀번호의 칸 오류 — 서버 AccountRules.PASSWORD_TOO_LONG_MESSAGE와 같다(잘라 내지 않고 알린다).
+// FP-258 64자를 넘은 새 비밀번호의 칸 오류 — 서버 AccountRules.PASSWORD_TOO_LONG_MESSAGE와 같다(잘라 내지 않고 알린다).
 export const PASSWORD_TOO_LONG_MESSAGE = `비밀번호는 ${PASSWORD_MAX}자 이하로 입력해 주세요.`
 
 export const PASSWORD_RULES = Object.freeze([
   { key: 'length', label: '8자 이상', test: (value) => value.length >= 8 },
   { key: 'letter', label: '영문 포함', test: (value) => /[A-Za-z]/.test(value) },
   { key: 'number', label: '숫자 포함', test: (value) => /\d/.test(value) },
-  // FP-258 PR #173 길이 상한도 목록에 보여 준다(넘으면 이 줄만 안 지킨 것으로 보인다).
+  // FP-258 길이 상한도 목록에 보여 준다(넘으면 이 줄만 안 지킨 것으로 보인다).
   { key: 'max', label: `${PASSWORD_MAX}자 이하`, test: (value) => value.length <= PASSWORD_MAX },
 ])
 
-// 비밀번호가 모든 규칙을 지키는지 돌려준다. FP-258 13차 64자 이하·ASCII 출력 문자만(서버 isValidPassword와 같음).
+// 비밀번호가 모든 규칙을 지키는지 돌려준다. FP-258 64자 이하·ASCII 출력 문자만(서버 isValidPassword와 같음).
 export function isValidPassword(value) {
   const text = value ?? ''
   return PASSWORD_RULES.every((rule) => rule.test(text)) && /^[\x20-\x7E]*$/.test(text)
 }
 
-// FP-258 PR #173 새 비밀번호 칸 오류 문구 — 64자를 넘으면 길이 안내, 그 밖의 규칙 위반이면 ruleMessage, 맞으면 ''(서버 newPasswordError와 같은 순서).
+// FP-258 새 비밀번호 칸 오류 문구 — 64자를 넘으면 길이 안내, 그 밖의 규칙 위반이면 ruleMessage, 맞으면 ''(서버 newPasswordError와 같은 순서).
 export function newPasswordError(value, ruleMessage = '비밀번호 규칙을 모두 지켜 주세요.') {
   const text = value ?? ''
   if (text.length > PASSWORD_MAX) return PASSWORD_TOO_LONG_MESSAGE
   return isValidPassword(text) ? '' : ruleMessage
+}
+
+// FP-258 입력하는 동안 바로 보이는 길이 오류 — 64자를 넘으면 PASSWORD_TOO_LONG_MESSAGE, 아니면 ''(재설정·비밀번호 변경 칸, 잘라 내지 않고 알린다).
+export function passwordTooLongError(value) {
+  return String(value ?? '').length > PASSWORD_MAX ? PASSWORD_TOO_LONG_MESSAGE : ''
 }
 
 // FP-258 N-02-1 이메일 형식 — 소문자로 바꾼 값을 '앞부분@도메인'으로 나눠 판정한다(서버 AccountRules.isValidEmail과 같은 규칙, 전체 100자 이하).
@@ -55,22 +60,22 @@ export function isValidEmail(value) {
 }
 
 // FP-258 N-02-1 서버(AccountRules.normalizeEmail·normalizeLoginId)와 같이 앞뒤 공백을 빼고 소문자로 바꾼다. mock이 요청 값을 이 함수로 정리한 뒤 쓴다.
-export function normalizeEmail(value) {
-  return String(value ?? '').trim().toLowerCase()
-}
-export function normalizeLoginId(value) {
-  return String(value ?? '').trim().toLowerCase()
-}
+const trimLower = (value) => String(value ?? '').trim().toLowerCase()
+export const normalizeEmail = trimLower
+export const normalizeLoginId = trimLower
 
 // ===== FP-258 N-02-1 칸별 걸러내기 — 입력·붙여넣기 모두 onChange에서 이 함수를 거친다. 판정(isValid…·validate…)은 따로 한다. =====
 // 한글 칸은 조합 중인 자모(ㄱ-ㅎ, ㅏ-ㅣ)를 남기므로 값이 바뀌지 않아 한글 조합이 끊기지 않는다.
-
-// FP-258 N-02-1 새 비밀번호: ASCII 출력 문자(영문·숫자·키보드 기호)와 공백만 남긴다. 보기 상태(type=text)에서 켜진 한글 IME 입력·붙여넣기를 막는다.
-// 공백은 지금 비밀번호 규칙(PASSWORD_RULES, 서버 isValidPassword)이 막지 않으므로 남긴다.
-// FP-258 PR #173 길이는 자르지 않는다 — 64자를 넘게 붙여 넣으면 칸 오류(PASSWORD_TOO_LONG_MESSAGE)로 알리고 제출을 막는다(말없이 잘리면 다른 비밀번호로 저장된다).
-export function filterPassword(value) {
-  return String(value ?? '').replace(/[^\x20-\x7E]/g, '')
+// 칸마다 (lower면 소문자로 바꾼 뒤) drop에 맞는 글자를 지우고 max자까지 남긴다.
+function cleanText(value, drop, { lower = false, max } = {}) {
+  const text = lower ? String(value ?? '').toLowerCase() : String(value ?? '')
+  const kept = text.replace(drop, '')
+  return max === undefined ? kept : kept.slice(0, max)
 }
+
+// FP-258 N-02-1 새 비밀번호: ASCII 출력 문자와 공백만 남긴다(보기 상태의 한글 IME 입력·붙여넣기를 막음, 공백은 규칙이 막지 않음).
+// 길이는 자르지 않는다 — 64자를 넘으면 칸 오류(PASSWORD_TOO_LONG_MESSAGE)로 막는다(말없이 잘리면 다른 비밀번호로 저장된다).
+export const filterPassword = (value) => cleanText(value, /[^\x20-\x7E]/g)
 // FP-258 N-02-1 두벌식 자판 기준으로 한글을 그 자리의 영문 키로 바꾼다(예: 가→rk, ㅂ→q). 가린 칸은 브라우저가 한글 IME를 끄므로, 보기 상태에서 친 한글도 같은 값이 되게 한다.
 const CHO_KEYS = ['r', 'R', 's', 'e', 'E', 'f', 'a', 'q', 'Q', 't', 'T', 'd', 'w', 'W', 'c', 'z', 'x', 'v', 'g']
 const JUNG_KEYS = ['k', 'o', 'i', 'O', 'j', 'p', 'u', 'P', 'h', 'hk', 'ho', 'hl', 'y', 'n', 'nj', 'np', 'nl', 'b', 'm', 'ml', 'l']
@@ -93,30 +98,18 @@ export function hangulToQwerty(value) {
   }).join('')
 }
 // N-02-1 가입 아이디: 소문자로 바꾸고 a-z0-9만, 20자.
-export function filterSignupLoginId(value) {
-  return String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)
-}
+export const filterSignupLoginId = (value) => cleanText(value, /[^a-z0-9]/g, { lower: true, max: 20 })
 // N-01-1·N-03-2 로그인·비밀번호 찾기 아이디: 시드(demo_employee)·관리자 아이디에 밑줄이 있어 _도 남긴다. 20자.
-export function filterLoginId(value) {
-  return String(value ?? '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20)
-}
+export const filterLoginId = (value) => cleanText(value, /[^a-z0-9_]/g, { lower: true, max: 20 })
 // N-02-1 이름: 한글 완성형과 조합 중 자모만, 20자. 판정은 NAME_PATTERN(완성형 2~20자).
-export function filterName(value) {
-  return String(value ?? '').replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ]/g, '').slice(0, 20)
-}
+export const filterName = (value) => cleanText(value, /[^가-힣ㄱ-ㅎㅏ-ㅣ]/g, { max: 20 })
 // N-02-1 이메일 앞부분: 소문자로 바꾸고 a-z0-9 . _ - 만, 64자.
-export function filterEmailLocal(value) {
-  return String(value ?? '').toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, EMAIL_LOCAL_MAX)
-}
+export const filterEmailLocal = (value) => cleanText(value, /[^a-z0-9._-]/g, { lower: true, max: EMAIL_LOCAL_MAX })
 // N-02-1 이메일 도메인(직접 입력): 소문자로 바꾸고 a-z0-9 . - 만.
-export function filterEmailDomain(value) {
-  return String(value ?? '').toLowerCase().replace(/[^a-z0-9.-]/g, '')
-}
-// FP-258 N-03-1·N-03-2 찾기 화면 이메일 앞부분(기존 이메일): 예전 규칙으로 가입한 이메일(+ ' 등 기호)도 찾도록 공백과 @만 지우고 나머지 글자는 그대로 둔 채 소문자로 바꾼다.
-// FP-258 PR #173 예전에는 a-z0-9 . _ % + - 밖의 기호를 지워 o'brien이 obrien이 됐다. 판정은 isBasicEmail 그대로. 직접 입력 도메인은 가입과 같은 filterEmailDomain을 쓴다.
-export function filterExistingEmailLocal(value) {
-  return String(value ?? '').toLowerCase().replace(/[\s@]/g, '').slice(0, EMAIL_LOCAL_MAX)
-}
+export const filterEmailDomain = (value) => cleanText(value, /[^a-z0-9.-]/g, { lower: true })
+// FP-258 N-03-1·N-03-2 찾기 화면 이메일 앞부분(기존 이메일): + ' 같은 기호가 든 기존 이메일도 찾도록 공백과 @만 지우고 소문자로 바꾼다(64자).
+// 판정은 isBasicEmail, 직접 입력 도메인은 가입과 같은 filterEmailDomain이다.
+export const filterExistingEmailLocal = (value) => cleanText(value, /[\s@]/g, { lower: true, max: EMAIL_LOCAL_MAX })
 // N-04-3 한 칸 이메일(마이페이지 이메일 변경): 첫 @ 앞뒤를 따로 거르고 @는 하나만 남긴다.
 export function filterEmail(value) {
   const text = String(value ?? '')
@@ -177,9 +170,7 @@ export const NICKNAME_RULE_MESSAGE = '닉네임은 한글·영문·숫자 2~7자
 export const WITHDRAWN_NICKNAME_PREFIX = '탈퇴'
 
 // FP-258 N-02-1 닉네임 걸러내기: 한글(조합 중 자모 포함)·영문·숫자만, 7자. 판정은 validateNickname.
-export function filterNickname(value) {
-  return String(value ?? '').replace(/[^가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9]/g, '').slice(0, NICKNAME_MAX)
-}
+export const filterNickname = (value) => cleanText(value, /[^가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9]/g, { max: NICKNAME_MAX })
 
 // 닉네임을 앞뒤 공백을 뺀 값으로 검사해 오류 문구를 돌려준다. 문제가 없으면 ''. 가입 화면과 가입·닉네임 확인 mock이 같은 규칙을 쓴다.
 // 공백·기호·자음/모음만(ㄱ, ㅏ)은 거절한다.
@@ -301,7 +292,7 @@ export function validateSignup(form, { emailVerified = false, phoneVerified = fa
   put('password', validateNewPassword(form.password, form.passwordConfirm).password)
   put('passwordConfirm', validatePasswordConfirm(form.password, form.passwordConfirm))
   put('birthDate', validateBirthDate(form.birthDate))
-  // FP-258 13차 N-02-2 필수 동의 2개(이용약관·개인정보 수집·이용)를 모두 체크해야 한다. 선택 동의(agreeMarketing)는 보지 않는다.
+  // FP-258 N-02-2 필수 동의 2개(이용약관·개인정보 수집·이용)를 모두 체크해야 한다. 선택 동의(agreeMarketing)는 보지 않는다.
   if (!form.agreeTerms || !form.agreePrivacy) errors.agreements = '필수 동의 항목에 모두 동의해 주세요.'
   return errors
 }

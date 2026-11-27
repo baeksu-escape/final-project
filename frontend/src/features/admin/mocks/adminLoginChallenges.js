@@ -38,7 +38,7 @@ export function consumeAdminLoginChallenge(challengeToken, code) {
   if (saved.expiresAt < Date.now()) {
     throw new ApiError(400, '인증번호가 만료되었습니다. 인증번호를 다시 받아 주세요.', { code: 'VERIFICATION_CODE_EXPIRED' })
   }
-  // FP-258 PR #173 2단계 인증 중에 잠긴 관리자는 관리자 안내(423 ADMIN_ACCOUNT_LOCKED, 서버 verifyLogin과 같은 순서: 번호 확인 전).
+  // FP-258 2단계 인증 중에 잠긴 관리자는 관리자 안내(423 ADMIN_ACCOUNT_LOCKED, 서버 verifyLogin과 같은 순서: 번호 확인 전).
   if (saved.account.locked) {
     throw new ApiError(423, ADMIN_ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ADMIN_ACCOUNT_LOCKED })
   }

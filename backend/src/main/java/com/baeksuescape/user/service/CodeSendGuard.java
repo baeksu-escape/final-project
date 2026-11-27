@@ -9,9 +9,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
 
-// FP-258 PR #173 N-02-3 인증코드 발송 잠금 — 같은 대상(채널 + 이메일·휴대폰 HMAC)의 발송을 한 번에 하나씩 하게 해, 동시 요청이 하루 상한(10회)을 넘지 못하게 한다.
-// 잠금은 트랜잭션 바깥에서 잡고, 그 안에서 "오늘 보낸 수 세기 → 상한 비교 → 기록 → 발송 → 커밋"이 모두 끝난 뒤 푼다(커밋 전에 풀면 다음 요청이 옛 수를 읽는다).
-// 서버 메모리 잠금이라 서버가 여러 대면 대마다 따로 센다(ClientRateLimiter와 같음). 대상마다 잠금을 만들지 않고 정해진 개수의 줄무늬 잠금을 나눠 써서 메모리가 늘지 않는다.
+// FP-258 N-02-3 인증코드 발송 잠금 — 같은 대상(채널 + 이메일·휴대폰 HMAC)의 발송을 한 번에 하나씩 하게 해, 동시 요청이 하루 상한(10회)을 넘지 못하게 한다.
+// 잠금은 트랜잭션 바깥에서 잡고 커밋이 끝난 뒤 푼다(커밋 전에 풀면 다음 요청이 옛 수를 읽는다). 서버 메모리의 줄무늬 잠금이라 서버가 여러 대면 대마다 따로 센다.
 @Component
 public class CodeSendGuard {
 

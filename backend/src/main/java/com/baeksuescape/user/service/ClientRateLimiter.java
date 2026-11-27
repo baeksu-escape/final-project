@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 import com.baeksuescape.global.exception.ApiException;
 
-// FP-258 13차 N-01-3·N-02-1·N-02-3 같은 접속지(IP)의 반복 시도 제한 — 규칙마다 정해진 시간 창 안에서 횟수를 넘으면 429 TOO_MANY_REQUESTS.
+// FP-258 N-01-3·N-02-1·N-02-3 같은 접속지(IP)의 반복 시도 제한 — 규칙마다 정해진 시간 창 안에서 횟수를 넘으면 429 TOO_MANY_REQUESTS.
 // 서버 메모리에만 세므로 서버를 다시 켜면 초기화되고, 서버가 여러 대면 대마다 따로 센다(DB에는 남기지 않는다).
 // IP는 컨트롤러가 HttpServletRequest.getRemoteAddr()로 넘긴다. 프록시 뒤에서 실제 접속지를 쓰려면 서버의 forward-headers 설정이 필요하다.
 @Component
@@ -60,8 +60,7 @@ public class ClientRateLimiter {
     }
 
     // 로그인·간편 로그인 연결처럼 실패만 세는 요청을 감싼다 — 결과적으로 401(아이디·비밀번호 틀림)로 끝난 요청만 센다.
-    // FP-258 PR #173 요청 전에 먼저 한 자리를 원자적으로 잡고(이미 limit이면 잡지 않고 429), 401이 아니면(성공·429·423·400 등) 잡은 자리를 돌려준다.
-    //   먼저 잡으므로 동시에 몰린 요청도 limit개까지만 비밀번호 확인에 들어간다(나중에 세면 동시 요청이 모두 검사를 통과한다).
+    // FP-258 요청 전에 한 자리를 원자적으로 잡고(이미 limit이면 429) 401이 아니면 돌려준다. 먼저 잡아야 동시 요청도 limit개까지만 들어간다.
     public <T> T countFailures(Rule rule, String clientIp, Supplier<T> action) {
         Instant start = reserve(rule, clientIp);
         boolean failed = false;

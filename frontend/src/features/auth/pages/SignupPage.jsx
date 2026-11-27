@@ -12,6 +12,7 @@ import PasswordRuleList from '../components/PasswordRuleList.jsx'
 import PhoneVerification from '../components/PhoneVerification.jsx'
 import SplitEmailField from '../components/SplitEmailField.jsx'
 import { resolveEmailDomain, splitEmail } from '../emailParts.js'
+import useAvailabilityCheck from '../useAvailabilityCheck.js'
 import useImeSafeFilter from '../useImeSafeFilter.js'
 import usePasswordReveal from '../usePasswordReveal.js'
 import {
@@ -42,7 +43,7 @@ const EMPTY_FORM = {
   password: '',
   passwordConfirm: '',
   birthDate: '',
-  // FP-258 13차 N-02-2 필수 동의 2개(이용약관·개인정보 수집·이용)와 선택 동의 1개(점수 변동 알림·혜택 안내)
+  // FP-258 N-02-2 필수 동의 2개(이용약관·개인정보 수집·이용)와 선택 동의 1개(점수 변동 알림·혜택 안내)
   agreeTerms: false,
   agreePrivacy: false,
   agreeMarketing: false,
@@ -59,7 +60,7 @@ const ERROR_KEY_OF = {
   emailCustomDomain: 'email',
 }
 // 서버 칸별 오류 field → 화면 오류 키. 서버는 생일 대신 출생연도(birthYear)로 검사한다.
-// FP-258 13차 필수 동의 칸 오류(agreeTerms·agreePrivacy)는 동의 묶음(agreements) 아래에 보인다.
+// FP-258 필수 동의 칸 오류(agreeTerms·agreePrivacy)는 동의 묶음(agreements) 아래에 보인다.
 const SERVER_FIELD_KEY = { birthYear: 'birthDate', agreeTerms: 'agreements', agreePrivacy: 'agreements' }
 
 // 칸을 감싸는 요소의 id. 첫 오류 칸으로 옮겨 갈 때 이 id로 찾는다.
@@ -93,14 +94,9 @@ export default function SignupPage() {
   const [touched, setTouched] = useState(() => ({ name: Boolean(socialSignup?.name), email: Boolean(socialSignup?.email) }))
   const [emailVerification, setEmailVerification] = useState(null)
   const [phoneVerification, setPhoneVerification] = useState(null)
-  // 닉네임 중복 확인 결과 { nickname, available }. 닉네임을 고치면 nickname이 달라져 확인이 풀린 것으로 본다.
-  const [nicknameCheck, setNicknameCheck] = useState(null)
-  const [nicknameCheckError, setNicknameCheckError] = useState('')
-  const [nicknameChecking, setNicknameChecking] = useState(false)
-  // FP-258 12차 아이디 중복 확인 결과 { loginId, available }. 닉네임과 같이 아이디를 고치면 확인이 풀린 것으로 본다.
-  const [loginIdCheck, setLoginIdCheck] = useState(null)
-  const [loginIdCheckError, setLoginIdCheckError] = useState('')
-  const [loginIdChecking, setLoginIdChecking] = useState(false)
+  // N-02-1 닉네임·아이디(FP-258) [중복 확인] — 결과는 확인한 값에만 유효해서, 고치면 확인이 풀린 것으로 본다.
+  const nicknameCheck = useAvailabilityCheck(checkNicknameAvailability)
+  const loginIdCheck = useAvailabilityCheck(checkLoginIdAvailability)
   const [submitted, setSubmitted] = useState(false)
   const [serverErrors, setServerErrors] = useState({})
   const [formError, setFormError] = useState('')
@@ -111,7 +107,7 @@ export default function SignupPage() {
   const [shownKeys, setShownKeys] = useState([])
   // 단계를 옮길 때 포커스를 줄 칸(없으면 그 단계 첫 입력)
   const [focusKey, setFocusKey] = useState(null)
-  // FP-258 13차 [보기]로 펼친 동의 항목(약관 전문 자리)
+  // FP-258 [보기]로 펼친 동의 항목(약관 전문 자리)
   const [openConsent, setOpenConsent] = useState(null)
   // FP-258 비밀번호 보기·숨기기는 칸마다 따로 바뀐다(usePasswordReveal). 실패하면 보기 상태를 그대로 둔다.
   const { reveal, hideAll } = usePasswordReveal()
@@ -122,10 +118,8 @@ export default function SignupPage() {
   const nickname = form.nickname.trim()
   const emailVerified = emailVerification !== null && emailVerification.email === email
   const phoneVerified = phoneVerification !== null && phoneVerification.phone === phone
-  const nicknameChecked = nicknameCheck?.nickname === nickname && nicknameCheck.available
-  const nicknameTaken = nicknameCheck?.nickname === nickname && !nicknameCheck.available
-  const loginIdChecked = loginIdCheck?.loginId === form.loginId && loginIdCheck.available
-  const loginIdTaken = loginIdCheck?.loginId === form.loginId && !loginIdCheck.available
+  const nicknameChecked = nicknameCheck.checked(nickname)
+  const loginIdChecked = loginIdCheck.checked(form.loginId)
   const checkContext = { emailVerified, phoneVerified, nicknameChecked, loginIdChecked }
   const validation = validateSignup(
     { ...form, emailDomain: resolveEmailDomain(form.emailDomainChoice, form.emailCustomDomain) },
@@ -135,8 +129,8 @@ export default function SignupPage() {
   // 칸 하나에 보여 줄 오류. 서버 오류(중복 등)가 먼저이고, 검사 오류는 손댄 칸이거나 [가입하기]를 누른 뒤에만 보인다.
   const errorOf = (key) => {
     if (serverErrors[key]) return serverErrors[key]
-    if (key === 'nickname' && nicknameTaken) return '이미 사용 중인 닉네임입니다.'
-    if (key === 'loginId' && loginIdTaken) return '이미 사용 중인 아이디입니다.'
+    if (key === 'nickname' && nicknameCheck.taken(nickname)) return '이미 사용 중인 닉네임입니다.'
+    if (key === 'loginId' && loginIdCheck.taken(form.loginId)) return '이미 사용 중인 아이디입니다.'
     const forced = submitted || shownKeys.includes(key)
     if (!touched[key] && !forced) return ''
     const message = validation[key] ?? ''
@@ -165,7 +159,7 @@ export default function SignupPage() {
   const filteredInput = (field, filter) => bindFilter((value) => patchForm({ [field]: value }), filter)
   // 아이디를 고치면 지난 [중복 확인]의 요청 오류(형식 400 등)도 지운다.
   const loginIdInput = bindFilter((value) => {
-    setLoginIdCheckError('')
+    loginIdCheck.clearError()
     patchForm({ loginId: value })
   }, filterSignupLoginId)
   const nameInput = filteredInput('name', filterName)
@@ -192,37 +186,6 @@ export default function SignupPage() {
     setFormError('')
     setFocusKey(null)
     setStep((prev) => Math.max(0, prev - 1))
-  }
-
-  // N-02-1 [중복 확인] — 형식 검사를 통과한 닉네임만 서버에 묻는다. 결과는 그 닉네임에만 유효하다.
-  const handleNicknameCheck = async () => {
-    setNicknameChecking(true)
-    setNicknameCheckError('')
-    try {
-      const { available } = await checkNicknameAvailability(nickname)
-      setNicknameCheck({ nickname, available })
-    } catch (error) {
-      setNicknameCheck(null)
-      setNicknameCheckError(error.message)
-    } finally {
-      setNicknameChecking(false)
-    }
-  }
-
-  // FP-258 12차 N-02-1 아이디 [중복 확인](AUTH-16) — 닉네임과 같이 형식이 맞는 아이디만 서버에 묻고, 결과는 그 아이디에만 유효하다.
-  const handleLoginIdCheck = async () => {
-    const loginId = form.loginId
-    setLoginIdChecking(true)
-    setLoginIdCheckError('')
-    try {
-      const { available } = await checkLoginIdAvailability(loginId)
-      setLoginIdCheck({ loginId, available })
-    } catch (error) {
-      setLoginIdCheck(null)
-      setLoginIdCheckError(error.message)
-    } finally {
-      setLoginIdChecking(false)
-    }
   }
 
   const handleSubmit = async (event) => {
@@ -285,13 +248,13 @@ export default function SignupPage() {
       const fieldErrors = error?.data?.fieldErrors
       let nextErrors = null
       if (code === AUTH_ERROR_CODES.DUPLICATE_LOGIN_ID) {
-        // FP-258 12차 확인한 뒤 다른 사람이 같은 아이디로 먼저 가입한 경우 — 닉네임처럼 확인 결과를 풀어 다시 확인하게 한다.
-        setLoginIdCheck(null)
+        // FP-258 확인한 뒤 다른 사람이 같은 아이디로 먼저 가입한 경우 — 닉네임처럼 확인 결과를 풀어 다시 확인하게 한다.
+        loginIdCheck.reset()
         nextErrors = { loginId: error.message }
       } else if (code === AUTH_ERROR_CODES.DUPLICATE_EMAIL) nextErrors = { email: error.message }
       else if (code === AUTH_ERROR_CODES.DUPLICATE_NICKNAME) {
         // 확인한 뒤 다른 사람이 같은 닉네임으로 먼저 가입한 경우 — 확인 결과도 풀어서 다시 확인하게 한다.
-        setNicknameCheck(null)
+        nicknameCheck.reset()
         nextErrors = { nickname: error.message }
       }
       // 서버가 칸별 오류(fieldErrors [{ field, message }])를 주면 그 칸 아래에 보여 준다(예: 출생연도 → 생일 칸).
@@ -322,7 +285,7 @@ export default function SignupPage() {
         const allAgreed = SIGNUP_CONSENT_ITEMS.every((item) => form[item.key])
         return (
           <>
-            {/* FP-258 13차 N-02-2 가입 동의 — [전체 동의] + 필수 2·선택 1. 필수 둘을 모두 체크해야 [동의하고 시작하기]가 켜진다.
+            {/* FP-258 N-02-2 가입 동의 — [전체 동의] + 필수 2·선택 1. 필수 둘을 모두 체크해야 [동의하고 시작하기]가 켜진다.
                 칸을 오가는 중에는 안내를 띄우지 않으려고 손댄 칸 표시(onBlur)를 달지 않는다. 약관 전문은 아직 없어 [보기]는 자리만 있다. */}
             <div id={fieldWrapperId('agreements')} className="signup-consent">
               <div className="signup-consent__all">
@@ -355,19 +318,17 @@ export default function SignupPage() {
       }
       case 'name':
         return (
-          <>
-            <div {...fieldProps('name')} {...nameInput.compositionProps}>
-              <TextInput
-                label="이름"
-                value={form.name}
-                onChange={nameInput.onChange}
-                error={errorOf('name')}
-                placeholder="한글 이름"
-                autoComplete="name"
-                maxLength={20}
-              />
-            </div>
-          </>
+          <div {...fieldProps('name')} {...nameInput.compositionProps}>
+            <TextInput
+              label="이름"
+              value={form.name}
+              onChange={nameInput.onChange}
+              error={errorOf('name')}
+              placeholder="한글 이름"
+              autoComplete="name"
+              maxLength={20}
+            />
+          </div>
         )
       case 'birthDate':
         return (
@@ -387,48 +348,44 @@ export default function SignupPage() {
         )
       case 'phone':
         return (
-          <>
-            <div {...fieldProps('phone')}>
-              <PhoneVerification
-                middle={form.phoneMiddle}
-                last={form.phoneLast}
-                onChange={({ middle, last }) => patchForm({ phoneMiddle: middle, phoneLast: last })}
-                purpose={PHONE_PURPOSES.SIGNUP}
-                verified={phoneVerified}
-                onVerified={setPhoneVerification}
-                error={errorOf('phone')}
-              />
-            </div>
-          </>
+          <div {...fieldProps('phone')}>
+            <PhoneVerification
+              middle={form.phoneMiddle}
+              last={form.phoneLast}
+              onChange={({ middle, last }) => patchForm({ phoneMiddle: middle, phoneLast: last })}
+              purpose={PHONE_PURPOSES.SIGNUP}
+              verified={phoneVerified}
+              onVerified={setPhoneVerification}
+              error={errorOf('phone')}
+            />
+          </div>
         )
       case 'email':
         return (
-          <>
-            <div {...fieldProps('email')}>
-              <SplitEmailField
-                local={form.emailLocal}
-                domainChoice={form.emailDomainChoice}
-                customDomain={form.emailCustomDomain}
-                onChange={patchForm}
-                purpose={EMAIL_PURPOSES.SIGNUP}
-                verified={emailVerified}
-                onVerified={setEmailVerification}
-                error={errorOf('email')}
-              />
-            </div>
-          </>
+          <div {...fieldProps('email')}>
+            <SplitEmailField
+              local={form.emailLocal}
+              domainChoice={form.emailDomainChoice}
+              customDomain={form.emailCustomDomain}
+              onChange={patchForm}
+              purpose={EMAIL_PURPOSES.SIGNUP}
+              verified={emailVerified}
+              onVerified={setEmailVerification}
+              error={errorOf('email')}
+            />
+          </div>
         )
       case 'loginId':
         return (
           <>
-            {/* FP-258 12차 N-02-1 아이디 — 닉네임과 같은 [중복 확인](AUTH-16). 형식이 맞을 때만 눌리고, 중복이면 칸 테두리와 칸 아래 문구로 알린다. */}
+            {/* FP-258 N-02-1 아이디 — 닉네임과 같은 [중복 확인](AUTH-16). 형식이 맞을 때만 눌리고, 중복이면 칸 테두리와 칸 아래 문구로 알린다. */}
             <div {...fieldProps('loginId')} {...loginIdInput.compositionProps} className="auth-field">
               <div className="signup-form__row">
                 <TextInput
                   label="아이디"
                   value={form.loginId}
                   onChange={loginIdInput.onChange}
-                  error={errorOf('loginId') || loginIdCheckError}
+                  error={errorOf('loginId') || loginIdCheck.error}
                   placeholder="영문 소문자로 시작, 4~20자"
                   autoComplete="username"
                   maxLength={20}
@@ -436,8 +393,8 @@ export default function SignupPage() {
                 <button
                   type="button"
                   className="signup-form__check"
-                  onClick={handleLoginIdCheck}
-                  disabled={loginIdChecking || validateLoginId(form.loginId) !== ''}
+                  onClick={() => loginIdCheck.run(form.loginId)}
+                  disabled={loginIdCheck.checking || validateLoginId(form.loginId) !== ''}
                 >
                   중복 확인
                 </button>
@@ -468,8 +425,8 @@ export default function SignupPage() {
                 <button
                   type="button"
                   className="signup-form__check"
-                  onClick={handleNicknameCheck}
-                  disabled={nicknameChecking || validateNickname(form.nickname) !== ''}
+                  onClick={() => nicknameCheck.run(nickname)}
+                  disabled={nicknameCheck.checking || validateNickname(form.nickname) !== ''}
                 >
                   중복 확인
                 </button>
@@ -481,7 +438,7 @@ export default function SignupPage() {
                 </p>
               )}
               <FieldError message={errorOf('nickname')} />
-              <FieldError message={nicknameCheckError} />
+              <FieldError message={nicknameCheck.error} />
             </div>
           </>
         )
@@ -505,25 +462,23 @@ export default function SignupPage() {
         )
       case 'passwordConfirm':
         return (
-          <>
-            <div {...fieldProps('passwordConfirm')} className="auth-field">
-              <PasswordField
-                label="비밀번호 확인"
-                rule="new"
-                value={form.passwordConfirm}
-                onChange={update('passwordConfirm')}
-                error={errorOf('passwordConfirm')}
-                placeholder="비밀번호 다시 입력"
-                autoComplete="new-password"
-                {...reveal('passwordConfirm')}
-              />
-              {form.passwordConfirm && form.password === form.passwordConfirm && (
-                <p className="auth-message auth-message--success" role="status">
-                  비밀번호가 일치합니다.
-                </p>
-              )}
-            </div>
-          </>
+          <div {...fieldProps('passwordConfirm')} className="auth-field">
+            <PasswordField
+              label="비밀번호 확인"
+              rule="new"
+              value={form.passwordConfirm}
+              onChange={update('passwordConfirm')}
+              error={errorOf('passwordConfirm')}
+              placeholder="비밀번호 다시 입력"
+              autoComplete="new-password"
+              {...reveal('passwordConfirm')}
+            />
+            {form.passwordConfirm && form.password === form.passwordConfirm && (
+              <p className="auth-message auth-message--success" role="status">
+                비밀번호가 일치합니다.
+              </p>
+            )}
+          </div>
         )
       default:
         return null

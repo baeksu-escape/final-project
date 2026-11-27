@@ -125,11 +125,9 @@ public class MyPageService {
         if (!passwordMatches(account, request.currentPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PASSWORD", "현재 비밀번호가 올바르지 않습니다.");
         }
-        // FP-258 PR #173 64자를 넘으면 길이 안내 문구(가입·재설정과 같음).
+        // FP-258 64자를 넘으면 길이 안내 문구(가입·재설정과 같음).
         String passwordError = AccountRules.newPasswordError(request.newPassword(), "비밀번호 규칙을 지켜 주세요.");
-        if (passwordError != null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", passwordError, List.of(new FieldErrorItem("newPassword", passwordError)));
-        }
+        if (passwordError != null) throw AuthErrors.invalidField("newPassword", passwordError);
         if (passwordMatches(account, request.newPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "SAME_PASSWORD", SAME_PASSWORD_MESSAGE,
                     List.of(new FieldErrorItem("newPassword", SAME_PASSWORD_MESSAGE)));

@@ -107,7 +107,7 @@ class PhoneVerificationServiceTest {
         assertThat(value.getExpiresAt()).isEqualTo(NOW.plusSeconds(300));
     }
 
-    // FP-258 13차 N-02-3 같은 번호로 오늘 0시부터 10회 보냈으면 429이고 보내지 않는다(9회까지는 보낸다).
+    // FP-258 N-02-3 같은 번호로 오늘 0시부터 10회 보냈으면 429이고 보내지 않는다(9회까지는 보낸다).
     @Test
     void 같은_번호로_오늘_10회_보냈으면_429이고_보내지_않는다() {
         given(codeMapper.countSentSince("PHONE", HMAC.phone(PHONE), NOW.toLocalDate().atStartOfDay())).willReturn(9);

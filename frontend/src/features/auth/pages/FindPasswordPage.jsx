@@ -8,20 +8,11 @@ import AuthLinks from '../components/AuthLinks.jsx'
 import PasswordField from '../components/PasswordField.jsx'
 import PasswordRuleList from '../components/PasswordRuleList.jsx'
 import SplitEmailField from '../components/SplitEmailField.jsx'
-import { resolveEmailDomain } from '../emailParts.js'
-import useBlurCheck from '../useBlurCheck.js'
+import useExistingEmailParts from '../useExistingEmailParts.js'
+import useFindNameField from '../useFindNameField.js'
 import useImeSafeFilter from '../useImeSafeFilter.js'
 import usePasswordReveal from '../usePasswordReveal.js'
-import {
-  PASSWORD_MAX,
-  PASSWORD_TOO_LONG_MESSAGE,
-  filterLoginId,
-  filterName,
-  joinEmail,
-  validateEmailParts,
-  validateName,
-  validateNewPassword,
-} from '../validation.js'
+import { filterLoginId, passwordTooLongError, validateNewPassword } from '../validation.js'
 import '../auth.css'
 
 // N-03 비밀번호 찾기 화면 — ① 아이디·이메일 인증 → ② 새 비밀번호 재설정 → ③ 완료 순서로 진행한다.
@@ -30,44 +21,22 @@ import '../auth.css'
 export default function FindPasswordPage() {
   const [step, setStep] = useState('verify')
   const [loginId, setLoginId] = useState('')
-  const [name, setName] = useState('')
-  const [nameError, setNameError] = useState('')
-  // 이메일 앞부분·도메인 선택·직접 입력 도메인. 합친 값(email)으로 인증한다.
-  const [emailParts, setEmailParts] = useState({ emailLocal: '', emailDomainChoice: '', emailCustomDomain: '' })
   const [verification, setVerification] = useState(null) // { loginId, name, email, verificationToken }
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [passwordErrors, setPasswordErrors] = useState({})
   const [formError, setFormError] = useState('')
-  // FP-258 PR #173 재설정 단계에서 인증이 풀려 되돌아왔을 때 인증 단계에 보이는 안내(다시 인증하면 지운다).
+  // FP-258 재설정 단계에서 인증이 풀려 되돌아왔을 때 인증 단계에 보이는 안내(다시 인증하면 지운다).
   const [verifyNotice, setVerifyNotice] = useState('')
   const [pending, setPending] = useState(false)
   const { reveal, hideAll } = usePasswordReveal()
   const bindFilter = useImeSafeFilter()
   const loginIdInput = bindFilter(setLoginId, filterLoginId)
-  // FP-258 12차 이름 오류가 보이는 동안은 지우지 않고 다시 검사한다(조합 중 칸을 벗어나면 blur 뒤에 조합이 끝나며 값이 들어와, 지우면 자모 안내가 사라졌다).
-  const nameInput = bindFilter((value) => {
-    setName(value)
-    setNameError((prev) => (prev ? validateName(value) : ''))
-  }, filterName)
-  // FP-258 요청 전과 칸을 벗어날 때 이름을 가입과 같은 규칙(validateName)으로 보고, 틀리면 이름 칸 아래에 알리고 요청을 보내지 않는다.
-  const checkName = (value = name) => {
-    const message = validateName(value)
-    setNameError(message)
-    return message === ''
-  }
-  // 칸을 벗어날 때는 친 값이 있을 때만 알린다(빈 칸은 버튼을 누를 때 알린다).
-  const handleNameBlur = (event) => {
-    if (event.target.value) checkName(event.target.value)
-  }
-
-  const emailDomain = resolveEmailDomain(emailParts.emailDomainChoice, emailParts.emailCustomDomain)
-  const email = joinEmail(emailParts.emailLocal, emailDomain)
-  // FP-258 12차 이메일 묶음을 벗어날 때 기존 이메일 기본 형식으로 보고, 틀리면 묶음 테두리와 칸 아래 문구로 알린다(아이디 찾기와 같음).
-  const emailCheck = useBlurCheck(
-    () => validateEmailParts(emailParts.emailLocal, emailDomain, 'existing'),
-    () => Boolean(emailParts.emailLocal || emailParts.emailCustomDomain),
-  )
+  const nameField = useFindNameField(bindFilter)
+  const { name, check: checkName } = nameField
+  // 이메일 앞부분·도메인 선택·직접 입력 도메인을 합친 값(email)으로 인증한다(아이디 찾기와 같은 칸).
+  const emailField = useExistingEmailParts()
+  const { email } = emailField
   // 인증받은 뒤 아이디·이름·이메일을 바꾸면 인증이 풀린 것으로 본다.
   const verified =
     verification !== null && verification.loginId === loginId.trim() && verification.name === name.trim() && verification.email === email
@@ -92,7 +61,7 @@ export default function FindPasswordPage() {
       hideAll()
       setStep('done')
     } catch (error) {
-      // FP-258 PR #173 재설정 중에 인증 토큰이 만료·사용됐으면 인증을 비우고 인증 단계로 되돌려, [인증코드 받기]부터 다시 하게 안내한다.
+      // FP-258 재설정 중에 인증 토큰이 만료·사용됐으면 인증을 비우고 인증 단계로 되돌려, [인증코드 받기]부터 다시 하게 안내한다.
       if (error?.data?.code === AUTH_ERROR_CODES.EMAIL_VERIFICATION_REQUIRED) {
         setVerification(null)
         setPasswordErrors({})
@@ -130,8 +99,7 @@ export default function FindPasswordPage() {
             rule="new"
             value={password}
             onChange={setPassword}
-            // FP-258 PR #173 64자를 넘게 붙여 넣으면 제출 전에도 바로 알린다(잘라 내지 않는다).
-            error={password.length > PASSWORD_MAX ? PASSWORD_TOO_LONG_MESSAGE : passwordErrors.password}
+            error={passwordTooLongError(password) || passwordErrors.password}
             autoComplete="new-password"
             {...reveal('password')}
           />
@@ -165,28 +133,23 @@ export default function FindPasswordPage() {
         <div {...loginIdInput.compositionProps}>
           <TextInput label="아이디" value={loginId} onChange={loginIdInput.onChange} autoComplete="username" />
         </div>
-        <div {...nameInput.compositionProps} onBlur={handleNameBlur}>
+        <div {...nameField.compositionProps} onBlur={nameField.onBlur}>
           <TextInput
             label="이름"
             value={name}
-            onChange={nameInput.onChange}
-            error={nameError}
+            onChange={nameField.onChange}
+            error={nameField.error}
             autoComplete="name"
             hint="가입할 때 입력한 이름"
           />
         </div>
-        <div onBlur={emailCheck.onBlur}>
+        <div onBlur={emailField.onBlur}>
           <SplitEmailField
-            rule="existing"
-            local={emailParts.emailLocal}
-            domainChoice={emailParts.emailDomainChoice}
-            customDomain={emailParts.emailCustomDomain}
-            onChange={(patch) => setEmailParts((prev) => ({ ...prev, ...patch }))}
+            {...emailField.fieldProps}
             purpose={EMAIL_PURPOSES.RESET_PASSWORD}
             extraBody={{ loginId: loginId.trim(), name: name.trim() }}
             disabled={!ready}
             verified={verified}
-            error={emailCheck.error}
             beforeRequest={() => checkName()}
             onVerified={({ verificationToken }) => {
               setVerifyNotice('')

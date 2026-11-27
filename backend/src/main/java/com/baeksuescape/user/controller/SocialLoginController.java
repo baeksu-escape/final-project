@@ -43,7 +43,7 @@ public class SocialLoginController {
     }
 
     // AUTH-05 기존 계정에 연결
-    // FP-258 13차 아이디·비밀번호를 받으므로 로그인과 같은 IP 실패 제한을 함께 센다(ClientRateLimiter LOGIN_FAILURE).
+    // FP-258 아이디·비밀번호를 받으므로 로그인과 같은 IP 실패 제한을 함께 센다(ClientRateLimiter LOGIN_FAILURE).
     @PostMapping("/api/auth/social/link")
     public AuthResponses.Login link(@Valid @RequestBody AuthRequests.SocialLink request, HttpServletRequest http) {
         return rateLimiter.countFailures(Rule.LOGIN_FAILURE, http.getRemoteAddr(), () -> socialLoginService.link(request));

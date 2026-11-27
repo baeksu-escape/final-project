@@ -3,14 +3,12 @@ package com.baeksuescape.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Clock;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -36,12 +34,13 @@ import com.baeksuescape.global.log.SystemLogMapper;
 import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.global.util.PiiCrypto;
 import com.baeksuescape.global.util.PiiHmac;
+import com.baeksuescape.user.QaItAccounts;
 import com.baeksuescape.user.dto.UserAccount;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 import com.zaxxer.hikari.HikariDataSource;
 
 /**
- * FP-258 PR #173 N-01-3 같은 계정에 커넥션 풀보다 많은 로그인 실패를 동시에 보내도 풀이 바닥나지 않는지 실제 Oracle DB에서 확인하는 통합 테스트(-Ddb.it=true일 때만 실행).
+ * FP-258 N-01-3 같은 계정에 커넥션 풀보다 많은 로그인 실패를 동시에 보내도 풀이 바닥나지 않는지 실제 Oracle DB에서 확인하는 통합 테스트(-Ddb.it=true일 때만 실행).
  * 로그인 실패 로그는 진짜처럼 REQUIRES_NEW 트랜잭션으로 커넥션을 하나 더 쓰되, SYSTEM_LOG(수정·삭제 금지)에 행을 남기지 않게 SELECT 1만 하는 대역으로 바꾼다.
  * 스레드마다 자기 트랜잭션을 써야 하므로 @Transactional을 붙이지 않고, 만든 계정(qa1127it 접두어)은 앞뒤로 지운다. 커넥션 대기는 5초로 줄여 고치기 전에도 빨리 끝나게 한다.
  */
@@ -49,7 +48,6 @@ import com.zaxxer.hikari.HikariDataSource;
 @EnabledIfSystemProperty(named = "db.it", matches = "true")
 class LoginFailPoolIT {
 
-    private static final String LOGIN_ID_PREFIX = "qa1127it";
     private static final long DEADLINE_SECONDS = 10;
 
     // 실패 로그 대역 — 커넥션을 REQUIRES_NEW로 하나 더 쓰고(SELECT 1 FROM DUAL) 성공·실패만 센다.
@@ -106,24 +104,12 @@ class LoginFailPoolIT {
     @BeforeEach
     @AfterEach
     void removeTestAccounts() {
-        jdbc.update("DELETE FROM APP_USER WHERE LOGIN_ID LIKE '" + LOGIN_ID_PREFIX + "%'");
+        QaItAccounts.deleteAll(jdbc);
     }
 
     // 실패 0회 계정 하나를 커밋해 둔다(다른 트랜잭션의 스레드가 볼 수 있어야 한다).
     private UserAccount newAccount() {
-        String suffix = String.valueOf(ThreadLocalRandom.current().nextInt(1000, 10000));
-        String email = LOGIN_ID_PREFIX + suffix + "@test.local";
-        UserAccount account = new UserAccount();
-        account.setLoginId(LOGIN_ID_PREFIX + suffix);
-        account.setPasswordHash(passwordEncoder.encode("qatest1127it"));
-        account.setNickname("qit" + suffix);
-        account.setNameEnc(crypto.encrypt("큐에이"));
-        account.setEmailEnc(crypto.encrypt(email));
-        account.setEmailHmac(hmac.email(email));
-        account.setBirthYear(1995);
-        account.setCreatedAt(LocalDateTime.now());
-        userMapper.insertUser(account);
-        return account;
+        return QaItAccounts.create(userMapper, passwordEncoder, crypto, hmac);
     }
 
     @Test

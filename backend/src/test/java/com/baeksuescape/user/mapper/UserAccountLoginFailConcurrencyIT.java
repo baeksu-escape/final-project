@@ -3,14 +3,12 @@ package com.baeksuescape.user.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
@@ -27,6 +25,7 @@ import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.global.util.PiiCrypto;
 import com.baeksuescape.global.util.PiiHmac;
+import com.baeksuescape.user.QaItAccounts;
 import com.baeksuescape.user.dto.UserAccount;
 import com.baeksuescape.user.service.AuthService;
 
@@ -39,8 +38,6 @@ import com.baeksuescape.user.service.AuthService;
 @EnabledIfSystemProperty(named = "db.it", matches = "true")
 class UserAccountLoginFailConcurrencyIT {
 
-    private static final String LOGIN_ID_PREFIX = "qa1127it";
-    private static final String PASSWORD = "qatest1127it";
     private static final int THREADS = 5;
 
     @Autowired
@@ -61,24 +58,12 @@ class UserAccountLoginFailConcurrencyIT {
     @BeforeEach
     @AfterEach
     void removeTestAccounts() {
-        jdbc.update("DELETE FROM APP_USER WHERE LOGIN_ID LIKE '" + LOGIN_ID_PREFIX + "%'");
+        QaItAccounts.deleteAll(jdbc);
     }
 
     // 실패 0회 계정 하나를 커밋해 둔다(다른 트랜잭션의 스레드가 볼 수 있어야 한다).
     private UserAccount newAccount() {
-        String suffix = String.valueOf(ThreadLocalRandom.current().nextInt(1000, 10000));
-        String email = LOGIN_ID_PREFIX + suffix + "@test.local";
-        UserAccount account = new UserAccount();
-        account.setLoginId(LOGIN_ID_PREFIX + suffix);
-        account.setPasswordHash(passwordEncoder.encode(PASSWORD));
-        account.setNickname("qit" + suffix);
-        account.setNameEnc(crypto.encrypt("큐에이"));
-        account.setEmailEnc(crypto.encrypt(email));
-        account.setEmailHmac(hmac.email(email));
-        account.setBirthYear(1995);
-        account.setCreatedAt(LocalDateTime.now());
-        userMapper.insertUser(account);
-        return account;
+        return QaItAccounts.create(userMapper, passwordEncoder, crypto, hmac);
     }
 
     @Test
@@ -110,7 +95,7 @@ class UserAccountLoginFailConcurrencyIT {
             pool.shutdownNow();
         }
 
-        assertThatThrownBy(() -> authService.authenticate(account.getLoginId(), PASSWORD))
+        assertThatThrownBy(() -> authService.authenticate(account.getLoginId(), QaItAccounts.PASSWORD))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("LOGIN_TEMPORARILY_BLOCKED"));
         assertThat(userMapper.selectById(account.getUserId()).getLoginFailCount()).isEqualTo(THREADS);
     }

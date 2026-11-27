@@ -11,9 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.baeksuescape.user.dto.UserAccount;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 
-// FP-258 PR #173 N-01-3 로그인 확인의 DB 부분 — 계정 조회·행 잠금·실패 횟수 갱신만 자기 트랜잭션에서 하고 결과를 돌려준다.
-// 로그(SYSTEM_LOG)와 오류 응답은 부르는 쪽(AuthService.authenticate)이 이 트랜잭션이 끝나 커넥션을 돌려준 뒤에 처리한다.
-// 잠근 채로 로그(REQUIRES_NEW)가 커넥션을 하나 더 기다리면, 같은 아이디로 몰린 요청들이 풀을 다 쥐고 막혀 전체 API가 DB를 못 쓰기 때문이다.
+// FP-258 N-01-3 로그인 확인의 DB 부분 — 계정 조회·행 잠금·실패 횟수 갱신만 자기 트랜잭션에서 하고 결과를 돌려준다.
+// 로그·오류 응답은 AuthService.authenticate가 커넥션을 돌려준 뒤 처리한다(잠근 채 로그가 커넥션을 더 기다리면 몰린 요청이 풀을 바닥낸다).
 @Service
 public class LoginAttemptService {
 

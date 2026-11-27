@@ -66,7 +66,7 @@ public class EmailVerificationService {
     }
 
     // AUTH-07 인증코드 발송. 가입·이메일 변경 목적이면 이미 가입된 이메일을 막는다. 재설정 목적은 계정이 있는지 알려 주지 않고 항상 보낸다.
-    // FP-258 PR #173 같은 이메일의 발송은 sendGuard 잠금 안에서 한 트랜잭션으로 한다(동시 요청이 하루 상한을 넘지 않게, 잠금은 커밋 뒤에 푼다).
+    // FP-258 같은 이메일의 발송은 sendGuard 잠금 안에서 한 트랜잭션으로 한다(동시 요청이 하루 상한을 넘지 않게, 잠금은 커밋 뒤에 푼다).
     public AuthResponses.EmailSent send(AuthRequests.EmailSend request) {
         EmailPurpose purpose = purposeOf(request.purpose());
         String email = AccountRules.normalizeEmail(request.email());
@@ -77,7 +77,7 @@ public class EmailVerificationService {
             if (purpose.blocksUsedEmail() && userMapper.countByEmailHmac(target) > 0) throw AuthErrors.duplicateEmail();
 
             LocalDateTime now = LocalDateTime.now(clock);
-            // FP-258 13차 같은 이메일로 오늘(0시부터) 보낸 횟수가 상한이면 429. 가입 여부와 상관없이 보내는 목적(FIND_ID·RESET_PASSWORD)도 같이 센다.
+            // FP-258 같은 이메일로 오늘(0시부터) 보낸 횟수가 상한이면 429. 가입 여부와 상관없이 보내는 목적(FIND_ID·RESET_PASSWORD)도 같이 센다.
             if (codeMapper.countSentSince(CHANNEL_EMAIL, target, now.toLocalDate().atStartOfDay()) >= AuthErrors.DAILY_CODE_SEND_LIMIT) {
                 throw AuthErrors.codeSendDailyLimit("이메일");
             }

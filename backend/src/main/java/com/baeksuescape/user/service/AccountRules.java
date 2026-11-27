@@ -32,7 +32,7 @@ public final class AccountRules {
     private static final Pattern PHONE = Pattern.compile("^01[016-9]\\d{7,8}$");
     private static final Pattern LETTER = Pattern.compile("[A-Za-z]");
     private static final Pattern DIGIT = Pattern.compile("\\d");
-    // FP-258 13차 N-02-4 새 비밀번호에 쓸 수 있는 글자 — ASCII 출력 문자(영문·숫자·키보드 기호)와 공백(프론트 filterPassword와 같음). 64자라 BCrypt 72바이트 안이다.
+    // FP-258 N-02-4 새 비밀번호에 쓸 수 있는 글자 — ASCII 출력 문자(영문·숫자·키보드 기호)와 공백(프론트 filterPassword와 같음). 64자라 BCrypt 72바이트 안이다.
     private static final Pattern PRINTABLE_ASCII = Pattern.compile("^[\\x20-\\x7E]*$");
 
     private AccountRules() {
@@ -80,13 +80,13 @@ public final class AccountRules {
     }
 
     // 비밀번호: 영문과 숫자를 섞어 8자 이상(decisions.md 1-2). 기호는 요구하지 않는다.
-    // FP-258 13차 새 비밀번호(가입·재설정·변경·관리자 비밀번호 설정)에만 쓴다 — 64자 이하, ASCII 출력 문자만. 로그인·현재 비밀번호 확인·탈퇴는 이 검사를 하지 않는다.
+    // FP-258 새 비밀번호(가입·재설정·변경·관리자 비밀번호 설정)에만 쓴다 — 64자 이하, ASCII 출력 문자만. 로그인·현재 비밀번호 확인·탈퇴는 이 검사를 하지 않는다.
     public static boolean isValidPassword(String value) {
         return value != null && value.length() >= 8 && value.length() <= PASSWORD_MAX && PRINTABLE_ASCII.matcher(value).matches()
                 && LETTER.matcher(value).find() && DIGIT.matcher(value).find();
     }
 
-    // FP-258 PR #173 새 비밀번호가 64자를 넘을 때의 칸 오류(프론트 validation.js PASSWORD_TOO_LONG_MESSAGE와 같다).
+    // FP-258 새 비밀번호가 64자를 넘을 때의 칸 오류(프론트 validation.js PASSWORD_TOO_LONG_MESSAGE와 같다).
     public static final String PASSWORD_TOO_LONG_MESSAGE = "비밀번호는 " + PASSWORD_MAX + "자 이하로 입력해 주세요.";
 
     // 새 비밀번호 칸 오류 문구 — 64자를 넘으면 길이 안내, 그 밖의 규칙 위반이면 ruleMessage(화면마다 지금 쓰는 문구), 맞으면 null.

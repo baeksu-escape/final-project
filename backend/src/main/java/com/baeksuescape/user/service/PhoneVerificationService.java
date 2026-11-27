@@ -57,7 +57,7 @@ public class PhoneVerificationService {
     }
 
     // 인증번호 발송 — { phone, purpose } → { expiresInSeconds }. 번호 형식이 틀리면 400(phone 칸 오류).
-    // FP-258 PR #173 같은 번호의 발송은 sendGuard 잠금 안에서 한 트랜잭션으로 한다(이메일 발송과 같은 방식).
+    // FP-258 같은 번호의 발송은 sendGuard 잠금 안에서 한 트랜잭션으로 한다(이메일 발송과 같은 방식).
     public AuthResponses.PhoneSent send(AuthRequests.PhoneSend request) {
         PhonePurpose purpose = purposeOf(request.purpose());
         String phone = AccountRules.normalizePhone(request.phone());
@@ -66,7 +66,7 @@ public class PhoneVerificationService {
         String target = hmac.phone(phone);
         return sendGuard.run(CHANNEL_PHONE, target, () -> {
             LocalDateTime now = LocalDateTime.now(clock);
-            // FP-258 13차 같은 번호로 오늘(0시부터) 보낸 횟수가 상한이면 429(가입·아이디 찾기 목적을 함께 센다).
+            // FP-258 같은 번호로 오늘(0시부터) 보낸 횟수가 상한이면 429(가입·아이디 찾기 목적을 함께 센다).
             if (codeMapper.countSentSince(CHANNEL_PHONE, target, now.toLocalDate().atStartOfDay()) >= AuthErrors.DAILY_CODE_SEND_LIMIT) {
                 throw AuthErrors.codeSendDailyLimit("번호");
             }

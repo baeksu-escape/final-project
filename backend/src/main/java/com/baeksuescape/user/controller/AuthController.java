@@ -41,7 +41,7 @@ public class AuthController {
     }
 
     // AUTH-01 N-01-1 로그인. 일반 사용자는 { accessToken, user }, 관리자는 { twoFactorRequired, challengeToken, maskedEmail }(FP-80).
-    // FP-258 13차 같은 IP의 로그인 실패가 많으면 계정과 상관없이 429(ClientRateLimiter LOGIN_FAILURE).
+    // FP-258 같은 IP의 로그인 실패가 많으면 계정과 상관없이 429(ClientRateLimiter LOGIN_FAILURE).
     @PostMapping("/login")
     public AuthResponses.LoginResult login(@Valid @RequestBody AuthRequests.Login request, HttpServletRequest http) {
         return rateLimiter.countFailures(Rule.LOGIN_FAILURE, http.getRemoteAddr(), () -> authService.login(request));
@@ -68,7 +68,7 @@ public class AuthController {
     // AUTH-07 N-02-3 이메일 인증코드 발송
     @PostMapping("/email/send")
     public AuthResponses.EmailSent sendEmailCode(@Valid @RequestBody AuthRequests.EmailSend request, HttpServletRequest http) {
-        // FP-258 13차 같은 IP의 인증코드 요청은 1시간 횟수 제한(ClientRateLimiter CODE_SEND)
+        // FP-258 같은 IP의 인증코드 요청은 1시간 횟수 제한(ClientRateLimiter CODE_SEND)
         rateLimiter.hit(Rule.CODE_SEND, http.getRemoteAddr());
         return emailVerification.send(request);
     }
@@ -82,7 +82,7 @@ public class AuthController {
     // N-02-1 닉네임 중복 확인(11/18 1차 시연 후속) — { nickname } → { available }. 닉네임을 주소에 남기지 않으려고 POST로 받는다.
     @PostMapping("/nickname/check")
     public AuthResponses.NicknameAvailability checkNickname(@RequestBody AuthRequests.NicknameCheck request, HttpServletRequest http) {
-        // FP-258 13차 같은 IP의 중복 확인은 1분 횟수 제한(ClientRateLimiter AVAILABILITY_CHECK, 아이디 확인과 함께 센다)
+        // FP-258 같은 IP의 중복 확인은 1분 횟수 제한(ClientRateLimiter AVAILABILITY_CHECK, 아이디 확인과 함께 센다)
         rateLimiter.hit(Rule.AVAILABILITY_CHECK, http.getRemoteAddr());
         return authService.checkNickname(request);
     }

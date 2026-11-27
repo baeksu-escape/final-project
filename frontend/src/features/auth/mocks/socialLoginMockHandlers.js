@@ -72,7 +72,7 @@ registerMockHandlers({
     if (!mockLinkKeys.has(body?.linkKey)) {
       throw new ApiError(400, '소셜 로그인을 처음부터 다시 진행해 주세요.', { code: SOCIAL_ERROR_CODES.LINK_EXPIRED })
     }
-    // FP-258 13차 로그인과 같은 접속지별 실패 제한을 함께 센다.
+    // FP-258 로그인과 같은 접속지별 실패 제한을 함께 센다.
     const account = countMockFailures(() => authenticateMockAccount(body.loginId, body.password))
     if (account.user.role === ROLES.ADMIN) throw adminBlockedError()
     account.loginFailCount = 0

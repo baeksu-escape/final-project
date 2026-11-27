@@ -112,7 +112,7 @@ class EmailVerificationServiceTest {
         assertThat(saved.getValue().getPurposeCode()).isEqualTo("FIND_PASSWORD");
     }
 
-    // FP-258 13차 N-02-3 같은 이메일로 오늘 0시부터 10회 보냈으면 429이고 보내지 않는다. 가입 여부와 상관없이 보내는 아이디 찾기(FIND_ID)도 같다.
+    // FP-258 N-02-3 같은 이메일로 오늘 0시부터 10회 보냈으면 429이고 보내지 않는다. 가입 여부와 상관없이 보내는 아이디 찾기(FIND_ID)도 같다.
     @Test
     void 같은_이메일로_오늘_10회_보냈으면_목적과_상관없이_429() {
         LocalDateTime today = LocalDateTime.now(CLOCK).toLocalDate().atStartOfDay();
@@ -142,7 +142,7 @@ class EmailVerificationServiceTest {
         assertThat(sentCodes).isEmpty();
     }
 
-    // FP-258 PR #164 검수 — 새 이메일 규칙은 가입·이메일 변경만. 아이디·비밀번호 찾기는 + 같은 글자가 든 기존 이메일도 보내고, 기본 형식이 틀리면 400.
+    // FP-258 새 이메일 규칙은 가입·이메일 변경만. 아이디·비밀번호 찾기는 + 같은 글자가 든 기존 이메일도 보내고, 기본 형식이 틀리면 400.
     @Test
     void 찾기와_재설정은_기존_이메일_형식도_보내고_가입과_변경은_새_규칙으로_막는다() {
         assertThat(codeOf(() -> service.send(new AuthRequests.EmailSend(" A+B@Example.com ", "FIND_ID", null)))).isEqualTo("no error");
