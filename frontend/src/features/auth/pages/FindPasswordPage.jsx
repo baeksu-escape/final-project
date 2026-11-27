@@ -9,9 +9,10 @@ import PasswordField from '../components/PasswordField.jsx'
 import PasswordRuleList from '../components/PasswordRuleList.jsx'
 import SplitEmailField from '../components/SplitEmailField.jsx'
 import { resolveEmailDomain } from '../emailParts.js'
+import useBlurCheck from '../useBlurCheck.js'
 import useImeSafeFilter from '../useImeSafeFilter.js'
 import usePasswordReveal from '../usePasswordReveal.js'
-import { filterLoginId, filterName, joinEmail, validateName, validateNewPassword } from '../validation.js'
+import { filterLoginId, filterName, joinEmail, validateEmailParts, validateName, validateNewPassword } from '../validation.js'
 import '../auth.css'
 
 // N-03 비밀번호 찾기 화면 — ① 아이디·이메일 인증 → ② 새 비밀번호 재설정 → ③ 완료 순서로 진행한다.
@@ -33,9 +34,10 @@ export default function FindPasswordPage() {
   const { reveal, hideAll } = usePasswordReveal()
   const bindFilter = useImeSafeFilter()
   const loginIdInput = bindFilter(setLoginId, filterLoginId)
+  // FP-258 12차 이름 오류가 보이는 동안은 지우지 않고 다시 검사한다(조합 중 칸을 벗어나면 blur 뒤에 조합이 끝나며 값이 들어와, 지우면 자모 안내가 사라졌다).
   const nameInput = bindFilter((value) => {
     setName(value)
-    setNameError('')
+    setNameError((prev) => (prev ? validateName(value) : ''))
   }, filterName)
   // FP-258 요청 전과 칸을 벗어날 때 이름을 가입과 같은 규칙(validateName)으로 보고, 틀리면 이름 칸 아래에 알리고 요청을 보내지 않는다.
   const checkName = (value = name) => {
@@ -48,7 +50,13 @@ export default function FindPasswordPage() {
     if (event.target.value) checkName(event.target.value)
   }
 
-  const email = joinEmail(emailParts.emailLocal, resolveEmailDomain(emailParts.emailDomainChoice, emailParts.emailCustomDomain))
+  const emailDomain = resolveEmailDomain(emailParts.emailDomainChoice, emailParts.emailCustomDomain)
+  const email = joinEmail(emailParts.emailLocal, emailDomain)
+  // FP-258 12차 이메일 묶음을 벗어날 때 기존 이메일 기본 형식으로 보고, 틀리면 묶음 테두리와 칸 아래 문구로 알린다(아이디 찾기와 같음).
+  const emailCheck = useBlurCheck(
+    () => validateEmailParts(emailParts.emailLocal, emailDomain, 'existing'),
+    () => Boolean(emailParts.emailLocal || emailParts.emailCustomDomain),
+  )
   // 인증받은 뒤 아이디·이름·이메일을 바꾸면 인증이 풀린 것으로 본다.
   const verified =
     verification !== null && verification.loginId === loginId.trim() && verification.name === name.trim() && verification.email === email
@@ -147,19 +155,22 @@ export default function FindPasswordPage() {
             hint="가입할 때 입력한 이름"
           />
         </div>
-        <SplitEmailField
-          rule="existing"
-          local={emailParts.emailLocal}
-          domainChoice={emailParts.emailDomainChoice}
-          customDomain={emailParts.emailCustomDomain}
-          onChange={(patch) => setEmailParts((prev) => ({ ...prev, ...patch }))}
-          purpose={EMAIL_PURPOSES.RESET_PASSWORD}
-          extraBody={{ loginId: loginId.trim(), name: name.trim() }}
-          disabled={!ready}
-          verified={verified}
-          beforeRequest={() => checkName()}
-          onVerified={({ verificationToken }) => setVerification({ loginId: loginId.trim(), name: name.trim(), email, verificationToken })}
-        />
+        <div onBlur={emailCheck.onBlur}>
+          <SplitEmailField
+            rule="existing"
+            local={emailParts.emailLocal}
+            domainChoice={emailParts.emailDomainChoice}
+            customDomain={emailParts.emailCustomDomain}
+            onChange={(patch) => setEmailParts((prev) => ({ ...prev, ...patch }))}
+            purpose={EMAIL_PURPOSES.RESET_PASSWORD}
+            extraBody={{ loginId: loginId.trim(), name: name.trim() }}
+            disabled={!ready}
+            verified={verified}
+            error={emailCheck.error}
+            beforeRequest={() => checkName()}
+            onVerified={({ verificationToken }) => setVerification({ loginId: loginId.trim(), name: name.trim(), email, verificationToken })}
+          />
+        </div>
         <button type="button" className="auth-form__submit" onClick={() => checkName() && setStep('reset')} disabled={!verified}>
           다음
         </button>

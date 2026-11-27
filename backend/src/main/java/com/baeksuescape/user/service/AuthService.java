@@ -39,6 +39,8 @@ public class AuthService {
     static final String FIND_ID_PHONE = "PHONE";
     static final String FIND_ID_EMAIL = "EMAIL";
     static final String LOG_SOURCE = "auth-service";
+    // 아이디 형식 오류 문구 — 가입(AUTH-06)과 아이디 중복 확인(AUTH-16)이 같이 쓴다(프론트 validateLoginId와 같은 문구).
+    static final String LOGIN_ID_RULE_MESSAGE = "아이디는 영문 소문자로 시작하는 4~20자 영문 소문자·숫자로 입력해 주세요.";
 
     private final UserAccountMapper userMapper;
     private final UserConsentMapper consentMapper;
@@ -159,6 +161,18 @@ public class AuthService {
         return new AuthResponses.NicknameAvailability(userMapper.countByNickname(request.nickname().strip()) == 0);
     }
 
+    // AUTH-16 N-02-1 아이디 중복 확인(FP-258) — 가입(AUTH-06)과 같은 형식 검사·문구로 틀리면 400(loginId 칸), 아니면 가입 중복 검사와 같은 countByLoginId로 쓸 수 있는지만 돌려준다.
+    // 가입처럼 값을 바꾸지 않고 그대로 본다(형식이 영문 소문자만 받으므로 대소문자 차이가 없고, 탈퇴 회원 아이디는 표시값으로 덮여 잡히지 않는다).
+    public AuthResponses.LoginIdAvailability checkLoginId(AuthRequests.LoginIdCheck request) {
+        String loginId = request.loginId();
+        String loginIdError = isBlank(loginId) ? "아이디를 입력해 주세요."
+                : AccountRules.isValidLoginId(loginId) ? null : LOGIN_ID_RULE_MESSAGE;
+        if (loginIdError != null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", loginIdError, List.of(new FieldErrorItem("loginId", loginIdError)));
+        }
+        return new AuthResponses.LoginIdAvailability(userMapper.countByLoginId(loginId) == 0);
+    }
+
     // AUTH-06 회원가입 — 칸 검사 → 중복(아이디·이메일·닉네임 순) → 간편 로그인 키 → 이메일·휴대폰 인증 토큰 사용 → 계정·동의·간편 로그인 연결 저장을 한 트랜잭션으로 한다.
     @Transactional
     public AuthResponses.Signup signup(AuthRequests.Signup request) {
@@ -222,7 +236,7 @@ public class AuthService {
         List<FieldErrorItem> errors = new ArrayList<>();
         if (isBlank(r.loginId())) errors.add(new FieldErrorItem("loginId", "아이디를 입력해 주세요."));
         else if (!AccountRules.isValidLoginId(r.loginId())) {
-            errors.add(new FieldErrorItem("loginId", "아이디는 영문 소문자로 시작하는 4~20자 영문 소문자·숫자로 입력해 주세요."));
+            errors.add(new FieldErrorItem("loginId", LOGIN_ID_RULE_MESSAGE));
         }
         // 11/18 1차 시연 후속: 이름은 완성형 한글 2~20자만 받는다(화면과 같은 문구).
         String nameError = AccountRules.nameError(r.name());

@@ -8,8 +8,9 @@ import AuthLinks from '../components/AuthLinks.jsx'
 import PhoneVerification from '../components/PhoneVerification.jsx'
 import SplitEmailField from '../components/SplitEmailField.jsx'
 import { resolveEmailDomain } from '../emailParts.js'
+import useBlurCheck from '../useBlurCheck.js'
 import useImeSafeFilter from '../useImeSafeFilter.js'
-import { filterName, joinEmail, joinPhone, normalizePhone, validateName } from '../validation.js'
+import { filterName, joinEmail, joinPhone, normalizePhone, validateEmailParts, validateName, validatePhoneParts } from '../validation.js'
 import '../auth.css'
 
 // 아이디 찾기 방법 선택지(공통 SegmentedControl).
@@ -31,9 +32,10 @@ export default function FindIdPage() {
   const [formError, setFormError] = useState('')
   const [loginId, setLoginId] = useState(null)
   const [pending, setPending] = useState(false)
+  // FP-258 12차 이름 오류가 보이는 동안은 지우지 않고 다시 검사한다(조합 중 칸을 벗어나면 blur 뒤에 조합이 끝나며 값이 들어와, 지우면 자모 안내가 사라졌다).
   const nameInput = useImeSafeFilter()((value) => {
     setName(value)
-    setFieldErrors((prev) => (prev.name ? { ...prev, name: undefined } : prev))
+    setFieldErrors((prev) => (prev.name ? { ...prev, name: validateName(value) || undefined } : prev))
   }, filterName)
   // FP-258 요청 전과 칸을 벗어날 때 이름을 가입과 같은 규칙(validateName)으로 보고, 틀리면 이름 칸 아래에 알리고 요청을 보내지 않는다.
   const checkName = (value = name) => {
@@ -47,7 +49,14 @@ export default function FindIdPage() {
   }
 
   const phone = joinPhone(phoneParts.middle, phoneParts.last)
-  const email = joinEmail(emailParts.emailLocal, resolveEmailDomain(emailParts.emailDomainChoice, emailParts.emailCustomDomain))
+  const emailDomain = resolveEmailDomain(emailParts.emailDomainChoice, emailParts.emailCustomDomain)
+  const email = joinEmail(emailParts.emailLocal, emailDomain)
+  // FP-258 12차 휴대폰·이메일 묶음을 벗어날 때 가입과 같은 검사 함수로 보고, 틀리면 묶음 테두리와 칸 아래 문구로 알린다(이메일은 기존 이메일 기본 형식).
+  const phoneCheck = useBlurCheck(() => validatePhoneParts(phoneParts.middle, phoneParts.last), () => Boolean(phoneParts.middle || phoneParts.last))
+  const emailCheck = useBlurCheck(
+    () => validateEmailParts(emailParts.emailLocal, emailDomain, 'existing'),
+    () => Boolean(emailParts.emailLocal || emailParts.emailCustomDomain),
+  )
   const target = method === FIND_ID_METHODS.PHONE ? normalizePhone(phone) : email
   // 방법을 바꾸거나 인증한 뒤 번호·이메일을 고치면 인증이 풀린 것으로 본다.
   const verified = verification !== null && verification.method === method && verification.target === target
@@ -110,27 +119,33 @@ export default function FindIdPage() {
           />
         </div>
         {method === FIND_ID_METHODS.PHONE ? (
-          <PhoneVerification
-            middle={phoneParts.middle}
-            last={phoneParts.last}
-            onChange={setPhoneParts}
-            purpose={PHONE_PURPOSES.FIND_ID}
-            verified={verified}
-            beforeRequest={() => checkName()}
-            onVerified={({ verificationToken }) => setVerification({ method, target, verificationToken })}
-          />
+          <div onBlur={phoneCheck.onBlur}>
+            <PhoneVerification
+              middle={phoneParts.middle}
+              last={phoneParts.last}
+              onChange={setPhoneParts}
+              purpose={PHONE_PURPOSES.FIND_ID}
+              verified={verified}
+              error={phoneCheck.error}
+              beforeRequest={() => checkName()}
+              onVerified={({ verificationToken }) => setVerification({ method, target, verificationToken })}
+            />
+          </div>
         ) : (
-          <SplitEmailField
-            rule="existing"
-            local={emailParts.emailLocal}
-            domainChoice={emailParts.emailDomainChoice}
-            customDomain={emailParts.emailCustomDomain}
-            onChange={(patch) => setEmailParts((prev) => ({ ...prev, ...patch }))}
-            purpose={EMAIL_PURPOSES.FIND_ID}
-            verified={verified}
-            beforeRequest={() => checkName()}
-            onVerified={({ verificationToken }) => setVerification({ method, target, verificationToken })}
-          />
+          <div onBlur={emailCheck.onBlur}>
+            <SplitEmailField
+              rule="existing"
+              local={emailParts.emailLocal}
+              domainChoice={emailParts.emailDomainChoice}
+              customDomain={emailParts.emailCustomDomain}
+              onChange={(patch) => setEmailParts((prev) => ({ ...prev, ...patch }))}
+              purpose={EMAIL_PURPOSES.FIND_ID}
+              verified={verified}
+              error={emailCheck.error}
+              beforeRequest={() => checkName()}
+              onVerified={({ verificationToken }) => setVerification({ method, target, verificationToken })}
+            />
+          </div>
         )}
         {formError && (
           <p className="auth-form__error" role="alert">

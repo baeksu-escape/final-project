@@ -50,6 +50,10 @@ public final class AuthResponses {
     public record NicknameAvailability(boolean available) {
     }
 
+    // FP-258 N-02-1 아이디 중복 확인(AUTH-16) — 닉네임 확인과 같은 모양
+    public record LoginIdAvailability(boolean available) {
+    }
+
     // N-02 휴대폰 인증번호 발송 — 이메일 발송 응답과 같은 모양
     public record PhoneSent(int expiresInSeconds) {
     }

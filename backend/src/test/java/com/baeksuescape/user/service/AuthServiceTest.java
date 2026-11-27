@@ -472,6 +472,22 @@ class AuthServiceTest {
         assertThat(fieldOf(() -> service.checkNickname(new AuthRequests.NicknameCheck(null)))).isEqualTo("nickname");
     }
 
+    // FP-258 AUTH-16 아이디 중복 확인 — 가입과 같은 중복 기준(countByLoginId)·형식 문구, 형식이 틀리면 DB를 보지 않고 400(loginId 칸)
+    @Test
+    void 아이디_확인은_쓸_수_있음_이미_있음_형식_오류_400() {
+        given(userMapper.countByLoginId("newbie01")).willReturn(0);
+        given(userMapper.countByLoginId("employee")).willReturn(1);
+        assertThat(service.checkLoginId(new AuthRequests.LoginIdCheck("newbie01")).available()).isTrue();
+        assertThat(service.checkLoginId(new AuthRequests.LoginIdCheck("employee")).available()).isFalse();
+        for (String loginId : new String[] { "1abc", "abc", "Abcd", "abc_d", "abc d", "a".repeat(21) }) {
+            assertThat(fieldOf(() -> service.checkLoginId(new AuthRequests.LoginIdCheck(loginId)))).as(loginId).isEqualTo("loginId");
+            assertThat(codeOf(() -> service.checkLoginId(new AuthRequests.LoginIdCheck(loginId)))).as(loginId).isEqualTo("400 INVALID_INPUT");
+            verify(userMapper, never()).countByLoginId(loginId);
+        }
+        assertThat(fieldOf(() -> service.checkLoginId(new AuthRequests.LoginIdCheck("")))).isEqualTo("loginId");
+        assertThat(fieldOf(() -> service.checkLoginId(new AuthRequests.LoginIdCheck(null)))).isEqualTo("loginId");
+    }
+
     @Test
     void 간편_로그인_키로_가입하면_연결_행도_만들고_키를_지운다() {
         givenInsertReturnsId(100L);

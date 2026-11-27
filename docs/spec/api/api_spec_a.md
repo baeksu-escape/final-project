@@ -3,6 +3,7 @@
 > A팀(우찬·경환) API의 요청·응답 상세다. 관리: A팀. 작성 규칙은 [README](README.md) 3장, 전체 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > - **원본:** 우찬 님 「A팀 API 명세 — 반영 요청(11/16)」. develop `bfe6b94`(PR #50·#52·#53 병합 후)의 실제 Spring Controller·DTO에서 뽑은 내용이다. 🆕 11/18 이 파일로 옮겼다(그 전에는 정의서에 요약만 있었다). 그 뒤 코드가 바뀌면 A팀이 이 파일을 고친다.
+> - 🆕 최근 변경 (11/27, FP-258 12차): AUTH-16 아이디 중복 확인 추가(가입 4단계 [중복 확인], AUTH-13과 같은 모양)
 > - 🆕 최근 변경 (11/27, FP-258 PR #164 검수): AUTH-01·05 잠긴 관리자 423 `ADMIN_ACCOUNT_LOCKED`, AUTH-07 목적별 이메일 형식(가입·이메일 변경만 새 규칙), AUTH-14·15 `purpose` 설명 정정
 > - 🆕 최근 변경 (11/26, FP-258): AUTH-01 단계적 로그인 제한(429 `LOGIN_TEMPORARILY_BLOCKED`, 10회 잠금), AUTH-09 휴대폰·이메일 인증 필수와 `loginId` 응답, AUTH-08·10 `name` 추가, 인증 목적 `FIND_ID`(DDL C16). 2차: 이메일 규칙 통일·소문자 저장(AUTH-06·07·08·09·10, MEM-03), AUTH-08(재설정)·09·10 이름 형식 400 `name` 칸, AUTH-01 아이디 소문자 조회
 > - 최근 변경 (11/23, FP-222): MEM-08 닉네임 변경 추가(`SAME_NICKNAME` 추가), MEM-04가 400 `SAME_PASSWORD`를 실제로 돌려줌
@@ -51,6 +52,7 @@
 | AUTH-13 | `POST /api/auth/nickname/check` | `{ nickname }` | `{ available }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) |
 | AUTH-14 | `POST /api/auth/phone/send` | `{ phone, purpose }` | `{ expiresInSeconds }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) 🆕 11/26 `purpose`는 `SIGNUP`·`FIND_ID` |
 | AUTH-15 | `POST /api/auth/phone/verify` | `{ phone, code, purpose }` | `{ verificationToken }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) 🆕 11/26 `FIND_ID` 토큰은 AUTH-09에 넣음 |
+| AUTH-16 🆕 11/27 | `POST /api/auth/login-id/check` | `{ loginId }` | `{ available }` | 없음 | ✅ (FP-258 12차) 정의서(api_definition.md) 행 추가 필요 |
 
 - `user` = `{ userId, name, role, jobType, hasScore }`
 - AUTH-11·12의 토큰 필드 이름은 `token`이다(AUTH-01은 `accessToken`). 화면은 둘 다 받는다.
@@ -61,6 +63,10 @@
   - `phone`: 필수. 비면 `휴대폰 번호를 입력해 주세요.`, 형식이 틀리면 형식 오류 문구가 온다. `phoneVerificationToken`이 없거나 다른 번호·다른 목적·이메일용 토큰이거나 이미 쓴 토큰이면 `phone` 칸 `휴대폰 인증을 완료해 주세요.`
   - `birthYear`: 화면에서 고른 생일의 연도다. 생일(월·일)은 보내지도 저장하지도 않는다.
 - 🆕 11/18 **AUTH-13 닉네임 중복 확인**: 닉네임을 주소에 남기지 않으려고 POST로 받는다. 형식이 틀리면 400 `INVALID_INPUT`(`nickname` 칸). 결과는 안내용이고, 가입 때 서버가 다시 막는다(409 `DUPLICATE_NICKNAME`).
+- 🆕 11/27 **AUTH-16 아이디 중복 확인**(FP-258): AUTH-13과 같은 모양이고, 아이디를 주소에 남기지 않으려고 POST로 받는다.
+  - 형식은 AUTH-06과 같다(영문 소문자로 시작하는 4~20자 영문 소문자·숫자). 비거나 틀리면 400 `INVALID_INPUT`(`loginId` 칸, 가입과 같은 문구)이고 DB는 보지 않는다.
+  - 중복 기준은 가입 중복 검사와 같다(`countByLoginId`, 받은 값 그대로 비교). 탈퇴 회원 아이디는 표시값으로 덮여 있어 잡히지 않는다.
+  - 결과는 안내용이고, 가입 때 서버가 다시 막는다(409 `DUPLICATE_LOGIN_ID`). 반복 조회 제한은 AUTH-13처럼 없다.
 - 🆕 11/26 **FP-258 2차 이메일 규칙**(AUTH-06·07·08·09·10, MEM-03 공통): 앞뒤 공백을 빼고 소문자로 바꾼 뒤 판정·저장한다(`EMAIL_ENC`도 소문자).
   - 앞부분은 영문 소문자·숫자·`.`·`_`·`-`(64자)이고, 처음·끝은 영문·숫자, 점 연속은 안 된다.
   - 도메인은 점으로 나눈 덩어리마다 영문·숫자로 시작·끝(가운데 `-` 가능)하고, 마지막은 영문 2자 이상이다. 전체는 100자 이하.

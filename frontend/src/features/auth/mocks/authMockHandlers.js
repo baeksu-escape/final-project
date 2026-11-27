@@ -25,6 +25,7 @@ import {
   normalizeLoginId,
   normalizePhone,
   validateBirthYear,
+  validateLoginId,
   validateName,
   validateNickname,
 } from '../validation.js'
@@ -277,6 +278,13 @@ registerMockHandlers({
     if (nicknameError) throw fieldError('nickname', nicknameError)
     const nickname = body.nickname.trim()
     return { available: !accounts.some((item) => item.nickname === nickname) }
+  },
+
+  // AUTH-16 N-02-1 아이디 중복 확인(FP-258) — 형식이 틀리면 400(loginId 칸), 아니면 가입 mock과 같은 기준(계정 목록의 아이디 그대로)으로 비교한다.
+  'POST /api/auth/login-id/check': ({ body }) => {
+    const loginIdError = validateLoginId(body?.loginId)
+    if (loginIdError) throw fieldError('loginId', loginIdError)
+    return { available: !accounts.some((item) => item.loginId === body.loginId) }
   },
 
   // N-02 휴대폰 인증번호 발송 — 이메일 발송 mock과 같은 구조. 실제 문자는 보내지 않고 고정 코드(MOCK_PHONE_CODE)를 쓴다.

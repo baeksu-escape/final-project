@@ -431,6 +431,69 @@
 - 끝난 뒤 개발 서버·헤드리스 Edge가 남지 않았다.
 - 확인 못 함: 실제 Windows 한글 IME, 화면 모양의 눈 비교(수치만 봄)
 
+## 12차 — 찾기·가입 화면 테스트 반영 (2026-11-27, 기준 d21635b) 🆕 11/27
+- **관련 N-ID:** N-02-1, N-03-1, N-03-2
+- 사용자가 화면에서 찾은 5건을 고쳤다. 화면 구조·디자인은 UI v2(#166)를 따르고, 공통 컴포넌트·공통 CSS·데이터 입력 화면은 건드리지 않았다.
+
+### 무엇을, 왜 바꿨나
+- **1. 아이디 찾기 휴대폰:** 틀린 번호에 아무 표시가 없었다.
+  - 휴대폰 묶음을 벗어날 때 가입과 같은 `validatePhoneParts`로 보고, 결과를 PhoneVerification `error`로 넘긴다(가입과 같은 컴포넌트·문구).
+  - 새 훅 `useBlurCheck`가 묶음 밖으로 나갈 때만 검사를 켠다(가운데 → 끝 칸 이동은 무시).
+  - [인증번호 받기]는 형식이 맞을 때만 켜지므로, 버튼을 누를 때 따로 검사할 일은 없다.
+- **2. 찾기 이메일:** 9차 `rule="existing"`이 소문자·앞뒤 공백만 처리해 한글·기호가 들어갔다.
+  - 앞부분은 새 `filterExistingEmailLocal`(영문·숫자·`. _ % + -`, 소문자)로 거른다. 9차 `filterExistingEmail`은 이 브랜치에서만 쓰던 함수라 바꿨다.
+  - 직접 입력 도메인은 가입과 같은 `filterEmailDomain`이다.
+  - 판정(`isBasicEmail`)과 서버 규칙은 그대로다. 묶음을 벗어날 때 기본 형식으로 보고 문구를 보인다.
+- **3. 비밀번호 찾기 이름:** 헤드리스(클릭 시 compositionend → blur 순서)로는 재현되지 않았다.
+  - blur 뒤에 compositionend가 오는 순서를 만들면, 두 찾기 화면 모두 이름 setter가 오류를 지워 자모 안내가 사라졌다.
+  - 이제 오류가 보이는 동안은 지우지 않고 `validateName`으로 다시 본다(두 화면 같게).
+  - 요청 전 검사(`beforeRequest`)·[다음] 전 검사는 원래 있었다.
+- **4. 이메일 직접 입력 배치:** 한 줄에 몰려 선택 상자가 86px(1280)·40px(390)로 줄어 글자가 잘렸다.
+  - 직접 입력 칸(`signup-email__custom-domain`)을 같은 상자 안 다음 줄로 내렸다.
+  - 480px 이하에서는 목록 선택도 상자 안에서 줄을 바꾼다. 원래 390에서 "@ 도메인"이 잘렸다.
+  - 휴대폰·이메일 묶음에 오류가 있으면 상자 테두리를 빨갛게 한다. 분할 틀이 줄 안 칸 테두리를 없애 가입 화면도 빨갛지 않았다.
+  - 모두 `auth.css`에만 넣었다.
+- **5. 가입 4단계 아이디 중복 확인:** 중복 아이디로 4단계를 넘어갔다가 [가입하기] 뒤에야 4단계로 돌아와 중복을 알렸다.
+  - 닉네임과 같은 [중복 확인]과 AUTH-16 `POST /api/auth/login-id/check`를 더했다.
+  - 아이디·닉네임을 모두 확인해야 [다음]이 켜진다. 가입 때 409면 확인을 풀어 다시 확인하게 한다.
+
+### 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `frontend/src/features/auth/useBlurCheck.js` (새 파일) | 칸 묶음을 벗어날 때 검사를 켜는 훅 |
+| `frontend/src/features/auth/pages/FindIdPage.jsx` | 휴대폰·이메일 묶음 검사, 이름 오류 다시 검사 |
+| `frontend/src/features/auth/pages/FindPasswordPage.jsx` | 이메일 묶음 검사, 이름 오류 다시 검사 |
+| `frontend/src/features/auth/components/SplitEmailField.jsx` | `existing` 걸러내기 교체, 직접 입력 칸 클래스 |
+| `frontend/src/features/auth/validation.js` | `filterExistingEmailLocal`, 아이디 대기 문구·`loginIdChecked` |
+| `frontend/src/features/auth/pages/SignupPage.jsx` | 아이디 [중복 확인]·결과·409 처리 |
+| `frontend/src/features/auth/api/authFeatureApi.js`, `mocks/authMockHandlers.js` | `checkLoginIdAvailability`, mock AUTH-16 |
+| `frontend/src/features/auth/auth.css` | 묶음 오류 테두리, 직접 입력 다음 줄, 480px 이하 줄바꿈 |
+| `backend/.../user/controller/AuthController.java`, `service/AuthService.java`, `dto/AuthRequests.java`, `dto/AuthResponses.java` | AUTH-16 `checkLoginId`, 아이디 형식 문구 상수 |
+| `backend/.../global/security/SecurityConfig.java` | 인증 없이 허용하는 경로에 `/api/auth/login-id/check` |
+| `backend/src/test/.../AuthServiceTest.java`, `UserApiContractTest.java` | AUTH-16 사용 가능·중복·형식 400, 토큰 없이 호출 |
+| `docs/spec/api/api_spec_a.md`, `docs/ai/features.md` | AUTH-16, N-02-1·N-03-1·N-03-2 한 줄씩 |
+
+### DB·API 변경
+- DB: 없음(기존 `countByLoginId`를 쓴다).
+- API: AUTH-16 `POST /api/auth/login-id/check` `{ loginId }` → `{ available }`를 새로 만들었다.
+  - 인증은 필요 없다.
+  - 형식이 틀리면 400 `INVALID_INPUT`(`loginId` 칸)이다.
+  - 반복 조회 제한은 닉네임 확인(AUTH-13)처럼 없다.
+  - API 정의서(`api_definition.md`)의 ID 행은 아직 더하지 않았다.
+
+### 확인
+- `./mvnw test`(-s) 543개 통과(새 시험 2개), `npm run lint` 오류 0, `npm run build` 성공. 하나씩 돌렸다.
+- mock 개발 서버와 헤드리스 Edge로 고치기 전(HEAD를 임시 worktree로 꺼내 돌린 뒤 지움)과 고친 뒤를 비교했다.
+  - 1: 가운데 `12`로 벗어남 → 문구 없음 ⇒ 빨간 테두리 + "휴대폰 번호 가운데·끝 자리를 숫자 4자리씩 입력해 주세요."
+  - 2: 앞부분 `Ab+C`·한·`_x%y-z!#`·붙여넣기 ` 가나 q.r ` → `ab+c한_x%y-z!# 가나 q.r` ⇒ `ab+c_x%y-zq.r`. 도메인 `Ex@Am!ple.co_m`·가 → 그대로 ⇒ `example.com`
+  - 3: blur → compositionend 순서에서 자모 안내가 사라짐 ⇒ 남음(두 화면)
+  - 4: 직접 입력 선택 상자 86px(1280)·40px(390) ⇒ 128px, 직접 입력 칸 396px·242px. 390 목록 선택 61px ⇒ 128px. 스크린샷은 1280·390 둘 다 봤다.
+  - 5: 버튼 없음, [가입하기] 뒤 4단계로 돌아와 중복 ⇒ [중복 확인]에 중복 문구·[다음] 꺼짐, 고친 아이디 확인 뒤 [다음] 켜짐, 가입 뒤 `/select-job`
+- 끝난 뒤 5199 개발 서버·헤드리스 Edge가 남지 않았다(사용자의 5173 서버는 건드리지 않음).
+- 확인 못 함
+  - 실제 Windows 한글 IME에서 이름 자모 안내(3번)
+  - 실제 서버·DB로 AUTH-16 호출(시험은 mock 매퍼)
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

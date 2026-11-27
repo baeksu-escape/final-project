@@ -76,6 +76,12 @@ public class AuthController {
         return authService.checkNickname(request);
     }
 
+    // AUTH-16 N-02-1 아이디 중복 확인(FP-258) — { loginId } → { available }. 닉네임 확인처럼 아이디를 주소에 남기지 않으려고 POST로 받는다.
+    @PostMapping("/login-id/check")
+    public AuthResponses.LoginIdAvailability checkLoginId(@RequestBody AuthRequests.LoginIdCheck request) {
+        return authService.checkLoginId(request);
+    }
+
     // N-02 휴대폰 인증번호 발송(11/18 1차 시연 후속) — { phone, purpose } → { expiresInSeconds }
     @PostMapping("/phone/send")
     public AuthResponses.PhoneSent sendPhoneCode(@Valid @RequestBody AuthRequests.PhoneSend request) {

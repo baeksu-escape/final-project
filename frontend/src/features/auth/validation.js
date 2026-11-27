@@ -96,9 +96,10 @@ export function filterEmailLocal(value) {
 export function filterEmailDomain(value) {
   return String(value ?? '').toLowerCase().replace(/[^a-z0-9.-]/g, '')
 }
-// N-03-1·N-03-2 찾기 화면 이메일 칸(기존 이메일): 글자는 지우지 않고 앞뒤 공백만 빼고 소문자로 바꾼다.
-export function filterExistingEmail(value) {
-  return String(value ?? '').trim().toLowerCase()
+// FP-258 N-03-1·N-03-2 찾기 화면 이메일 앞부분(기존 이메일): 예전 규칙으로 가입한 이메일(+ 등)도 찾도록 a-z0-9 . _ % + - 를 남기고 소문자로 바꾼다.
+// 한글·공백·그 밖의 기호는 어떤 이메일에도 쓸 수 없어 지운다(판정은 isBasicEmail 그대로). 직접 입력 도메인은 가입과 같은 filterEmailDomain을 쓴다.
+export function filterExistingEmailLocal(value) {
+  return String(value ?? '').toLowerCase().replace(/[^a-z0-9._%+-]/g, '').slice(0, EMAIL_LOCAL_MAX)
 }
 // N-04-3 한 칸 이메일(마이페이지 이메일 변경): 첫 @ 앞뒤를 따로 거르고 @는 하나만 남긴다.
 export function filterEmail(value) {
@@ -177,7 +178,7 @@ export function validateNickname(value) {
 // ===== 11/18 1차 시연 후속: 회원가입 칸별 검사 =====
 // 칸마다 오류 문구를 돌려준다(문제가 없으면 ''). 가입 화면은 입력할 때마다 칸 하나씩, [가입하기]에서는 validateSignup으로 전부 부른다. 가입 mock도 같은 함수를 쓴다.
 
-// N-02 아이디 — 규칙은 isValidLoginId 그대로다. 가입할 때 서버가 중복을 막는다(중복 확인 버튼은 이번 범위가 아님).
+// N-02 아이디 — 규칙은 isValidLoginId 그대로다. FP-258 중복은 4단계 [중복 확인](AUTH-16)으로 묻고, 가입할 때 서버가 한 번 더 막는다.
 export function validateLoginId(value) {
   if (!value) return '아이디를 입력해 주세요.'
   if (!isValidLoginId(value)) return `아이디는 ${LOGIN_ID_RULE_TEXT}로 입력해 주세요.`
@@ -262,6 +263,7 @@ export function validateNewPassword(password, passwordConfirm) {
 
 // 가입 화면에서 [가입하기]를 누르기 전에는 띄우지 않는 문구(중복 확인·인증을 아직 안 한 상태). 입력하는 도중에는 형식 오류만 보인다.
 export const SIGNUP_PENDING_MESSAGES = Object.freeze({
+  loginId: '아이디 중복 확인을 해 주세요.',
   nickname: '닉네임 중복 확인을 해 주세요.',
   phone: '휴대폰 인증을 완료해 주세요.',
   email: '이메일 인증을 완료해 주세요.',
@@ -270,12 +272,12 @@ export const SIGNUP_PENDING_MESSAGES = Object.freeze({
 // N-02 가입 입력값 전체를 검사해 항목별 오류 객체를 돌려준다. 오류가 없으면 빈 객체.
 // form: { loginId, name, nickname, phoneMiddle, phoneLast, emailLocal, emailDomain, password, passwordConfirm, birthDate, agreeCreditInfo }
 //   emailDomain은 '직접 입력'까지 반영한 최종 도메인이다. 키 순서가 화면 칸 순서와 같아서, 첫 오류 칸을 찾을 때 이 순서를 쓴다.
-export function validateSignup(form, { emailVerified = false, phoneVerified = false, nicknameChecked = false } = {}) {
+export function validateSignup(form, { emailVerified = false, phoneVerified = false, nicknameChecked = false, loginIdChecked = false } = {}) {
   const errors = {}
   const put = (key, message) => {
     if (message) errors[key] = message
   }
-  put('loginId', validateLoginId(form.loginId))
+  put('loginId', validateLoginId(form.loginId) || (loginIdChecked ? '' : SIGNUP_PENDING_MESSAGES.loginId))
   put('name', validateName(form.name))
   put('nickname', validateNickname(form.nickname) || (nicknameChecked ? '' : SIGNUP_PENDING_MESSAGES.nickname))
   put('phone', validatePhoneParts(form.phoneMiddle, form.phoneLast) || (phoneVerified ? '' : SIGNUP_PENDING_MESSAGES.phone))

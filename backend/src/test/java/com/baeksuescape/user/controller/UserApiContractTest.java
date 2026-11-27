@@ -166,6 +166,15 @@ class UserApiContractTest {
                 .andExpect(jsonPath("$.available").value(true));
     }
 
+    // FP-258 AUTH-16 아이디 중복 확인도 로그인 없이 부르고, 응답 모양은 닉네임 확인과 같다.
+    @Test
+    void 아이디_중복_확인은_토큰_없이_available을_준다() throws Exception {
+        given(authService.checkLoginId(any())).willReturn(new AuthResponses.LoginIdAvailability(false));
+        mvc.perform(json(post("/api/auth/login-id/check"), "{\"loginId\":\"employee\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(false));
+    }
+
     @Test
     void 휴대폰_인증_발송과_확인은_토큰_없이_부르고_이메일과_같은_모양이다() throws Exception {
         given(phoneVerification.send(any())).willReturn(new AuthResponses.PhoneSent(300));

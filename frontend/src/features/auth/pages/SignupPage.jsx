@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { PATHS } from '../../../common/config/navigation.js'
 import { Checkbox, DateSelect, FieldError, TextInput } from '../../../common/components/index.js'
-import { checkNicknameAvailability, requestSignup } from '../api/authFeatureApi.js'
+import { checkLoginIdAvailability, checkNicknameAvailability, requestSignup } from '../api/authFeatureApi.js'
 import { AUTH_ERROR_CODES, CREDIT_INFO_AGREEMENT_LABEL, EMAIL_PURPOSES, PHONE_PURPOSES, toAgeGroup } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
@@ -23,6 +23,7 @@ import {
   joinEmail,
   joinPhone,
   normalizePhone,
+  validateLoginId,
   validateNickname,
   validateSignup,
 } from '../validation.js'
@@ -71,7 +72,7 @@ const SIGNUP_STEPS = [
 ]
 const stepIndexOf = (key) => SIGNUP_STEPS.findIndex((item) => item.fields.includes(key))
 
-// N-02 회원가입 화면 — 형식 검사·닉네임 중복 확인·휴대폰 인증·이메일 인증·필수 동의를 거쳐 계정을 만든다. 직군은 가입 후 직군 선택 화면(FP-85)에서 받는다.
+// N-02 회원가입 화면 — 형식 검사·아이디·닉네임 중복 확인·휴대폰 인증·이메일 인증·필수 동의를 거쳐 계정을 만든다. 직군은 가입 후 직군 선택 화면(FP-85)에서 받는다.
 // 11/18 1차 시연 후속: 칸마다 한 번 입력했거나 칸을 벗어난 뒤부터 입력할 때마다 검사해 칸 아래에 바로 보여 준다(손대지 않은 칸은 [가입하기] 전까지 조용하다).
 //   중복 확인·인증을 아직 안 했다는 문구(SIGNUP_PENDING_MESSAGES)는 [가입하기]를 누른 뒤에만 보인다.
 export default function SignupPage() {
@@ -92,6 +93,10 @@ export default function SignupPage() {
   const [nicknameCheck, setNicknameCheck] = useState(null)
   const [nicknameCheckError, setNicknameCheckError] = useState('')
   const [nicknameChecking, setNicknameChecking] = useState(false)
+  // FP-258 12차 아이디 중복 확인 결과 { loginId, available }. 닉네임과 같이 아이디를 고치면 확인이 풀린 것으로 본다.
+  const [loginIdCheck, setLoginIdCheck] = useState(null)
+  const [loginIdCheckError, setLoginIdCheckError] = useState('')
+  const [loginIdChecking, setLoginIdChecking] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [serverErrors, setServerErrors] = useState({})
   const [formError, setFormError] = useState('')
@@ -113,7 +118,9 @@ export default function SignupPage() {
   const phoneVerified = phoneVerification !== null && phoneVerification.phone === phone
   const nicknameChecked = nicknameCheck?.nickname === nickname && nicknameCheck.available
   const nicknameTaken = nicknameCheck?.nickname === nickname && !nicknameCheck.available
-  const checkContext = { emailVerified, phoneVerified, nicknameChecked }
+  const loginIdChecked = loginIdCheck?.loginId === form.loginId && loginIdCheck.available
+  const loginIdTaken = loginIdCheck?.loginId === form.loginId && !loginIdCheck.available
+  const checkContext = { emailVerified, phoneVerified, nicknameChecked, loginIdChecked }
   const validation = validateSignup(
     { ...form, emailDomain: resolveEmailDomain(form.emailDomainChoice, form.emailCustomDomain) },
     checkContext,
@@ -123,6 +130,7 @@ export default function SignupPage() {
   const errorOf = (key) => {
     if (serverErrors[key]) return serverErrors[key]
     if (key === 'nickname' && nicknameTaken) return '이미 사용 중인 닉네임입니다.'
+    if (key === 'loginId' && loginIdTaken) return '이미 사용 중인 아이디입니다.'
     const forced = submitted || shownKeys.includes(key)
     if (!touched[key] && !forced) return ''
     const message = validation[key] ?? ''
@@ -149,7 +157,11 @@ export default function SignupPage() {
   const update = (field) => (value) => patchForm({ [field]: value })
   // FP-258 칸별 걸러내기(validation.js)를 거친 값만 넣는다(한글 조합은 끝날 때, useImeSafeFilter).
   const filteredInput = (field, filter) => bindFilter((value) => patchForm({ [field]: value }), filter)
-  const loginIdInput = filteredInput('loginId', filterSignupLoginId)
+  // 아이디를 고치면 지난 [중복 확인]의 요청 오류(형식 400 등)도 지운다.
+  const loginIdInput = bindFilter((value) => {
+    setLoginIdCheckError('')
+    patchForm({ loginId: value })
+  }, filterSignupLoginId)
   const nameInput = filteredInput('name', filterName)
   const nicknameInput = filteredInput('nickname', filterNickname)
 
@@ -188,6 +200,22 @@ export default function SignupPage() {
       setNicknameCheckError(error.message)
     } finally {
       setNicknameChecking(false)
+    }
+  }
+
+  // FP-258 12차 N-02-1 아이디 [중복 확인](AUTH-16) — 닉네임과 같이 형식이 맞는 아이디만 서버에 묻고, 결과는 그 아이디에만 유효하다.
+  const handleLoginIdCheck = async () => {
+    const loginId = form.loginId
+    setLoginIdChecking(true)
+    setLoginIdCheckError('')
+    try {
+      const { available } = await checkLoginIdAvailability(loginId)
+      setLoginIdCheck({ loginId, available })
+    } catch (error) {
+      setLoginIdCheck(null)
+      setLoginIdCheckError(error.message)
+    } finally {
+      setLoginIdChecking(false)
     }
   }
 
@@ -248,8 +276,11 @@ export default function SignupPage() {
       const code = error?.data?.code
       const fieldErrors = error?.data?.fieldErrors
       let nextErrors = null
-      if (code === AUTH_ERROR_CODES.DUPLICATE_LOGIN_ID) nextErrors = { loginId: error.message }
-      else if (code === AUTH_ERROR_CODES.DUPLICATE_EMAIL) nextErrors = { email: error.message }
+      if (code === AUTH_ERROR_CODES.DUPLICATE_LOGIN_ID) {
+        // FP-258 12차 확인한 뒤 다른 사람이 같은 아이디로 먼저 가입한 경우 — 닉네임처럼 확인 결과를 풀어 다시 확인하게 한다.
+        setLoginIdCheck(null)
+        nextErrors = { loginId: error.message }
+      } else if (code === AUTH_ERROR_CODES.DUPLICATE_EMAIL) nextErrors = { email: error.message }
       else if (code === AUTH_ERROR_CODES.DUPLICATE_NICKNAME) {
         // 확인한 뒤 다른 사람이 같은 닉네임으로 먼저 가입한 경우 — 확인 결과도 풀어서 다시 확인하게 한다.
         setNicknameCheck(null)
@@ -360,16 +391,32 @@ export default function SignupPage() {
       case 'loginId':
         return (
           <>
-            <div {...fieldProps('loginId')} {...loginIdInput.compositionProps}>
-              <TextInput
-                label="아이디"
-                value={form.loginId}
-                onChange={loginIdInput.onChange}
-                error={errorOf('loginId')}
-                placeholder="영문 소문자로 시작, 4~20자"
-                autoComplete="username"
-                maxLength={20}
-              />
+            {/* FP-258 12차 N-02-1 아이디 — 닉네임과 같은 [중복 확인](AUTH-16). 형식이 맞을 때만 눌리고, 중복이면 칸 테두리와 칸 아래 문구로 알린다. */}
+            <div {...fieldProps('loginId')} {...loginIdInput.compositionProps} className="auth-field">
+              <div className="signup-form__row">
+                <TextInput
+                  label="아이디"
+                  value={form.loginId}
+                  onChange={loginIdInput.onChange}
+                  error={errorOf('loginId') || loginIdCheckError}
+                  placeholder="영문 소문자로 시작, 4~20자"
+                  autoComplete="username"
+                  maxLength={20}
+                />
+                <button
+                  type="button"
+                  className="signup-form__check"
+                  onClick={handleLoginIdCheck}
+                  disabled={loginIdChecking || validateLoginId(form.loginId) !== ''}
+                >
+                  중복 확인
+                </button>
+              </div>
+              {loginIdChecked && (
+                <p className="auth-message auth-message--success" role="status">
+                  사용할 수 있는 아이디입니다.
+                </p>
+              )}
             </div>
           </>
         )

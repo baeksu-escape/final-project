@@ -11,6 +11,7 @@ export const AUTH_FEATURE_API = Object.freeze({
   FIND_ID: '/api/auth/find-id',
   PASSWORD_RESET: '/api/auth/password/reset',
   NICKNAME_CHECK: '/api/auth/nickname/check',
+  LOGIN_ID_CHECK: '/api/auth/login-id/check',
   PHONE_SEND: '/api/auth/phone/send',
   PHONE_VERIFY: '/api/auth/phone/verify',
 })
@@ -31,6 +32,12 @@ export function requestSignup(payload) {
 //   가입할 때 서버가 다시 중복을 막으므로(409 DUPLICATE_NICKNAME), 이 결과는 안내용이다.
 export function checkNicknameAvailability(nickname) {
   return apiPost(AUTH_FEATURE_API.NICKNAME_CHECK, { nickname })
+}
+
+// AUTH-16 N-02-1 아이디 중복 확인(FP-258) — { loginId } → { available }. 닉네임 확인과 같은 모양이고, 형식이 틀리면 400(data.fieldErrors의 field 'loginId').
+//   가입할 때 서버가 다시 중복을 막으므로(409 DUPLICATE_LOGIN_ID), 이 결과는 안내용이다.
+export function checkLoginIdAvailability(loginId) {
+  return apiPost(AUTH_FEATURE_API.LOGIN_ID_CHECK, { loginId })
 }
 
 // N-02 휴대폰 인증번호 발송 — { phone, purpose } → { expiresInSeconds }   (purpose: PHONE_PURPOSES.SIGNUP)

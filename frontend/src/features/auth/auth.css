@@ -343,6 +343,35 @@
   min-width: 0;
 }
 
+/* FP-258 12차 휴대폰·이메일 묶음(한 상자로 보이는 줄)에 오류가 있으면 상자 테두리를 다른 칸의 오류(forms.css)처럼 빨간 빛 테두리로 한다.
+   분할 틀(.fin-form)은 줄 안 칸의 테두리를 없애므로 줄 상자에 직접 준다. 포커스·마우스 올림보다 앞선다. */
+.fin-form .auth-form .signup-form__row:has(> [aria-invalid='true']) {
+  border-color: var(--bad);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 22%, transparent);
+}
+
+/* FP-258 12차 [직접 입력]을 고르면 직접 입력 도메인 칸을 같은 상자 안 다음 줄로 내린다.
+   한 줄에 앞부분·직접 입력 칸·선택 상자·버튼이 몰려 선택 상자 글자가 잘리고 버튼이 밀리던 것을, 첫 줄은 목록에서 고를 때와 같게 둔다. */
+.fin-form .signup-email .signup-form__row:has(> .signup-email__custom-domain) {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+
+.fin-form .signup-email .signup-form__row > .signup-email__custom-domain {
+  order: 1;
+  flex: 1 0 100%;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+/* FP-258 12차 좁은 화면(휴대폰 폭)에서는 목록에서 고를 때도 한 줄에 다 들어가지 않아 도메인 글자가 잘리므로, 같은 상자 안에서 줄을 바꿔 놓는다. */
+@media (max-width: 480px) {
+  .fin-form .signup-email .signup-form__row:has(> input, > select) {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+}
+
 /* 휴대폰·이메일 묶음 — 줄 사이 간격 */
 .phone-verification,
 .signup-email {

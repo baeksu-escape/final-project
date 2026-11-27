@@ -39,6 +39,10 @@ public final class AuthRequests {
     public record NicknameCheck(String nickname) {
     }
 
+    // FP-258 N-02-1 아이디 중복 확인(AUTH-16). 형식 검사는 서비스가 칸별 오류로 한다(가입과 같은 문구).
+    public record LoginIdCheck(String loginId) {
+    }
+
     // N-02 휴대폰 인증번호 발송. purpose: SIGNUP
     public record PhoneSend(
             @NotBlank(message = "휴대폰 번호를 입력해 주세요.") String phone,
