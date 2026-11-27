@@ -64,9 +64,14 @@ function checkMonth(value, nowMonth) {
   return null
 }
 
-// 기준월 규칙 — 연-월 형식이고 미래 월이 아니어야 한다. ctx.nowMonth가 없으면 이번 달을 기준으로 본다.
+// 기준월 규칙 — 연-월 형식이고 미래 월이 아니며, 최근 BASE_MONTH_MAX_AGE개월 안이어야 한다(서버 점수 산출의 최신성 한도와 같다).
+// ctx.nowMonth가 없으면 이번 달을 기준으로 본다.
 export function monthRule(value, { nowMonth = currentMonth() } = {}) {
-  return checkMonth(value, nowMonth)
+  const monthError = checkMonth(value, nowMonth)
+  if (monthError) return monthError
+  const maxAge = VALIDATION_LIMITS.BASE_MONTH_MAX_AGE
+  if (monthsBetween(value, nowMonth) > maxAge) return `최근 ${maxAge}개월 안의 달(${addMonths(nowMonth, -maxAge)} 이후)만 입력할 수 있습니다. 점수는 최근 자료로 계산합니다.`
+  return null
 }
 
 // 월별 소득의 '소득 월' 규칙 — 형식·미래 월에 더해, 기준월부터 거꾸로 최근 12개월 안에 있어야 한다.

@@ -22,6 +22,7 @@ const balanceAmountRule = amountRule(VALIDATION_LIMITS.BALANCE_AMOUNT_MAX)
 //   key: 요청 본문에 그대로 쓰는 이름   label: 화면 이름
 //   input: 'money' | 'number' | 'month' | 'select' | 'text'   (FieldControl.jsx가 공통 컴포넌트로 바꿔 그린다)
 //   required: 필수 여부   options: select 선택지   unit·min·max·step: number 보조값   hint: 안내 문구
+//   placeholder: 글자 칸의 흐린 예시   wide: 화면 2열 배치에서 두 칸 너비로(빠른 입력 칩이 있는 금액 칸)
 //   validate(value, { row, values, nowMonth }): FP-86 상세 검증을 꽂는 자리 — 문제가 있으면 오류 문구를 돌려준다(값이 있을 때만 호출).
 //     규칙 함수는 validation/inputRules.js에 있다.
 //   input: 'checkbox'는 체크 칸(값은 true/false)이다.
@@ -30,11 +31,12 @@ const balanceAmountRule = amountRule(VALIDATION_LIMITS.BALANCE_AMOUNT_MAX)
 // 섹션(section) 설정
 //   kind: 'fields'(칸 묶음) | 'list'(줄 추가·삭제)   fields | itemFields: 칸 목록
 //   payloadExtra: 요청 본문에 함께 보낼 고정값   minItems·minItemsMessage: list 최소 줄 수
-//   derive(value): 요청 본문에 덧붙일 계산값   summary(value): 화면에 보여 줄 요약 문구
+//   derive(value): 요청 본문에 덧붙일 계산값   summary(value): 화면에 보여 줄 요약 줄 { label, value }(칸들 아래 요약 바의 왼쪽 이름·오른쪽 값)
 //   FP-86 list 전용 — maxItems·maxItemsMessage: 최대 줄 수(추가 버튼도 막힌다)
 //     uniqueField·duplicateMessage: 이 칸 값이 앞줄과 같으면 오류   notice(rows): 입력 완료 현황의 같은 key 항목 옆에 보여 줄 안내 문구(없으면 null, 오류 아님)
 //   N-05-2 list 전용 — fixedMonths: 기준월로 끝나는 이 개월 수만큼 줄을 미리 채운다(줄 추가·삭제 없음). readOnly 칸은 입력 칸을 그리지 않는다.
 //   isComplete(saved): 입력 완료 현황에서 이 섹션의 완료 조건이 따로 있을 때 쓴다.
+//   list 전용 — itemLabel: 줄 카드 머리말 이름(예: '대출' → '대출 1').
 //   N-05-8 list 전용 — noItemsLabel: 줄이 없어도 완료로 볼 수 있게 하는 체크 문구(대출이 없는 사용자용)
 //     체크하면 줄은 지우지 않고 잠근다(FP-227). 잠긴 줄은 검사하지 않고, 요청 본문에는 줄 없이(items: []) noItems: true로 보낸다.
 //   FP-227 list 전용 — minRows: "없음" 체크가 풀려 있으면 늘 보일 최소 줄 수. 줄이 모자라면 빈 줄을 채운다(inputValues.js withMinimumRows).
@@ -45,18 +47,23 @@ export const BASE_MONTH_FIELD = Object.freeze({
   label: '기준월',
   input: 'month',
   required: true,
-  hint: '이 화면의 모든 입력은 이 기준월로 저장됩니다.',
+  // 최근 6개월 제한은 칸 검사(monthRule) 오류 문구가 알려 준다
+  hint: '선택한 기준월을 바탕으로 점수를 산출합니다.',
   validate: monthRule,
 })
+
+// 금액 칸 아래 빠른 입력 칩(누를 때마다 그만큼 더한다) — 큰 금액(잔액·자산·월급)과 매달 나가는 금액
+const QUICK_BIG = [1000000, 5000000, 10000000]
+const QUICK_MONTHLY = [100000, 500000, 1000000]
 
 // 급여소득자 소득 — 보너스를 뺀 월급 하나만 받는다.
 const SALARY_SECTION = {
   key: 'income',
   title: '월급',
-  description: '보너스를 제외한 월급을 입력해 주세요.',
+  // 설명 글은 칸 이름 '월급(보너스 제외)'과 겹쳐 뺐다(11/26)
   kind: 'fields',
   payloadExtra: { incomeType: 'MONTHLY_SALARY' },
-  fields: [{ key: 'monthlySalary', label: '월급(보너스 제외)', input: 'money', required: true, validate: monthlyAmountRule }],
+  fields: [{ key: 'monthlySalary', label: '월급(보너스 제외)', input: 'money', required: true, validate: monthlyAmountRule, quickAdd: QUICK_BIG }],
 }
 
 // N-05-2 자영업자·프리랜서 소득 — 기준월로 끝나는 최근 12개월을 한 달에 한 줄씩 미리 채워 모두 받는다.
@@ -90,7 +97,7 @@ export const INCOME_SECTION_BY_JOB = Object.freeze({
 })
 
 // N-05-2 소득과 함께 받는 기간 섹션을 만든다. 직군마다 이름만 다르다.
-// TODO(D-24) 기간의 단위를 팀이 정하지 않아 개월 수로 받는다.
+// 화면은 년·개월 두 칸(FieldControl의 'period')으로 받고, 값과 서버 전송은 개월 수 하나(periodMonths)로 한다.
 function createPeriodSection(label) {
   return {
     key: 'workPeriod',
@@ -100,13 +107,11 @@ function createPeriodSection(label) {
       {
         key: 'periodMonths',
         label,
-        input: 'number',
-        unit: '개월',
-        min: 0,
-        max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX,
-        step: 1,
+        input: 'period',
         required: true,
-        validate: numberRule({ max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX, integer: true, unit: '개월' }),
+        // 0년 0개월은 입력하지 않은 것과 같으므로 1개월 이상만 받는다
+        validate: (value, context) =>
+          value < 1 ? `${label}을 1개월 이상 입력해 주세요.` : numberRule({ max: VALIDATION_LIMITS.WORK_PERIOD_MONTHS_MAX, integer: true, unit: '개월' })(value, context),
       },
     ],
   }
@@ -139,8 +144,8 @@ const CREDIT_PROFILE_SECTION = {
   description: '신용카드와 대출 이용 기록을 입력해 주세요. 신용카드·대출을 써 본 적이 없으면 아래 항목을 체크해 주세요. 해당 없는 항목은 0을 입력해 주세요.',
   kind: 'fields',
   fields: [
-    { key: 'cardLimitAmount', label: '카드 한도(모든 카드 합계)', input: 'money', validate: balanceAmountRule, required: true, disabledWhen: hasNoCreditHistory },
-    { key: 'cardMonthlySpendAmount', label: '월 카드 사용액(모든 카드 합계)', input: 'money', validate: cardSpendRule, required: true, disabledWhen: hasNoCreditHistory },
+    { key: 'cardLimitAmount', label: '카드 한도(모든 카드 합계)', input: 'money', quickAdd: QUICK_BIG, validate: balanceAmountRule, required: true, disabledWhen: hasNoCreditHistory },
+    { key: 'cardMonthlySpendAmount', label: '월 카드 사용액(모든 카드 합계)', input: 'money', quickAdd: QUICK_MONTHLY, validate: cardSpendRule, required: true, disabledWhen: hasNoCreditHistory },
     {
       key: 'delinquencyCount12m',
       label: '최근 1년 연체(30일 이상)',
@@ -177,7 +182,7 @@ const CREDIT_PROFILE_SECTION = {
       required: true,
       disabledWhen: hasNoCreditHistory,
     },
-    { key: 'privateLenderLoanBalanceAmount', label: '대부업 대출 잔액', input: 'money', validate: balanceAmountRule, required: true, disabledWhen: hasNoCreditHistory },
+    { key: 'privateLenderLoanBalanceAmount', label: '대부업 대출 잔액', input: 'money', quickAdd: QUICK_BIG, validate: balanceAmountRule, required: true, disabledWhen: hasNoCreditHistory },
     { key: 'noCreditHistory', label: '신용 이력이 없어요', input: 'checkbox' },
   ],
 }
@@ -192,12 +197,15 @@ export const COMMON_SECTIONS = Object.freeze([
     noItemsLabel: '보유한 대출이 없습니다.',
     // FP-227 "보유한 대출이 없습니다."를 체크하지 않았으면 대출 줄이 늘 1개 이상 보인다(마지막 줄을 지우면 빈 줄이 다시 생긴다).
     minRows: 1,
-    addLabel: '대출 추가',
+    addLabel: '+ 대출 추가하기',
+    itemLabel: '대출',
     emptyMessage: '추가한 대출이 없습니다.',
+    // 칸 순서 = 화면 2열 배치 순서(대출 종류·고정변동 / 대출 잔액 넓게 / 연 금리·남은 기간 / 월 상환액 넓게). wide: 두 칸 너비
     itemFields: [
       // N-05-3 대출 종류(DIM_LOAN_TYPE). FP-86 작업 5에서 옛 '업권'(sectorCode)을 바꿨다 — INP-02 요청 필드도 loanTypeCode.
       { key: 'loanTypeCode', label: '대출 종류', input: 'select', options: LOAN_TYPE_OPTIONS, required: true },
-      { key: 'balanceAmount', label: '대출 잔액', input: 'money', required: true, validate: balanceAmountRule },
+      { key: 'rateType', label: '고정·변동', input: 'select', options: LOAN_RATE_TYPE_OPTIONS, required: true },
+      { key: 'balanceAmount', label: '대출 잔액', input: 'money', wide: true, quickAdd: QUICK_BIG, required: true, validate: balanceAmountRule },
       {
         key: 'annualRatePercent',
         label: '연 금리',
@@ -209,8 +217,6 @@ export const COMMON_SECTIONS = Object.freeze([
         required: true,
         validate: numberRule({ max: VALIDATION_LIMITS.ANNUAL_RATE_MAX_PERCENT, unit: '%' }),
       },
-      { key: 'rateType', label: '고정·변동', input: 'select', options: LOAN_RATE_TYPE_OPTIONS, required: true },
-      { key: 'monthlyPaymentAmount', label: '월 상환액', input: 'money', required: true, validate: monthlyAmountRule },
       {
         key: 'remainingMonths',
         label: '남은 기간',
@@ -223,6 +229,7 @@ export const COMMON_SECTIONS = Object.freeze([
         required: true,
         validate: numberRule({ max: VALIDATION_LIMITS.REMAINING_MONTHS_MAX, integer: true, unit: '개월' }),
       },
+      { key: 'monthlyPaymentAmount', label: '월 상환액', input: 'money', wide: true, quickAdd: QUICK_MONTHLY, required: true, validate: monthlyAmountRule },
     ],
   },
   CREDIT_PROFILE_SECTION,
@@ -232,32 +239,33 @@ export const COMMON_SECTIONS = Object.freeze([
     description: '종류별 금액을 입력하면 합계가 총자산이 됩니다.',
     kind: 'fields',
     fields: [
-      { key: 'depositAmount', label: '예금·적금', input: 'money', validate: balanceAmountRule },
-      { key: 'investmentAmount', label: '투자(주식·펀드 등)', input: 'money', validate: balanceAmountRule },
-      { key: 'realEstateAmount', label: '부동산·보증금', input: 'money', validate: balanceAmountRule },
-      { key: 'otherAmount', label: '기타 자산', input: 'money', validate: balanceAmountRule },
+      { key: 'depositAmount', label: '예금·적금', input: 'money', quickAdd: QUICK_BIG, validate: balanceAmountRule },
+      { key: 'investmentAmount', label: '투자(주식·펀드 등)', input: 'money', quickAdd: QUICK_BIG, validate: balanceAmountRule },
+      { key: 'realEstateAmount', label: '부동산·보증금', input: 'money', quickAdd: QUICK_BIG, validate: balanceAmountRule },
+      { key: 'otherAmount', label: '기타 자산', input: 'money', quickAdd: QUICK_BIG, validate: balanceAmountRule },
     ],
     derive: (value) => ({ totalAmount: sumAssets(value) }),
-    summary: (value) => `자산 합계: ${formatWithComma(sumAssets(value))}원`,
+    summary: (value) => ({ label: '총 자산 합계', value: `${formatWithComma(sumAssets(value))}원` }),
   },
   {
     key: 'fixedExpense',
     title: '월 고정 지출',
     description: '식비·교통·공과금 등 매달 나가는 지출의 합계를 입력해 주세요.',
     kind: 'fields',
-    fields: [{ key: 'monthlyAmount', label: '월 고정 지출', input: 'money', validate: monthlyAmountRule }],
+    fields: [{ key: 'monthlyAmount', label: '월 고정 지출', input: 'money', quickAdd: QUICK_MONTHLY, validate: monthlyAmountRule }],
   },
   {
     key: 'otherExpenses',
     title: '할부·정기결제',
     description: '할부금이나 구독료처럼 매달 나가는 결제를 항목별로 추가해 주세요.',
     kind: 'list',
-    addLabel: '할부·정기결제 추가',
+    addLabel: '+ 할부·정기결제 추가하기',
+    itemLabel: '할부·정기결제',
     emptyMessage: '추가한 할부·정기결제가 없습니다.',
     itemFields: [
       { key: 'category', label: '종류', input: 'select', options: OTHER_EXPENSE_CATEGORY_OPTIONS, required: true },
-      { key: 'memo', label: '내용', input: 'text', maxLength: 50 },
-      { key: 'monthlyAmount', label: '월 금액', input: 'money', required: true, validate: monthlyAmountRule },
+      { key: 'memo', label: '내용', input: 'text', maxLength: 50, placeholder: '예: 넷플릭스, 휴대폰 할부, 보험료' },
+      { key: 'monthlyAmount', label: '월 금액', input: 'money', wide: true, quickAdd: QUICK_MONTHLY, required: true, validate: monthlyAmountRule },
     ],
   },
 ])

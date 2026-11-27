@@ -1,0 +1,243 @@
+/* N-10 메인 ② 밝은 바탕 스티키(LandingStory) — 왼쪽 서비스 목록(아코디언), 오른쪽 기울어진 입체 폰.
+   구간 동안 화면이 고정되고(position: sticky), --t(0~1)로 폰이 정면에서 사선으로 기운다. 단계는 LandingStory가 정한다. */
+
+.story {
+  --c: 0;
+  --t: 0;
+  position: relative;
+  /* 페이지 실제 폭만큼 화면 끝까지(--page-w는 LandingPage가 넘긴다) */
+  width: var(--page-w, 100vw);
+  height: 460vh;
+  height: 460dvh;
+  /* 위 히어로의 마지막 한 화면과 겹친다 — 히어로 사진이 사라지는 순간 이 구간이 같은 자리에 고정돼 이어 나타난다.
+     바탕은 투명(페이지 바탕색이 비침)이라 겹쳐도 히어로를 가리지 않는다 */
+  margin: calc(-1 * (100vh - var(--bar-h, 68px))) calc(50% - var(--page-w, 100vw) / 2) 0;
+  margin-top: calc(-1 * (100dvh - var(--bar-h, 68px)));
+}
+
+.story[data-shown='false'] .story__sticky {
+  pointer-events: none;
+}
+
+/* 나타남 — 목록은 아래에서 올라오고, 폰은 0.9배에서 1배로 커진다(예전 메인 효과) */
+.story__list {
+  opacity: var(--c);
+  transform: translateY(calc((1 - var(--c)) * 24px));
+}
+
+.story__visual {
+  opacity: var(--c);
+  transform: translateY(calc((1 - var(--c)) * 20px)) scale(calc(0.9 + var(--c) * 0.1));
+}
+
+.story__sticky {
+  position: sticky;
+  top: var(--bar-h, 68px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(32px, 5vw, 80px);
+  max-width: 1120px;
+  height: calc(100vh - var(--bar-h, 68px));
+  height: calc(100dvh - var(--bar-h, 68px));
+  margin: 0 auto;
+  padding: 0 clamp(20px, 4vw, 48px);
+  color: var(--fg);
+}
+
+.story__title {
+  margin-bottom: 32px;
+  font-size: clamp(30px, 3vw, 44px);
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: -0.04em;
+}
+
+/* 서비스 목록(토스 같은 아코디언) */
+.svc-acc {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+.svc-acc li {
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  transition: background 0.3s, border-radius 0.3s;
+}
+
+/* 펼쳐진 항목 — 연한 파랑 카드(--sel) + 파랑 제목(--pri). 블랙 테마 색은 토큰이 바꾼다 */
+.svc-acc li.is-on {
+  border-bottom-color: transparent;
+  border-radius: 16px;
+  background: var(--sel);
+}
+
+.svc-acc__head {
+  display: block;
+  width: 100%;
+  padding: 16px 0;
+  border: 0;
+  background: none;
+  color: var(--mut2);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.svc-acc__head:hover,
+.svc-acc li.is-on .svc-acc__head {
+  color: var(--fg);
+}
+
+.svc-acc li.is-on .svc-acc__head {
+  padding-bottom: 6px;
+  color: var(--pri);
+  font-size: 19px;
+}
+
+/* 펼침 — 높이를 grid 0fr → 1fr로 바꿔 부드럽게 연다 */
+.svc-acc__body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.svc-acc__body > div {
+  overflow: hidden;
+}
+
+.svc-acc li.is-on .svc-acc__body {
+  grid-template-rows: 1fr;
+}
+
+.svc-acc__body p {
+  margin: 0 0 14px;
+  color: var(--mut);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.svc-acc__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.svc-acc__cta span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--pri);
+  color: var(--pri-fg);
+  font-size: 12px;
+}
+
+.svc-acc__cta:hover {
+  background: var(--line);
+}
+
+/* 오른쪽 폰 — 화면 높이에 맞춰 크기를 줄인다(폰 틀은 296×612 고정이라 zoom으로 맞춤) */
+.story__visual {
+  display: flex;
+  justify-content: center;
+}
+
+.story__phone {
+  zoom: 1;
+}
+
+@media (max-height: 860px) {
+  .story__phone { zoom: 0.85; }
+}
+
+@media (max-height: 720px) {
+  .story__phone { zoom: 0.7; }
+}
+
+/* 정면 → 사선(위로 12°, 옆으로 -24°, 화면 쪽으로 8°) — 뒤쪽 겹(phone3d__edge)이 옆면 두께처럼 보인다 */
+.story__phone .phone3d--tilt {
+  transform: perspective(2400px) rotateX(calc(var(--t) * 12deg)) rotateY(calc(var(--t) * -24deg)) rotateZ(calc(var(--t) * 8deg));
+}
+
+/* 폰 화면 겹침 — 앱 첫 화면과 서비스 미리보기를 겹쳐 두고, 지금 것만 부드럽게 나타난다 */
+.story__screens {
+  position: relative;
+  height: 100%;
+}
+
+.story__screen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.35s ease-out, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.story__screen.is-on {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .svc-acc__body,
+  .story__screen {
+    transition: none;
+  }
+}
+
+/* 모바일(767px 이하) — 위(폰)·아래(목록)로 쌓아 겹치지 않게 한다 */
+@media (max-width: 767px) {
+  .story__sticky {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: start;
+    align-items: start;
+    gap: 12px;
+    padding: 16px 20px;
+  }
+
+  .story__visual {
+    order: -1;
+  }
+
+  /* 폰은 화면 높이의 절반 아래로(612px × 0.55 ≈ 340px) */
+  .story__phone {
+    zoom: 0.55;
+  }
+
+  .story__title {
+    margin-bottom: 12px;
+    font-size: 24px;
+  }
+
+  .svc-acc__head {
+    padding: 10px 0;
+    font-size: 15px;
+  }
+
+  .svc-acc li.is-on .svc-acc__head {
+    font-size: 16px;
+  }
+
+  .svc-acc__body p {
+    font-size: 14px;
+  }
+}

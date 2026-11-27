@@ -42,14 +42,22 @@ def main(source_path=None,report_dir=None):
         src_report=f'pass: {mine.shape[1]+1} columns including identifier x {len(mine)} rows identical to {Path(source_path).name}'
     cfgv=json.loads((ROOT/'extension_config.json').read_text())
     capv=p.annual_income_krw-p.annual_debt_service_krw+np.rint(cfgv['expense_drawdown_fraction']*p.liquid_assets_krw)
-    assert ((sums.expense_total_krw<=capv)|(p.exceeds_drawdown_limit==1)).all()  # every customer is within the cap or explicitly flagged
+    rules=cfgv.get('input_rules') or {}
+    capped=not (rules.get('enabled') and not rules.get('expense_cap_enabled',True))
+    if capped:
+        assert ((sums.expense_total_krw<=capv)|(p.exceeds_drawdown_limit==1)).all()  # every customer is within the cap or explicitly flagged
+    else:
+        # v3.7.0: 지출 상한 대신 지출 비율 상한과 상환 부담률 상한(소득 하한)을 확인한다. 1원 반올림 오차만 허용한다.
+        assert (sums.expense_total_krw<=p.annual_income_krw*rules['expense_ratio_max']+1).all()
+        assert (p.annual_debt_service_krw<=p.annual_income_krw*rules['income_floor_dsr_range'][1]+1).all()
     # Funding-shortfall flags recomputed from saved monthly data; flagged customers must be exactly those whose spending the cap could not hold.
     short=np.maximum(-h.groupby('customer_id').net_cash_krw.sum().loc[p.index],0)
     lim=np.rint(cfgv['expense_drawdown_fraction']*p.liquid_assets_krw)
     assert np.array_equal(short,p.annual_shortfall_krw)
     assert np.array_equal((short>lim).astype(int),p.exceeds_drawdown_limit)
     assert np.array_equal((short>p.liquid_assets_krw).astype(int),p.liquid_assets_insufficient)
-    assert (sums.expense_total_krw[p.exceeds_drawdown_limit==1]<=cfgv['minimum_annual_living_expense_krw']).all()  # shortfall only where floor applied
+    if capped:
+        assert (sums.expense_total_krw[p.exceeds_drawdown_limit==1]<=cfgv['minimum_annual_living_expense_krw']).all()  # shortfall only where floor applied
     assert (p.liquid_assets_insufficient<=p.exceeds_drawdown_limit).all()
     # Month-end liquid balance recomputed independently from saved monthly net cash.
     hb=h.assign(bal=h.net_cash_krw.groupby(h.customer_id).cumsum()+h.customer_id.map(p.liquid_assets_krw))
@@ -62,7 +70,7 @@ def main(source_path=None,report_dir=None):
     assert (p.min_liquid_balance_krw<=p.ending_liquid_balance_krw).all()
     rho=p.annual_income_krw.corr(b.set_index('식별구분').loc[p.index].L00000002,method='spearman')
     assert rho>0.4, rho  # income-debt link at configured copula rho=0.5
-    report={'expense_cap_within_or_flagged':'pass','shortfall_flags_recomputed':'pass','liquid_balance_recomputed':'pass','income_debt_spearman':round(float(rho),3),'source_fields_preserved':src_report,'saved_income_totals':'pass','saved_expense_ratio':'pass','saved_debt_service_totals':'pass','cashflow_identity':'pass','thousand_to_won_conversion':'pass','same_seed_reproducibility':'pass','target_changes_do_not_change_features':'pass','zero_weight_integer_allocation':'pass','generation_seeds':[20261029,20261030,20261031],'generation_sensitivity':rows}
+    report={('expense_cap_within_or_flagged' if capped else 'input_rule_limits'):'pass','shortfall_flags_recomputed':'pass','liquid_balance_recomputed':'pass','income_debt_spearman':round(float(rho),3),'source_fields_preserved':src_report,'saved_income_totals':'pass','saved_expense_ratio':'pass','saved_debt_service_totals':'pass','cashflow_identity':'pass','thousand_to_won_conversion':'pass','same_seed_reproducibility':'pass','target_changes_do_not_change_features':'pass','zero_weight_integer_allocation':'pass','generation_seeds':[20261029,20261030,20261031],'generation_sensitivity':rows}
     if report_dir is not None:
         report_dir=Path(report_dir);report_dir.mkdir(parents=True,exist_ok=True)
         csv_path=report_dir/'generation_sensitivity.csv';json_path=report_dir/'independent_checks.json'

@@ -20,7 +20,7 @@
 
 | 라벨 | 파일 | 정의 |
 |---|---|---|
-| `label_any_delinquency_12m` | `profiles.csv` | 가상 향후 12개월 중 연체가 발생한 월이 1개월 이상. 부도확률이 아니다. 기존 집단은 원본 학원 생성기의 라벨, 씬파일 집단은 원장 위험요인과 미래 신용 사용 가정으로 새로 만든 라벨이다(`THINFILE.md`) |
+| `label_any_delinquency_12m` | `profiles.csv` | 가상 향후 12개월 중 연체 발생 여부. 부도확률이 아니다. v3.7.0부터 원본 logit(기존 집단은 원본 학원 생성기, 씬파일은 원장 위험요인과 미래 신용 사용 가정, `THINFILE.md`)에 상환 부담률·소득 대비 잔액·지출 비율·적자·소득 등의 가정 효과를 더해 다시 뽑는다(`reference/delinquency_label.json`, `build_delinquency_label.py`). 원래 라벨은 `labels_delinquency_metadata.csv`(모델 입력 금지)에 남는다 |
 | `label_nonfin_effect_12m` | `labels_nonfinancial.csv` | 같은 정의에 통신·공과금 미납(승산비 2.5), 약한 현금흐름 효과, 국민연금·건강보험 비정시 납부(승산비 2.0, v3.5.0), 간편결제 규칙성(사용자 안 표준점수당 로짓 −0.15, v3.5.0)을 가정해 넣은 라벨. 기존 라벨은 그대로 둔다(`NONFINANCIAL_LABEL.md`) |
 
 두 집단의 라벨은 생성 방식이 다르므로 합쳐 쓸 때는 `cohort`로 구분하고 집단별 결과를 함께 본다.
@@ -121,7 +121,8 @@
 
 - 고객 ID 단위(고객 한 명은 한 구분에만), 비율 70/15/15, 직군(`segment`) × `label_any_delinquency_12m` 층화, legacy·thinfile 각각, seed 20261114(폴더마다 `[seed, 폴더 순번]`). 설정은 `reference/data_split.json`.
 - 칸마다 고객 ID를 정렬한 뒤 섞고, 비율 × 칸 크기를 내림한 다음 남는 수를 나머지가 큰 구분부터(같으면 TRAIN·VALID·TEST 순) 1명씩 준다.
-- 실측: legacy 8,400 / 1,800 / 1,800, thinfile 1,680 / 361 / 359. 가장 작은 칸의 TEST는 legacy 11명, thinfile 7명(자영업자 × 연체 45명 칸)이다.
+- **v3.7.0.** 기존 집단은 이전 버전의 12,000명(`reference/previous_cohort_ids.csv`, 시험 결과를 본 고객 포함)을 모두 TRAIN에 두고, 칸 전체 크기의 15%씩인 VALID·TEST를 나머지 고객에서만 뽑는다. 씬파일은 원래 라벨(`labels_delinquency_metadata.csv`의 `original_label`)로 층화해 이전 분할과 같다.
+- 실측(v3.7.0): legacy 97,543 / 20,903 / 20,901, thinfile 1,680 / 361 / 359.
 - 보조 라벨 `label_nonfin_effect_12m`과 씬파일 `cohort`는 층화하지 않았다. 구분별 분포는 `verify/verify_data_split.py` 출력에 남는다.
 - 모델 표에서는 `dataset` 바로 뒤 열이고 `role = split`(학습에 쓰지 않음)이다. 성능 비교는 `TEST`만 쓰고, 씬파일은 `eval_future_credit_exposure = 1`인 고객만 쓴다(TEST 359명 중 246명). DB `EVAL_ELIGIBLE_YN = Y`는 TEST 표시일 뿐이므로 씬파일 비교에는 이 조건을 따로 건다.
 

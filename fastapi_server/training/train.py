@@ -67,9 +67,10 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=config.DEFAULT_OUT_DIR, help="모델·설명 파일을 저장할 폴더")
     parser.add_argument("--with-thinfile", action="store_true", help="씬파일(노출 1) TRAIN 행을 학습에 더한다(결측을 학습시키는 c안). 씬파일 TRAIN은 평가에 쓰지 않는다")
     parser.add_argument("--monotone", action="store_true", help="config.MONOTONE_CONSTRAINTS의 피처에 단조 제약을 건다(후보 B, 8개 피처)")
+    parser.add_argument("--monotone-set", choices=sorted(config.MONOTONE_SETS), help="단조 제약 목록을 고른다(v03 = 모델 0.3, 정의서 C33). 주면 --monotone 없이도 제약을 건다")
     parser.add_argument("--model-version", default=config.MODEL_VERSION, help="설명 파일에 적을 모델 버전(기본은 config 값, 0.2를 만들 때만 바꾼다)")
     args = parser.parse_args()
-    monotone = config.MONOTONE_CONSTRAINTS if args.monotone else None
+    monotone = config.MONOTONE_SETS[args.monotone_set] if args.monotone_set else config.MONOTONE_CONSTRAINTS if args.monotone else None
 
     train, valid, thin_valid, data_info = load_training_sets(args.data_dir, args.with_thinfile)
     thin_text = f" + 씬파일 TRAIN {data_info['train_rows_thinfile']}행, 씬파일 VALID {len(thin_valid)}행" if args.with_thinfile else ""
@@ -107,7 +108,8 @@ def main() -> None:
                           "expense_avg_max_krw": config.EXPENSE_AVG_MAX_KRW,
                           "debt_service_min_krw": config.DEBT_SERVICE_MIN_KRW},
             "preprocess": "C8 상한 밖 값과 파생 열을 결측으로 둠(정의서 C19 전처리 (나)), 범주형은 고정 부호표, 남은 결측은 모델이 처리",
-            "options": {"with_thinfile": bool(args.with_thinfile), "monotone": bool(monotone)},
+            "options": {"with_thinfile": bool(args.with_thinfile), "monotone": bool(monotone),
+                        **({"monotone_set": args.monotone_set} if args.monotone_set else {})},
             "monotone_constraints": dict(monotone) if monotone else None,
             "data": {"table_sha256": data_info["table_sha256"], "train_rows": int(len(train)), "valid_rows": int(len(valid)),
                      **{key: value for key, value in data_info.items() if "thinfile" in key or key == "train_rows_legacy"}},
