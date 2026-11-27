@@ -59,26 +59,43 @@ public class ClientRateLimiter {
         if (window.count() > rule.limit) throw tooMany(rule, window);
     }
 
-    // 세지 않고 이미 limit에 닿았는지만 본다(로그인은 요청 전에 이것을 보고, 실패했을 때만 record로 센다).
-    public void check(Rule rule, String clientIp) {
-        Window window = windows.get(key(rule, clientIp));
-        if (window != null && !expired(rule, window) && window.count() >= rule.limit) throw tooMany(rule, window);
-    }
-
-    // 한 번 센다(로그인 실패).
-    public void record(Rule rule, String clientIp) {
-        add(rule, clientIp);
-    }
-
-    // 로그인·간편 로그인 연결처럼 실패만 세는 요청을 감싼다 — 이미 넘었으면 429, 요청이 401(아이디·비밀번호 틀림)로 끝나면 한 번 센다.
+    // 로그인·간편 로그인 연결처럼 실패만 세는 요청을 감싼다 — 결과적으로 401(아이디·비밀번호 틀림)로 끝난 요청만 센다.
+    // FP-258 PR #173 요청 전에 먼저 한 자리를 원자적으로 잡고(이미 limit이면 잡지 않고 429), 401이 아니면(성공·429·423·400 등) 잡은 자리를 돌려준다.
+    //   먼저 잡으므로 동시에 몰린 요청도 limit개까지만 비밀번호 확인에 들어간다(나중에 세면 동시 요청이 모두 검사를 통과한다).
     public <T> T countFailures(Rule rule, String clientIp, Supplier<T> action) {
-        check(rule, clientIp);
+        Instant start = reserve(rule, clientIp);
+        boolean failed = false;
         try {
             return action.get();
         } catch (ApiException e) {
-            if (e.getStatus() == HttpStatus.UNAUTHORIZED) record(rule, clientIp);
+            failed = e.getStatus() == HttpStatus.UNAUTHORIZED;
             throw e;
+        } finally {
+            if (!failed) release(rule, clientIp, start);
         }
+    }
+
+    // 한 자리를 잡고 그 창의 시작 시각을 돌려준다. 이미 limit만큼 찼으면 바꾸지 않고 429.
+    private Instant reserve(Rule rule, String clientIp) {
+        if (windows.size() > CLEANUP_THRESHOLD) windows.entrySet().removeIf((entry) -> expired(ruleOf(entry.getKey()), entry.getValue()));
+        Instant now = clock.instant();
+        Window[] full = new Window[1];
+        Window window = windows.compute(key(rule, clientIp), (k, old) -> {
+            Window current = old == null || expired(rule, old) ? new Window(now, 0) : old;
+            if (current.count() >= rule.limit) {
+                full[0] = current;
+                return current;
+            }
+            return new Window(current.start(), current.count() + 1);
+        });
+        if (full[0] != null) throw tooMany(rule, full[0]);
+        return window.start();
+    }
+
+    // 잡은 자리를 돌려준다. 그사이 창이 바뀌었으면(시간이 지나 새 창) 건드리지 않는다.
+    private void release(Rule rule, String clientIp, Instant start) {
+        windows.computeIfPresent(key(rule, clientIp),
+                (k, window) -> window.start().equals(start) && window.count() > 0 ? new Window(window.start(), window.count() - 1) : window);
     }
 
     private Window add(Rule rule, String clientIp) {

@@ -1,4 +1,5 @@
 import { ApiError } from '../../../common/api/ApiError.js'
+import { ADMIN_ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES } from '../../auth/authConstants.js'
 import { MOCK_EMAIL_CODE } from '../../auth/mocks/authMockData.js'
 import { RESEND_WAIT_SECONDS } from '../adminConstants.js'
 import { maskEmail } from './adminMockMasking.js'
@@ -36,6 +37,10 @@ export function consumeAdminLoginChallenge(challengeToken, code) {
   }
   if (saved.expiresAt < Date.now()) {
     throw new ApiError(400, '인증번호가 만료되었습니다. 인증번호를 다시 받아 주세요.', { code: 'VERIFICATION_CODE_EXPIRED' })
+  }
+  // FP-258 PR #173 2단계 인증 중에 잠긴 관리자는 관리자 안내(423 ADMIN_ACCOUNT_LOCKED, 서버 verifyLogin과 같은 순서: 번호 확인 전).
+  if (saved.account.locked) {
+    throw new ApiError(423, ADMIN_ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ADMIN_ACCOUNT_LOCKED })
   }
   if (code !== MOCK_EMAIL_CODE) {
     throw new ApiError(400, '인증번호가 올바르지 않습니다.', { code: 'INVALID_VERIFICATION_CODE' })

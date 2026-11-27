@@ -1,7 +1,6 @@
 package com.baeksuescape.user.service;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,11 +55,12 @@ public class AuthService {
     private final Clock clock;
     private final AdminAuthService adminAuth;
     private final SystemLogService systemLog;
+    private final LoginAttemptService loginAttempts;
 
     public AuthService(UserAccountMapper userMapper, UserConsentMapper consentMapper, UserSocialAccountMapper socialMapper,
             EmailVerificationService emailVerification, PhoneVerificationService phoneVerification, DevSocialStore socialStore,
             UserViewFactory userViews, JwtTokenProvider tokenProvider, PasswordEncoder passwordEncoder, PiiCrypto crypto, PiiHmac hmac, Clock clock,
-            AdminAuthService adminAuth, SystemLogService systemLog) {
+            AdminAuthService adminAuth, SystemLogService systemLog, LoginAttemptService loginAttempts) {
         this.userMapper = userMapper;
         this.consentMapper = consentMapper;
         this.socialMapper = socialMapper;
@@ -75,11 +75,12 @@ public class AuthService {
         this.clock = clock;
         this.adminAuth = adminAuth;
         this.systemLog = systemLog;
+        this.loginAttempts = loginAttempts;
     }
 
     // AUTH-01 로그인. 일반 사용자는 토큰을 준다(응답 그대로).
     // FP-80 관리자는 비밀번호가 맞아도 토큰을 주지 않고, 업무 이메일로 6자리 번호를 보낸 뒤 2단계 인증 대기 응답을 준다(AUTH-11로 이어짐).
-    @Transactional(noRollbackFor = ApiException.class)
+    // FP-258 PR #173 트랜잭션을 걸지 않는다 — 계정 행 잠금은 authenticate 안(LoginAttemptService)에서만 쥐고, 성공 처리·로그는 그 뒤에 한다.
     public AuthResponses.LoginResult login(AuthRequests.Login request) {
         UserAccount account = authenticate(request.loginId(), request.password());
         if (account.isAdmin()) {
@@ -88,58 +89,49 @@ public class AuthService {
         return loginResponse(account);
     }
 
-    // 아이디·비밀번호를 확인한다. 로그인과 간편 로그인 연결(AUTH-05)이 같은 규칙을 쓴다(FP-258 단계적 제한).
+    // 아이디·비밀번호를 확인한다. 로그인·관리자 로그인과 간편 로그인 연결(AUTH-05)이 같은 규칙을 쓴다(FP-258 단계적 제한).
     //   없는 계정·탈퇴·비밀번호 없는 계정·틀린 비밀번호 → 401(어느 쪽이 틀렸는지 알리지 않음)
     //   잠긴 계정은 횟수를 세지 않고, 비밀번호가 맞을 때만 423으로 알린다(프론트 mock과 같은 순서). 관리자는 423 ADMIN_ACCOUNT_LOCKED(FP-258).
-    //   5회째 실패하면 그때부터 5분 동안 비밀번호와 상관없이 429(제한 중에는 횟수를 올리지 않음). 10회째면 잠그고 423.
+    //   5회째 실패하면 그때부터 5분 동안 비밀번호와 상관없이 429(제한 중에는 횟수를 올리지 않음). 10회째면 잠그고 423(관리자는 ADMIN_ACCOUNT_LOCKED).
     //   FP-258 13차 같은 계정 행을 잠근(lockUser) 뒤 다시 읽은 횟수로 판단한다. 동시에 보낸 로그인은 커밋까지 줄을 서므로 실패 횟수가 덜 오르지 않는다(FP-290).
     //   lockUser가 MyBatis 1차 캐시를 비우므로(flushCache) 잠근 뒤 다시 읽은 값이 최신이다(13-1차 보완, 비우지 않으면 잠그기 전 값이 돌아왔다).
-    @Transactional(noRollbackFor = ApiException.class)
+    //   FP-258 PR #173 DB 처리는 LoginAttemptService 트랜잭션에서 끝내고, 실패 로그(REQUIRES_NEW)는 커넥션을 돌려준 뒤 여기서 남긴다.
+    //   부르는 쪽도 트랜잭션 밖에서 불러야 한다(트랜잭션 안에서 부르면 잠금과 커넥션을 그 트랜잭션 끝까지 쥔다).
     public UserAccount authenticate(String loginId, String password) {
-        // FP-258 가입 아이디는 소문자만 받으므로 소문자로 바꿔 조회한다.
-        String normalizedLoginId = AccountRules.normalizeLoginId(loginId);
-        UserAccount account = userMapper.selectByLoginId(normalizedLoginId);
-        if (account == null) throw AuthErrors.loginFailed();
-        userMapper.lockUser(account.getUserId());
-        account = userMapper.selectByLoginId(normalizedLoginId);
-        if (account == null || account.isWithdrawn() || account.getPasswordHash() == null) throw AuthErrors.loginFailed();
-        boolean passwordMatches = passwordEncoder.matches(password, account.getPasswordHash());
-        if (account.isLocked()) {
-            if (passwordMatches) throw account.isAdmin() ? AuthErrors.adminAccountLocked() : AuthErrors.accountLocked();
-            throw AuthErrors.loginFailed();
+        LoginAttemptService.Attempt attempt = loginAttempts.attempt(loginId, password);
+        UserAccount account = attempt.account();
+        switch (attempt.outcome()) {
+            case SUCCESS:
+                return account;
+            case REJECTED:
+                throw AuthErrors.loginFailed();
+            case LOCKED:
+                throw lockedError(account);
+            case BLOCKED:
+                throw AuthErrors.loginTemporarilyBlocked(attempt.blockedMinutes());
+            default:
+                break;
         }
-        LocalDateTime now = LocalDateTime.now(clock);
-        long blockedMinutes = remainingBlockMinutes(account, now);
-        if (blockedMinutes > 0) throw AuthErrors.loginTemporarilyBlocked(blockedMinutes);
-        if (!passwordMatches) {
-            int failures = account.getLoginFailCount() + 1;
-            boolean lock = failures >= MAX_LOGIN_FAILURES;
-            userMapper.updateLoginFailure(account.getUserId(), failures, lock, now);
-            // FP-80 N-28-1 로그인 실패 n/10회(WARN), 5회째 5분 제한, 10회째 자동 잠금. 아이디는 가린 값만 남긴다.
-            String masked = SystemLogService.maskLoginId(account.getLoginId());
-            systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 실패 " + failures + "/" + MAX_LOGIN_FAILURES + "회 (" + masked + ")",
+        // FP-80 N-28-1 로그인 실패 n/10회(WARN), 5회째 5분 제한, 10회째 자동 잠금. 아이디는 가린 값만 남긴다.
+        String masked = SystemLogService.maskLoginId(account.getLoginId());
+        systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 실패 " + attempt.failures() + "/" + MAX_LOGIN_FAILURES + "회 (" + masked + ")",
+                account.getUserId());
+        if (attempt.outcome() == LoginAttemptService.Outcome.AUTO_LOCKED) {
+            systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 " + MAX_LOGIN_FAILURES + "회 실패로 계정 자동 잠금 (" + masked + ")",
                     account.getUserId());
-            if (lock) {
-                systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 " + MAX_LOGIN_FAILURES + "회 실패로 계정 자동 잠금 (" + masked + ")",
-                        account.getUserId());
-                throw AuthErrors.accountLocked();
-            }
-            if (failures == TEMP_BLOCK_FAILURES) {
-                systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE,
-                        "로그인 " + TEMP_BLOCK_FAILURES + "회 실패로 " + TEMP_BLOCK_MINUTES + "분 제한 (" + masked + ")", account.getUserId());
-                throw AuthErrors.loginTemporarilyBlocked(TEMP_BLOCK_MINUTES);
-            }
-            throw AuthErrors.loginFailed();
+            throw lockedError(account);
         }
-        return account;
+        if (attempt.outcome() == LoginAttemptService.Outcome.TEMP_BLOCKED) {
+            systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE,
+                    "로그인 " + TEMP_BLOCK_FAILURES + "회 실패로 " + TEMP_BLOCK_MINUTES + "분 제한 (" + masked + ")", account.getUserId());
+            throw AuthErrors.loginTemporarilyBlocked(TEMP_BLOCK_MINUTES);
+        }
+        throw AuthErrors.loginFailed();
     }
 
-    // FP-258 5분 제한의 남은 분(올림). 실패가 정확히 5회이고 마지막 실패 시각(LAST_LOGIN_FAIL_AT)에서 5분이 안 지났을 때만 0보다 크다.
-    private static long remainingBlockMinutes(UserAccount account, LocalDateTime now) {
-        if (account.getLoginFailCount() != TEMP_BLOCK_FAILURES || account.getLastLoginFailAt() == null) return 0;
-        long seconds = Duration.between(now, account.getLastLoginFailAt().plusMinutes(TEMP_BLOCK_MINUTES)).getSeconds();
-        if (seconds <= 0) return 0;
-        return (seconds + 59) / 60;
+    // FP-258 잠긴 계정 안내 — 관리자는 다른 관리자에게 풀어 달라는 문구(423 ADMIN_ACCOUNT_LOCKED), 회원은 비밀번호 찾기 안내(423 ACCOUNT_LOCKED).
+    private static ApiException lockedError(UserAccount account) {
+        return account.isAdmin() ? AuthErrors.adminAccountLocked() : AuthErrors.accountLocked();
     }
 
     // 로그인 성공 처리(실패 횟수 0, 마지막 로그인 시각)와 응답. 간편 로그인도 쓴다.
@@ -257,16 +249,15 @@ public class AuthService {
         else if (!AccountRules.isValidEmail(r.email().strip())) errors.add(new FieldErrorItem("email", "이메일 형식이 올바르지 않습니다. 예) name@example.com"));
         else if (isBlank(r.emailVerificationToken())) errors.add(new FieldErrorItem("email", "이메일 인증을 완료해 주세요."));
         if (isBlank(r.password())) errors.add(new FieldErrorItem("password", "비밀번호를 입력해 주세요."));
-        else if (!AccountRules.isValidPassword(r.password())) errors.add(new FieldErrorItem("password", "비밀번호 규칙을 모두 지켜 주세요."));
+        else {
+            String passwordError = AccountRules.newPasswordError(r.password(), "비밀번호 규칙을 모두 지켜 주세요.");
+            if (passwordError != null) errors.add(new FieldErrorItem("password", passwordError));
+        }
         String birthYearError = AccountRules.birthYearError(r.birthYear(), thisYear);
         if (birthYearError != null) errors.add(new FieldErrorItem("birthYear", birthYearError));
-        // FP-258 13차 필수 동의 2개를 따로 받으면 칸도 따로 알린다. 예전 요청(agreeCreditInfo 하나)은 지금처럼 그 칸으로 알린다.
-        if (r.separateConsents()) {
-            if (!r.termsAgreed()) errors.add(new FieldErrorItem("agreeTerms", "필수 동의 항목입니다."));
-            if (!r.privacyAgreed()) errors.add(new FieldErrorItem("agreePrivacy", "필수 동의 항목입니다."));
-        } else if (!Boolean.TRUE.equals(r.agreeCreditInfo())) {
-            errors.add(new FieldErrorItem("agreeCreditInfo", "필수 동의 항목입니다."));
-        }
+        // FP-258 PR #173 필수 동의 2개는 각각 true여야 한다(예전 agreeCreditInfo 하나로 대신하지 않는다). 빠진 칸마다 알린다.
+        if (!Boolean.TRUE.equals(r.agreeTerms())) errors.add(new FieldErrorItem("agreeTerms", "필수 동의 항목입니다."));
+        if (!Boolean.TRUE.equals(r.agreePrivacy())) errors.add(new FieldErrorItem("agreePrivacy", "필수 동의 항목입니다."));
         if (!errors.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", errors.get(0).message(), errors);
     }
 
@@ -318,9 +309,9 @@ public class AuthService {
     public void resetPassword(AuthRequests.PasswordReset request) {
         // 이름 형식(가입과 같은 규칙)을 먼저 본다.
         AuthErrors.requireValidName(request.name());
-        if (!AccountRules.isValidPassword(request.newPassword())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "비밀번호 규칙을 지켜 주세요.",
-                    List.of(new FieldErrorItem("newPassword", "비밀번호 규칙을 지켜 주세요.")));
+        String passwordError = AccountRules.newPasswordError(request.newPassword(), "비밀번호 규칙을 지켜 주세요.");
+        if (passwordError != null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", passwordError, List.of(new FieldErrorItem("newPassword", passwordError)));
         }
         String email = AccountRules.normalizeEmail(request.email());
         UserAccount account = userMapper.selectUserByLoginIdAndEmailHmac(AccountRules.normalizeLoginId(request.loginId()), hmac.email(email));

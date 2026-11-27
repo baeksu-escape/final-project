@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.transaction.support.TransactionOperations;
 
 import com.baeksuescape.global.TestKeys;
 import com.baeksuescape.global.config.AvenueProperties;
@@ -58,7 +59,8 @@ class PhoneVerificationServiceTest {
     void setUp() {
         properties = TestKeys.properties();
         tokenService = new VerificationTokenService(properties, CLOCK);
-        service = new PhoneVerificationService(codeMapper, tokenService, (phone, code, purpose) -> sentCodes.add(code), ENCODER, HMAC, properties, CLOCK);
+        service = new PhoneVerificationService(codeMapper, tokenService, (phone, code, purpose) -> sentCodes.add(code), ENCODER, HMAC, properties, CLOCK,
+                new CodeSendGuard(TransactionOperations.withoutTransaction()));
     }
 
     private static String codeOf(Runnable action) {

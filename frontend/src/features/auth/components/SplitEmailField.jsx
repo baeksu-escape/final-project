@@ -25,7 +25,7 @@ const IDLE_FLOW = { target: null, status: 'idle', message: '', codeOpen: false }
 //     error={errors.email}
 //   />
 //   FP-258 앞부분·직접 입력 도메인은 filterEmailLocal·filterEmailDomain으로 거른다(한글 조합은 끝날 때, useImeSafeFilter).
-//   FP-258 rule="existing"(아이디·비밀번호 찾기): 이미 가입한 이메일(+ 등)을 찾는 칸이라 앞부분은 filterExistingEmailLocal(영문·숫자·. _ % + -)로,
+//   FP-258 rule="existing"(아이디·비밀번호 찾기): 이미 가입한 이메일(+ ' 등)을 찾는 칸이라 앞부분은 filterExistingEmailLocal(공백·@만 지움)로,
 //   직접 입력 도메인은 가입과 같은 filterEmailDomain으로 거르고, 판정은 기본 형식(isBasicEmail)만 본다.
 //   문구는 한 번에 하나만 보인다: 완료 / (실패 > 부모 오류 > 발송 안내). 이메일을 고치면 발송·코드·오류·안내를 모두 비운다.
 //   FP-258 beforeRequest: [받기]·[확인] 요청 전에 부른다. false를 돌려주면 보내지 않는다(아이디·비밀번호 찾기의 이름 검사). 없으면 그대로 보낸다.

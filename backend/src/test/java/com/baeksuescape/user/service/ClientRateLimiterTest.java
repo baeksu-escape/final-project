@@ -7,6 +7,14 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -95,6 +103,66 @@ class ClientRateLimiterTest {
                     assertThat(e.getMessage()).isEqualTo("로그인 시도가 너무 많습니다. 10분 뒤에 다시 시도해 주세요.");
                 });
         clock.advance(Duration.ofMinutes(10));
+        assertThat(limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> "ok")).isEqualTo("ok");
+    }
+
+    // FP-258 PR #173 동시에 몰린 로그인 실패도 limit(20)개까지만 비밀번호 확인에 들어가고, 나머지는 요청 전에 429.
+    @Test
+    void 동시에_몰린_로그인_실패도_20개까지만_확인하고_나머지는_요청_전에_429() throws Exception {
+        int threads = 40;
+        AtomicInteger entered = new AtomicInteger();
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch allIn = new CountDownLatch(Rule.LOGIN_FAILURE.limit);
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        List<Future<String>> results = new ArrayList<>();
+        try {
+            for (int i = 0; i < threads; i++) {
+                results.add(pool.submit(() -> {
+                    start.await();
+                    try {
+                        return limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> {
+                            entered.incrementAndGet();
+                            allIn.countDown();
+                            // 들어온 요청은 limit개가 모두 들어올 때까지 붙잡아 둔다(나중에 세는 방식이면 여기서 limit을 넘는다).
+                            try {
+                                allIn.await(2, TimeUnit.SECONDS);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                            throw AuthErrors.loginFailed();
+                        });
+                    } catch (ApiException e) {
+                        return e.getCode();
+                    }
+                }));
+            }
+            start.countDown();
+            List<String> codes = new ArrayList<>();
+            for (Future<String> result : results) codes.add(result.get(10, TimeUnit.SECONDS));
+
+            assertThat(entered.get()).isEqualTo(Rule.LOGIN_FAILURE.limit);
+            assertThat(codes).filteredOn("LOGIN_FAILED"::equals).hasSize(Rule.LOGIN_FAILURE.limit);
+            assertThat(codes).filteredOn("TOO_MANY_REQUESTS"::equals).hasSize(threads - Rule.LOGIN_FAILURE.limit);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    // FP-258 PR #173 먼저 잡은 자리는 401이 아니면(성공·5분 제한 429·잠금 423) 돌려주므로, 그런 요청이 많아도 실패 한도를 쓰지 않는다.
+    @Test
+    void 성공과_401이_아닌_오류는_먼저_잡은_자리를_돌려준다() {
+        for (int i = 0; i < 30; i++) limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> "ok");
+        for (int i = 0; i < 30; i++) {
+            assertThatThrownBy(() -> limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> {
+                throw AuthErrors.loginTemporarilyBlocked(5);
+            })).isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("LOGIN_TEMPORARILY_BLOCKED"));
+        }
+        for (int i = 0; i < 19; i++) {
+            assertThatThrownBy(() -> limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> {
+                throw AuthErrors.loginFailed();
+            })).isInstanceOf(ApiException.class);
+        }
+        // 실패는 19번이라 20번째 요청도 들어간다.
         assertThat(limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> "ok")).isEqualTo("ok");
     }
 }

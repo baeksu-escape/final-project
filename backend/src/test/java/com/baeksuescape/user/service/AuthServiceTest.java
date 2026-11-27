@@ -32,6 +32,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.support.TransactionOperations;
 
 import com.baeksuescape.admin.service.AdminAuthService;
@@ -76,7 +77,8 @@ class AuthServiceTest {
     void setUp() {
         service = new AuthService(userMapper, consentMapper, socialMapper, emailVerification, phoneVerification, socialStore,
                 new UserViewFactory(userMapper, CRYPTO), tokenProvider, ENCODER, CRYPTO, HMAC, CLOCK, adminAuth,
-                new SystemLogService(systemLogMapper, TransactionOperations.withoutTransaction(), CLOCK));
+                new SystemLogService(systemLogMapper, TransactionOperations.withoutTransaction(), CLOCK),
+                new LoginAttemptService(userMapper, ENCODER, CLOCK));
     }
 
     private static String codeOf(Runnable action) {
@@ -252,6 +254,22 @@ class AuthServiceTest {
         verify(userMapper, never()).updateLoginFailure(anyLong(), anyInt(), anyBoolean(), any());
     }
 
+    // FP-258 PR #173 관리자가 10회째 실패로 잠기는 순간에도 회원용(비밀번호 찾기) 안내가 아니라 관리자 안내다. 잠금 기록은 회원과 같다.
+    @Test
+    void 관리자가_10회째_실패로_잠기면_423_ADMIN_ACCOUNT_LOCKED() {
+        UserAccount admin = UserFixtures.account(1L, "admin", UserAccount.ROLE_ADMIN, UserAccount.ACTIVE);
+        admin.setLoginFailCount(9);
+        given(userMapper.selectByLoginId("admin")).willReturn(admin);
+        assertThatThrownBy(() -> service.login(new AuthRequests.Login("admin", "wrong1234")))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getStatus().value()).isEqualTo(423);
+                    assertThat(e.getCode()).isEqualTo("ADMIN_ACCOUNT_LOCKED");
+                });
+        verify(userMapper).updateLoginFailure(eq(1L), eq(10), eq(true), any());
+        verify(systemLogMapper).insertLog(eq("WARN"), eq("auth-service"), eq("로그인 10회 실패로 계정 자동 잠금 (ad***)"), eq(1L), any());
+        verify(adminAuth, never()).startLogin(any());
+    }
+
     // FP-80 관리자는 비밀번호가 맞아도 토큰을 주지 않고 2단계 인증 대기 응답(AdminAuthService.startLogin)으로 넘어간다.
     @Test
     void 관리자는_비밀번호가_맞아도_토큰_없이_2단계_인증으로_넘어간다() {
@@ -328,7 +346,7 @@ class AuthServiceTest {
     private static AuthRequests.Signup signup(String name, String nickname, Integer birthYear, String phone, Boolean agree, String socialLinkKey,
             String phoneToken) {
         return new AuthRequests.Signup("newbie01", name, nickname, phone, "Newbie@Example.com", "abcd1234", birthYear, "AGE_30S",
-                agree, null, "token", socialLinkKey, phoneToken, null, null);
+                null, "token", socialLinkKey, phoneToken, agree, agree);
     }
 
     private void givenInsertReturnsId(long userId) {
@@ -380,7 +398,7 @@ class AuthServiceTest {
 
     private static AuthRequests.Signup consentSignup(boolean terms, boolean privacy, boolean marketing) {
         return new AuthRequests.Signup("newbie01", "홍길동", "새닉네임", PHONE, "newbie@example.com", "abcd1234", 1990, "AGE_30S",
-                null, marketing, "token", null, PHONE_TOKEN, terms, privacy);
+                marketing, "token", null, PHONE_TOKEN, terms, privacy);
     }
 
     // FP-258 13차 N-02-4 서버도 새 비밀번호를 화면과 같은 규칙으로 본다 — 한글·이모지 같은 ASCII 밖 글자, 64자 초과는 password 칸 400. 공백·기호는 된다.
@@ -388,9 +406,13 @@ class AuthServiceTest {
     void 새_비밀번호는_ASCII_출력_문자_64자_이하만_받는다() {
         for (String password : new String[] { "abcd1234한", "abcd1234é", "abcd1234	", "a1" + "b".repeat(63) }) {
             AuthRequests.Signup request = new AuthRequests.Signup("newbie01", "홍길동", "새닉네임", PHONE, "newbie@example.com", password, 1990,
-                    "AGE_30S", true, null, "token", null, PHONE_TOKEN, null, null);
+                    "AGE_30S", null, "token", null, PHONE_TOKEN, true, true);
             assertThat(fieldOf(() -> service.signup(request))).as(password).isEqualTo("password");
         }
+        // FP-258 PR #173 64자를 넘으면 길이 안내 문구(화면 validation.js와 같음), 그 밖의 위반은 지금 문구.
+        assertThat(AccountRules.newPasswordError("a1" + "b".repeat(63), "규칙")).isEqualTo("비밀번호는 64자 이하로 입력해 주세요.");
+        assertThat(AccountRules.newPasswordError("abcd1234한", "규칙")).isEqualTo("규칙");
+        assertThat(AccountRules.newPasswordError("a1" + "b".repeat(62), "규칙")).isNull();
         assertThat(AccountRules.isValidPassword("ab cd!@#1234")).isTrue();
         assertThat(AccountRules.isValidPassword("a1" + "b".repeat(62))).isTrue();
     }
@@ -481,8 +503,20 @@ class AuthServiceTest {
 
     @Test
     void 필수_동의가_없거나_휴대폰_형식이_틀리면_칸별_오류() {
-        assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, PHONE, false, null)))).isEqualTo("agreeCreditInfo");
+        assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, PHONE, false, null)))).isEqualTo("agreeTerms");
         assertThat(fieldOf(() -> service.signup(signup("새닉네임", 1990, "02-123-4567", true, null)))).isEqualTo("phone");
+    }
+
+    // FP-258 PR #173 예전 화면처럼 agreeCreditInfo만 보내면(agreeTerms·agreePrivacy 없음) 필수 동의 두 칸 모두 400이고 가입하지 않는다.
+    @Test
+    void 필수_동의_두_항목이_없으면_agreeCreditInfo를_보내도_두_칸_모두_400() {
+        assertThatThrownBy(() -> service.signup(signup("새닉네임", 1990, PHONE, null, null)))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(e.getCode()).isEqualTo("INVALID_INPUT");
+                    assertThat(e.getFieldErrors()).extracting(item -> item.field()).containsExactly("agreeTerms", "agreePrivacy");
+                });
+        verify(userMapper, never()).insertUser(any());
     }
 
     // ---- 11/18 1차 시연 후속: 휴대폰 필수·인증, 이름 한글, 닉네임 중복 확인 ----
@@ -516,7 +550,7 @@ class AuthServiceTest {
         for (String email : new String[] { "홍길동@example.com", "a..b@example.com", ".ab@example.com", "ab.@example.com", "a+b@example.com",
                 "ab@ex_ample.com", "ab@-example.com", "ab@example.c", "ab@example.c1", "ab@example" }) {
             AuthRequests.Signup request = new AuthRequests.Signup("newbie01", "홍길동", "새닉네임", PHONE, email, "abcd1234", 1990, "AGE_30S",
-                    true, null, "token", null, PHONE_TOKEN, null, null);
+                    null, "token", null, PHONE_TOKEN, true, true);
             assertThat(fieldOf(() -> service.signup(request))).as(email).isEqualTo("email");
         }
         verify(userMapper, never()).insertUser(any());

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { TextInput } from '../../../common/components/index.js'
 import { requestPasswordReset } from '../api/authFeatureApi.js'
-import { EMAIL_PURPOSES } from '../authConstants.js'
+import { AUTH_ERROR_CODES, EMAIL_PURPOSES } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
 import PasswordField from '../components/PasswordField.jsx'
@@ -12,7 +12,16 @@ import { resolveEmailDomain } from '../emailParts.js'
 import useBlurCheck from '../useBlurCheck.js'
 import useImeSafeFilter from '../useImeSafeFilter.js'
 import usePasswordReveal from '../usePasswordReveal.js'
-import { filterLoginId, filterName, joinEmail, validateEmailParts, validateName, validateNewPassword } from '../validation.js'
+import {
+  PASSWORD_MAX,
+  PASSWORD_TOO_LONG_MESSAGE,
+  filterLoginId,
+  filterName,
+  joinEmail,
+  validateEmailParts,
+  validateName,
+  validateNewPassword,
+} from '../validation.js'
 import '../auth.css'
 
 // N-03 비밀번호 찾기 화면 — ① 아이디·이메일 인증 → ② 새 비밀번호 재설정 → ③ 완료 순서로 진행한다.
@@ -30,6 +39,8 @@ export default function FindPasswordPage() {
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [passwordErrors, setPasswordErrors] = useState({})
   const [formError, setFormError] = useState('')
+  // FP-258 PR #173 재설정 단계에서 인증이 풀려 되돌아왔을 때 인증 단계에 보이는 안내(다시 인증하면 지운다).
+  const [verifyNotice, setVerifyNotice] = useState('')
   const [pending, setPending] = useState(false)
   const { reveal, hideAll } = usePasswordReveal()
   const bindFilter = useImeSafeFilter()
@@ -81,6 +92,14 @@ export default function FindPasswordPage() {
       hideAll()
       setStep('done')
     } catch (error) {
+      // FP-258 PR #173 재설정 중에 인증 토큰이 만료·사용됐으면 인증을 비우고 인증 단계로 되돌려, [인증코드 받기]부터 다시 하게 안내한다.
+      if (error?.data?.code === AUTH_ERROR_CODES.EMAIL_VERIFICATION_REQUIRED) {
+        setVerification(null)
+        setPasswordErrors({})
+        setVerifyNotice(`${error.message} 인증코드를 다시 받아 확인한 뒤 [다음]을 눌러 주세요.`)
+        setStep('verify')
+        return
+      }
       setFormError(error.message)
     } finally {
       setPending(false)
@@ -111,7 +130,8 @@ export default function FindPasswordPage() {
             rule="new"
             value={password}
             onChange={setPassword}
-            error={passwordErrors.password}
+            // FP-258 PR #173 64자를 넘게 붙여 넣으면 제출 전에도 바로 알린다(잘라 내지 않는다).
+            error={password.length > PASSWORD_MAX ? PASSWORD_TOO_LONG_MESSAGE : passwordErrors.password}
             autoComplete="new-password"
             {...reveal('password')}
           />
@@ -168,9 +188,17 @@ export default function FindPasswordPage() {
             verified={verified}
             error={emailCheck.error}
             beforeRequest={() => checkName()}
-            onVerified={({ verificationToken }) => setVerification({ loginId: loginId.trim(), name: name.trim(), email, verificationToken })}
+            onVerified={({ verificationToken }) => {
+              setVerifyNotice('')
+              setVerification({ loginId: loginId.trim(), name: name.trim(), email, verificationToken })
+            }}
           />
         </div>
+        {verifyNotice && (
+          <p className="auth-form__error" role="alert">
+            {verifyNotice}
+          </p>
+        )}
         <button type="button" className="auth-form__submit" onClick={() => checkName() && setStep('reset')} disabled={!verified}>
           다음
         </button>

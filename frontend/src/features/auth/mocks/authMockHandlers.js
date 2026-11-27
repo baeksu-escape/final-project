@@ -177,6 +177,14 @@ function loginBlockedError(minutes) {
   return new ApiError(429, loginTemporarilyBlockedMessage(minutes), { code: AUTH_ERROR_CODES.LOGIN_TEMPORARILY_BLOCKED })
 }
 
+// FP-258 잠긴 계정 오류(423) — 관리자는 다른 관리자에게 풀어 달라는 안내(ADMIN_ACCOUNT_LOCKED), 회원은 비밀번호 찾기 안내(ACCOUNT_LOCKED).
+export function lockedAccountError(account) {
+  if (account.user.role === ROLES.ADMIN) {
+    return new ApiError(423, ADMIN_ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ADMIN_ACCOUNT_LOCKED })
+  }
+  return new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ACCOUNT_LOCKED })
+}
+
 // N-01 아이디·비밀번호 확인 — 로그인과 소셜 계정 연결(AUTH-05)이 같은 규칙을 쓴다(서버 AuthService.authenticate와 같은 순서). 맞으면 계정을 돌려준다.
 //   잠긴 계정은 비밀번호가 맞을 때만 423(관리자는 ADMIN_ACCOUNT_LOCKED), 5회째 실패부터 5분 동안 429(횟수는 그대로), 누적 10회째면 잠그고 423.
 export function authenticateMockAccount(loginId, password) {
@@ -185,10 +193,7 @@ export function authenticateMockAccount(loginId, password) {
   const passwordMatches = account.password === null || account.password === password
   if (account.locked) {
     if (!passwordMatches) throw new ApiError(401, LOGIN_FAILED_MESSAGE)
-    if (account.user.role === ROLES.ADMIN) {
-      throw new ApiError(423, ADMIN_ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ADMIN_ACCOUNT_LOCKED })
-    }
-    throw new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ACCOUNT_LOCKED })
+    throw lockedAccountError(account)
   }
   const blockedMinutes = remainingBlockMinutes(account)
   if (blockedMinutes > 0) throw loginBlockedError(blockedMinutes)
@@ -197,7 +202,8 @@ export function authenticateMockAccount(loginId, password) {
     account.lastLoginFailureAt = Date.now()
     if (account.loginFailCount >= LOGIN_MAX_FAILURES) {
       account.locked = true
-      throw new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ACCOUNT_LOCKED })
+      // FP-258 PR #173 10회째에 잠기는 관리자도 관리자 안내(서버와 같음).
+      throw lockedAccountError(account)
     }
     if (account.loginFailCount === LOGIN_TEMP_BLOCK_FAILURES) throw loginBlockedError(LOGIN_TEMP_BLOCK_MINUTES)
     throw new ApiError(401, LOGIN_FAILED_MESSAGE)
@@ -215,7 +221,8 @@ function nameMatches(account, name) {
 export function consumeVerification(token, { purpose, email, loginId }) {
   const saved = verifications.get(token)
   const matches = saved && saved.purpose === purpose && saved.email === email && (loginId === undefined || saved.loginId === loginId)
-  if (!matches) throw new ApiError(400, '이메일 인증을 다시 진행해 주세요.')
+  // FP-258 PR #173 서버(EmailVerificationService.consume)와 같은 code를 붙인다(재설정 화면이 이 code로 인증 단계로 돌아간다).
+  if (!matches) throw new ApiError(400, '이메일 인증을 다시 진행해 주세요.', { code: AUTH_ERROR_CODES.EMAIL_VERIFICATION_REQUIRED })
   verifications.delete(token)
 }
 
@@ -323,10 +330,8 @@ registerMockHandlers({
 
   // N-02 회원가입 — 직군은 받지 않으므로 jobType은 null로 만든다(로그인 후 직군 선택 화면으로 간다).
   'POST /api/auth/signup': ({ body }) => {
-    // FP-258 13차 N-02-2 필수 동의 2개를 따로 받는다(agreeTerms·agreePrivacy). 둘 다 없으면 예전 요청처럼 agreeCreditInfo 하나로 본다(서버와 같음).
-    const separateConsents = body?.agreeTerms !== undefined || body?.agreePrivacy !== undefined
-    const agreed = separateConsents ? body.agreeTerms === true && body.agreePrivacy === true : body?.agreeCreditInfo === true
-    if (!agreed) throw new ApiError(400, '필수 동의 항목에 동의해 주세요.')
+    // FP-258 PR #173 N-02-2 필수 동의 2개(agreeTerms·agreePrivacy)는 각각 true여야 한다. 예전 agreeCreditInfo는 보지 않는다(서버와 같음).
+    if (body?.agreeTerms !== true || body?.agreePrivacy !== true) throw new ApiError(400, '필수 동의 항목에 동의해 주세요.')
     if (!isValidPassword(body.password)) throw new ApiError(400, '비밀번호 규칙을 지켜 주세요.')
     // 이름은 완성형 한글 2~20자 — 화면과 같은 규칙(validateName)이다.
     const nameError = validateName(body.name)

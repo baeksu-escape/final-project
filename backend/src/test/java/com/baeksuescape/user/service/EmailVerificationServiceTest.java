@@ -27,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.transaction.support.TransactionOperations;
 
 import com.baeksuescape.global.TestKeys;
 import com.baeksuescape.global.config.AvenueProperties;
@@ -59,7 +60,7 @@ class EmailVerificationServiceTest {
         properties = TestKeys.properties();
         tokenService = new VerificationTokenService(properties, CLOCK);
         service = new EmailVerificationService(codeMapper, userMapper, tokenService, (email, code, purpose) -> sentCodes.add(code),
-                ENCODER, HMAC, CRYPTO, properties, CLOCK);
+                ENCODER, HMAC, CRYPTO, properties, CLOCK, new CodeSendGuard(TransactionOperations.withoutTransaction()));
     }
 
     private static String codeOf(Runnable action) {
@@ -158,7 +159,8 @@ class EmailVerificationServiceTest {
     void 대문자_이메일은_소문자로_바꿔_보낸다() {
         List<String> sentTo = new ArrayList<>();
         EmailVerificationService capturing = new EmailVerificationService(codeMapper, userMapper, tokenService,
-                (email, code, purpose) -> sentTo.add(email), ENCODER, HMAC, CRYPTO, properties, CLOCK);
+                (email, code, purpose) -> sentTo.add(email), ENCODER, HMAC, CRYPTO, properties, CLOCK,
+                new CodeSendGuard(TransactionOperations.withoutTransaction()));
         capturing.send(new AuthRequests.EmailSend(" NewBie@Example.COM ", "SIGNUP", null));
         assertThat(sentTo).containsExactly(EMAIL);
         ArgumentCaptor<VerificationCode> saved = ArgumentCaptor.forClass(VerificationCode.class);

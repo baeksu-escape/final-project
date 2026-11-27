@@ -17,7 +17,7 @@ export const AUTH_FEATURE_API = Object.freeze({
 })
 
 // N-02 회원가입 — { loginId, name, nickname, phone, email, password, birthYear, ageGroup, agreeTerms, agreePrivacy, agreeMarketing, emailVerificationToken, phoneVerificationToken } → { userId }
-//   FP-258 13차 agreeTerms·agreePrivacy: 필수 동의 2개(둘 다 true여야 가입), agreeMarketing: 선택 동의. 예전 agreeCreditInfo 하나도 서버가 받는다.
+//   FP-258 13차 agreeTerms·agreePrivacy: 필수 동의 2개(각각 true여야 가입), agreeMarketing: 선택 동의. 예전 agreeCreditInfo는 PR #173부터 서버가 보지 않는다.
 //   name: 완성형 한글 2~20자(validation.js validateName).
 //   nickname: 닉네임(앞뒤 공백을 뺀 2~12자, '탈퇴'로 시작할 수 없음). 신용 라운지에 작성자로 보인다.
 //   phone: 숫자만 남긴 휴대폰(010XXXXXXXX). phoneVerificationToken: 휴대폰 인증 확인에서 받은 토큰(필수).

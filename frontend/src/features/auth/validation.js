@@ -1,18 +1,29 @@
 // N-02 비밀번호 규칙 — 영문과 숫자를 섞어 8자 이상, 기호는 요구하지 않는다(decisions.md 1-2). 가입·비밀번호 찾기·마이페이지가 함께 쓴다.
 // 입력하는 동안 PasswordRuleList가 이 목록으로 충족 여부를 보여 준다.
+// FP-258 13차 N-02-4 새 비밀번호 최대 길이 — 서버 AccountRules.PASSWORD_MAX와 같다(BCrypt 72바이트 안).
+export const PASSWORD_MAX = 64
+// FP-258 PR #173 64자를 넘은 새 비밀번호의 칸 오류 — 서버 AccountRules.PASSWORD_TOO_LONG_MESSAGE와 같다(잘라 내지 않고 알린다).
+export const PASSWORD_TOO_LONG_MESSAGE = `비밀번호는 ${PASSWORD_MAX}자 이하로 입력해 주세요.`
+
 export const PASSWORD_RULES = Object.freeze([
   { key: 'length', label: '8자 이상', test: (value) => value.length >= 8 },
   { key: 'letter', label: '영문 포함', test: (value) => /[A-Za-z]/.test(value) },
   { key: 'number', label: '숫자 포함', test: (value) => /\d/.test(value) },
+  // FP-258 PR #173 길이 상한도 목록에 보여 준다(넘으면 이 줄만 안 지킨 것으로 보인다).
+  { key: 'max', label: `${PASSWORD_MAX}자 이하`, test: (value) => value.length <= PASSWORD_MAX },
 ])
-
-// FP-258 13차 N-02-4 새 비밀번호 최대 길이 — 서버 AccountRules.PASSWORD_MAX와 같다(BCrypt 72바이트 안).
-export const PASSWORD_MAX = 64
 
 // 비밀번호가 모든 규칙을 지키는지 돌려준다. FP-258 13차 64자 이하·ASCII 출력 문자만(서버 isValidPassword와 같음).
 export function isValidPassword(value) {
   const text = value ?? ''
-  return PASSWORD_RULES.every((rule) => rule.test(text)) && text.length <= PASSWORD_MAX && /^[\x20-\x7E]*$/.test(text)
+  return PASSWORD_RULES.every((rule) => rule.test(text)) && /^[\x20-\x7E]*$/.test(text)
+}
+
+// FP-258 PR #173 새 비밀번호 칸 오류 문구 — 64자를 넘으면 길이 안내, 그 밖의 규칙 위반이면 ruleMessage, 맞으면 ''(서버 newPasswordError와 같은 순서).
+export function newPasswordError(value, ruleMessage = '비밀번호 규칙을 모두 지켜 주세요.') {
+  const text = value ?? ''
+  if (text.length > PASSWORD_MAX) return PASSWORD_TOO_LONG_MESSAGE
+  return isValidPassword(text) ? '' : ruleMessage
 }
 
 // FP-258 N-02-1 이메일 형식 — 소문자로 바꾼 값을 '앞부분@도메인'으로 나눠 판정한다(서버 AccountRules.isValidEmail과 같은 규칙, 전체 100자 이하).
@@ -56,8 +67,9 @@ export function normalizeLoginId(value) {
 
 // FP-258 N-02-1 새 비밀번호: ASCII 출력 문자(영문·숫자·키보드 기호)와 공백만 남긴다. 보기 상태(type=text)에서 켜진 한글 IME 입력·붙여넣기를 막는다.
 // 공백은 지금 비밀번호 규칙(PASSWORD_RULES, 서버 isValidPassword)이 막지 않으므로 남긴다.
+// FP-258 PR #173 길이는 자르지 않는다 — 64자를 넘게 붙여 넣으면 칸 오류(PASSWORD_TOO_LONG_MESSAGE)로 알리고 제출을 막는다(말없이 잘리면 다른 비밀번호로 저장된다).
 export function filterPassword(value) {
-  return String(value ?? '').replace(/[^\x20-\x7E]/g, '').slice(0, PASSWORD_MAX)
+  return String(value ?? '').replace(/[^\x20-\x7E]/g, '')
 }
 // FP-258 N-02-1 두벌식 자판 기준으로 한글을 그 자리의 영문 키로 바꾼다(예: 가→rk, ㅂ→q). 가린 칸은 브라우저가 한글 IME를 끄므로, 보기 상태에서 친 한글도 같은 값이 되게 한다.
 const CHO_KEYS = ['r', 'R', 's', 'e', 'E', 'f', 'a', 'q', 'Q', 't', 'T', 'd', 'w', 'W', 'c', 'z', 'x', 'v', 'g']
@@ -100,10 +112,10 @@ export function filterEmailLocal(value) {
 export function filterEmailDomain(value) {
   return String(value ?? '').toLowerCase().replace(/[^a-z0-9.-]/g, '')
 }
-// FP-258 N-03-1·N-03-2 찾기 화면 이메일 앞부분(기존 이메일): 예전 규칙으로 가입한 이메일(+ 등)도 찾도록 a-z0-9 . _ % + - 를 남기고 소문자로 바꾼다.
-// 한글·공백·그 밖의 기호는 어떤 이메일에도 쓸 수 없어 지운다(판정은 isBasicEmail 그대로). 직접 입력 도메인은 가입과 같은 filterEmailDomain을 쓴다.
+// FP-258 N-03-1·N-03-2 찾기 화면 이메일 앞부분(기존 이메일): 예전 규칙으로 가입한 이메일(+ ' 등 기호)도 찾도록 공백과 @만 지우고 나머지 글자는 그대로 둔 채 소문자로 바꾼다.
+// FP-258 PR #173 예전에는 a-z0-9 . _ % + - 밖의 기호를 지워 o'brien이 obrien이 됐다. 판정은 isBasicEmail 그대로. 직접 입력 도메인은 가입과 같은 filterEmailDomain을 쓴다.
 export function filterExistingEmailLocal(value) {
-  return String(value ?? '').toLowerCase().replace(/[^a-z0-9._%+-]/g, '').slice(0, EMAIL_LOCAL_MAX)
+  return String(value ?? '').toLowerCase().replace(/[\s@]/g, '').slice(0, EMAIL_LOCAL_MAX)
 }
 // N-04-3 한 칸 이메일(마이페이지 이메일 변경): 첫 @ 앞뒤를 따로 거르고 @는 하나만 남긴다.
 export function filterEmail(value) {
@@ -259,7 +271,7 @@ export function validatePasswordConfirm(password, passwordConfirm) {
 export function validateNewPassword(password, passwordConfirm) {
   const errors = {}
   if (!password) errors.password = '비밀번호를 입력해 주세요.'
-  else if (!isValidPassword(password)) errors.password = '비밀번호 규칙을 모두 지켜 주세요.'
+  else if (newPasswordError(password)) errors.password = newPasswordError(password)
   if (!passwordConfirm) errors.passwordConfirm = '비밀번호를 한 번 더 입력해 주세요.'
   else if (password !== passwordConfirm) errors.passwordConfirm = '비밀번호가 일치하지 않습니다.'
   return errors

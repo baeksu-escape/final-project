@@ -5,6 +5,7 @@
 -- 회원 행은 지우거나 바꾸지 않는다. 이미 있는 행의 새 열은 NULL(실패 기록 없음)이라, 지금 5회 실패 상태인 계정도 제한 없이 로그인을 다시 시도할 수 있다.
 -- 이 열이 없는 DB에서는 새 코드의 로그인·회원 조회가 ORA-00904 오류를 낸다. 새 코드를 띄우기 전에 실행한다(열만 먼저 추가해도 이전 코드는 그대로 동작한다).
 -- LOGIN_FAIL_COUNT 열 주석도 지금 동작(5회째 5분 제한, 누적 10회 잠금)으로 고친다(주석만 바뀌고 데이터는 그대로다).
+-- PR #173 검수: ACCOUNT_STATUS_CODE 열 주석의 자동 잠금 횟수도 5회 → 10회로 고친다(주석만).
 -- 이미 열이 있으면 건너뛰고 주석은 같은 값으로 다시 쓰므로 다시 실행해도 된다.
 -- Oracle DDL은 실행 전후에 자동 커밋되므로, 커밋하지 않은 작업이 없는 세션에서 실행한다.
 -- SQL Developer는 "스크립트 실행"(F5)으로 실행한다.
@@ -33,3 +34,6 @@ SELECT COLUMN_NAME, DATA_TYPE, NULLABLE
 
 -- C18 LOGIN_FAIL_COUNT 열 주석을 지금 동작으로 맞춘다(주석만 바뀐다).
 COMMENT ON COLUMN APP_USER.LOGIN_FAIL_COUNT IS 'v0.3.2 (C18) 연속 로그인 실패 횟수 (5회째 5분 제한, 누적 10회 잠금, 재설정으로 해제)';
+
+-- C18(PR #173 검수) ACCOUNT_STATUS_CODE 열 주석의 자동 잠금 횟수를 지금 동작(10회)으로 맞춘다(주석만 바뀐다, avenue_ddl.sql과 같은 값).
+COMMENT ON COLUMN APP_USER.ACCOUNT_STATUS_CODE IS 'v0.3.2 (W1·C18) 계정 상태 (ACTIVE, LOCKED=비밀번호 10회 실패 또는 관리자 잠금, WITHDRAWN=탈퇴. 탈퇴해도 행은 지우지 않고 개인정보 칸을 표시값으로 덮어쓴다(CK_APU_PII_BY_STATUS), N-04-7)';

@@ -102,6 +102,8 @@ public class AdminAuthService {
 
     // AUTH-01 관리자 분기 — 비밀번호가 맞은 관리자에게 6자리 번호를 보내고 2단계 인증 대기 토큰(5분, 1회용)을 준다.
     // [다시 보내기]는 AUTH-01을 다시 부르는 것이다(새 번호·새 토큰, 이전 번호는 최신이 아니라 무효). 1분 안에 다시 부르면 429.
+    // FP-258 PR #173 로그인(AuthService.login)이 트랜잭션 밖으로 나가서, 번호 저장과 발송을 여기서 한 트랜잭션으로 묶는다(발송이 실패하면 저장도 되돌린다, 예전과 같음).
+    @Transactional
     public AuthResponses.AdminChallenge startLogin(UserAccount admin) {
         SentCode sent = sendCode(admin);
         ScopedToken challenge = tokens.issueScoped(admin.getUserId(), admin.getRoleCode(), TokenScope.ADMIN_LOGIN_CHALLENGE, CHALLENGE_TTL);
@@ -119,7 +121,8 @@ public class AdminAuthService {
         if (verificationId == null) throw challengeInvalid();
         UserAccount admin = userMapper.selectById(claims.userId());
         if (admin == null || !admin.isAdmin() || admin.isWithdrawn()) throw challengeInvalid();
-        if (admin.isLocked()) throw AuthErrors.accountLocked();
+        // FP-258 PR #173 잠긴 관리자는 회원용 안내(비밀번호 찾기) 대신 관리자 안내(423 ADMIN_ACCOUNT_LOCKED).
+        if (admin.isLocked()) throw AuthErrors.adminAccountLocked();
 
         VerificationCode row = checkCode(admin, verificationId, request.code(), "관리자 2단계 인증");
         if (!oneTimeTokens.consume(claims.jti())) throw challengeInvalid();

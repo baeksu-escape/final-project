@@ -59,8 +59,8 @@ const ERROR_KEY_OF = {
   emailCustomDomain: 'email',
 }
 // 서버 칸별 오류 field → 화면 오류 키. 서버는 생일 대신 출생연도(birthYear)로 검사한다.
-// FP-258 13차 필수 동의 칸 오류(agreeTerms·agreePrivacy, 예전 agreeCreditInfo)는 동의 묶음(agreements) 아래에 보인다.
-const SERVER_FIELD_KEY = { birthYear: 'birthDate', agreeTerms: 'agreements', agreePrivacy: 'agreements', agreeCreditInfo: 'agreements' }
+// FP-258 13차 필수 동의 칸 오류(agreeTerms·agreePrivacy)는 동의 묶음(agreements) 아래에 보인다.
+const SERVER_FIELD_KEY = { birthYear: 'birthDate', agreeTerms: 'agreements', agreePrivacy: 'agreements' }
 
 // 칸을 감싸는 요소의 id. 첫 오류 칸으로 옮겨 갈 때 이 id로 찾는다.
 const fieldWrapperId = (key) => `signup-field-${key}`

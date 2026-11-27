@@ -86,6 +86,15 @@ public final class AccountRules {
                 && LETTER.matcher(value).find() && DIGIT.matcher(value).find();
     }
 
+    // FP-258 PR #173 새 비밀번호가 64자를 넘을 때의 칸 오류(프론트 validation.js PASSWORD_TOO_LONG_MESSAGE와 같다).
+    public static final String PASSWORD_TOO_LONG_MESSAGE = "비밀번호는 " + PASSWORD_MAX + "자 이하로 입력해 주세요.";
+
+    // 새 비밀번호 칸 오류 문구 — 64자를 넘으면 길이 안내, 그 밖의 규칙 위반이면 ruleMessage(화면마다 지금 쓰는 문구), 맞으면 null.
+    public static String newPasswordError(String value, String ruleMessage) {
+        if (value != null && value.length() > PASSWORD_MAX) return PASSWORD_TOO_LONG_MESSAGE;
+        return isValidPassword(value) ? null : ruleMessage;
+    }
+
     // 휴대폰에서 숫자만 남긴다. 하이픈을 넣거나 빼도 같은 값이 된다. null이면 빈 문자열.
     public static String normalizePhone(String value) {
         return value == null ? "" : value.replaceAll("\\D", "");

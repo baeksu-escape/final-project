@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { requestPasswordChange } from '../api/myPageApi.js'
 import { AUTH_ERROR_CODES, SAME_PASSWORD_MESSAGE } from '../authConstants.js'
 import usePasswordReveal from '../usePasswordReveal.js'
-import { validateNewPassword } from '../validation.js'
+import { PASSWORD_MAX, PASSWORD_TOO_LONG_MESSAGE, validateNewPassword } from '../validation.js'
 import PasswordField from './PasswordField.jsx'
 import PasswordRuleList from './PasswordRuleList.jsx'
 
@@ -68,7 +68,8 @@ export default function PasswordChangeForm({ onSaved, onCancel }) {
         rule="new"
         value={form.password}
         onChange={update('password')}
-        error={errors.password}
+        // FP-258 PR #173 64자를 넘게 붙여 넣으면 저장 전에도 바로 알린다(잘라 내지 않는다).
+        error={form.password.length > PASSWORD_MAX ? PASSWORD_TOO_LONG_MESSAGE : errors.password}
         autoComplete="new-password"
         {...reveal('password')}
       />
