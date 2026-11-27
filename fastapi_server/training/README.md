@@ -11,6 +11,7 @@ python -m training.train --data-dir <학습 데이터 폴더>
 ```
 
 - `<학습 데이터 폴더>`는 안에 `1_model/legacy_model_table.csv`가 있는 폴더다. 기본값은 `fastapi_server/data/training/`(`data/README.md` 참고, Git 제외).
+- 지금 `data/training/`은 v3.7.0이다(11/27 교체). 모델 0.1·0.2를 다시 만들거나 확인할 때는 `--data-dir data/training_v3.6.1`을 준다.
 - 학습 데이터는 `*_svc_12m` 열이 있는 v3.6.0 이상이어야 한다. 열이 없으면 없는 열 이름을 알리고 멈춘다.
 - 결과: `artifacts/legacy.joblib`, `artifacts/alternative.joblib`(Git 제외) 와 설명 파일 `*.meta.json`(모델 버전 `LGBM-BASE-0.1`·피처 세트 `FS-V1`·알고리즘, 피처 목록, 범주 부호표, 설정, 라이브러리 버전, 학습 표 SHA-256, VALID AUC). 버전 이름은 DB 장부(`MODEL_REGISTRY`, `FEATURE_SET_VERSION`)와 같고 `config.py`의 상수가 원본이다. 설명 파일은 만들어지는 파일이라 커밋하지 않는다.
 - 시험: `python -m unittest discover tests -v`
@@ -49,12 +50,17 @@ python -m training.train --monotone --model-version LGBM-BASE-0.2 --out-dir <저
 학습 데이터를 v3.7.0(기존 집단 TRAIN 97,543행, 새 연체 라벨)으로 바꾸고 `--monotone-set v03`(19개: 0.2의 8개 + 대출 잔액·상환액·건수·신규 대출·대부업 잔액·현금서비스·소득 0인 달 +1(C33) + 통신 미납 개월 +1·통신 연속 정시 개월 −1·공과금 연체 개월 +1·간편결제 건수 −1(C36, 시뮬레이터 반대 방향 제거))으로 만든다. 사전 기준은 정의서 10장 C33·C36, VALID 결과는 C37이다.
 
 ```
-python -m training.check_v03 --data-dir data/training_v3.7.0 --out ../docs/spec/model_v03_valid_check_c36.json   # C33 기준 11개 항목 판정(VALID만, 모델 저장 안 함)
-python -m training.train --data-dir data/training_v3.7.0 --out-dir data/model_v03 --monotone-set v03 --model-version LGBM-BASE-0.3
+python -m training.check_v03 --data-dir data/training --out ../docs/spec/model_v03_valid_check_c36.json   # C33 기준 11개 항목 판정(VALID만, 모델 저장 안 함)
+python -m training.train --data-dir data/training --out-dir data/model_v03 --monotone-set v03 --model-version LGBM-BASE-0.3
 ```
 
-- `compare_labels.py`도 `--monotone-set`을 받는다. `export_eval_scores.py`에는 아직 없다(서비스 반영 단계에서 추가).
-- 모델 파일은 서버 폴더(`artifacts/`)와 따로 둔다. 서비스는 계속 0.2를 쓴다.
+- `compare_labels.py`와 `export_eval_scores.py`도 `--monotone-set`을 받는다. 관리자 성능 비교용 평가 표본(FP-285)은 `--max-rows`로 기존 집단 VALID를 직군×라벨 비율로 3,000행만 뽑는다(씬파일은 전부):
+
+```
+python -m training.export_eval_scores --data-dir data/training --model-dir data/model_v03 --monotone-set v03 --model-version LGBM-BASE-0.3 --max-rows 3000 --out data/model_v03_eval/eval_scores_v03.csv --sql-out ../docs/spec/sql/load_model_eval_sample_lgbm_base_0_3.sql
+```
+
+- 모델 파일은 서버 폴더(`artifacts/`)와 따로 두고, 서비스 전환 때 묶음(`avenue_model_files_20261127_v03.zip`)으로 옮긴다(`docs/spec/sql/activate_model_lgbm_base_0_3.sql` 머리말). **다시 학습해 덮어쓰지 않는다**(해시 C37).
 
 ## 지켜야 할 것
 
@@ -196,7 +202,7 @@ python -m training.final_test_eval --version 0.3                                
 python -m training.final_test_eval --version 0.3 --split TEST --confirm-test-once          # 최종(TEST). 한 번만 실행한다
 ```
 
-- 기본 데이터는 `data/training_v3.7.0`, 모델은 `data/model_v03`이다. 아직 DB에 등록하지 않아 모델 파일 4개의 해시와 학습 표 해시를 정의서 C37에 적은 값과 대조하고, `meta.json`의 버전·표 해시도 확인한다.
+- 기본 데이터는 `data/training`(v3.7.0), 모델은 `data/model_v03`이다. TEST를 실행한 시점에는 DB에 등록하지 않아 모델 파일 4개의 해시와 학습 표 해시를 정의서 C37에 적은 값과 대조하고, `meta.json`의 버전·표 해시도 확인한다.
 - 정상 범위는 VALID 5개 시드 평균 ±0.02, 등급 비율은 후보 경계 CUT-0.4(0~644 / 645~711 / 712~1000)로 본다. 씬파일 TEST는 이전에 본 고객이라 판정하지 않는다.
 - 실행 기록·결과는 `docs/spec/final_test_eval_run_v03.json`, `final_test_eval_result_v03.json`·`.md`로 따로 남으며 0.2의 파일은 건드리지 않는다. 커밋·재실행 규칙은 위와 같다.
 - `--version`을 주지 않으면 0.2 설정이다.

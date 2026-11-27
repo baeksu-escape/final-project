@@ -10,8 +10,8 @@ from fastapi import APIRouter, Header
 from pipeline import mock_scorer, model_scorer
 from pipeline.feature_builder import build_features
 from pipeline.feature_catalog import (
-    CUTOFF_VERSION, FEATURE_SET_VERSION, FEATURES, GRADE_BANDS, MODEL_VERSION,
-    REAL_FEATURE_SET_VERSION, is_real_model_version,
+    FEATURE_SET_VERSION, FEATURES, GRADE_BANDS_BY_CUTOFF, MODEL_VERSION,
+    REAL_FEATURE_SET_VERSION, cutoff_for, is_real_model_version,
 )
 from pipeline.simulation import simulate, validate_changes
 from schemas.assessment import ScoreRequest, SimulateRequest
@@ -117,11 +117,12 @@ def model_info():
         model_version, feature_set, features = scorer.version, REAL_FEATURE_SET_VERSION, [f for f in FEATURES if f.code in codes]
     else:
         model_version, feature_set, features = MODEL_VERSION, FEATURE_SET_VERSION, FEATURES
+    cutoff_version = cutoff_for(model_version)
     return {
         "modelVersion": model_version,
         "featureSetVersion": feature_set,
-        "cutoffVersion": CUTOFF_VERSION,
-        "gradeBands": GRADE_BANDS,
+        "cutoffVersion": cutoff_version,
+        "gradeBands": GRADE_BANDS_BY_CUTOFF[cutoff_version],
         "supportedModelVersions": supported_model_versions(),
         "features": [
             {"featureCode": f.code, "alternativeYn": f.alternative_yn, "simulatableYn": f.simulatable_yn}
@@ -148,7 +149,7 @@ def score(req: ScoreRequest, x_mock_scenario: str | None = Header(default=None))
         "requestId": req.requestId,
         "modelVersion": model_version,
         "featureSetVersion": feature_set,
-        "cutoffVersion": CUTOFF_VERSION,
+        "cutoffVersion": cutoff_for(model_version),
         **result,
         "featureSnapshot": features,
     }
@@ -173,4 +174,4 @@ def simulate_score(req: SimulateRequest, x_mock_scenario: str | None = Header(de
 
     result = simulate(req.baseAssessment.featureSnapshot, req.changes, score_features)
     log.info("simulate requestId=%s model=%s elapsedMs=%d", req.requestId, model_version, (time.perf_counter() - started) * 1000)
-    return {"requestId": req.requestId, "modelVersion": model_version, "cutoffVersion": CUTOFF_VERSION, **result}
+    return {"requestId": req.requestId, "modelVersion": model_version, "cutoffVersion": cutoff_for(model_version), **result}

@@ -57,7 +57,7 @@
 | 평가 식별자 | 화면과 URL에는 `ASSESSMENT_ID` 대신 **`REQUEST_ID`(소문자 UUID)**만 쓴다. 번호를 추측해 남의 결과를 보는 것을 막기 위해서다 | DDL `ASSESSMENT.REQUEST_ID` 주석 |
 | 형식 | JSON, UTF-8. 필드는 camelCase, 경로는 kebab-case. 코드값은 DB 코드 그대로 쓴다(`SELF_EMPLOYED`, `SCORED` 등) | 기존 코드 |
 | 금액·비율 | 금액은 원 단위 정수, 금리는 연 %(8.9 = 8.9%), 확률은 0~1 | DDL 머리말 |
-| 점수 | **0~1000** 정수. 등급은 `GOOD` / `STANDARD` / `CAUTION`(ACTIVE CUT-0.3: 0~653 / 654~726 / 727~1000, 🟡 임시값. 11/23 `CUT-0.1`(0~664 / 665~779 / 780~1000)에서 전환, FP-248 🆕 11/23. `CUT-0.2` 0~659 / 660~730 / 731~1000은 DRAFT) | DDL v0.3.1 A-1 |
+| 점수 | **0~1000** 정수. 등급은 `GOOD` / `STANDARD` / `CAUTION`(ACTIVE CUT-0.4: 0~644 / 645~711 / 712~1000, 🟡 임시값. 🆕 11/27 모델 0.3과 함께 `CUT-0.3`(0~653 / 654~726 / 727~1000)에서 전환, FP-285 — 전환 SQL을 아직 실행하지 않은 DB는 CUT-0.3. 11/23 `CUT-0.1`(0~664 / 665~779 / 780~1000)에서 전환, FP-248 🆕 11/23. `CUT-0.2` 0~659 / 660~730 / 731~1000은 DRAFT) | DDL v0.3.1 A-1 |
 | 날짜 | 월 `"YYYY-MM"`, 날짜 `"YYYY-MM-DD"`, 시각은 ISO-8601 | DDL CHECK |
 | 오류 응답 | HTTP 상태 + `{ "code", "message", "fieldErrors": [{ "field", "message" }] }`. ✅ 전 API 공통(FP-87 `GlobalExceptionHandler`, D-20 확정 🆕 11/20) | 프론트 `serverErrors.js` |
 | 개인정보 | 이름·휴대폰·이메일은 마스킹해서 응답한다. 원문은 로그에 남기지 않는다. 관리자가 회원 신용정보를 열람하면 `ACCESS_AUDIT_LOG`에 남긴다 | AGENTS.md 5장, DDL N-35 |
@@ -114,6 +114,11 @@
 | 409 | `INPUT_INCOMPLETE` | DIAG-09: 입력 기준월·출생연도 없음, 소득이 직군에 필요한 개월 수보다 적거나 같은 달이 겹침(점수 산출과 같은 문구) 🆕 11/20 |
 | 409 | `ALT_DATA_EMPTY` | DIAG-09: 통신비 또는 공과금 기관 기록이 0건이라 ML-03을 부르지 않음 → "통신비·공과금 기록이 없어 예상 점수를 계산할 수 없어요." (점수 산출 RPT-01의 `NOT_SCORABLE` `ALT_DATA_EMPTY`와 같은 기준, FP-239 리뷰 후속) 🆕 11/23 |
 | 503 | `MODEL_NOT_READY` | SIM-02·DIAG-09: 실제 모델 파일 없음, 연결 실패, 타임아웃, 그 밖의 5xx. 저장하지 않으므로 `MODEL_ERROR` 기록 없음 |
+| 409 | `NOT_SCORED` | RPT-04: 점수가 산출되지 않은(SCORED가 아닌) 평가는 요약하지 않음 🆕 11/26 |
+| 429 | `DAILY_LIMIT_EXCEEDED` | HELP-03: 오늘 성공한 자유 질문이 하루 횟수(`CHATBOT_DAILY_LIMIT`, 기본 10)에 이름 — 신고(COMM)와 같은 코드 🆕 11/26 |
+| 502 | `AI_FAILED` | HELP-03·RPT-04: OpenAI 연결 실패·시간 초과(D-18)·4xx·5xx·빈 답. 자유 질문은 실패로 기록하고 횟수는 줄지 않음, 요약은 저장하지 않음 🆕 11/26 |
+| 409 | `QUESTION_IN_PROGRESS` | HELP-03: 같은 사용자의 앞 질문이 아직 AI 답을 기다리는 중(한 번에 1개만 처리해 하루 횟수를 넘기지 않게 함) 🆕 11/27 |
+| 503 | `AI_UNAVAILABLE` | HELP-03·RPT-04: 서버에 OpenAI 키(`avenue.ai.openai.api-key`)가 없음. 백엔드는 켜지고 두 API만 이 응답 🆕 11/26 |
 
 - 커뮤니티(동주, PR #80) 오류 code: 403 `NOT_OWNER`(남의 글 수정·삭제), 404 `POST_NOT_FOUND`·`TARGET_NOT_FOUND`·`REPORT_NOT_FOUND`·`COMMENT_NOT_FOUND`(없거나 삭제된 댓글, 다른 글의 댓글 🆕 11/25), 409 `OWN_CONTENT`(본인 글 신고)·`DUPLICATE_REPORT`·`POST_HIDDEN`·`COMMENT_HIDDEN`(신고로 숨겨진 댓글 수정·삭제 🆕 11/25)·`STATUS_CHANGED`·`ALREADY_HANDLED`, 429 `DAILY_LIMIT_EXCEEDED`(하루 3번 초과).
 ---
@@ -191,7 +196,7 @@
 | RPT-01 | `POST /api/members/me/score-calculation` | N-12-2 기존·대안 점수·3등급 계산·저장 | `ASSESSMENT`, `ASSESSMENT_FACTOR` | USER | ✅ **구현됨 (FP-142, 실제 연결 확인 11/16)** (요청 `{ requestId }` 필수·소문자 UUID, 화면도 이렇게 보냄. 응답: B팀 명세서 3-1. 입력·동의가 덜 차면 409 `INPUT_INCOMPLETE`, O-13 확정. 통신비·공과금 기록 0건이면 200 `NOT_SCORABLE` + `ALT_DATA_EMPTY`, PR #62) |
 | RPT-02 | `GET /api/report/me` | N-12-1 저장 데이터 조회, N-12-3 점수 차이·등급 변화 계산, N-12-6 점수·등급 비교 표시, N-12-7 부도 확률 표시, N-14 영역별 영향도(SHAP) | `ASSESSMENT`, `ASSESSMENT_FACTOR`, `DIM_FEATURE`, `SCORE_GRADE_BAND` | USER | ✅ **구현됨 (FP-142, 실제 연결 확인 11/16)** 경로 / 🟡 응답 (B팀 명세서 3-2) |
 | RPT-03 | `GET /api/report/{requestId}` | N-04-6 진단 내역 조회 (지난 평가 1건 상세) | 위와 같음 | USER | ✅ **구현됨 (FP-142, 실제 연결 확인 11/16)** (B팀 명세서 3-3) |
-| RPT-04 | `POST /api/report/{requestId}/ai-summary` | N-12-5 AI 결과 요약 요청, N-31-2 AI 요약 생성·저장 | `ASSESSMENT.AI_SUMMARY` | USER | 🟡 담당 광희 (FP-179) |
+| RPT-04 | `POST /api/report/{requestId}/ai-summary` | N-12-5 AI 결과 요약 요청, N-31-2 AI 요약 생성·저장 | `ASSESSMENT.AI_SUMMARY` | USER | ✅ 담당 광희 (FP-181, C팀 명세서 N-31-2) 🆕 11/26 |
 | RPT-05 | `GET /api/members/me/score-percentile` 🆕 11/23 | N-13-1 저장 데이터 조회, N-13-2 같은 직군·연령대·직군+연령대 점수 조회, N-13-3 상위 n%·평균 대비 차이 계산. 집계 기준은 ADM-03과 같음(ACTIVE 모델의 회원별 최근 SCORED 평가, 탈퇴 제외), 5명 미만 집단은 값 숨김. 내 점수가 없으면 404 `ASSESSMENT_NOT_FOUND` 🆕 11/23 | `ASSESSMENT`, `APP_USER` 🆕 11/23 | USER | ✅ 담당 동주 (FP-251, C팀 명세서 N-13) 🆕 11/23 |
 
 ### 2-5. 재무 진단 — 담당 동주·광희
@@ -283,10 +288,10 @@
 | ID | 메서드 · 경로 | 기능 | 주요 표 | 인증 | 상태 |
 |---|---|---|---|---|---|
 | HELP-01 | `GET /api/glossary` | N-30-1 용어 사전 데이터, N-30-2 쉬운 말로 바꾸기 | `GLOSSARY_TERM` | USER | ✅ FP-180 PR #108 🆕 11/20 |
-| HELP-02 | `GET /api/chatbot/presets` | N-32-1 질문 버튼 방식 설명 | `CHATBOT_PRESET_QUESTION` | USER | 🟡 |
-| HELP-03 | `POST /api/chatbot/questions` | N-32-2 자유 질문 AI 설명 (하루 10회, 질문 글은 저장 안 함) | `CHATBOT_QUESTION_LOG`, `APP_SETTING` | USER | 🟡 |
+| HELP-02 | `GET /api/chatbot/presets` | N-32-1 질문 버튼 방식 설명, 오늘 남은 자유 질문 횟수(`remainingCount`·`dailyLimit`) 🆕 11/26 | `CHATBOT_PRESET_QUESTION`, `CHATBOT_QUESTION_LOG`, `APP_SETTING` | USER | ✅ FP-181 🆕 11/23 |
+| HELP-03 | `POST /api/chatbot/questions` | N-32-2 자유 질문 AI 설명 (하루 10회, 질문 글은 저장 안 함) | `CHATBOT_QUESTION_LOG`, `APP_SETTING` | USER | ✅ FP-181 🆕 11/26 |
 
-- Gemini에는 계산된 숫자·라벨만 넘긴다(RPT-04). 자유 질문(HELP-03)에는 사용자가 쓴 질문 글만 넘긴다(AGENTS.md 5장, D-21).
+- 서비스 AI는 OpenAI다(decisions.md 1-1, 🆕 11/26 Gemini에서 변경). AI 요약(RPT-04)에는 계산된 숫자·라벨만 넘긴다. 자유 질문(HELP-03)에는 사용자가 쓴 질문 글만 넘긴다(AGENTS.md 5장, D-21).
 
 ### 2-9-1. 알림 — 담당 경환 (FP-284) 🆕 11/27
 
@@ -338,7 +343,7 @@
 
 - FastAPI는 DB를 읽거나 쓰지 않는다. 저장은 Spring이 한다. 상세는 B팀 명세서 4장에 있다.
 - **모델 선택 (PR #74):** Spring이 보내는 모델 버전(= DB `MODEL_REGISTRY`의 ACTIVE)으로 FastAPI가 계산기를 고른다. `DEV-DUMMY` → Mock(`FS-DRAFT` 39개), `LGBM-BASE-0.1` → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`. 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503 `MODEL_NOT_READY`.
-- **모델 파일 확인 (PR #77):** `fastapi_server/artifacts/SHA256SUMS.txt`가 있으면 서버가 켜질 때 모델 파일 해시를 대조하고, 다르면 열지 않는다. 공용 DB는 11/18 `LGBM-BASE-0.1`(FP-216, PR #88)에 이어 **11/20 `LGBM-BASE-0.2`로 전환**(FP-237, PR #110·#113) 🆕 11/20. `/v1/health`의 해시 확인 표시(`hashVerified`)는 2차 후보(FP-215).
+- **모델 파일 확인 (PR #77):** `fastapi_server/artifacts/SHA256SUMS.txt`가 있으면 서버가 켜질 때 모델 파일 해시를 대조하고, 다르면 열지 않는다. 공용 DB는 11/18 `LGBM-BASE-0.1`(FP-216, PR #88)에 이어 **11/20 `LGBM-BASE-0.2`로 전환**(FP-237, PR #110·#113) 🆕 11/20. `LGBM-BASE-0.3` 전환 SQL은 FP-285에서 추가했고 공용 DB 전환은 병합 뒤에 한다 🆕 11/27. `/v1/health`의 해시 확인 표시(`hashVerified`)는 2차 후보(FP-215).
 
 ### 2-12. 내부 연동: Spring → 가상 기관(mock 서버) — A팀
 
@@ -369,7 +374,7 @@
 | ~~Q-4~~ | ~~SIM-02 mock의 점수 범위, 출발점, 필드 이름~~ ✅ **해결:** PR #78에서 모두 고침(2-6) | — |
 | ~~Q-5~~ | ~~RPT-05(N-13 백분위) 담당~~ ✅ **해결 🆕 11/23:** 동주(FP-251). ~~DIAG-03(N-16 건전성)~~ ✅ 광희(FP-166) | — |
 | Q-6 | 🟡 경로 전체 확정 (각 담당) | 각 팀 |
-| ~~Q-7~~ | ✅ 해결(🆕 11/20): 오류 응답 형식은 D-20 확정(1장 공통 형식), FastAPI 타임아웃은 설정값으로 분리(D-18, Gemini만 남음) | 팀 전체 |
+| ~~Q-7~~ | ✅ 해결(🆕 11/20): 오류 응답 형식은 D-20 확정(1장 공통 형식), FastAPI 타임아웃은 설정값으로 분리(D-18, Gemini만 남음 → 🆕 11/26 OpenAI 연결 2초·응답 15초로 확정, FP-181) | 팀 전체 |
 | ~~Q-8~~ | ~~DIAG-07-1·08-1 경로~~ ✅ **해결:** `/api/members/me/…`로 이동(광희 PR #103, 우찬 합의, SIM-01·02·DIAG-09 포함) 🆕 11/20 | — |
 | ~~Q-9~~ | ~~SIM-03·대출 상품 담당~~ ✅ **해결:** 대출 상품 LOAN-01~05 경환(FP-90, PR #101), SIM-03은 만들지 않고 SIM-04 + LOAN-01로 대신 🆕 11/20 | — |
 | ~~Q-10~~ | ~~ADM-03(N-26 관리자 통계) 담당과 Jira 번호. 정의서에 있던 FP-191은 커뮤니티 카드였다. 비교 통계는 FP-159(광희)~~ ✅ **해결 🆕 11/20:** 광희, API FP-161·화면 FP-162 | — |

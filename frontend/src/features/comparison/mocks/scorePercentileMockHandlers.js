@@ -8,7 +8,7 @@ const SAMPLE = Object.freeze({
   myScore: 700,
   workerTypeCode: 'EMPLOYEE',
   ageBandCode: '30S',
-  modelVersion: 'LGBM-BASE-0.2',
+  modelVersion: 'LGBM-BASE-0.3',
   minGroupSize: 5,
   groups: [
     { groupType: 'WORKER_TYPE', memberCount: 6, topPct: 66.7, avgScore: 720.0, diffFromAvg: -20.0 },
