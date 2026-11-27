@@ -33,7 +33,7 @@ export const PATHS = Object.freeze({
 })
 
 // N-08-1 사용자 기능 9개(이 순서). 직군과 상관없이 모두 같다. 마이 페이지는 헤더 버튼이다.
-// 화면 위쪽 메뉴는 아래 NAV_GROUPS로 큰 분류 5개에 묶어 보인다(UI 리뉴얼 FP-252).
+// 화면 위쪽 메뉴는 아래 NAV_GROUPS로 큰 분류 6개에 묶어 보인다(UI 리뉴얼 FP-252, 11/27 상권 분석 분리 FP-307).
 export const USER_TABS = Object.freeze([
   { key: 'report', label: '신용 리포트', path: PATHS.REPORT, nId: 'N-12' },
   { key: 'asset-debt', label: '자산·부채 건전성', path: PATHS.ASSET_DEBT, nId: 'N-16' },
@@ -55,7 +55,7 @@ export const ADMIN_TABS = Object.freeze([
   { key: 'audit', label: '접근·감사 로그', path: PATHS.ADMIN_AUDIT, nId: 'N-28·N-35' },
 ])
 
-// UI 리뉴얼 — 사용자 메뉴를 큰 분류 5개로 묶는다. 분류 안 항목은 USER_TABS의 key를 가리키고, 설명은 허브·홈 화면 목록에 쓴다.
+// UI 리뉴얼 — 사용자 메뉴를 큰 분류 6개로 묶는다. 분류 안 항목은 USER_TABS의 key를 가리키고, 설명은 허브·홈 화면 목록에 쓴다.
 const TAB_BY_KEY = Object.fromEntries(USER_TABS.map((tab) => [tab.key, tab]))
 const item = (key, description) => Object.freeze({ ...TAB_BY_KEY[key], description })
 
