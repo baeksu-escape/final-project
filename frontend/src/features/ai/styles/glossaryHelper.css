@@ -107,6 +107,17 @@
   }
 }
 
+/* 아주 넓은 화면 — 카드 오른쪽 빈칸에 패널이 다 들어가면 그 빈칸에 띄워 본문을 가리지 않는다(11/27 광희 결정).
+   빈칸 = 카드 끝에서 화면 오른쪽 끝까지. 패널은 카드에서 12px, 화면 끝에서 16px 띄우고 너비는 320~380px.
+   빈칸이 그보다 좁은 화면(노트북·휴대폰)은 지금처럼 버튼 위에 겹쳐 뜬다. */
+@media (min-width: 2030px) {
+  .gh-panel {
+    --gh-panel-w: min(380px, calc(var(--gh-card-edge) - var(--sp-3) - 16px));
+    right: calc(var(--gh-card-edge) - var(--sp-3) - var(--gh-panel-w));
+    width: var(--gh-panel-w);
+  }
+}
+
 @media (max-width: 480px) {
   .gh-fab {
     bottom: var(--sp-4);
