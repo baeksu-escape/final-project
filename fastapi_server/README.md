@@ -10,6 +10,7 @@ Spring이 부르는 내부 API(ML-01~04)를 제공한다. **요청의 모델 버
 
 - 그래서 **DB의 ACTIVE 모델을 바꾸는 것이 곧 스위치**다. 코드를 병합해도 DB가 `DEV-DUMMY`인 동안은 Mock 그대로다.
 - **실제 모델 버전은 넣은 묶음의 `*.meta.json`(`model_version`)에서 정한다(FP-237).** 0.1 묶음을 넣으면 `LGBM-BASE-0.1`, 0.2 묶음을 넣으면 `LGBM-BASE-0.2`로 동작하고, 요청 버전(DB ACTIVE)이 불러온 버전과 다르면 409 `VERSION_MISMATCH`다. 두 설명 파일의 버전이 다르거나 `LGBM-BASE-숫자.숫자` 모양이 아니면 불러오지 않는다. 버전이 적히지 않은 옛 묶음은 `training/config.py`의 `MODEL_VERSION`(0.1)으로 본다.
+- **등급 구간도 모델 버전을 따른다(FP-285).** `LGBM-BASE-0.3` 묶음은 `CUT-0.4`(0~644 / 645~711 / 712~1000), 그 밖(0.1·0.2·Mock)은 `CUT-0.3`(0~653 / 654~726 / 727~1000)으로 답한다(`pipeline/feature_catalog.py`의 `cutoff_for`). 그 DB에 해당 구간 행이 있어야 저장되므로 0.3 묶음을 넣기 전에 `add_cutoff_cut_0_4.sql`을 실행한다.
 - 실제 모델은 `artifacts/legacy.joblib`·`alternative.joblib`에서 서버가 켜질 때 한 번 불러온다. 파일이 없으면 `/v1/health`의 `modelLoaded: false`이고, `LGBM-BASE-0.1` 요청은 **503 `MODEL_NOT_READY`**다(Mock으로 바꾸지 않는다, 11/17 범영·재욱 합의).
 - 실제 모델의 점수 환산·SHAP·합 규칙은 `training/explain.py`(FP-138), 모델 입력은 `training/interface.py`를 그대로 쓴다. 점수·SHAP은 실제 신용평가나 인과관계가 아니다.
 
@@ -86,7 +87,7 @@ python -m unittest discover tests -v
 - 이상치 고정 상한(정의서 C8): 소득 합계 20억 초과·평균 월 지출 2억 초과·월 상환액 0 미만이면 그 값과 그 값으로 계산하는 피처를 결측으로
 - 소득 합계 0 이하·카드 한도 0이면 비율 피처 결측
 - 기존 모델 19개 / 대안 모델 39개, 대안 데이터를 바꿔도 기존 점수는 그대로인지
-- 점수 0~1000, 등급 경계(664 / 665 / 779 / 780), 같은 입력 같은 결과
+- 점수 0~1000, 등급 경계(CUT-0.3 653 / 654 / 726 / 727, 모델 0.3의 CUT-0.4 644 / 645 / 711 / 712), 같은 입력 같은 결과
 - 기준점 + SHAP 점수 합 = 대안 점수, rank(같으면 항목 이름 가나다순)
 - 급여소득자 월급 × 12, 값이 없으면 0으로 채우지 않음
 - 시뮬레이션 금융 영향 + 대안 영향 = 전체 변화
@@ -114,6 +115,7 @@ python -m unittest discover tests -v
 - 현금흐름 화면의 예상 대안 점수(N-21-8, DIAG-09)는 Spring이 바꾼 입력으로 ML-03을 부르고 저장하지 않는다(O-6). FastAPI 쪽 추가 작업은 없다.
 - Mock 가중치는 화면 시험용 임의 값이다. 학습 결과가 아니고 점수 의미도 없다.
 - **모델을 바꿀 때(예: 0.1 → 0.2):** ① DB에 등록 SQL(`register_model_lgbm_base_0_2.sql`) — CANDIDATE로만 넣으므로 서비스는 그대로다. 미리 해 둬도 된다 ② 서버 PC `artifacts/`의 5개 파일을 새 묶음으로 바꾸고 FastAPI를 다시 켠다 → `/v1/health`의 `modelVersion`이 새 버전인지 확인 ③ **②가 끝나면 바로** 전환 SQL(`activate_model_lgbm_base_0_2.sql`). 되돌리기는 파일을 이전 묶음으로 바꾸고 바로 `rollback_model_lgbm_base_0_2_to_0_1.sql`. 그 DB를 쓰는 모든 PC가 같은 묶음이어야 한다(다르면 409). 코드는 바꾸지 않는다.
+  - **0.2 → 0.3(FP-285)** 은 등급 구간도 바뀐다: ① `add_cutoff_cut_0_4.sql` → `register_model_lgbm_base_0_3.sql` → `load_model_eval_sample_lgbm_base_0_3.sql` → `update_model_metrics_same_label_lgbm_base_0_3.sql`(서비스 영향 없음) ② 파일을 0.3 묶음으로 교체·health 확인 ③ 바로 `activate_model_lgbm_base_0_3.sql` → `activate_cutoff_cut_0_4.sql` → 시드 평가 적재. 되돌리기는 파일을 0.2 묶음으로 바꾸고 `rollback_model_lgbm_base_0_3_to_0_2.sql` → `rollback_cutoff_cut_0_4_to_0_3.sql`.
   - ⚠️ **②와 ③ 사이에는 점수 요청이 모두 409 `VERSION_MISMATCH`다.** 서버는 새 버전만 계산하는데 DB ACTIVE는 아직 옛 버전이기 때문이다. 이때 점수 산출은 `NOT_SCORABLE`(`MODEL_ERROR`) 평가로 저장되어 쓸모없는 행이 남는다(시뮬레이터·예상 점수는 저장하지 않고 오류만 난다). 공용 DB에서는 ②·③을 연달아 하고, 사용자가 없는 시간(시연·통합 테스트 중이 아닐 때)에 한다. 반대 순서(파일은 그대로 두고 SQL만 실행)도 같은 409가 난다.
   - Spring은 ML-01·02를 부르지 않아서(시작할 때도) 버전이 어긋나도 미리 경고하지 않는다. 바꾼 뒤 `docs/spec/e2e/e2e_check.py`(FP-143)로 확인하면 E2E-03·05에서 바로 드러난다.
 - 피처 사전: Mock은 `FS-DRAFT` 39개, 실제 모델은 `FS-V1` 38개(`LRZ021201` 제외, O-17). `FS-V1`·`LGBM-BASE-0.1`(CANDIDATE) 기준 데이터는 PR #72로 들어왔다. 이미 만든 DB에는 `docs/spec/sql/add_fs_v1_feature_set.sql` → `seed/avenue_seed_dim_feature_fs_v1.sql` 순서로 한 번 실행한다. 버전 이름은 `training/config.py` 한 곳에서 가져온다.
