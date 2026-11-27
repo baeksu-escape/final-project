@@ -8,6 +8,7 @@ import { ADMIN_TABS, NAV_GROUPS, PATHS, findNavGroup } from '../config/navigatio
 import { ROLE_LABELS, isAdmin } from '../config/roles.js'
 import MegaNav from './MegaNav.jsx'
 import { ADMIN_PATHS } from '../../features/admin/adminConstants.js'
+import GlossaryHelperDialog from '../../features/ai/components/GlossaryHelperDialog.jsx'
 
 // TODO(D-23) 알림 범위가 정해지기 전까지 [알림]을 누르면 이 안내만 보여 준다.
 const NOTIFICATION_PENDING_MESSAGE = '알림 기능은 준비 중입니다.'
@@ -68,6 +69,8 @@ export default function AppHeader() {
         )}
       </header>
       <Toast message={toastMessage} onClose={() => setToastMessage('')} />
+      {/* N-32 용어 도우미(FP-207) — 사용자 화면 오른쪽 아래에 떠 있는 아이콘 버튼과 패널. 관리자 화면에는 없다. */}
+      {!admin && <GlossaryHelperDialog />}
     </>
   )
 }
