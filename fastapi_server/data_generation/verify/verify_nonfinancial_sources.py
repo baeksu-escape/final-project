@@ -86,10 +86,12 @@ def check(folder, seed_offset, cfg, lcfg):
     np.testing.assert_allclose(np.where(elig, expit(lg + a), 0.0), m.design_probability, rtol=0, atol=1e-8)
     out['label_terms'] = 'pass'
 
-    # The original label stays defined by the 207-column result (연체회차 >= 1); new panels never carry it.
+    # v3.7.0: the delinquency label is redrawn (verify_delinquency_label.py). The original definition (연체회차 >= 1)
+    # is kept only in labels_delinquency_metadata.csv; new panels never carry a label.
     orig = pd.read_csv(f/'base_207.csv', encoding='utf-8-sig', usecols=['식별구분', '결과값(연체회차)']).rename(columns={'식별구분': 'customer_id'})
-    merged = profiles[['customer_id', 'label_any_delinquency_12m']].merge(orig, on='customer_id', validate='one_to_one')
-    assert ((merged['결과값(연체회차)'] > 0).astype(int) == merged.label_any_delinquency_12m).all()
+    meta = pd.read_csv(f/'labels_delinquency_metadata.csv', encoding='utf-8-sig', usecols=['customer_id', 'original_label'])
+    merged = meta.merge(orig, on='customer_id', validate='one_to_one')
+    assert len(merged) == len(profiles) and ((merged['결과값(연체회차)'] > 0).astype(int) == merged.original_label).all()
     for frame in (pay, ins, feat):
         assert not any(c.startswith('label') for c in frame.columns)
     out['original_label'] = 'pass'

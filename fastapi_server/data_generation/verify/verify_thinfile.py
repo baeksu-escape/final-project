@@ -3,6 +3,7 @@ from pathlib import Path
 import json,tempfile,hashlib
 import numpy as np,pandas as pd
 from generate.build_thinfile import run
+from generate.build_delinquency_label import build as build_label
 from verify.verify_card_accounts import validate as validate_card_accounts
 R=Path(__file__).resolve().parents[1];D=R/'thinfile'
 # Only explicitly declared continuous fields permit floating-point tolerance.
@@ -87,6 +88,8 @@ def main():
  with tempfile.TemporaryDirectory() as td:
   byte_identical={}
   run(td,cfg['per_cohort'],cfg['seed'])
+  # v3.7.0 저장본의 라벨은 build_delinquency_label.py로 다시 만든 값이라 재생성본에도 같은 단계를 적용해 비교한다.
+  build_label(td,json.loads((R/'reference/delinquency_label.json').read_text(encoding='utf-8')),1,True)
   for name in ['base_207','profiles','monthly_history','scenarios','loans','cards','delinquencies','model_inputs','target_metadata','card_account_monthly']:
    a,b2=pd.read_csv(D/f'{name}.csv'),pd.read_csv(Path(td)/f'{name}.csv')
    same=True
