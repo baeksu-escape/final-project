@@ -47,13 +47,17 @@ export default function NotificationBell({ enabled = true }) {
         알림{notifications.unreadCount > 0 && <span className="nt-badge">{notifications.unreadCount > 99 ? '99+' : notifications.unreadCount}</span>}
       </button>
       {open && <section className="nt-panel" id="notification-panel" aria-label="알림 목록">
-        <header className="nt-panel__head"><strong>알림</strong><button type="button" className="text-link" disabled={notifications.unreadCount === 0} onClick={readAll}>모두 읽음</button></header>
+        <header className="nt-panel__head"><strong>알림</strong><button type="button" className="nt-read-all" disabled={notifications.unreadCount === 0} onClick={readAll}>모두 읽음</button></header>
         {notifications.loading ? <p className="hint">알림을 불러오는 중이에요.</p>
           : notifications.error ? <p className="hint" role="status">{notifications.error}</p>
             : notifications.items.length === 0 ? <p className="hint">새 알림이 없어요.</p>
               : <ul className="nt-list">{notifications.items.map((item) => <li key={item.notificationId}>
                 <button type="button" className={item.read ? 'nt-item' : 'nt-item nt-item--unread'} onClick={() => selectItem(item)}>
-                  <strong className="nt-item__title">{item.title}</strong>
+                  <span className="nt-item__heading">
+                    <strong className="nt-item__title">{item.title}</strong>
+                    <span className={item.read ? 'nt-dot' : 'nt-dot nt-dot--unread'} aria-hidden="true" />
+                    {!item.read && <span className="sr-only">안 읽음</span>}
+                  </span>
                   <span className="nt-item__content">{item.content}</span>
                   <time className="nt-item__time" dateTime={item.createdAt}>{relativeTime(item.createdAt)}</time>
                 </button>
