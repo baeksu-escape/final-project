@@ -31,7 +31,7 @@ class NotificationServiceTest {
     private NotificationService service;
 
     @Test
-    @DisplayName("알림 저장 실패는 notifyQuietly에서 삼켜 원래 처리를 계속한다")
+    @DisplayName("알림 저장 실패를 삼켜 원래 처리를 계속한다")
     void notifyQuietly_swallowsCreateFailure() {
         given(mapper.insert(any())).willThrow(new IllegalStateException("database failure"));
 
@@ -63,9 +63,10 @@ class NotificationServiceTest {
     }
 
 
+    // FP-300·D-23 필터·커서 페이지 조회와 hasMore 계산을 확인한다.
     @Test
-    @DisplayName("list applies filters, cursor, size, and computes hasMore")
-    void list_filteredAndHasMore() {
+    @DisplayName("목록에 읽음·종류·커서 조건을 적용하고 다음 페이지 여부를 계산한다")
+    void 목록_조건_커서_크기_다음페이지여부() {
         LocalDateTime now = LocalDateTime.now();
         given(mapper.selectFiltered(7L, true, "COMMENT_NEW", 50L, 3))
                 .willReturn(List.of(row(49L, 7L, null, now), row(48L, 7L, null, now.minusMinutes(1)),
@@ -81,9 +82,10 @@ class NotificationServiceTest {
         verify(mapper).selectFiltered(7L, true, "COMMENT_NEW", 50L, 3);
     }
 
+    // FP-300·D-23 허용되지 않은 알림 종류의 400 검증을 확인한다.
     @Test
-    @DisplayName("list rejects unsupported notification type")
-    void list_invalidType_rejected() {
+    @DisplayName("지원하지 않는 알림 종류는 400으로 거부한다")
+    void 목록_잘못된종류_거부() {
         assertThatThrownBy(() -> service.list(7L, false, "UNKNOWN", null, 20))
                 .isInstanceOf(ApiException.class)
                 .satisfies(error -> assertThat(((ApiException) error).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
@@ -147,6 +149,7 @@ class NotificationServiceTest {
         assertInvalid("WELCOME", "제목", "x".repeat(1001), "/home");
         assertInvalid("WELCOME", "제목", "내용", "https://example.com");
         assertInvalid("WELCOME", "제목", "내용", "//example.com");
+        assertInvalid("WELCOME", "제목", "내용", "/\t/evil.com");
         verify(mapper, never()).insert(any());
         verify(eventPublisher, never()).publishEvent(any());
     }

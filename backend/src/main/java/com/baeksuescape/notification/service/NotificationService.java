@@ -136,12 +136,13 @@ public class NotificationService {
         return response;
     }
 
+    // FP-300·D-23 저장 전에 알림 필수값과 내부 링크 형식·제어문자 미포함을 검증한다.
     private static void validate(long userId, String typeCode, String title, String content, String linkUrl) {
         if (userId <= 0 || typeCode == null || !TYPE_CODES.contains(typeCode)
                 || title == null || title.isBlank() || title.length() > 200
                 || content == null || content.isBlank() || content.length() > 1000
                 || (linkUrl != null && (!linkUrl.startsWith("/") || linkUrl.startsWith("//")
-                        || linkUrl.length() > 500 || linkUrl.indexOf('\\') >= 0 || linkUrl.contains("://")))) {
+                        || linkUrl.length() > 500 || linkUrl.indexOf('\\') >= 0 || linkUrl.contains("://") || linkUrl.chars().anyMatch(Character::isISOControl)))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "알림 입력값을 확인해 주세요.");
         }
     }

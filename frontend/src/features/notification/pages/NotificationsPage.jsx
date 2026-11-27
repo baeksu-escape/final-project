@@ -5,7 +5,8 @@ import { PATHS } from '../../../common/config/navigation.js'
 import { adaptNotifications } from '../adapters/notificationAdapter.js'
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../api/notificationApi.js'
 import '../styles/notification.css'
-import { NOTIFICATIONS_CHANGED_EVENT } from '../components/useNotifications.js'
+import { emitNotificationsChanged, NOTIFICATIONS_CHANGED_EVENT } from '../components/useNotifications.js'
+import { relativeTime } from '../adapters/notificationTime.js'
 
 const PAGE_SIZE = 20
 const TABS = [
@@ -16,14 +17,7 @@ const TABS = [
   { code: 'WELCOME', label: '안내', empty: '안내 알림이 없어요.' },
 ]
 
-const relativeTime = (value) => {
-  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60000))
-  if (minutes < 1) return '방금 전'
-  if (minutes < 60) return `${minutes}분 전`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}시간 전`
-  return `${Math.floor(hours / 24)}일 전`
-}
+// D-23 알림 기록의 날짜를 화면에서 읽기 쉬운 연-월-일 시:분으로 표시한다.
 const dateTime = (value) => {
   const date = new Date(value)
   const pad = (number) => String(number).padStart(2, '0')
@@ -39,6 +33,7 @@ export default function NotificationsPage() {
   const [history, setHistory] = useState({ type: null, items: [], unreadCount: 0, hasMore: false, loading: true, error: '' })
   const [loadingMore, setLoadingMore] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [refreshVersion, setRefreshVersion] = useState(0)
   const sequence = useRef(0)
 
   useEffect(() => {
@@ -49,7 +44,16 @@ export default function NotificationsPage() {
       if (sequence.current === requestId) setHistory({ type, items: [], unreadCount: 0, hasMore: false, loading: false, error: '알림을 불러오지 못했어요.' })
     })
     return () => { sequence.current += 1 }
-  }, [type])
+  }, [type, refreshVersion])
+
+  useEffect(() => {
+    const refreshFromBell = (event) => {
+      if (event.detail?.source === 'page') return
+      setRefreshVersion((version) => version + 1)
+    }
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshFromBell)
+    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshFromBell)
+  }, [])
 
   const visible = history.type === type ? history : { items: [], unreadCount: 0, hasMore: false, loading: true, error: '' }
   const selectTab = (code) => {
@@ -63,7 +67,7 @@ export default function NotificationsPage() {
     try {
       if (!item.read) {
         await markNotificationRead(item.notificationId)
-        window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT))
+        emitNotificationsChanged('page')
       }
       setHistory((current) => current.type === type
         ? { ...current, items: current.items.map((row) => row.notificationId === item.notificationId ? { ...row, read: true } : row), unreadCount: Math.max(0, current.unreadCount - Number(!item.read)) }
@@ -74,7 +78,7 @@ export default function NotificationsPage() {
   const readAll = async () => {
     try {
       await markAllNotificationsRead()
-      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT))
+      emitNotificationsChanged('page')
       setHistory((current) => ({ ...current, items: current.items.map((item) => ({ ...item, read: true })), unreadCount: 0 }))
       setActionError('')
     } catch { setActionError('읽음 처리에 실패했어요.') }
@@ -95,7 +99,7 @@ export default function NotificationsPage() {
   const selectedTab = TABS.find((tab) => tab.code === type)
 
   return (
-    <main className="nt-page">
+    <div className="nt-page">
       <div className="page-head">
         <div>
           <span className="page-head__tag">내 알림</span>
@@ -132,6 +136,6 @@ export default function NotificationsPage() {
         {actionError && <p className="hint" role="status">{actionError}</p>}
         {visible.hasMore && <div className="nt-more"><Button variant="weak" size="sm" disabled={loadingMore} onClick={loadMore}>{loadingMore ? '불러오는 중…' : '더 보기'}</Button></div>}
       </Card>
-    </main>
+    </div>
   )
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useNotifications } from './useNotifications.js'
 import { PATHS } from '../../../common/config/navigation.js'
+import { relativeTime } from '../adapters/notificationTime.js'
 import '../styles/notification.css'
 
 // D-23 헤더 알림 버튼의 종 모양 — 글자색(currentColor)을 따라가는 선 아이콘.
@@ -18,16 +19,6 @@ const CloseIcon = () => (
     <path d="M6 6l12 12M18 6L6 18" />
   </svg>
 )
-
-const relativeTime = (value) => {
-  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60000))
-  if (minutes < 1) return '방금 전'
-  if (minutes < 60) return `${minutes}분 전`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}시간 전`
-  const days = Math.floor(hours / 24)
-  return `${days}일 전`
-}
 
 // D-23 헤더 알림 패널은 안 읽은 알림을 최근 5건까지만 보여 주고(나머지는 전체 보기), 읽음 처리 후 내부 화면으로 이동하며 바깥 클릭·Esc로 닫는다.
 const PANEL_LIMIT = 5

@@ -65,9 +65,10 @@ class NotificationControllerTest {
         verify(notificationService).list(7L, false, null, null, 20);
     }
 
+    // FP-300·D-23 잘못된 알림 종류가 기존 400 오류 형식으로 반환되는지 확인한다.
     @Test
-    @DisplayName("unsupported type returns the existing 400 error contract")
-    void list_invalidType_badRequest() throws Exception {
+    @DisplayName("지원하지 않는 종류는 기존 400 오류 형식으로 응답한다")
+    void 목록_잘못된종류_400응답() throws Exception {
         given(notificationService.list(7L, false, "UNKNOWN", null, 20))
                 .willThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "알림 목록 조건을 확인해 주세요."));
 
@@ -76,9 +77,10 @@ class NotificationControllerTest {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_INPUT"));
         verify(notificationService).list(7L, false, "UNKNOWN", null, 20);
     }
+    // FP-300·D-23 선택 조건 쿼리 바인딩과 hasMore 응답을 확인한다.
     @Test
-    @DisplayName("list query parameters are forwarded to the filtered service")
-    void list_forwardsOptionalFilters() throws Exception {
+    @DisplayName("선택한 목록 조건을 서비스에 전달한다")
+    void 목록_선택조건_전달() throws Exception {
         given(notificationService.list(7L, true, "WELCOME", 31L, 5))
                 .willReturn(new NotificationListResponse(8, List.of(), true));
 
@@ -88,6 +90,28 @@ class NotificationControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(8))
                 .andExpect(jsonPath("$.items").isEmpty()).andExpect(jsonPath("$.hasMore").value(true));
         verify(notificationService).list(7L, true, "WELCOME", 31L, 5);
+    }
+    // FP-300·D-23 페이지 크기 범위와 커서 경계 위반이 기존 400 오류 형식으로 처리되는지 확인한다.
+    @Test
+    @DisplayName("페이지 크기 0·51과 0번 커서는 400으로 거부한다")
+    void 목록_잘못된크기와커서_400응답() throws Exception {
+        given(notificationService.list(7L, false, null, null, 0))
+                .willThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "알림 목록 조건을 확인해 주세요."));
+        given(notificationService.list(7L, false, null, null, 51))
+                .willThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "알림 목록 조건을 확인해 주세요."));
+        given(notificationService.list(7L, false, null, 0L, 20))
+                .willThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "알림 목록 조건을 확인해 주세요."));
+        String token = bearer(7, "ROLE_USER");
+
+        mockMvc.perform(get(PATH).queryParam("size", "0").header(HttpHeaders.AUTHORIZATION, token))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        mockMvc.perform(get(PATH).queryParam("size", "51").header(HttpHeaders.AUTHORIZATION, token))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        mockMvc.perform(get(PATH).queryParam("before", "0").header(HttpHeaders.AUTHORIZATION, token))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        verify(notificationService).list(7L, false, null, null, 0);
+        verify(notificationService).list(7L, false, null, null, 51);
+        verify(notificationService).list(7L, false, null, 0L, 20);
     }
     @Test
     @DisplayName("본인 읽음 API는 200을 반환한다")
