@@ -1,6 +1,8 @@
-# 학습용 합성 데이터 v3.6.1 — 이것부터 보세요
+# 학습용 합성 데이터 v3.7.0 — 이것부터 보세요
 
-모든 값은 합성 데이터다. 성능 수치는 실제 예측력의 근거가 아니다. 저장소의 생성 코드 v3.6.1(`fastapi_server/data_generation/`)를 기본 설정으로 생성했다.
+모든 값은 합성 데이터다. 성능 수치는 실제 예측력의 근거가 아니다. 저장소의 생성 코드 v3.7.0(`fastapi_server/data_generation/`)를 기본 설정으로 생성했다.
+
+**v3.7.0 변경.** 기존 집단을 139,347명으로 늘리고, 연체 라벨(`label_any_delinquency_12m`)을 상환 부담·잔액·소득 등의 가정 효과를 넣어 다시 만들었으며, 소득·지출 생성 규칙을 바꿨다. 비금융 효과 라벨의 바탕값도 새 라벨의 설계값으로 바뀌었다. 열 이름과 순서는 v3.6.1과 같다. **이전 버전의 모델 성능·시험 결과와 직접 비교하지 않는다.** 자세한 내용과 한계는 `docs/CHANGES.md`.
 
 **v3.6.0 변경.** 서비스 입력 규칙(소득만 12개월, 지출 = 평균 월 지출, 상환 = 현재 월 상환액, 급여소득자 소득 = 기준월 × 12)과 같은 정의의 12개월 9열(`*_svc_12m*`, `expense_avg_month_krw`, `debt_service_current_krw`)을 라벨 앞에 추가해 기본 학습으로 쓴다. 기존 12개월 집계 중 10열(`income_12m_krw`, `income_cv_12m`, `zero_income_months_12m`, `dp_amount_to_income_12m`, `expense_12m_krw`, `debt_service_12m_krw`, `expense_ratio_12m`, `dsr_12m`, `deficit_months_12m`, `worst_month_net_cash_12m_krw`)은 **모델 표에서 뺐다**(상세 `2_detail/*/input_features_12m.csv`에는 값 그대로). 평균 월 지출은 `ROUND_HALF_UP`(정확히 .5이면 올림)이다. 학습·검증·시험 구분 `data_split`(TRAIN/VALID/TEST = 70/15/15)을 `dataset` 바로 뒤에 넣었다. 그 밖의 기존 열 값·상대 순서는 그대로다.
 
@@ -12,12 +14,12 @@ v3.5.13 설명: **기본 학습은 12개월(role=feature), 6개월은 보존·�
 
 | 파일 | 행 | 열 | 내용 |
 |---|---:|---:|---|
-| `1_model/legacy_model_table.csv` | 12,000 | 252 | 기존 집단. 고객 한 줄 = 207열 + 기본 12개월 소득·지출 집계(서비스 정의 열) + 보존·참고용 6개월 집계 + 간편결제·사회보험·통신·공과금 집계 + `data_split` + 라벨 2개 |
+| `1_model/legacy_model_table.csv` | 139,347 | 252 | 기존 집단. 고객 한 줄 = 207열 + 기본 12개월 소득·지출 집계(서비스 정의 열) + 보존·참고용 6개월 집계 + 간편결제·사회보험·통신·공과금 집계 + `data_split` + 라벨 2개 |
 | `1_model/thinfile_model_table.csv` | 2,400 | 261 | 금융이력 부족 집단(4개 cohort × 600명). 같은 형식 + 씬파일 전용 열 |
 
 열마다 역할이 `1_model/model_table_columns.csv`에 있다(`id`, `group`, `split`, `feature`, `label`, `eval_only`, `compatibility_only`). **`feature`인 열만 모델에 넣는다.** 피처 수는 기존 집단 235개, 씬파일 243개다.
 
-**학습·검증·시험은 `data_split`으로 나눈다.** 고객 ID 단위, 직군 × `label_any_delinquency_12m` 층화, 집단마다 따로(고정 seed 20261114). 기존 집단 8,400 / 1,800 / 1,800, 씬파일 1,680 / 361 / 359명. 성능 비교는 `TEST`만 쓴다. 씬파일은 아래 `eval_future_credit_exposure = 1` 조건도 함께 건다(씬파일 TEST 359명 중 246명).
+**학습·검증·시험은 `data_split`으로 나눈다.** 고객 ID 단위, 직군 × `label_any_delinquency_12m` 층화, 집단마다 따로(고정 seed 20261114). 기존 집단 97,543 / 20,903 / 20,901, 씬파일 1,680 / 361 / 359명. 기존 집단은 v3.6.1의 12,000명이 모두 TRAIN이고 VALID·TEST는 새 고객이다. 씬파일 분할은 v3.6.1과 같아 씬파일 TEST는 이전에 본 고객이다(참고 값). 성능 비교는 `TEST`만 쓴다. 씬파일은 아래 `eval_future_credit_exposure = 1` 조건도 함께 건다(씬파일 TEST 359명 중 246명).
 
 ## 서비스 회원에게도 있는 피처만 들어 있다
 
@@ -95,5 +97,5 @@ v3.5.13 설명: **기본 학습은 12개월(role=feature), 6개월은 보존·�
 - 직군 코드는 원본 값 `wage/selfemp/freelance`다(서비스 코드 `EMPLOYEE/SELF_EMPLOYED/FREELANCER`).
 - 대출 상환 일정(`loan_extension/`, 약 440MB)은 크기 때문에 뺐다. 필요하면 `data_generation/`에서 `python -m generate.build_loan_extension`으로 만든다.
 - 권장 재현 환경은 `requirements.txt`의 고정 버전(numpy 2.3.5·pandas 2.2.3·scipy 1.17.0·scikit-learn 1.8.0)이다. 다른 버전으로 다시 만들면 소수점 마지막 자리가 다를 수 있다.
-- 이번 묶음(v3.6.1)의 실제 생성 환경은 Python 3.11.9와 requirements.txt 고정 버전(numpy 2.3.5·pandas 2.2.3·scipy 1.17.0·scikit-learn 1.8.0 등)이다(`3_reference/legacy/validation.json`에 numpy·pandas 버전 기록). 기존 원천·6개월 값 보존 결과와 실행 검증은 provenance.json 및 작업 로그에 기록한다.
-- 학습 값은 v3.6.0과 같다(줄바꿈 외 바이트 동일). v3.6.1 변경은 서비스 더미 대출 종류·금리 방식뿐이다.
+- 이번 묶음(v3.7.0)의 실제 생성 환경은 `3_reference/legacy/validation.json`에 기록한 numpy·pandas 버전이다. 실행 검증은 provenance.json 및 작업 로그에 기록한다.
+- 크기: `1_model/` 약 120MB, `2_detail/` 약 750MB. 모델 학습·평가에는 `1_model/`만 있으면 된다.

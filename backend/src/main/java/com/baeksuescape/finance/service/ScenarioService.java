@@ -3,6 +3,7 @@ package com.baeksuescape.finance.service;
 import com.baeksuescape.finance.dto.cashflow.MonthlyIncomeItem;
 import com.baeksuescape.finance.dto.scenario.PolicyRateRow;
 import com.baeksuescape.finance.dto.scenario.ScenarioBaseResponse;
+import com.baeksuescape.finance.dto.scenario.ScenarioBaseResponse.ScenarioLoanItem;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateRequest;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateResponse;
 import com.baeksuescape.finance.dto.scenario.ScenarioRecalculateResponse.Side;
@@ -26,7 +27,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * FP-167 N-17 시나리오 테스트 — 로그인 회원의 저장값(N-17-1)에 금리·소득·지출 변화(N-17-2)를 공통 재계산 틀(N-17-3)로 반영해
- * 월 잉여·상환 부담률·월 이자 변화·버틸 수 있는 개월 수(N-17-4)를 구한다. 점수는 구하지 않는다(점수 예측은 N-21).
+ * 월 여유 자금·상환 부담률·월 이자 변화·버틸 수 있는 개월 수(N-17-4)를 구한다. 점수는 구하지 않는다(점수 예측은 N-21).
  * 결과는 저장하지 않는다.
  */
 @Service
@@ -68,13 +69,16 @@ public class ScenarioService {
     private final ScenarioMapper scenarioMapper;
 
     /** N-17-1 시나리오 기준값. 저장된 소득이 없으면 404 NOT_FOUND(현금흐름 전망과 같음). */
+    // N-17-1 기준 상환액은 함께 반환하는 대출 목록의 합으로 구해 목록·합계 기준월을 맞춘다.
     public ScenarioBaseResponse base(long userId) {
         Baseline b = loadBaseline(userId);
+        List<ScenarioLoanItem> loanItems = b.loanItems();
+        long monthlyPaymentAmount = b.payment();
         PolicyRateRow rate = scenarioMapper.selectLatestPolicyRate();
         ScenarioBaseResponse.PolicyRate policyRate = rate == null ? null
                 : new ScenarioBaseResponse.PolicyRate(rate.getBaseDate(), rate.getRatePct());
-        return new ScenarioBaseResponse(b.income(), b.expense(), b.payment(), b.variableBalance(), b.totalAsset(),
-                policyRate, ASSUMPTIONS);
+        return new ScenarioBaseResponse(b.income(), b.expense(), monthlyPaymentAmount, b.variableBalance(), b.totalAsset(),
+                policyRate, ASSUMPTIONS, loanItems);
     }
 
     /** N-17-2~4 조건을 반영한 상환 여력. 조건은 DB를 읽기 전에 검사한다(범위 밖이면 400). */
@@ -88,7 +92,7 @@ public class ScenarioService {
                 "expensePct", "지출 변화는 -50~+100% 사이로 입력해 주세요.");
 
         Baseline b = loadBaseline(userId);
-        return calculate(b, ratePctPoint, incomePct, expensePct);
+        return calculate(b, ratePctPoint, incomePct, expensePct, b.loanItems());
     }
 
     /**
@@ -96,6 +100,12 @@ public class ScenarioService {
      * 공통 재계산 틀은 null을 0으로 보므로, 누락을 구분해야 하는 총자산은 틀에 넣지 않는다.
      */
     static ScenarioRecalculateResponse calculate(Baseline b, BigDecimal ratePctPoint, BigDecimal incomePct, BigDecimal expensePct) {
+        return calculate(b, ratePctPoint, incomePct, expensePct, List.of());
+    }
+
+    /** N-17-5 현재 계산 응답에 같은 기준값 조회에서 얻은 대출 상세를 포함한다. */
+    private static ScenarioRecalculateResponse calculate(Baseline b, BigDecimal ratePctPoint, BigDecimal incomePct,
+                                                          BigDecimal expensePct, List<ScenarioLoanItem> loanItems) {
         Map<String, BigDecimal> current = new LinkedHashMap<>();
         current.put(INCOME, BigDecimal.valueOf(b.income()));
         current.put(EXPENSE, BigDecimal.valueOf(b.expense()));
@@ -123,10 +133,10 @@ public class ScenarioService {
 
         return new ScenarioRecalculateResponse(now, after, interestChange, surplusDiff,
                 survivableMonths(after.monthlySurplusAmount(), b.totalAsset()), verdict(after.monthlySurplusAmount(), surplusDiff),
-                ASSUMPTIONS);
+                ASSUMPTIONS, loanItems);
     }
 
-    /** 월 잉여 = 소득 − 지출 − 상환액, 상환 부담률은 N-16-1·N-20-4와 같은 함수(연 원리금 ÷ 연소득)로 구한다. */
+    /** 월 여유 자금 = 소득 − 지출 − 상환액, 상환 부담률은 N-16-1·N-20-4와 같은 함수(연 원리금 ÷ 연소득)로 구한다. */
     private static Side side(long income, long expense, long payment) {
         BigDecimal dsr = FinancialHealthCalculator.calculateRepaymentBurdenRatio(
                 BigDecimal.valueOf(payment).multiply(TWELVE), BigDecimal.valueOf(income).multiply(TWELVE));
@@ -142,7 +152,7 @@ public class ScenarioService {
                 .divide(HUNDRED.multiply(BigDecimal.valueOf(-changedSurplus)), 0, RoundingMode.DOWN).longValueExact();
     }
 
-    /** 적자면 SHORTFALL, 지금보다 잉여가 늘면 IMPROVED, 그 밖(흑자 유지)은 STILL_POSITIVE (시나리오 화면과 같은 규칙) */
+    /** 적자면 SHORTFALL, 지금보다 여유 자금이 늘면 IMPROVED, 그 밖(흑자 유지)은 STILL_POSITIVE (시나리오 화면과 같은 규칙) */
     static String verdict(long changedSurplus, long surplusDiff) {
         if (changedSurplus < 0) {
             return SHORTFALL;
@@ -154,14 +164,34 @@ public class ScenarioService {
      * 저장된 기준값을 읽는다. 기준월은 소득 기준월이고, 월 소득은 최근 12개월 평균(급여소득자는 월급을 12개월로 펼침)이다.
      * 지출·월 원리금은 없으면 0, 변동금리 대출은 없으면 빈 목록, 총자산은 미입력이면 null이다.
      */
+    // N-17-1·N-17-5 같은 기준월 대출 목록 합을 현재 상환액으로 써 목록과 계산 기준을 일치시킨다.
     private Baseline loadBaseline(long userId) {
         List<MonthlyIncomeItem> history = incomeVolatilityService.loadIncomeHistory(userId, 0L);
         long income = Math.round(history.stream().mapToLong(MonthlyIncomeItem::getIncome).average().orElse(0));
+        List<ScenarioLoanItem> loanItems = scenarioMapper.selectLatestLoanItems(userId);
+        if (loanItems == null) {
+            loanItems = List.of();
+        }
+        // N-17-1·N-17-5 기준 대출 목록을 한 번만 읽고, 월 상환액과 변동금리 계산 대상을 같은 결과에서 만든다.
+        List<VariableLoanRow> variableLoans = loanItems.stream()
+                .filter(loan -> "VARIABLE".equals(loan.rateTypeCode()))
+                .map(loan -> {
+                    VariableLoanRow row = new VariableLoanRow();
+                    row.setBalanceAmount(loan.balanceAmount());
+                    row.setAnnualRatePct(loan.annualRatePct());
+                    row.setMonthlyPaymentAmount(loan.monthlyPaymentAmount());
+                    return row;
+                })
+                .toList();
         return new Baseline(income,
                 incomeVolatilityMapper.selectLatestTotalExpense(userId),
-                incomeVolatilityMapper.selectLatestLoanMonthlyPayment(userId),
-                scenarioMapper.selectLatestVariableLoans(userId),
-                scenarioMapper.selectLatestTotalAsset(userId));
+                sumLoanPayments(loanItems),
+                variableLoans,
+                scenarioMapper.selectLatestTotalAsset(userId), loanItems);
+    }
+
+    private static long sumLoanPayments(List<ScenarioLoanItem> loanItems) {
+        return loanItems.stream().mapToLong(ScenarioLoanItem::monthlyPaymentAmount).sum();
     }
 
     /** 생략은 0(변화 없음), 범위 밖은 400 INVALID_INPUT(fieldErrors에 그 이름) */
@@ -191,7 +221,12 @@ public class ScenarioService {
      * 시나리오 기준값 (원). payment는 기준월 전체 대출의 월 원리금 합계이고, variableLoans는 그중 변동금리 대출 행이다.
      * 총자산만 미입력이면 null
      */
-    record Baseline(long income, long expense, long payment, List<VariableLoanRow> variableLoans, Long totalAsset) {
+    record Baseline(long income, long expense, long payment, List<VariableLoanRow> variableLoans, Long totalAsset,
+                    List<ScenarioLoanItem> loanItems) {
+        Baseline(long income, long expense, long payment, List<VariableLoanRow> variableLoans, Long totalAsset) {
+            this(income, expense, payment, variableLoans, totalAsset, List.of());
+        }
+
 
         /** 변동금리 대출 잔액 합계 (기준값 응답의 variableLoanBalanceAmount) */
         long variableBalance() {

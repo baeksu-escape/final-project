@@ -55,6 +55,46 @@ public class CashFlowForecastResponse {
     @Setter
     private Long baseMonthlyLoanPayment;
 
+    /**
+     * N-21-1·N-21-3·N-21-5 기타 지출(FIXED 제외)의 항목별 내역. 합이 baseOtherExpenseAmount와 같다.
+     * 금액 큰 순, 같으면 저장 순이다. 저장 데이터 조회(DIAG-08-1)만 채우고 POST(DIAG-08)는 null이며, 항목이 없으면 빈 리스트다.
+     */
+    @Setter
+    private List<BaseOtherExpenseItem> baseOtherExpenseItems;
+    /**
+     * N-21-1·N-21-3·N-21-5 보유 대출별 월 원리금 내역. 합이 baseMonthlyLoanPayment와 같다.
+     * 대출 번호 순이다. 저장 데이터 조회(DIAG-08-1)만 채우고 POST(DIAG-08)는 null이며, 대출이 없으면 빈 리스트다.
+     */
+    @Setter
+    private List<BaseLoanItem> baseLoanItems;
+
+    /** N-21-3 기타 지출 한 항목 (소득 기준월, FIXED 제외). 매퍼가 열 별칭으로 바로 채운다. */
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BaseOtherExpenseItem {
+        private String expenseGroupCode;
+        private String expenseCategory;
+        private String description;
+        /** 월 금액 (원) */
+        private long monthlyAmount;
+    }
+
+    /** N-21-5 대출 한 건의 월 원리금 (소득 기준월). 매퍼가 열 별칭으로 바로 채운다. */
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BaseLoanItem {
+        private long loanId;
+        private String loanTypeName;
+        /** 월 원리금 (원) */
+        private long monthlyPaymentAmount;
+    }
+
     @Getter
     @Builder
     @NoArgsConstructor

@@ -236,7 +236,7 @@
   - ML-04: Spring SIM-02는 ACTIVE가 아니라 **출발 평가(최근 SCORED)에 저장된** `MODEL_VERSION`을 `baseAssessment.modelVersion`으로 보낸다. 저장된 피처값과 같은 모델로 다시 계산해야 하기 때문이다(4-4, FP-170 PR #93). 정정
   - `DEV-DUMMY`(또는 버전 없음) → Mock(`FS-DRAFT` 39개), **불러온 실제 모델 묶음의 버전**(🆕 11/23 지금 `LGBM-BASE-0.2`, `fastapi_server/artifacts/*.meta.json`의 `model_version`. 모델 파일은 Git에 넣지 않고 팀 파일 공유로 받으며, 공용 DB의 ACTIVE 모델도 같은 버전이다 — FP-237) → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`
   - 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503 `MODEL_NOT_READY`(11/17 범영·재욱 합의)
-  - 공용 DB는 11/18 `LGBM-BASE-0.1`(FP-216)에 이어 **11/20 `LGBM-BASE-0.2`로 전환 완료**(FP-237, 🆕 11/20). 학습 데이터·모델 파일 기록은 `docs/spec/sql/register_model_lgbm_base_0_1.sql`(PR #88). 전환은 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`, 되돌리기는 `rollback_model_to_dev_dummy.sql`(PR #77, 절차: `fastapi_server/README.md`). 0.2는 `register_model_lgbm_base_0_2.sql` → `activate_model_lgbm_base_0_2.sql`, 되돌리기 `rollback_model_lgbm_base_0_2_to_0_1.sql`(PR #110·#113)
+  - 공용 DB는 11/18 `LGBM-BASE-0.1`(FP-216)에 이어 **11/20 `LGBM-BASE-0.2`로 전환 완료**(FP-237, 🆕 11/20). 학습 데이터·모델 파일 기록은 `docs/spec/sql/register_model_lgbm_base_0_1.sql`(PR #88). 전환은 `docs/spec/sql/activate_model_lgbm_base_0_1.sql`, 되돌리기는 `rollback_model_to_dev_dummy.sql`(PR #77, 절차: `fastapi_server/README.md`). 0.2는 `register_model_lgbm_base_0_2.sql` → `activate_model_lgbm_base_0_2.sql`, 되돌리기 `rollback_model_lgbm_base_0_2_to_0_1.sql`(PR #110·#113). 🆕 11/27 0.3(FP-285)은 `add_cutoff_cut_0_4.sql` → `register_model_lgbm_base_0_3.sql` → 파일 교체 → `activate_model_lgbm_base_0_3.sql` → `activate_cutoff_cut_0_4.sql`(순서·되돌리기: `docs/spec/sql/README.md`). 공용 DB 전환은 병합 뒤에 한다
 
 ### 4-1. ML-01 `GET /v1/health`
 ```json
@@ -258,6 +258,7 @@ Spring이 시작할 때 한 번 부른다. 세 버전이 DB에 있는지 확인�
 }
 ```
 - `gradeBands`와 `features`가 DB(`SCORE_GRADE_BAND`, `DIM_FEATURE`)와 다르면 Spring이 경고 로그를 남긴다.
+- 🆕 11/27 `cutoffVersion`·`gradeBands`(ML-02·03·04)는 계산한 모델 버전을 따른다(FP-285): `LGBM-BASE-0.3`은 `CUT-0.4`(0~644 / 645~711 / 712~1000), 그 밖의 버전과 Mock은 `CUT-0.3`. 필드 이름·모양은 그대로다.
 - 실제 모델을 불러왔으면 그 묶음의 버전(예: `LGBM-BASE-0.2` 🆕 11/23) / `FS-V1` / 피처 38개, 아니면 Mock `DEV-DUMMY` / `FS-DRAFT` / 39개를 돌려준다. `supportedModelVersions`는 이 서버가 지금 계산할 수 있는 버전 목록이다: `DEV-DUMMY` + 불러온 묶음의 버전(못 불러왔으면 `DEV-DUMMY`만). 🆕 11/20
 - 🆕 11/20 실제 모델 버전은 코드 상수가 아니라 불러온 묶음의 `meta.json`(`model_version`)에서 정한다(FP-237). 모델을 바꿀 때 코드는 그대로 두고 파일 교체 + DB 등록·전환 SQL만 한다.
 
@@ -497,7 +498,7 @@ C팀 SIM-02 `POST /api/members/me/credit-care-recalculate`가 부른다(11/19 �
 - **추천:** 신용점수에서 흔히 쓰는 규칙(PDO 방식)을 써요.
   - 기준: "약속을 지킬 사람 20명 : 못 지킬 사람 1명"인 학생을 **700점**으로 정해요.
   - 확률이 반으로 줄어들 때마다 점수를 **40점씩** 올려요.
-  - 이렇게 하면 (11/16 당시 CUT-0.1) 등급 경계 665점은 못 지킬 확률 약 8.4%, 780점은 약 1.2%예요. 🆕 11/23 지금 경계는 CUT-0.3(654·727, FP-248)
+  - 이렇게 하면 (11/16 당시 CUT-0.1) 등급 경계 665점은 못 지킬 확률 약 8.4%, 780점은 약 1.2%예요. 🆕 11/23 CUT-0.3(654·727, FP-248), 🆕 11/27 모델 0.3 전환 뒤에는 CUT-0.4(645·712, FP-285)
 
 **O-6. 예상 대안 점수 (N-21-8)** — ✅ 11/16 아래 추천안으로 확정
 - **질문:** "소득이 이렇게 바뀌면 내 점수는?" 하고 **미리 보기**를 할 때, 그 결과를 성적 기록부에 남길지 정해요.

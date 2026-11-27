@@ -28,6 +28,8 @@ public class OpenAiClient {
     public static final String AI_FAILED = "AI_FAILED";
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiClient.class);
+    // 토큰 상한에 걸려 중간에 끊긴 답의 finish_reason 값
+    private static final String FINISH_LENGTH = "length";
 
     private final OpenAiProperties properties;
     private final RestClient restClient;
@@ -89,10 +91,14 @@ public class OpenAiClient {
         return answer.trim();
     }
 
-    // choices[0].message.content. 모양이 다르면 null
+    // choices[0].message.content. 모양이 다르거나 길이 상한에서 잘린 답(finish_reason = length)이면 null — 잘린 요약이 저장되지 않게 실패로 본다
     private static String firstAnswer(Map<String, Object> body) {
         if (body == null || !(body.get("choices") instanceof List<?> choices) || choices.isEmpty()
                 || !(choices.get(0) instanceof Map<?, ?> choice) || !(choice.get("message") instanceof Map<?, ?> message)) {
+            return null;
+        }
+        if (FINISH_LENGTH.equals(choice.get("finish_reason"))) {
+            log.warn("OpenAI 답이 길이 상한에서 잘림");
             return null;
         }
         return message.get("content") instanceof String content ? content : null;

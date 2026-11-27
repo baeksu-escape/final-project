@@ -1,6 +1,6 @@
 """Add the nonfinancial-effect label next to the original labels (never replaces them).
 
-Run after extend.py (data/), build_thinfile.py (thinfile/) and build_nonfinancial_sources.py. Writes, per dataset:
+Run after extend.py (data/), build_thinfile.py (thinfile/), build_delinquency_label.py and build_nonfinancial_sources.py. Writes, per dataset:
   labels_nonfinancial.csv          customer_id, label_nonfin_effect_12m   (scope: delivery)
   labels_nonfinancial_metadata.csv customer_id, design probability, ...   (scope: reference, never a model input)
 Parameters and sources: reference/nonfinancial_label.json, docs/NONFINANCIAL_LABEL.md
@@ -17,8 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 def build(folder, cfg, seed_offset, thinfile):
     folder = Path(folder)
     profiles = pd.read_csv(folder/'profiles.csv', encoding='utf-8-sig')
-    base = pd.read_csv(folder/'base_207.csv', encoding='utf-8-sig').rename(columns={'식별구분': 'customer_id'})
-    frame = profiles.merge(base[['customer_id'] + cfg['financial_features']], on='customer_id', validate='one_to_one')
+    # v3.7.0 바탕값은 새 연체 라벨의 설계 logit이다(build_delinquency_label.py). 금융 특성에 다시 적합하지 않으므로
+    # 잔액·상환액처럼 거의 같은 두 값의 계수가 반대로 나뉘지 않고, 새 라벨의 효과가 그대로 전달된다.
+    design = pd.read_csv(folder/'labels_delinquency_metadata.csv', encoding='utf-8-sig', usecols=['customer_id', 'base_logit'])
+    frame = profiles.merge(design, on='customer_id', validate='one_to_one')
     src = pd.read_csv(folder/'nonfinancial_source_features.csv', encoding='utf-8-sig')
     frame = frame.merge(src[['customer_id', 'si_arrears_any', 'dp_active_months', 'dp_ever_used']], on='customer_id', validate='one_to_one')
     if thinfile:
@@ -28,8 +30,7 @@ def build(folder, cfg, seed_offset, thinfile):
     else:
         eligible = np.ones(len(frame), bool)
     y = frame.label_any_delinquency_12m.to_numpy()
-    x = nl.financial_matrix(frame, cfg['financial_features'], cfg['log1p_features'])
-    base_logit = nl.base_logit(x, y, fit_mask=eligible)
+    base_logit = frame.base_logit.to_numpy(float)
     bill = ((frame.telecom_late_months > 0) | (frame.utility_late_months > 0)).astype(int).to_numpy()
     cf = nl.cashflow_z(frame.months_liquid_negative, frame.income_cv)
     si = frame.si_arrears_any.to_numpy()

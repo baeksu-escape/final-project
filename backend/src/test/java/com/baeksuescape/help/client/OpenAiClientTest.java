@@ -140,6 +140,17 @@ class OpenAiClientTest {
     }
 
     @Test
+    @DisplayName("finish_reason이 length(토큰 상한에서 잘림)면 502 AI_FAILED, stop이면 정상 답이다(PR #170 리뷰)")
+    void truncatedAnswer() {
+        body.set("{\"choices\":[{\"index\":0,\"finish_reason\":\"length\",\"message\":{\"role\":\"assistant\",\"content\":\"중간에 끊긴\"}}]}");
+        ApiException error = assertThrows(ApiException.class, () -> client(TEST_KEY, 3000).complete("지시", "질문", 100));
+        assertEquals(OpenAiClient.AI_FAILED, error.getCode());
+
+        body.set("{\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\"끝까지 쓴 답\"}}]}");
+        assertEquals("끝까지 쓴 답", client(TEST_KEY, 3000).complete("지시", "질문", 100));
+    }
+
+    @Test
     @DisplayName("설정이 비면 기본 주소·기본 모델을 쓰고, 주소 끝의 / 는 뗀다")
     void defaults() {
         OpenAiProperties properties = new OpenAiProperties();
