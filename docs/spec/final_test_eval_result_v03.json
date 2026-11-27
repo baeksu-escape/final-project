@@ -1,0 +1,426 @@
+{
+  "split": "TEST",
+  "model_version": "LGBM-BASE-0.3",
+  "synthetic_notice": "합성 데이터와 합성 라벨 기준이며, 실제 신용평가·대출 심사 결과나 실제 개선을 뜻하지 않는다.",
+  "criteria": {
+    "source": "정의서 10장 C38",
+    "ranges": {
+      "legacy_delinq": [
+        0.6549,
+        0.6949
+      ],
+      "alt_nonfin": [
+        0.7183,
+        0.7583
+      ],
+      "alt_delinq": [
+        0.655,
+        0.695
+      ],
+      "legacy_nonfin": [
+        0.6993,
+        0.7393
+      ]
+    },
+    "delinq_diff_limit": 0.02
+  },
+  "legacy_group": {
+    "rows": 20901,
+    "shipped_auc": {
+      "legacy_delinq": {
+        "rows": 20901,
+        "positives": 2079,
+        "auc": 0.683
+      },
+      "alt_nonfin": {
+        "rows": 20901,
+        "positives": 2015,
+        "auc": 0.7476
+      }
+    },
+    "five_seed_auc": {
+      "legacy_delinq": {
+        "mean": 0.6835,
+        "std": 0.0006,
+        "by_seed": [
+          0.683,
+          0.6845,
+          0.6836,
+          0.6832,
+          0.6834
+        ]
+      },
+      "alt_delinq": {
+        "mean": 0.6821,
+        "std": 0.0003,
+        "by_seed": [
+          0.682,
+          0.6822,
+          0.6824,
+          0.6817,
+          0.6819
+        ]
+      },
+      "legacy_nonfin": {
+        "mean": 0.729,
+        "std": 0.0002,
+        "by_seed": [
+          0.7292,
+          0.7288,
+          0.7292,
+          0.7287,
+          0.7291
+        ]
+      },
+      "alt_nonfin": {
+        "mean": 0.748,
+        "std": 0.0006,
+        "by_seed": [
+          0.7476,
+          0.7473,
+          0.7488,
+          0.7479,
+          0.7481
+        ]
+      }
+    },
+    "same_label_diff": {
+      "delinq": {
+        "mean": -0.0015,
+        "min": -0.0023,
+        "max": -0.0009,
+        "verdict": "차이 없음(±0.02 안)"
+      },
+      "nonfin": {
+        "mean": 0.019,
+        "min": 0.0184,
+        "max": 0.0197,
+        "verdict": "설계한 효과 재현(+방향)"
+      }
+    },
+    "judgement": {
+      "legacy_delinq": {
+        "range": [
+          0.6549,
+          0.6949
+        ],
+        "valid_mean_reference": 0.6749,
+        "five_seed_mean": 0.6835,
+        "five_seed_verdict": "범위 안",
+        "shipped_auc": 0.683,
+        "shipped_verdict": "범위 안"
+      },
+      "alt_delinq": {
+        "range": [
+          0.655,
+          0.695
+        ],
+        "valid_mean_reference": 0.675,
+        "five_seed_mean": 0.6821,
+        "five_seed_verdict": "범위 안"
+      },
+      "legacy_nonfin": {
+        "range": [
+          0.6993,
+          0.7393
+        ],
+        "valid_mean_reference": 0.7193,
+        "five_seed_mean": 0.729,
+        "five_seed_verdict": "범위 안"
+      },
+      "alt_nonfin": {
+        "range": [
+          0.7183,
+          0.7583
+        ],
+        "valid_mean_reference": 0.7383,
+        "five_seed_mean": 0.748,
+        "five_seed_verdict": "범위 안",
+        "shipped_auc": 0.7476,
+        "shipped_verdict": "범위 안"
+      }
+    },
+    "by_segment": {
+      "legacy_delinq": {
+        "freelance": {
+          "rows": 1503,
+          "positives": 177,
+          "auc": 0.6873
+        },
+        "selfemp": {
+          "rows": 3071,
+          "positives": 326,
+          "auc": 0.6681
+        },
+        "wage": {
+          "rows": 16327,
+          "positives": 1576,
+          "auc": 0.6836
+        }
+      },
+      "alt_nonfin": {
+        "freelance": {
+          "rows": 1503,
+          "positives": 216,
+          "auc": 0.7311
+        },
+        "selfemp": {
+          "rows": 3071,
+          "positives": 378,
+          "auc": 0.7489
+        },
+        "wage": {
+          "rows": 16327,
+          "positives": 1421,
+          "auc": 0.7409
+        }
+      }
+    },
+    "grade_ratio": {
+      "legacy": {
+        "CAUTION": {
+          "count": 5317,
+          "ratio": 0.2544
+        },
+        "STANDARD": {
+          "count": 13127,
+          "ratio": 0.6281
+        },
+        "GOOD": {
+          "count": 2457,
+          "ratio": 0.1176
+        }
+      },
+      "alt": {
+        "CAUTION": {
+          "count": 5257,
+          "ratio": 0.2515
+        },
+        "STANDARD": {
+          "count": 10381,
+          "ratio": 0.4967
+        },
+        "GOOD": {
+          "count": 5263,
+          "ratio": 0.2518
+        }
+      }
+    }
+  },
+  "thinfile": {
+    "rows": 246,
+    "shipped_auc": {
+      "legacy_delinq": {
+        "rows": 246,
+        "positives": 20,
+        "auc": 0.6212
+      },
+      "alt_nonfin": {
+        "rows": 246,
+        "positives": 19,
+        "auc": 0.6061
+      }
+    },
+    "five_seed_auc": {
+      "legacy_delinq": {
+        "mean": 0.6394,
+        "std": 0.0165,
+        "by_seed": [
+          0.6212,
+          0.6345,
+          0.6414,
+          0.6659,
+          0.6341
+        ]
+      },
+      "alt_delinq": {
+        "mean": 0.7056,
+        "std": 0.0086,
+        "by_seed": [
+          0.7177,
+          0.7115,
+          0.7009,
+          0.6993,
+          0.6985
+        ]
+      },
+      "legacy_nonfin": {
+        "mean": 0.5569,
+        "std": 0.0055,
+        "by_seed": [
+          0.566,
+          0.5537,
+          0.5565,
+          0.5567,
+          0.5516
+        ]
+      },
+      "alt_nonfin": {
+        "mean": 0.6125,
+        "std": 0.0055,
+        "by_seed": [
+          0.6061,
+          0.6144,
+          0.6186,
+          0.6072,
+          0.616
+        ]
+      }
+    },
+    "same_label_diff": {
+      "delinq": {
+        "mean": 0.0662,
+        "min": 0.0334,
+        "max": 0.0965,
+        "verdict": "참고(C38 판정 기준은 기존 집단에만 적용)"
+      },
+      "nonfin": {
+        "mean": 0.0556,
+        "min": 0.0401,
+        "max": 0.0645,
+        "verdict": "참고(C38 판정 기준은 기존 집단에만 적용)"
+      }
+    },
+    "judgement": {},
+    "by_cohort": {
+      "legacy_delinq": {
+        "no_credit": {
+          "rows": 35,
+          "positives": 1,
+          "auc": 1.0
+        },
+        "short_history": {
+          "rows": 94,
+          "positives": 5,
+          "auc": 0.7281
+        },
+        "sparse_history": {
+          "rows": 20,
+          "positives": 2,
+          "auc": 0.5278
+        },
+        "young_established": {
+          "rows": 97,
+          "positives": 12,
+          "auc": 0.5029
+        }
+      },
+      "alt_nonfin": {
+        "no_credit": {
+          "rows": 35,
+          "positives": 6,
+          "auc": 0.5172
+        },
+        "short_history": {
+          "rows": 94,
+          "positives": 8,
+          "auc": 0.6177
+        },
+        "sparse_history": {
+          "rows": 20,
+          "positives": 1,
+          "auc": 0.6842
+        },
+        "young_established": {
+          "rows": 97,
+          "positives": 4,
+          "auc": 0.793
+        }
+      }
+    },
+    "cohort_rows": {
+      "no_credit": 35,
+      "short_history": 94,
+      "sparse_history": 20,
+      "young_established": 97
+    },
+    "grade_ratio": {
+      "legacy": {
+        "CAUTION": {
+          "count": 30,
+          "ratio": 0.122
+        },
+        "STANDARD": {
+          "count": 125,
+          "ratio": 0.5081
+        },
+        "GOOD": {
+          "count": 91,
+          "ratio": 0.3699
+        }
+      },
+      "alt": {
+        "CAUTION": {
+          "count": 39,
+          "ratio": 0.1585
+        },
+        "STANDARD": {
+          "count": 126,
+          "ratio": 0.5122
+        },
+        "GOOD": {
+          "count": 81,
+          "ratio": 0.3293
+        }
+      }
+    }
+  },
+  "reproduction_on_valid": {
+    "legacy_delinq": "같음",
+    "alt_nonfin": "같음"
+  },
+  "model_files_sha256": {
+    "legacy.joblib": "2afa3e925dc40da41dce2c07046c54f23b0d6d13c822086fc02c34758bb54f36",
+    "alternative.joblib": "bde7d5338de7e9fcc6b11ea0e029e3ccd0b13ec32ad7d02d7db5f2370cc0397f",
+    "legacy.meta.json": "19b46ee1619387557269d6a5572710891bb74a4c61695474ac120dcc532c1187",
+    "alternative.meta.json": "6795cdaedf475d114ed4669eb88a90501f020e9422a4036314ed461f78c69afd"
+  },
+  "tables_sha256_8": {
+    "legacy": "814d6d2d",
+    "thinfile": "1bd3d740"
+  },
+  "provenance": {
+    "commit": "f200cf50cda64446c4e37eeb3b326f870ea4a44e",
+    "working_tree_clean": true,
+    "untracked_files_count": 0,
+    "untracked_files": []
+  },
+  "settings": {
+    "seeds": [
+      11,
+      22,
+      33,
+      44,
+      55
+    ],
+    "monotone_constraints": {
+      "expense_ratio_svc_12m": 1,
+      "dsr_svc_12m": 1,
+      "deficit_months_svc_12m": 1,
+      "worst_month_net_cash_svc_12m_krw": -1,
+      "DQ1200001": 1,
+      "CL0631905": 1,
+      "income_svc_12m_krw": -1,
+      "expense_avg_month_krw": 1,
+      "debt_balance_krw": 1,
+      "debt_service_current_krw": 1,
+      "L00000001": 1,
+      "L22000900": 1,
+      "LA0099212": 1,
+      "CF1231605": 1,
+      "zero_income_months_svc_12m": 1,
+      "telecom_late_months": 1,
+      "telecom_on_time_streak": -1,
+      "utility_late_months": 1,
+      "dp_payment_count_12m": -1
+    },
+    "shipped_seed": 11
+  },
+  "library_versions": {
+    "lightgbm": "4.6.0",
+    "scikit-learn": "1.9.1",
+    "pandas": "3.0.5",
+    "numpy": "2.4.6"
+  },
+  "generated_at": "2026-11-27T00:35:39+00:00"
+}

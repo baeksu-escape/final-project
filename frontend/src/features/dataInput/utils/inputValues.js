@@ -11,9 +11,24 @@ export function isEmptyValue(value) {
   return value === null || value === undefined || (typeof value === 'string' && value.trim() === '')
 }
 
+// 칸 하나의 처음 값 — 글자 칸은 '', 필수가 아닌 금액 칸은 0원, 그 밖은 null(값 없음).
+// 필수가 아닌 금액(자산 4종·월 고정 지출 등)을 비워 두면 서버가 그 항목을 '미완료'로 보아 점수 산출이 막히므로, 없으면 0원으로 시작한다.
+// 필수 금액 칸(월급·대출 잔액 등)은 0원으로 채우면 입력을 빠뜨려도 검사를 통과해 틀린 점수가 나오므로 비워 둔다.
+function initialValueOf(field) {
+  if (field.input === 'text') return ''
+  if (field.input === 'money' && !field.required) return 0
+  return null
+}
+
 // 줄 섹션의 빈 줄 하나를 만든다(id는 EditableList가 붙인다).
 export function createEmptyRow(section) {
-  return Object.fromEntries(section.itemFields.map((field) => [field.key, field.input === 'text' ? '' : null]))
+  return Object.fromEntries(section.itemFields.map((field) => [field.key, initialValueOf(field)]))
+}
+
+// 줄의 모든 칸이 처음 값 그대로인지(새로 추가했거나 [초기화]한 카드) — 이런 줄은 검사하지 않고 요청 본문에도 넣지 않는다.
+// 달이 고정된 줄(월별 소득)은 달 칸이 늘 차 있어 해당하지 않는다.
+export function isBlankRow(section, row) {
+  return section.itemFields.every((field) => isEmptyValue(row[field.key]) || row[field.key] === initialValueOf(field))
 }
 
 // N-05-2 기준월 기본값 — 12개월을 받는 직군은 12줄의 끝 달(설정값, 지금은 지난달), 그 외 직군은 이번 달이다.
@@ -56,7 +71,7 @@ export function withFixedMonthRows(values, sections) {
 
 // 칸 섹션의 빈 값을 만든다.
 function createEmptyFields(section) {
-  return Object.fromEntries(section.fields.map((field) => [field.key, field.input === 'text' ? '' : null]))
+  return Object.fromEntries(section.fields.map((field) => [field.key, initialValueOf(field)]))
 }
 
 // N-05 화면 입력값의 처음 상태 — { baseMonth, [섹션 key]: 칸 객체 | 줄 배열 }. 최소 줄 수가 있는 섹션은 빈 줄로 채워 둔다.
@@ -130,7 +145,7 @@ export function buildPayload(values, sections, jobType) {
     if (section.kind === 'list') {
       // FP-227 "없음" 체크면 잠가 둔 줄은 보내지 않는다(체크하면 줄을 지우던 때와 같은 본문: items: [], noItems: true).
       const noItems = section.noItemsLabel ? values.noItems[section.key] : false
-      body.items = noItems ? [] : value.map(withoutId)
+      body.items = noItems ? [] : value.filter((row) => !isBlankRow(section, row)).map(withoutId)
       if (section.noItemsLabel) body.noItems = noItems
     } else {
       // FP-86 체크 칸은 true/false로, 비활성 칸(disabledWhen)은 null로 보낸다.

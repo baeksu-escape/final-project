@@ -1,5 +1,5 @@
 import { BASE_MONTH_FIELD } from '../config/inputSections.js'
-import { currentMonth, isEmptyValue } from '../utils/inputValues.js'
+import { currentMonth, isBlankRow, isEmptyValue } from '../utils/inputValues.js'
 import { findDuplicateRowIds } from './inputRules.js'
 
 // 필수 칸이 비었을 때의 기본 문구.
@@ -70,7 +70,12 @@ export function validateFinancialInput(values, sections, { checkRequired = true,
       if (checkRequired && section.minItems && value.length < section.minItems) {
         errors[errorKeyOf(section.key)] = section.minItemsMessage ?? REQUIRED_MESSAGE
       }
-      for (const row of value) {
+      // 비어 있는 카드(처음 값 그대로)는 건너뛴다. "없음" 체크가 있는 섹션(대출)이 빈 카드뿐이면 칸마다 '필수'를 띄우지 않고 무엇을 할지 한 줄로 알린다.
+      const filledRows = value.filter((row) => !isBlankRow(section, row))
+      if (checkRequired && section.noItemsLabel && filledRows.length === 0) {
+        errors[errorKeyOf(section.key)] = `${section.itemLabel ?? '항목'} 정보를 입력하거나 '${section.noItemsLabel}'에 체크해 주세요.`
+      }
+      for (const row of filledRows) {
         for (const field of section.itemFields) {
           const key = errorKeyOf(section.key, field.key, row.id)
           checkField(field, row[field.key], { row, values, nowMonth }, errors, key, checkRequired)

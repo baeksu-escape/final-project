@@ -20,8 +20,9 @@ def main() -> None:
     parser.add_argument("--data-dir", type=Path, default=config.DEFAULT_DATA_DIR)
     parser.add_argument("--with-thinfile", action="store_true", help="씬파일(노출 1) TRAIN 행을 학습에 더한다(train.py와 같은 설정)")
     parser.add_argument("--monotone", action="store_true", help="config.MONOTONE_CONSTRAINTS에 단조 제약을 건다(train.py와 같은 설정)")
+    parser.add_argument("--monotone-set", choices=sorted(config.MONOTONE_SETS), help="단조 제약 목록을 고른다(train.py와 같은 설정)")
     args = parser.parse_args()
-    monotone = config.MONOTONE_CONSTRAINTS if args.monotone else None
+    monotone = config.MONOTONE_SETS[args.monotone_set] if args.monotone_set else config.MONOTONE_CONSTRAINTS if args.monotone else None
 
     train, valid, thin_valid, _ = load_training_sets(args.data_dir, args.with_thinfile)
     same = float((valid[LABELS[0]] == valid[LABELS[1]]).mean())

@@ -39,12 +39,20 @@ function LockedRows({ section, items }) {
       <ul className="editable-list__items">
         {rows.map((item, index) => (
           <li key={item.id} className="editable-list__item">
+            <div className="editable-list__item-head">
+              <span>{section.itemLabel ?? '항목'} {index + 1}</span>
+              <button type="button" className="editable-list__remove editable-list__remove--reset" aria-label={`${section.itemLabel ?? '항목'} ${index + 1} 초기화`}>
+                초기화
+              </button>
+            </div>
             {section.itemFields.map((field) => (
               <FieldControl key={field.key} field={field} value={item[field.key]} onChange={() => {}} disabled />
             ))}
-            <button type="button" className="editable-list__remove" aria-label={`${index + 1}번째 항목 삭제`}>
-              삭제
-            </button>
+            {rows.length > 1 && (
+              <button type="button" className="editable-list__remove editable-list__remove--bottom" aria-label={`${section.itemLabel ?? '항목'} ${index + 1} 삭제`}>
+                삭제
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -78,6 +86,7 @@ export default function SectionList({ section, items, onChange, errors, noItems 
           addLabel={section.addLabel}
           emptyMessage={section.emptyMessage}
           maxItems={section.maxItems}
+          itemLabel={section.itemLabel}
           renderItem={(item, update) =>
             section.itemFields.map((field) => (
               <FieldControl

@@ -10,13 +10,13 @@ A팀이 만든 공통 프론트입니다. 다른 팀은 이 틀과 부품 위에
 | 로그인 상태·접근 제한 | 토큰 보관·삭제, 앱 전체에서 쓰는 로그인 상태(`useAuth`). 비로그인 → `/login`, 역할이 다른 화면 → 내 첫 화면(관리자: 모형 성능 비교 / 사용자: 한눈에 `/home` 🆕 11/23, `getHomePath`), 직군 미선택 → `/select-job`, 점수 없음 → `/data-input`(신용 리포트·재무 진단 4종·시뮬레이터) | `auth/` |
 | 사용자·관리자 계정 분기 (N-08-1) | 역할로만 화면을 나눈다. 사용자 메뉴(기능 9개, 화면에서는 큰 분류 5개로 묶음 🆕 11/23)는 직군과 상관없이 같고 점수가 나온 뒤에만 보인다. 관리자 탭은 5개다. 메뉴 이름·순서·경로는 설정 파일 하나에 있다 | `config/navigation.js`, `auth/accessRules.js` |
 | 등급 공통 상수 | 등급 코드(GOOD·STANDARD·CAUTION)·화면 이름(좋음·보통·주의 🆕 11/23), 점수 범위 0~1000, 경계 727·654(CUT-0.3, 임시, D-01). 실제 등급은 서버가 정해 보낸다 | `config/grades.js` |
-| 공통 카드·입력 폼 | 카드, 텍스트 입력, 금액 입력, 숫자 입력, 슬라이더, 선택 상자, 체크박스, 입력 오류 표시, 항목 추가·삭제 목록 | `components/` |
-| 공통 UI 부품 | 버튼(`Button`), 칩(`Chip`), 안내 박스(`Notice`), 진행률 막대(`ProgressBar`), 스위치(`Switch`), 구간 선택(`SegmentedControl`), 모달(`Modal`), 토스트(`Toast`) | `components/` |
+| 공통 카드·입력 폼 | 카드, 텍스트 입력, 금액 입력, 숫자 입력, 슬라이더, 선택 상자, 체크박스, 입력 오류 표시, 항목 추가·삭제 목록, 날짜 연·월·일 칸(`DateSelect`) 🆕 11/27 | `components/` |
+| 공통 UI 부품 | 버튼(`Button`), 칩(`Chip`), 안내 박스(`Notice`), 진행률 막대(`ProgressBar`), 스위치(`Switch`), 구간 선택(`SegmentedControl`), 모달(`Modal`), 토스트(`Toast`), 가입 진행 단계(`JourneySteps`)·점수 캐릭터 카드(`ScoreRoad`) 🆕 11/27 | `components/` |
 | 공통 스타일 | 색·글꼴 변수(화이트·블랙 테마), 위 컴포넌트의 스타일 | `styles/` |
 | 공통 차트 컴포넌트 (FP-156) | 수평 비교 막대, 시계열 추이선, 지표·증감 막대, 직군×연령 격자 히트맵 (경량 SVG 기반) | `components/` |
 | API 공통 모듈 | 모든 요청에 토큰을 붙이고, 401이면 로그아웃. `VITE_USE_MOCK`으로 mock과 실제 API를 전환 | `api/`, `mocks/` |
 
-공통 컴포넌트의 스타일은 `styles/`(`tokens.css`·`forms.css`·`components.css`)에 있고 `main.jsx`에서 불러옵니다. 기본은 화이트 테마이며 `html`에 `data-theme="dark"`를 달면 블랙 테마가 됩니다(전환 코드는 아직 없습니다). 화면별 스타일은 각 담당자가 따로 추가합니다.
+공통 컴포넌트의 스타일은 `styles/`(`tokens.css`·`forms.css`·`components.css`, 로그인·가입·데이터 입력 화면의 입력칸·버튼·단계 표시는 `finForm.css` 🆕 11/27)에 있고 `main.jsx`에서 불러옵니다. 기본은 화이트 테마이며 `html`에 `data-theme="dark"`를 달면 블랙 테마가 됩니다(전환 코드는 아직 없습니다). 화면별 스타일은 각 담당자가 따로 추가합니다.
 
 ## 다른 팀이 쓰는 방법
 
@@ -32,6 +32,11 @@ A팀이 만든 공통 프론트입니다. 다른 팀은 이 틀과 부품 위에
   - `HeatmapGrid`: 직군 × 연령 매트릭스 히트맵 (`rows`, `columns`, `data`, `myCell`, `selectedCell`, `onSelectCell`, `unit`, `rowSummary`·`colSummary`·`totalSummary`, `formatValue`) — N-26-3, N-26-6 · 값이 `null`(인원이 적어 숨긴 값 등)이면 '—'로 보이고 색 범위에서 빠진다. `formatValue`로 "+42점"·"56%"처럼 표시를 바꾼다(11/23 FP-164)
   - 사용 예시: `import { CompareBar, TrendLineChart, BarChart, HeatmapGrid } from '../../common/components/index.js'`
   - 각 props의 의미와 `data` 형식은 차트 파일 맨 위 주석에 있습니다.
+- **새 입력·표시 부품** 🆕 11/27 (사용법은 각 파일 맨 위 주석):
+  - `DateSelect`: 생일처럼 연·월·일을 숫자 칸 3개로 받는다. 칸을 다 채우면 다음 칸으로 넘어간다 — N-02-1
+  - `JourneySteps`: 가입 → 직군 선택 → 데이터 입력 3단계 진행 막대 (`current`는 0부터)
+  - `ScoreRoad`: 한눈에의 점수 카드. 점수 구간(좋음·보통·주의)에 따라 캐릭터가 바뀌고, 지난 평가보다 오르면 축하 화면을 한 번 띄운다 (`score`, `previous`, `seenKey`). 캐릭터 그림(`assets/mascot-*.png`)은 저작권 때문에 저장소에 없고, 없으면 코드로 그린 캐릭터가 나온다
+  - `NumberInput`에 `ref`·`placeholder`를 넘길 수 있다(기존 사용처 영향 없음)
 - **로그인 정보:** `const { user, logout } = useAuth()`
 - **API 호출:** `apiGet`·`apiPost` 등(`api/client.js`)을 씁니다. mock 응답은 자기 폴더에서 `registerMockHandlers()`로 추가합니다.
 
