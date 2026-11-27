@@ -17,14 +17,14 @@ export function useNotifications(enabled = true) {
   const [state, setState] = useState({ items: [], unreadCount: 0, loading: true, error: '' })
   const refresh = useCallback(async () => {
     setState((current) => ({ ...current, error: '', loading: true }))
-    try { setState({ ...adaptNotifications(await fetchNotifications()), loading: false, error: '' }) }
+    try { setState({ ...adaptNotifications(await fetchNotifications({ unreadOnly: true })), loading: false, error: '' }) }
     catch { setState((current) => ({ ...current, loading: false, error: '알림을 불러오지 못했어요.' })) }
   }, [])
 
   useEffect(() => {
     if (!enabled) return undefined
     let active = true
-    fetchNotifications().then((data) => { if (active) setState({ ...adaptNotifications(data), loading: false, error: '' }) })
+    fetchNotifications({ unreadOnly: true }).then((data) => { if (active) setState({ ...adaptNotifications(data), loading: false, error: '' }) })
       .catch(() => { if (active) setState((current) => ({ ...current, loading: false, error: '알림을 불러오지 못했어요.' })) })
     return () => { active = false }
   }, [enabled])
@@ -96,13 +96,14 @@ export function useNotifications(enabled = true) {
   const markRead = useCallback(async (id) => {
     await markNotificationRead(id)
     setState((current) => {
-      const items = current.items.map((item) => item.notificationId === id ? { ...item, read: true } : item)
-      return { ...current, items, unreadCount: items.filter((item) => !item.read).length }
+      const wasUnread = current.items.some((item) => item.notificationId === id && !item.read)
+      const items = current.items.filter((item) => item.notificationId !== id)
+      return { ...current, items, unreadCount: Math.max(0, current.unreadCount - Number(wasUnread)) }
     })
   }, [])
   const markAllRead = useCallback(async () => {
     await markAllNotificationsRead()
-    setState((current) => ({ ...current, items: current.items.map((item) => ({ ...item, read: true })), unreadCount: 0 }))
+    setState((current) => ({ ...current, items: [], unreadCount: 0 }))
   }, [])
 
   return { ...state, refresh, addNotification, markRead, markAllRead }

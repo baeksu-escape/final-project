@@ -10,5 +10,5 @@ export function adaptNotifications(data) {
     const linkUrl = typeof item.linkUrl === 'string' && item.linkUrl.startsWith('/') && !item.linkUrl.startsWith('//') ? item.linkUrl : null
     return { ...item, linkUrl, read: Boolean(item.read) }
   })
-  return { unreadCount: items.filter((item) => !item.read).length, items }
+  return { unreadCount: data.unreadCount, items, hasMore: Boolean(data.hasMore) }
 }

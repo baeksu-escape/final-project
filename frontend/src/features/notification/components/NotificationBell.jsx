@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useNotifications } from './useNotifications.js'
+import { PATHS } from '../../../common/config/navigation.js'
 import '../styles/notification.css'
 
 const relativeTime = (value) => {
@@ -46,7 +47,7 @@ export default function NotificationBell({ enabled = true }) {
       <button type="button" className="app-header__text-btn" aria-expanded={open} aria-controls="notification-panel" onClick={() => { setOpen((value) => !value); setActionError('') }}>
         알림{notifications.unreadCount > 0 && <span className="nt-badge">{notifications.unreadCount > 99 ? '99+' : notifications.unreadCount}</span>}
       </button>
-      {open && <section className="nt-panel" id="notification-panel" aria-label="알림 목록">
+      {open && <section className="nt-panel" id="notification-panel" aria-label="안 읽은 알림 목록">
         <header className="nt-panel__head"><strong>알림</strong><button type="button" className="nt-read-all" disabled={notifications.unreadCount === 0} onClick={readAll}>모두 읽음</button></header>
         {notifications.loading ? <p className="hint">알림을 불러오는 중이에요.</p>
           : notifications.error ? <p className="hint" role="status">{notifications.error}</p>
@@ -63,6 +64,7 @@ export default function NotificationBell({ enabled = true }) {
                 </button>
               </li>)}</ul>}
         {actionError && <p className="hint" role="status">{actionError}</p>}
+        <Link className="text-link nt-all-link" to={PATHS.NOTIFICATIONS} onClick={() => setOpen(false)}>전체 보기</Link>
       </section>}
     </div>
   )

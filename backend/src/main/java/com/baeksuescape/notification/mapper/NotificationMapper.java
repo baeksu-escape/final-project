@@ -12,6 +12,9 @@ import com.baeksuescape.notification.dto.NotificationRow;
 @Mapper
 public interface NotificationMapper {
     List<NotificationRow> selectLatest(@Param("userId") long userId, @Param("limit") int limit);
+    // FP-300·D-23 조건별 최신 목록을 조회하며 limit에는 hasMore 확인을 위한 추가 한 건이 포함된다.
+    List<NotificationRow> selectFiltered(@Param("userId") long userId, @Param("unreadOnly") boolean unreadOnly,
+            @Param("typeCode") String typeCode, @Param("before") Long before, @Param("limit") int limit);
     long countUnread(@Param("userId") long userId);
     NotificationRow selectOwned(@Param("userId") long userId, @Param("notificationId") long notificationId);
     int markRead(@Param("userId") long userId, @Param("notificationId") long notificationId,

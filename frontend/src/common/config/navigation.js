@@ -21,6 +21,7 @@ export const PATHS = Object.freeze({
   LOAN_DETAIL: '/loans/:productCode',
   COMPARISON: '/comparison',
   LOUNGE: '/lounge',
+  NOTIFICATIONS: '/notifications',
   MY_PAGE: '/mypage',
   // v3 삭제(N-08-3, 11/06) — 직군별 재무 진단 묶음. 라우트에 연결하지 않으며, 이 경로는 없는 페이지로 간다.
   DIAGNOSIS: '/diagnosis',

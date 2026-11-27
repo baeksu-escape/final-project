@@ -13,6 +13,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.baeksuescape.global.security.JwtTokenProvider;
+import com.baeksuescape.global.exception.ApiException;
+import org.springframework.http.HttpStatus;
 import com.baeksuescape.notification.dto.NotificationItemResponse;
 import com.baeksuescape.notification.dto.NotificationListResponse;
 import com.baeksuescape.notification.service.NotificationService;
@@ -50,18 +52,43 @@ class NotificationControllerTest {
     @Test
     @DisplayName("로그인 회원 토큰의 ID로 목록을 조회하고 계약 필드를 반환한다")
     void list_contract() throws Exception {
-        given(notificationService.list(7L)).willReturn(new NotificationListResponse(2,
+        given(notificationService.list(7L, false, null, null, 20)).willReturn(new NotificationListResponse(2,
                 List.of(new NotificationItemResponse(31, "WELCOME", "환영", "시작해 보세요", "/home", false,
-                        LocalDateTime.of(2026, 11, 27, 10, 0)))));
+                        LocalDateTime.of(2026, 11, 27, 10, 0))), false));
         mockMvc.perform(get(PATH).header(HttpHeaders.AUTHORIZATION, bearer(7, "ROLE_USER")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(2))
                 .andExpect(jsonPath("$.items[0].notificationId").value(31))
                 .andExpect(jsonPath("$.items[0].typeCode").value("WELCOME"))
                 .andExpect(jsonPath("$.items[0].read").value(false))
-                .andExpect(jsonPath("$.items[0].linkUrl").value("/home"));
-        verify(notificationService).list(7L);
+                .andExpect(jsonPath("$.items[0].linkUrl").value("/home"))
+                .andExpect(jsonPath("$.hasMore").value(false));
+        verify(notificationService).list(7L, false, null, null, 20);
     }
 
+    @Test
+    @DisplayName("unsupported type returns the existing 400 error contract")
+    void list_invalidType_badRequest() throws Exception {
+        given(notificationService.list(7L, false, "UNKNOWN", null, 20))
+                .willThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "알림 목록 조건을 확인해 주세요."));
+
+        mockMvc.perform(get(PATH).queryParam("type", "UNKNOWN")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(7, "ROLE_USER")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        verify(notificationService).list(7L, false, "UNKNOWN", null, 20);
+    }
+    @Test
+    @DisplayName("list query parameters are forwarded to the filtered service")
+    void list_forwardsOptionalFilters() throws Exception {
+        given(notificationService.list(7L, true, "WELCOME", 31L, 5))
+                .willReturn(new NotificationListResponse(8, List.of(), true));
+
+        mockMvc.perform(get(PATH).queryParam("unreadOnly", "true").queryParam("type", "WELCOME")
+                        .queryParam("before", "31").queryParam("size", "5")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(7, "ROLE_USER")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(8))
+                .andExpect(jsonPath("$.items").isEmpty()).andExpect(jsonPath("$.hasMore").value(true));
+        verify(notificationService).list(7L, true, "WELCOME", 31L, 5);
+    }
     @Test
     @DisplayName("본인 읽음 API는 200을 반환한다")
     void markRead_contract() throws Exception {

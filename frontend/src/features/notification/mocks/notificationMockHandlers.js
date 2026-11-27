@@ -15,10 +15,21 @@ const storeFor = (token) => {
   if (!stores.has(user.userId)) stores.set(user.userId, structuredClone(seeded))
   return stores.get(user.userId)
 }
-const snapshot = (items) => ({ unreadCount: items.filter((item) => !item.read).length, items: structuredClone(items).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)) })
+const snapshot = (items, { unreadOnly = false, type, before, size = 20 } = {}) => {
+  const sorted = structuredClone(items).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+  const filtered = sorted.filter((item) => (!unreadOnly || !item.read)
+    && (!type || item.typeCode === type)
+    && (before == null || item.notificationId < Number(before)))
+  return { unreadCount: items.filter((item) => !item.read).length, items: filtered.slice(0, size), hasMore: filtered.length > size }
+}
 const ids = seeded.map((item) => item.notificationId)
 const handlers = {
-  'GET /api/members/me/notifications': ({ token }) => snapshot(storeFor(token)),
+  'GET /api/members/me/notifications': ({ token, query }) => snapshot(storeFor(token), {
+    unreadOnly: query?.get('unreadOnly') === 'true',
+    type: query?.get('type') || undefined,
+    before: query?.get('before'),
+    size: Math.min(100, Math.max(1, Number(query?.get('size')) || 20)),
+  }),
   'PATCH /api/members/me/notifications/read-all': ({ token }) => {
     storeFor(token).forEach((item) => { item.read = true })
     return snapshot(storeFor(token))

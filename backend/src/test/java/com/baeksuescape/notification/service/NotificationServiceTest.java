@@ -64,6 +64,31 @@ class NotificationServiceTest {
 
 
     @Test
+    @DisplayName("list applies filters, cursor, size, and computes hasMore")
+    void list_filteredAndHasMore() {
+        LocalDateTime now = LocalDateTime.now();
+        given(mapper.selectFiltered(7L, true, "COMMENT_NEW", 50L, 3))
+                .willReturn(List.of(row(49L, 7L, null, now), row(48L, 7L, null, now.minusMinutes(1)),
+                        row(47L, 7L, null, now.minusMinutes(2))));
+        given(mapper.countUnread(7L)).willReturn(4L);
+
+        var result = service.list(7L, true, "COMMENT_NEW", 50L, 2);
+
+        assertThat(result.unreadCount()).isEqualTo(4);
+        assertThat(result.items()).extracting(com.baeksuescape.notification.dto.NotificationItemResponse::notificationId)
+                .containsExactly(49L, 48L);
+        assertThat(result.hasMore()).isTrue();
+        verify(mapper).selectFiltered(7L, true, "COMMENT_NEW", 50L, 3);
+    }
+
+    @Test
+    @DisplayName("list rejects unsupported notification type")
+    void list_invalidType_rejected() {
+        assertThatThrownBy(() -> service.list(7L, false, "UNKNOWN", null, 20))
+                .isInstanceOf(ApiException.class)
+                .satisfies(error -> assertThat(((ApiException) error).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+    @Test
     @DisplayName("본인 안 읽은 알림을 읽음 처리한다")
     void markRead_ownedNotification() {
         given(mapper.markRead(eq(7L), eq(31L), any())).willReturn(1);

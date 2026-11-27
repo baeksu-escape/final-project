@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -24,10 +25,12 @@ public class NotificationController {
     private final NotificationService notificationService;
     private final NotificationStreamService notificationStreamService;
 
-    /** FP-284·D-23 로그인 회원의 최근 알림과 안 읽은 개수를 반환한다. */
+    /** FP-300·D-23 로그인 회원의 조건별 알림 목록과 전체 안 읽은 개수, 다음 페이지 유무를 반환한다. */
     @GetMapping
-    public ResponseEntity<NotificationListResponse> list(@AuthenticationPrincipal AuthUser user) {
-        return ResponseEntity.ok(notificationService.list(user.userId()));
+    public ResponseEntity<NotificationListResponse> list(@AuthenticationPrincipal AuthUser user,
+            @RequestParam(defaultValue = "false") boolean unreadOnly, @RequestParam(required = false) String type,
+            @RequestParam(required = false) Long before, @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(notificationService.list(user.userId(), unreadOnly, type, before, size));
     }
 
     /**

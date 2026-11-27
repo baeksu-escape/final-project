@@ -13,6 +13,16 @@
          ORDER BY CREATED_AT DESC, NOTIFICATION_ID DESC
          FETCH FIRST #{limit} ROWS ONLY
     </select>
+    <!-- FP-300·D-23 읽음 여부·종류·커서 조건을 적용하고 다음 페이지 확인용으로 요청 수보다 한 건 더 조회한다. -->
+    <select id="selectFiltered" resultType="com.baeksuescape.notification.dto.NotificationRow">
+        SELECT <include refid="columns"/> FROM USER_NOTIFICATION
+         WHERE USER_ID = #{userId}
+        <if test="unreadOnly">AND READ_AT IS NULL</if>
+        <if test="typeCode != null">AND NOTIFICATION_TYPE_CODE = #{typeCode}</if>
+        <if test="before != null">AND NOTIFICATION_ID &lt; #{before}</if>
+         ORDER BY CREATED_AT DESC, NOTIFICATION_ID DESC
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
     <select id="countUnread" resultType="long">
         SELECT COUNT(*) FROM USER_NOTIFICATION WHERE USER_ID = #{userId} AND READ_AT IS NULL
     </select>
