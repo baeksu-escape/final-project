@@ -33,6 +33,7 @@ import com.baeksuescape.user.mapper.UserAccountMapper;
 import com.baeksuescape.user.mapper.VerificationCodeMapper;
 import com.baeksuescape.user.service.AccountRules;
 import com.baeksuescape.user.service.AuthErrors;
+import com.baeksuescape.user.service.LoginAttemptService;
 import com.baeksuescape.user.service.UserViewFactory;
 import com.baeksuescape.user.service.email.EmailCodeSender;
 
@@ -79,11 +80,12 @@ public class AdminAuthService {
     private final SystemLogService systemLog;
     private final AvenueProperties properties;
     private final Clock clock;
+    private final LoginAttemptService loginAttempts;
     private final SecureRandom random = new SecureRandom();
 
     public AdminAuthService(VerificationCodeMapper codeMapper, UserAccountMapper userMapper, AdminAccountMapper adminMapper, JwtTokenProvider tokens,
             OneTimeTokenStore oneTimeTokens, EmailCodeSender sender, PasswordEncoder passwordEncoder, PiiCrypto crypto, UserViewFactory userViews,
-            SystemLogService systemLog, AvenueProperties properties, Clock clock) {
+            SystemLogService systemLog, AvenueProperties properties, Clock clock, LoginAttemptService loginAttempts) {
         this.codeMapper = codeMapper;
         this.userMapper = userMapper;
         this.adminMapper = adminMapper;
@@ -96,6 +98,7 @@ public class AdminAuthService {
         this.systemLog = systemLog;
         this.properties = properties;
         this.clock = clock;
+        this.loginAttempts = loginAttempts;
     }
 
     // ── 로그인 ──
@@ -113,7 +116,7 @@ public class AdminAuthService {
 
     // AUTH-11 번호 확인. 맞으면 ACCESS 토큰, 임시 비밀번호 상태면 토큰 대신 비밀번호 설정 토큰을 준다.
     // 틀리면 시도 횟수를 올리고(5회면 그 번호는 못 씀) 대기 토큰은 그대로 둔다(다시 입력할 수 있게). 시도 횟수는 실패해도 저장한다.
-    @Transactional(noRollbackFor = ApiException.class)
+    // FP-258 트랜잭션을 걸지 않는다(쓰기는 한 문장씩 바로 저장) — 성공 처리는 completeLogin이 계정 행 잠금 안(LoginAttemptService)에서 하고, 로그는 잠금 밖에서 남긴다.
     public AdminDtos.AdminLogin verifyLogin(AdminDtos.VerifyCode request) {
         String token = request == null ? null : request.challengeToken();
         ScopedClaims claims = tokens.parseScoped(token, TokenScope.ADMIN_LOGIN_CHALLENGE).orElseThrow(AdminAuthService::challengeInvalid);
@@ -140,7 +143,7 @@ public class AdminAuthService {
 
     // 첫 로그인(임시 비밀번호) 비밀번호 설정 — 설정 토큰(10분, 1회용)으로 새 비밀번호를 저장하고 그때 ACCESS 토큰을 준다.
     // 비밀번호 규칙·임시 비밀번호와 같은지를 먼저 보고, 통과한 뒤에 토큰을 쓴다(규칙에 걸리면 같은 토큰으로 다시 시도할 수 있다).
-    @Transactional
+    // FP-258 verifyLogin과 같은 까닭으로 트랜잭션을 걸지 않는다(비밀번호 저장은 한 문장, 성공 처리는 completeLogin의 잠금 안).
     public AdminDtos.AdminLogin setupPassword(AdminDtos.PasswordSetup request) {
         String token = request == null ? null : request.passwordSetupToken();
         ScopedClaims claims = tokens.parseScoped(token, TokenScope.ADMIN_PASSWORD_SETUP).orElseThrow(AdminAuthService::passwordSetupInvalid);
@@ -157,8 +160,9 @@ public class AdminAuthService {
     }
 
     // 로그인 완료 — 실패 횟수 0·마지막 로그인 시각, 로그인 성공 기록, ACCESS 토큰.
+    // FP-258 성공 처리는 계정 행을 잠그고 다시 읽은 뒤 한다. 그사이 잠겼으면(10회째 실패·관리자 잠금) 423 ADMIN_ACCOUNT_LOCKED, 로그는 잠금이 끝난 뒤.
     private AdminDtos.AdminLogin completeLogin(UserAccount admin, Boolean passwordChangeRequired) {
-        userMapper.updateLoginSuccess(admin.getUserId(), LocalDateTime.now(clock));
+        if (!loginAttempts.recordSuccess(admin.getUserId())) throw AuthErrors.adminAccountLocked();
         systemLog.record(SystemLogService.Type.AUTH, LOG_SOURCE, "로그인 성공 (" + masked(admin) + ")", admin.getUserId());
         return new AdminDtos.AdminLogin(tokens.issue(admin.getUserId(), admin.getRoleCode()), userViews.of(admin), passwordChangeRequired, null);
     }

@@ -1,4 +1,5 @@
 import { ApiError } from '../../../common/api/ApiError.js'
+import { AUTH_ERROR_CODES } from '../authConstants.js'
 
 // FP-258 N-01-3·N-02-1·N-02-3 서버의 반복 시도 제한(ClientRateLimiter)과 하루 인증코드 발송 상한(AuthErrors.DAILY_CODE_SEND_LIMIT)을 mock에서 흉내 낸다.
 // mock에는 접속 IP가 없어 브라우저 탭 하나를 한 접속지로 보고, 새로고침하면 초기화된다. 숫자·문구는 서버와 같다.
@@ -38,14 +39,14 @@ export function hitMockRate(ruleName) {
   if (window.count > MOCK_RATE_RULES[ruleName].limit) throw tooMany(MOCK_RATE_RULES[ruleName], window)
 }
 
-// 로그인·간편 로그인 연결 — 이미 limit에 닿았으면 요청 전에 429, 401로 끝나면 한 번 센다.
+// 로그인·간편 로그인 연결 — 이미 limit에 닿았으면 요청 전에 429. 401과 계정 5분 제한 429(LOGIN_TEMPORARILY_BLOCKED, 5회째 포함)로 끝나면 한 번 센다(서버 countFailures와 같음).
 export function countMockFailures(action) {
   const window = currentWindow('LOGIN_FAILURE')
   if (window && window.count >= MOCK_RATE_RULES.LOGIN_FAILURE.limit) throw tooMany(MOCK_RATE_RULES.LOGIN_FAILURE, window)
   try {
     return action()
   } catch (error) {
-    if (error?.status === 401) addRate('LOGIN_FAILURE')
+    if (error?.status === 401 || error?.data?.code === AUTH_ERROR_CODES.LOGIN_TEMPORARILY_BLOCKED) addRate('LOGIN_FAILURE')
     throw error
   }
 }

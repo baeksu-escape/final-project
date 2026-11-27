@@ -148,14 +148,16 @@ class ClientRateLimiterTest {
         }
     }
 
-    // FP-258 먼저 잡은 자리는 401이 아니면(성공·5분 제한 429·잠금 423) 돌려주므로, 그런 요청이 많아도 실패 한도를 쓰지 않는다.
+    // FP-258 먼저 잡은 자리는 401·계정 5분 제한 429가 아니면(성공·잠금 423·400) 돌려주므로, 그런 요청이 많아도 실패 한도를 쓰지 않는다.
     @Test
-    void 성공과_401이_아닌_오류는_먼저_잡은_자리를_돌려준다() {
+    void 성공과_잠금_입력_오류는_먼저_잡은_자리를_돌려준다() {
         for (int i = 0; i < 30; i++) limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> "ok");
-        for (int i = 0; i < 30; i++) {
-            assertThatThrownBy(() -> limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> {
-                throw AuthErrors.loginTemporarilyBlocked(5);
-            })).isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("LOGIN_TEMPORARILY_BLOCKED"));
+        for (ApiException error : new ApiException[] { AuthErrors.accountLocked(), AuthErrors.invalidField("loginId", "아이디를 입력해 주세요.") }) {
+            for (int i = 0; i < 15; i++) {
+                assertThatThrownBy(() -> limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> {
+                    throw error;
+                })).isSameAs(error);
+            }
         }
         for (int i = 0; i < 19; i++) {
             assertThatThrownBy(() -> limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> {
@@ -164,5 +166,25 @@ class ClientRateLimiterTest {
         }
         // 실패는 19번이라 20번째 요청도 들어간다.
         assertThat(limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> "ok")).isEqualTo("ok");
+    }
+
+    // FP-258 계정 5분 제한 429(LOGIN_TEMPORARILY_BLOCKED, 5회째에 거는 응답 포함)도 401처럼 센다. 제한된 계정에 몰아 보내도 IP 한도에 걸린다.
+    @Test
+    void 계정_5분_제한_429도_실패로_세어_21번째는_IP_제한_429() {
+        for (int i = 0; i < 10; i++) {
+            assertThatThrownBy(() -> limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> {
+                throw AuthErrors.loginTemporarilyBlocked(5);
+            })).isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("LOGIN_TEMPORARILY_BLOCKED"));
+        }
+        for (int i = 0; i < 10; i++) {
+            assertThatThrownBy(() -> limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> {
+                throw AuthErrors.loginFailed();
+            })).isInstanceOf(ApiException.class);
+        }
+        assertThatThrownBy(() -> limiter.countFailures(Rule.LOGIN_FAILURE, IP, () -> "ok"))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+                    assertThat(e.getCode()).isEqualTo("TOO_MANY_REQUESTS");
+                });
     }
 }

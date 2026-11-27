@@ -59,15 +59,16 @@ public class ClientRateLimiter {
         if (window.count() > rule.limit) throw tooMany(rule, window);
     }
 
-    // 로그인·간편 로그인 연결처럼 실패만 세는 요청을 감싼다 — 결과적으로 401(아이디·비밀번호 틀림)로 끝난 요청만 센다.
-    // FP-258 요청 전에 한 자리를 원자적으로 잡고(이미 limit이면 429) 401이 아니면 돌려준다. 먼저 잡아야 동시 요청도 limit개까지만 들어간다.
+    // 로그인·간편 로그인 연결처럼 실패만 세는 요청을 감싼다 — 401(아이디·비밀번호 틀림)과 계정 5분 제한 429(LOGIN_TEMPORARILY_BLOCKED, 5회째 포함)로 끝난 요청을 센다.
+    // FP-258 요청 전에 한 자리를 원자적으로 잡고(이미 limit이면 429) 위 둘이 아니면(성공·423·400 등) 돌려준다. 먼저 잡아야 동시 요청도 limit개까지만 들어간다.
     public <T> T countFailures(Rule rule, String clientIp, Supplier<T> action) {
         Instant start = reserve(rule, clientIp);
         boolean failed = false;
         try {
             return action.get();
         } catch (ApiException e) {
-            failed = e.getStatus() == HttpStatus.UNAUTHORIZED;
+            failed = e.getStatus() == HttpStatus.UNAUTHORIZED
+                    || (e.getStatus() == HttpStatus.TOO_MANY_REQUESTS && AuthErrors.LOGIN_TEMPORARILY_BLOCKED.equals(e.getCode()));
             throw e;
         } finally {
             if (!failed) release(rule, clientIp, start);

@@ -80,9 +80,9 @@ public class AuthService {
 
     // AUTH-01 로그인. 일반 사용자는 토큰을 준다(응답 그대로).
     // FP-80 관리자는 비밀번호가 맞아도 토큰을 주지 않고, 업무 이메일로 6자리 번호를 보낸 뒤 2단계 인증 대기 응답을 준다(AUTH-11로 이어짐).
-    // FP-258 트랜잭션을 걸지 않는다 — 계정 행 잠금은 authenticate 안(LoginAttemptService)에서만 쥐고, 성공 처리·로그는 그 뒤에 한다.
+    // FP-258 트랜잭션을 걸지 않는다 — 계정 행 잠금과 일반 회원의 성공 처리는 LoginAttemptService 안에서 끝내고, 로그·토큰은 그 뒤에 한다.
     public AuthResponses.LoginResult login(AuthRequests.Login request) {
-        UserAccount account = authenticate(request.loginId(), request.password());
+        UserAccount account = authenticate(request.loginId(), request.password(), true);
         if (account.isAdmin()) {
             return adminAuth.startLogin(account);
         }
@@ -94,8 +94,14 @@ public class AuthService {
     //   잠긴 계정은 횟수를 세지 않고, 비밀번호가 맞을 때만 423(관리자는 ADMIN_ACCOUNT_LOCKED). 5회째 실패부터 5분 동안 429, 10회째면 잠그고 423.
     //   DB 처리(행 잠금 뒤 다시 읽기, FP-290)는 LoginAttemptService 트랜잭션에서 끝내고, 로그(REQUIRES_NEW)는 커넥션을 돌려준 뒤 남긴다.
     //   그래서 부르는 쪽도 트랜잭션 밖에서 불러야 한다(안에서 부르면 잠금과 커넥션을 그 트랜잭션 끝까지 쥔다).
+    //   간편 로그인 연결은 성공 처리를 하지 않고 확인만 한다(연결을 저장한 뒤 confirmLogin).
     public UserAccount authenticate(String loginId, String password) {
-        LoginAttemptService.Attempt attempt = loginAttempts.attempt(loginId, password);
+        return authenticate(loginId, password, false);
+    }
+
+    // recordSuccess면 비밀번호가 맞은 일반 회원의 성공 처리를 확인과 같은 잠금 안에서 한다(관리자는 2단계 인증 뒤).
+    private UserAccount authenticate(String loginId, String password, boolean recordSuccess) {
+        LoginAttemptService.Attempt attempt = loginAttempts.attempt(loginId, password, recordSuccess);
         UserAccount account = attempt.account();
         switch (attempt.outcome()) {
             case SUCCESS:
@@ -132,9 +138,14 @@ public class AuthService {
         return account.isAdmin() ? AuthErrors.adminAccountLocked() : AuthErrors.accountLocked();
     }
 
-    // 로그인 성공 처리(실패 횟수 0, 마지막 로그인 시각)와 응답. 간편 로그인도 쓴다.
-    public AuthResponses.Login loginResponse(UserAccount account) {
-        userMapper.updateLoginSuccess(account.getUserId(), LocalDateTime.now(clock));
+    // FP-258 비밀번호 확인 없이 들어오는 로그인 성공(간편 로그인·연결) — 잠금 안에서 성공 처리하고, 그사이 잠겼으면 423(관리자는 ADMIN_ACCOUNT_LOCKED).
+    public AuthResponses.Login confirmLogin(UserAccount account) {
+        if (!loginAttempts.recordSuccess(account.getUserId())) throw lockedError(account);
+        return loginResponse(account);
+    }
+
+    // 로그인 성공 로그와 응답(토큰). 성공 처리(실패 횟수 0, 마지막 로그인 시각)는 부르기 전에 계정 잠금 안에서 끝낸다(LoginAttemptService).
+    private AuthResponses.Login loginResponse(UserAccount account) {
         systemLog.record(SystemLogService.Type.AUTH, LOG_SOURCE, "로그인 성공 (" + SystemLogService.maskLoginId(account.getLoginId()) + ")",
                 account.getUserId());
         return new AuthResponses.Login(tokenProvider.issue(account.getUserId(), account.getRoleCode()), userViews.of(account));

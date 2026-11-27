@@ -35,9 +35,11 @@ public final class AuthErrors {
         return new ApiException(LOCKED, "ADMIN_ACCOUNT_LOCKED", ADMIN_ACCOUNT_LOCKED_MESSAGE);
     }
 
-    // FP-258 로그인 5회 실패 뒤 잠깐 막을 때(429). minutes는 남은 분(올림, 최소 1).
+    // FP-258 로그인 5회 실패 뒤 잠깐 막을 때(429). minutes는 남은 분(올림, 최소 1). IP 실패 집계(ClientRateLimiter)도 이 code를 실패로 센다.
+    public static final String LOGIN_TEMPORARILY_BLOCKED = "LOGIN_TEMPORARILY_BLOCKED";
+
     public static ApiException loginTemporarilyBlocked(long minutes) {
-        return new ApiException(HttpStatus.TOO_MANY_REQUESTS, "LOGIN_TEMPORARILY_BLOCKED",
+        return new ApiException(HttpStatus.TOO_MANY_REQUESTS, LOGIN_TEMPORARILY_BLOCKED,
                 "로그인 시도가 너무 많습니다. " + minutes + "분 뒤에 다시 시도해 주세요.");
     }
 

@@ -48,7 +48,6 @@
 - **로그인 실패 로그가 커넥션 풀을 바닥냄(PR #173)**
   - 원인: 잠근 트랜잭션 안의 `systemLog.record`(REQUIRES_NEW)가 커넥션을 하나 더 요청했다. 같은 아이디로 풀 크기(10) 이상 몰리면 서로 기다리며 막혔다.
   - 고친 방법: `LoginAttemptService.attempt`가 자기 트랜잭션에서 조회·잠금·갱신만 하고 결과를 돌려준다. `authenticate`는 트랜잭션 없이 받은 뒤 로그를 남기고 오류를 던진다. `login`·`SocialLoginService.link`의 `@Transactional`은 뺐고, `AdminAuthService.startLogin`에는 달았다.
-  - 달라진 점: 성공 처리가 잠금과 따로 커밋된다. 맞는·틀린 비밀번호가 정확히 동시에 오면 틀린 1회가 지워질 수 있다.
 - **인증코드 하루 상한을 동시 요청으로 넘김(PR #173)**
   - 원인: 같은 트랜잭션 안에서 "세기 → 비교 → 기록"을 해서 동시 요청이 같은 수를 읽었다.
   - 고친 방법: `CodeSendGuard`(서버 메모리 잠금 64개)가 대상(채널 + HMAC) 잠금을 트랜잭션 밖에서 잡는다. `TransactionTemplate`으로 세기 → 비교 → 기록 → 발송 → 커밋을 끝낸 뒤 푼다.
@@ -125,6 +124,21 @@
   - `./mvnw test` 589개 통과, db.it 4개 클래스 6건 통과, `npm run lint` 오류 0, `npm run build` 성공
   - 걸러내기 함수 252개 입력이 전과 같은 결과
   - mock 헤드리스 확인 스크립트 3개를 HEAD 사본과 고친 뒤에 각각 돌려 출력이 같았다(전환 중 테두리 색 2줄만 다름)
+
+## PR 검수 반영 — 성공 처리 잠금, 5분 제한 먼저 확인·429 IP 집계, 관리자 이메일·잠금 안내 (2026-11-27)
+- **[A] 성공 처리가 잠금 밖이었음:** 비밀번호 확인은 행 잠금 안에서 하고, 성공 처리(실패 0)는 잠금을 푼 뒤 따로 했다. 그래서 실패 9회 계정에 다른 요청이 10회째로 잠근 직후 성공 쪽이 0으로 만들고 토큰도 받았다.
+  - 고친 방법: 일반 회원 로그인은 `LoginAttemptService.attempt`가 같은 잠금 안에서 성공 처리까지 한다.
+  - 간편 로그인(교환·연결)과 관리자 2단계 인증 완료(번호 확인·첫 비밀번호 설정)는 `recordSuccess(userId)`가 처리한다. 잠그고 다시 읽어 잠겼으면 423(관리자는 `ADMIN_ACCOUNT_LOCKED`)이다.
+  - 그 경로들(`SocialLoginService.exchange`, `AdminAuthService.verifyLogin`·`setupPassword`)은 트랜잭션을 빼서 로그가 잠금 밖에 남게 했다.
+  - 시험: 새 `LoginSuccessFailureRaceIT`(30라운드)가 고치기 전에는 1라운드부터 "성공 200 + 최종 0회 LOCKED"로 실패했고, 고친 뒤에는 통과한다.
+- **[B] 5분 제한 중에도 BCrypt를 돌리고, 그 429는 IP 실패 횟수에 들어가지 않았음:** 잠기지 않은 계정은 다시 읽은 뒤 제한부터 보고, 제한 중이면 BCrypt 없이 막는다(잠긴 계정은 지금처럼 BCrypt 먼저).
+  - IP 집계(`ClientRateLimiter.countFailures`, mock 포함)는 계정 5분 제한 429(`LOGIN_TEMPORARILY_BLOCKED`, 5회째 포함)도 401처럼 센다.
+  - 시험: `LoginFailPoolIT`에 제한 중 계정으로 동시 15개 요청을 보내는 경우를 더했다. 고치기 전에는 BCrypt가 15번 불렸고, 고친 뒤에는 0번이며 모두 429다(0.18초).
+  - 단위 시험 `LoginAttemptServiceTest`, `ClientRateLimiterTest`도 더했다.
+- **[C] 관리자 추가 화면의 업무 이메일이 새 가입 규칙을 썼음:** `AddAdminForm`을 기본 형식(`isBasicEmail`)으로 바꿨다. 서버·mock과 같아 `ops+admin@avenue.example`이 통과한다(node로 확인).
+- **[D] 잠긴 관리자 토큰에 회원 안내(비밀번호 찾기)가 나갔음:** `JwtAuthenticationFilter`가 잠금 표시와 함께 역할을 요청 속성으로 넘기고, `JsonErrorWriter`가 관리자면 401 `ADMIN_ACCOUNT_LOCKED`와 관리자 안내를 보낸다.
+  - 프론트 `client.js`는 `STEP_UP_REQUIRED` 말고는 401이면 code와 상관없이 로그아웃하므로, 관리자도 처리가 같다.
+  - 시험: `LockedAccountTokenTest`, `SecurityConfigTest`
 
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)

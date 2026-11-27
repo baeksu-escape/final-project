@@ -91,14 +91,16 @@ class LockedAccountTokenTest {
                 .andExpect(jsonPath("$.message").value("잠긴 계정입니다. 비밀번호 찾기에서 이메일 인증 후 비밀번호를 재설정하면 풀립니다."));
     }
 
+    // FP-258 관리자는 비밀번호 찾기로 풀 수 없어 관리자 안내(401 ADMIN_ACCOUNT_LOCKED)다.
     @Test
-    void 잠긴_관리자_토큰으로_계정_목록은_401_ACCOUNT_LOCKED() throws Exception {
+    void 잠긴_관리자_토큰으로_계정_목록은_401_ADMIN_ACCOUNT_LOCKED와_관리자_안내() throws Exception {
         String token = bearer(ADMIN_ID, UserAccount.ROLE_ADMIN);
         statuses.put(ADMIN_ID, UserAccount.LOCKED);
 
         mvc.perform(get(ADMIN_USERS).header(HttpHeaders.AUTHORIZATION, token))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"));
+                .andExpect(jsonPath("$.code").value("ADMIN_ACCOUNT_LOCKED"))
+                .andExpect(jsonPath("$.message").value("잠긴 관리자 계정입니다. 다른 관리자에게 잠금 해제를 요청해 주세요."));
     }
 
     @Test

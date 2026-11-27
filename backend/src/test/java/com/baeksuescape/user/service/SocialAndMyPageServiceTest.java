@@ -7,9 +7,11 @@ import static com.baeksuescape.user.service.UserFixtures.HMAC;
 import static com.baeksuescape.user.service.UserFixtures.PASSWORD;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -134,9 +137,16 @@ class SocialAndMyPageServiceTest {
         assertThat(codeOf(() -> social.link(new AuthRequests.SocialLink(key, "employee", PASSWORD)))).isEqualTo("409 SOCIAL_ALREADY_LINKED");
 
         given(socialMapper.countByUserAndProvider(7L, "NAVER")).willReturn(0);
+        given(userMapper.selectById(7L)).willReturn(UserFixtures.user(7L, "employee"));
         AuthResponses.Login login = social.link(new AuthRequests.SocialLink(key, "employee", PASSWORD));
         assertThat(login.devMode()).isTrue();
         verify(socialMapper).insertLink(7L, "NAVER", "dev-naver-user");
+        // FP-258 연결을 저장한 뒤 성공 처리는 계정 행 잠금 안에서 한 번만 한다(409로 막힌 연결은 초기화하지 않는다).
+        InOrder order = inOrder(socialMapper, userMapper);
+        order.verify(socialMapper).insertLink(7L, "NAVER", "dev-naver-user");
+        order.verify(userMapper).lockUser(7L);
+        order.verify(userMapper).updateLoginSuccess(eq(7L), any());
+        verify(userMapper).updateLoginSuccess(anyLong(), any());
         assertThat(store.findLinkKey(key)).isEmpty();
         assertThat(codeOf(() -> social.link(new AuthRequests.SocialLink(key, "employee", PASSWORD)))).isEqualTo("400 SOCIAL_LINK_EXPIRED");
     }

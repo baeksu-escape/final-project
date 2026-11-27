@@ -105,6 +105,10 @@ class AuthServiceTest {
         assertThat(result.user()).isEqualTo(new AuthResponses.UserView(7L, "홍*동", "ROLE_USER", "EMPLOYEE", true));
         assertThat(result.devMode()).isNull();
         verify(userMapper).updateLoginSuccess(eq(7L), any());
+        // FP-258 성공 처리는 확인과 같은 행 잠금 안에서 한 번만 한다(잠금을 푼 뒤 다시 0으로 만들지 않는다).
+        InOrder order = inOrder(userMapper);
+        order.verify(userMapper).lockUser(7L);
+        order.verify(userMapper).updateLoginSuccess(eq(7L), any());
     }
 
     // FP-258 로그인 아이디는 앞뒤 공백을 빼고 소문자로 바꿔 조회한다(시드 demo_employee처럼 밑줄이 있는 아이디 포함).

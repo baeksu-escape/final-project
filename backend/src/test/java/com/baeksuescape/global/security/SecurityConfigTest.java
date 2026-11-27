@@ -109,7 +109,7 @@ class SecurityConfigTest {
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 
-    // FP-80 잠긴 계정의 기존 토큰도 쓰지 못한다. 401 code는 ACCOUNT_LOCKED로 구분한다.
+    // FP-80 잠긴 계정의 기존 토큰도 쓰지 못한다. 401 code는 ACCOUNT_LOCKED로 구분한다(FP-258 관리자는 ADMIN_ACCOUNT_LOCKED와 관리자 안내).
     @Test
     void 잠긴_회원과_관리자는_토큰이_있어도_401_ACCOUNT_LOCKED() throws Exception {
         given(userAccountMapper.selectAccountStatus(11L)).willReturn("LOCKED");
@@ -120,7 +120,8 @@ class SecurityConfigTest {
                 .andExpect(jsonPath("$.message").value("잠긴 계정입니다. 비밀번호 찾기에서 이메일 인증 후 비밀번호를 재설정하면 풀립니다."));
         mvc.perform(get("/api/admin/__test/ping").header(HttpHeaders.AUTHORIZATION, bearer(12L, "ROLE_ADMIN")))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"));
+                .andExpect(jsonPath("$.code").value("ADMIN_ACCOUNT_LOCKED"))
+                .andExpect(jsonPath("$.message").value("잠긴 관리자 계정입니다. 다른 관리자에게 잠금 해제를 요청해 주세요."));
     }
 
     @Test
