@@ -30,7 +30,7 @@ def work_period_months(user_id, birth_year, worker_type):
     r = (user_id * 7919 + birth_year * 31) % 1000
     return max(WORK_PERIOD_MIN[worker_type], cap * (a * 1000 + b * r) // 100000)
 # N-37 시연용 최소점수 가정이다. 실제 금융기관의 심사 조건이 아니다.
-PRODUCT_MIN_SCORES = {'0': 727, '5': 654, '1': 0, '2': 0, '3': 0}   # 서비스 등급 구간 CUT-0.3의 우수·보통 하한(FP-248, 이전 780·665)
+PRODUCT_MIN_SCORES = {'0': 712, '5': 645, '1': 0, '2': 0, '3': 0}   # 서비스 등급 구간 CUT-0.4의 우수·보통 하한(FP-285, 이전 727·654)
 # N-37-1·2 상품 코드별 시연용 문구(상품명, 한 줄 소개, 설명, 제출 서류, 특징 1~3개). 가상 기관의 시연 상품이며 실제 상품·약속이 아니다.
 # 서류 이름에는 '·'를 쓰지 않는다(REQUIRED_DOCUMENTS는 '·'로 이어 한 칸에 저장).
 LOAN_COPY = {

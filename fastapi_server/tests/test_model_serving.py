@@ -8,9 +8,9 @@ from pathlib import Path
 
 from pipeline import model_scorer
 from pipeline.feature_builder import build_features, round_half_up
-from pipeline.feature_catalog import MODEL_VERSION, REAL_FEATURE_SET_VERSION, REAL_MODEL_VERSION
+from pipeline.feature_catalog import MODEL_VERSION, REAL_FEATURE_SET_VERSION, REAL_MODEL_VERSION, grade_band
 from pipeline.model_scorer import ModelScorer, load_from_artifacts
-from routers.assessment import ApiError, health, score, simulate_score
+from routers.assessment import ApiError, health, model_info, score, simulate_score
 from schemas.assessment import ScoreRequest, SimulateRequest
 from test_mock_scorer import REQUEST_ID, sample_request
 from test_training_explain import tiny_model
@@ -167,6 +167,28 @@ class ModelVersionFromBundleTest(ScorerSwitchTestBase):
         h = health()
         self.assertEqual((h["modelLoaded"], h["modelVersion"], h["supportedModelVersions"]),
                          (True, "LGBM-BASE-0.2", [MODEL_VERSION, "LGBM-BASE-0.2"]))
+
+    def test_cutoff_follows_bundle_version(self):
+        """FP-285 0.2 묶음은 CUT-0.3, 0.3 묶음은 CUT-0.4로 점수·시뮬레이터·model-info가 답하고 등급도 그 구간을 따른다."""
+        for version, cutoff, good_min in (("LGBM-BASE-0.2", "CUT-0.3", 727), ("LGBM-BASE-0.3", "CUT-0.4", 712)):
+            with self.subTest(version=version):
+                self.use(ModelScorer(tiny_model("legacy"), tiny_model("alternative"), version))
+                r = score(ScoreRequest(**sample_request(expectedModelVersion=version)), None)
+                self.assertEqual(r["cutoffVersion"], cutoff)
+                for side in ("traditional", "alternative"):
+                    self.assertEqual(r[side]["gradeBandCode"], grade_band(r[side]["score"], cutoff))
+                simulated = simulate_score(SimulateRequest(requestId=SIMULATE_ID, changes={}, baseAssessment={
+                    "requestId": REQUEST_ID, "modelVersion": version, "featureSetVersion": REAL_FEATURE_SET_VERSION,
+                    "featureSnapshot": r["featureSnapshot"]}), None)
+                self.assertEqual(simulated["cutoffVersion"], cutoff)
+                info = model_info()
+                self.assertEqual((info["modelVersion"], info["cutoffVersion"]), (version, cutoff))
+                self.assertEqual(info["gradeBands"][-1]["minScore"], good_min)
+
+    def test_mock_keeps_cut_03_even_with_03_bundle(self):
+        """FP-285 0.3 묶음을 불러온 서버에서도 Mock(DEV-DUMMY) 요청은 CUT-0.3이다."""
+        self.use(ModelScorer(tiny_model("legacy"), tiny_model("alternative"), "LGBM-BASE-0.3"))
+        self.assertEqual(score(ScoreRequest(**sample_request()), None)["cutoffVersion"], "CUT-0.3")
 
     def test_not_loaded_any_real_version_is_503(self):
         """묶음이 없는 서버에 실제 모델 버전(0.1이든 0.2든)을 요청하면 Mock으로 바꾸지 않고 503."""

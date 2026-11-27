@@ -1,6 +1,6 @@
 # N-12-2·N-25 모델 0.3 사전 기준(정의서 10장 C33) 점검 — 새 TRAIN으로 학습하고 VALID와 고정 점검 사례로 (a)~(f)를 판정한다.
 # TEST는 읽자마자 버리며, 모델 파일은 저장하지 않는다(저장은 training.train). 기준은 모델 결과를 보기 전에 정했고 결과를 본 뒤 바꾸지 않는다.
-# 실행(fastapi_server 폴더에서): python -m training.check_v03 --data-dir data/training_v3.7.0 [--out <결과 json>]
+# 실행(fastapi_server 폴더에서): python -m training.check_v03 --data-dir data/training [--out <결과 json>]   # data/training은 v3.7.0
 import argparse
 import json
 from datetime import datetime, timezone
