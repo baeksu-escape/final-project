@@ -5,7 +5,8 @@
 # 실행(fastapi_server 폴더에서):
 #   리허설(VALID, 기본): python -m training.final_test_eval        # 알려진 VALID 값과 맞는지 먼저 본다. 파일은 만들지 않는다(--out-dir를 주면 저장)
 #   최종(TEST, 한 번):    python -m training.final_test_eval --split TEST --confirm-test-once
-#   모델 0.3은 두 명령에 --version 0.3을 더한다(데이터 data/training_v3.7.0, 모델 data/model_v03가 기본값). 0.2의 기록·결과 파일은 건드리지 않는다
+#   모델 0.3은 두 명령에 --version 0.3을 더한다(데이터 data/training(v3.7.0), 모델 data/model_v03가 기본값). 0.2의 기록·결과 파일은 건드리지 않는다.
+#   0.2를 다시 볼 때는 --data-dir data/training_v3.6.1을 준다(11/27 데이터 폴더 교체, FP-285)
 import argparse
 import json
 import re
@@ -70,7 +71,7 @@ C38_CRITERIA = {
     ("alt", "delinq"): (0.6750, 0.6550, 0.6950),
     ("legacy", "nonfin"): (0.7193, 0.6993, 0.7393),
 }
-# 모델 0.3의 등급 경계 후보 CUT-0.4(C37, VALID 대안 점수 25·75%). 서비스 구간(feature_catalog)은 아직 CUT-0.3이다.
+# 모델 0.3의 등급 경계 후보 CUT-0.4(C37, VALID 대안 점수 25·75%). TEST를 실행한 11/27에는 서비스 구간이 CUT-0.3이었다(반영은 FP-285).
 CUT_0_4_BANDS = [
     {"gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 644},
     {"gradeBandCode": "STANDARD", "minScore": 645, "maxScore": 711},
@@ -99,7 +100,7 @@ class Plan:
 PLAN_02 = Plan(EXPECTED_MODEL_VERSION, "C26", C26_CRITERIA, DELINQ_DIFF_LIMIT, config.MONOTONE_CONSTRAINTS, "CUT-0.3", GRADE_BANDS,
                RESULT_STEM, None, config.DEFAULT_DATA_DIR, config.DEFAULT_OUT_DIR)
 PLAN_03 = Plan("LGBM-BASE-0.3", "C38", C38_CRITERIA, 0.02, config.MONOTONE_CONSTRAINTS_V03, "CUT-0.4 후보", CUT_0_4_BANDS,
-               f"{RESULT_STEM}_v03", "final_test_eval_run_v03.json", config.FASTAPI_ROOT / "data" / "training_v3.7.0",
+               f"{RESULT_STEM}_v03", "final_test_eval_run_v03.json", config.DEFAULT_DATA_DIR,
                config.FASTAPI_ROOT / "data" / "model_v03", "C37",
                ("씬파일 TEST는 이전 데이터 버전과 같은 분할이라 이전에 본 고객이다(판정하지 않는 참고 값).",
                 "0.2의 TEST를 본 뒤 데이터와 라벨을 바꿔 만든 모델이다. 0.2 수치와 직접 비교하지 않는다."))

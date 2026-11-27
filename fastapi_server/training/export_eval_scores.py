@@ -35,6 +35,7 @@ EXPOSURE_COLUMN = config.EXPOSURE_COLUMN
 EVAL_SPLITS = {"legacy": [config.VALID_SPLIT], "thinfile": [config.TRAIN_SPLIT, config.VALID_SPLIT]}
 OUTPUT_COLUMNS = ["customer_id", "group", "segment", "data_split", *LABEL_COLUMNS.values(), *SCORE_COLUMNS.values()]
 DEFAULT_OUT_PATH = config.DEFAULT_OUT_DIR / "eval_scores.csv"
+SAMPLE_SEED = 285    # FP-285 --max-rows 표본 추출용 고정 seed(같은 입력이면 같은 행이 뽑힌다)
 # MODEL_EVAL_SAMPLE(DDL C10) 적재용: CSV의 직군 이름을 DIM_WORKER_TYPE 코드로, 집단은 대문자 코드로 바꾼다.
 SEGMENT_TO_WORKER_TYPE = {"wage": "EMPLOYEE", "selfemp": "SELF_EMPLOYED", "freelance": "FREELANCER"}
 LOAD_COLUMNS = ["MODEL_VERSION", "SPLIT_CODE", "GROUP_CODE", "CUSTOMER_REF", "WORKER_TYPE_CODE",
@@ -86,6 +87,24 @@ def build_rows(models: dict, groups: dict, eval_splits: dict | None = None) -> p
     return pd.concat(parts, ignore_index=True)
 
 
+def sample_legacy_rows(rows: pd.DataFrame, max_rows: int | None, seed: int = SAMPLE_SEED) -> pd.DataFrame:
+    """FP-285 N-25 기존 집단 행이 max_rows보다 많으면 직군 × 두 라벨의 비율을 지켜 max_rows행만 남긴다(고정 seed). 씬파일 행은 그대로 둔다.
+    데이터 v3.7.0은 VALID가 2만 행이 넘어 전부 DB에 넣지 않으려고 둔 것이다."""
+    legacy = rows[rows["group"] == "legacy"]
+    if max_rows is None or len(legacy) <= max_rows:
+        return rows
+    keys = ["segment", *LABEL_COLUMNS.values()]
+    exact = legacy.groupby(keys).size() * max_rows / len(legacy)
+    quota = np.floor(exact).astype(int)
+    leftover = (exact - quota).sort_values(ascending=False, kind="stable")      # 남는 자리는 소수점이 큰 칸부터 채운다
+    quota.loc[leftover.index[:max_rows - int(quota.sum())]] += 1
+    random = np.random.default_rng(seed)
+    kept = []
+    for key, part in legacy.groupby(keys):
+        kept.extend(random.choice(part.index.to_numpy(), size=int(quota.loc[key]), replace=False))
+    return rows.drop(index=legacy.index.difference(kept)).reset_index(drop=True)
+
+
 def group_auc(rows: pd.DataFrame) -> dict:
     """점수 열마다 자기 라벨에 대한 AUC(정수로 자른 점수 기준, 점수가 낮을수록 불량)를 집단별로 센다. 파일에 든 행 전체가 대상이다."""
     result = {}
@@ -108,7 +127,7 @@ def count_summary(rows: pd.DataFrame) -> dict:
     return summary
 
 
-def render_load_sql(rows: pd.DataFrame, model_version: str, csv_sha256: str) -> str:
+def render_load_sql(rows: pd.DataFrame, model_version: str, csv_sha256: str, sample_note: str | None = None) -> str:
     """평가 점수 행을 MODEL_EVAL_SAMPLE에 넣는 SQL 글로 바꾼다. 이미 그 모델 버전의 행이 있으면 멈추고(한 번만 적재), 500행마다 커밋한다."""
     counts = rows.groupby(["group", "data_split"], sort=False).size()
     count_text = ", ".join(f"{group}/{split} {int(count)}" for (group, split), count in counts.items())
@@ -120,6 +139,7 @@ def render_load_sql(rows: pd.DataFrame, model_version: str, csv_sha256: str) -> 
         ("-- 기존 집단은 VALID만, 씬파일은 노출 1인(eval_future_credit_exposure = 1) TRAIN+VALID이며 TEST는 없다(최종 평가 FP-144)."
          if "TRAIN" in set(rows.loc[rows["group"] == "thinfile", "data_split"]) or "thinfile" not in set(rows["group"]) else
          "-- 기존 집단·씬파일 모두 VALID만이다(씬파일 노출 1, 씬파일 TRAIN은 모델 학습에 써서 평가에서 뺐다). TEST는 없다(최종 평가 FP-144)."),
+        *([f"-- {sample_note}"] if sample_note else []),
         "-- 점수 4개: 연체 라벨로 학습·평가한 기존·대안, 비금융 효과 라벨로 학습·평가한 기존·대안(0~1000). 서버 모델은 SCORE_LEGACY_DELINQ와 SCORE_ALT_NONFIN뿐이다.",
         "-- 한 번만 실행한다: 이 모델 버전의 행이 이미 있으면 오류로 멈춘다(다시 넣으려면 먼저 해당 행을 지운다). 표가 없으면 create_model_eval_sample.sql을 먼저 실행한다.",
         "-- SQL*Plus/SQLcl/SQL Developer(F5 스크립트 실행)에서 대상 스키마 소유자로 실행한다. 공용 DB는 DB 담당이 실행한다.",
@@ -179,11 +199,15 @@ def main() -> None:
     parser.add_argument("--thinfile-valid-only", action="store_true", help="thinfile도 VALID 행만 낸다(thinfile을 학습에 쓰는 모델일 때)")
     parser.add_argument("--with-thinfile", action="store_true", help="씬파일(노출 1) TRAIN 행을 학습에 더해 모델을 학습한다(train.py와 같은 설정). 씬파일은 VALID 행만 내므로 --thinfile-valid-only가 자동으로 켜진다")
     parser.add_argument("--monotone", action="store_true", help="config.MONOTONE_CONSTRAINTS에 단조 제약을 걸어 학습한다(train.py와 같은 설정)")
-    parser.add_argument("--model-version", default=config.MODEL_VERSION, help="설명 파일·적재 SQL에 적을 모델 버전(기본은 config 값, 0.2를 만들 때만 바꾼다)")
+    parser.add_argument("--monotone-set", choices=sorted(config.MONOTONE_SETS), help="단조 제약 목록을 고른다(train.py와 같은 설정, v03 = 모델 0.3). 주면 --monotone 없이도 제약을 건다")
+    parser.add_argument("--max-rows", type=int, default=None, help="기존 집단 VALID 행을 직군×라벨 비율로 이 수까지만 뽑는다(씬파일은 전부). 주지 않으면 전부 낸다")
+    parser.add_argument("--model-version", default=config.MODEL_VERSION, help="설명 파일·적재 SQL에 적을 모델 버전(기본은 config 값, 0.2·0.3을 만들 때 바꾼다)")
     args = parser.parse_args()
     if args.with_thinfile and args.skip_thinfile:
         sys.exit("--with-thinfile은 씬파일 표가 필요해서 --skip-thinfile과 함께 쓸 수 없다")
-    monotone = config.MONOTONE_CONSTRAINTS if args.monotone else None
+    if args.max_rows is not None and args.max_rows < 1:
+        sys.exit("--max-rows는 1 이상이어야 한다")
+    monotone = config.MONOTONE_SETS[args.monotone_set] if args.monotone_set else config.MONOTONE_CONSTRAINTS if args.monotone else None
     thinfile_valid_only = args.thinfile_valid_only or args.with_thinfile      # 학습에 쓴 씬파일 TRAIN 행은 평가에 쓰면 누수다
 
     tables = {name: args.data_dir / path for name, path in GROUP_TABLES.items() if not (args.skip_thinfile and name == "thinfile")}
@@ -201,7 +225,11 @@ def main() -> None:
               for label_key in LABEL_COLUMNS for model_name in MODEL_FEATURES}
 
     eval_splits = dict(EVAL_SPLITS, thinfile=[config.VALID_SPLIT]) if thinfile_valid_only else EVAL_SPLITS
-    rows = build_rows(models, groups, eval_splits)
+    all_rows = build_rows(models, groups, eval_splits)
+    rows = sample_legacy_rows(all_rows, args.max_rows)
+    legacy_total, legacy_kept = int((all_rows["group"] == "legacy").sum()), int((rows["group"] == "legacy").sum())
+    sample_note = (f"기존 집단은 VALID {legacy_total}행 중 직군×라벨 비율을 지켜 {legacy_kept}행만 뽑았다(--max-rows {args.max_rows}, seed {SAMPLE_SEED}). 씬파일은 줄이지 않았다."
+                   if legacy_kept < legacy_total else None)
     legacy_valid = groups["legacy"][groups["legacy"][config.SPLIT_COLUMN] == config.VALID_SPLIT]
     shipped = check_shipped(models, legacy_valid, args.model_dir)
     aucs, counts = group_auc(rows), count_summary(rows)
@@ -214,7 +242,9 @@ def main() -> None:
                                                       for (model_name, label_key), column in SCORE_COLUMNS.items()},
         "score_scale": "0~1000 정수, 높을수록 좋음(서비스와 같은 명세서 O-3 환산). 컷오프는 이 점수에 건다",
         "seed": seed, "feature_set_version": config.FEATURE_SET_VERSION, "model_version_of_shipped_models": args.model_version,
-        "options": {"with_thinfile": bool(args.with_thinfile), "monotone": bool(monotone), "thinfile_valid_only": bool(thinfile_valid_only)},
+        "options": {"with_thinfile": bool(args.with_thinfile), "monotone": bool(monotone), "thinfile_valid_only": bool(thinfile_valid_only),
+                    **({"monotone_set": args.monotone_set} if args.monotone_set else {})},
+        "legacy_sample": {"max_rows": args.max_rows, "seed": SAMPLE_SEED, "from_rows": legacy_total, "kept_rows": legacy_kept} if sample_note else None,
         "monotone_constraints": dict(monotone) if monotone else None,
         "shipped_models": {"score_legacy_delinq": "legacy.joblib", "score_alt_nonfin": "alternative.joblib"},
         "shipped_models_reproduced": shipped, "counts": counts, "auc_by_score_column": aucs,
@@ -225,14 +255,14 @@ def main() -> None:
         "note": ("라벨마다 두 모델을 기존 집단 TRAIN으로 새로 학습한 값이라 같은 라벨끼리 비교할 수 있다. score_legacy_delinq와 score_alt_nonfin 외의 두 열은 서버에 올린 모델이 아니다. "
                  "thinfile 행은 기존 집단으로 학습한 모델을 적용한 결과다. 이 모델들은 thinfile을 학습하지 않았으므로 TRAIN 행도 평가에 써도 누수가 없지만(표본을 늘리려는 것), thinfile을 학습에 쓰는 모델이 생기면 VALID만 써야 한다. "
                  "eval_future_credit_exposure = 1인 고객만 넣었다(0인 고객은 라벨이 항상 0이라 제외, 정의서 5장, excluded_rows). 씬파일 라벨은 기존 집단과 생성 방식이 달라 집단별로 따로 본다. "
-                 "AUC는 시드 하나(11)의 값이라 METRICS_JSON의 5개 시드 평균과 다르다(연체 라벨에서 시드 11의 대안 AUC는 5개 시드 중 가장 높다). 정수 점수 기준이라 확률 기준과 소수 넷째 자리가 다를 수 있다. "
+                 "AUC는 시드 하나(11)의 값이라 METRICS_JSON의 5개 시드 평균과 다르고, legacy_sample이 있으면 뽑힌 행만의 값이다. 정수 점수 기준이라 확률 기준과 소수 넷째 자리가 다를 수 있다. "
                  "TEST 행은 들어 있지 않다(최종 평가 FP-144). 합성 데이터이며 실제 신용평가 결과가 아니다."),
     }
     args.out.with_suffix(".meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
     if args.sql_out is not None:
         args.sql_out.parent.mkdir(parents=True, exist_ok=True)
-        args.sql_out.write_text(render_load_sql(rows, args.model_version, meta["file_sha256"]), encoding="utf-8", newline="\n")
+        args.sql_out.write_text(render_load_sql(rows, args.model_version, meta["file_sha256"], sample_note), encoding="utf-8", newline="\n")
         print(f"적재 SQL 저장: {args.sql_out}")
     print(f"저장: {args.out} ({len(rows)}행, TEST 없음)")
     for group, info in counts.items():
