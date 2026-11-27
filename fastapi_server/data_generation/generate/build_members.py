@@ -44,7 +44,8 @@ def run(out, per_cohort=None, seed=None):
     if seed in TRAINING_SEEDS:
         raise ValueError('member seed must differ from training seeds')
     with tempfile.TemporaryDirectory() as tmp:
-        build_thinfile.run(tmp, per_cohort, seed)
+        # v3.7.0 학습 데이터용 소득·지출 규칙은 시연 회원에 적용하지 않는다(시드 DB가 바뀌지 않게).
+        build_thinfile.run(tmp, per_cohort, seed, input_rules=False)
         t = Path(tmp)
         read = lambda name: pd.read_csv(t/f'{name}.csv', encoding='utf-8-sig')
         profiles, plan, monthly = read('profiles'), read('plan'), read('monthly_history')
