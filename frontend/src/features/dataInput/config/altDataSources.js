@@ -107,7 +107,7 @@ export const ALT_DATA_CONSENT_TERMS = Object.freeze({
 
 // 납부 상태 코드(DDL PAYMENT_STATUS_CODE) → 화면에 보일 이름. 공과금 표에 쓴다.
 export const PAYMENT_STATUS_LABELS = Object.freeze({
-  ON_TIME: '정시 납부',
+  ON_TIME: '정상 납부',
   LATE: '연체',
   UNPAID: '미납',
 })

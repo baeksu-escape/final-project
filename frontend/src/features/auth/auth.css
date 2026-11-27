@@ -127,8 +127,8 @@
   background: var(--inp);
   color: var(--fg);
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 400;
   cursor: pointer;
 }
 
@@ -261,6 +261,23 @@
   cursor: not-allowed;
 }
 
+/* FP-258 develop(#166) 반영 — 로그인·가입·찾기 분할 틀(.fin-form) 안에서는 눈 버튼을 #166 모양(둥근 34px, 옅은 회색)에 맞춘다. */
+.fin-form .password-field__toggle {
+  right: 7px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--mut2);
+}
+
+.fin-form .password-field__toggle:hover {
+  color: var(--fg);
+}
+
+.fin-form .password-field--filled .text-input__control {
+  padding-right: 52px;
+}
+
 /* 비밀번호 규칙 — 지킨 규칙은 초록 */
 .password-rules {
   display: flex;
@@ -304,7 +321,7 @@
 .signup-form__fixed {
   align-self: center;
   color: var(--mut);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* 휴대폰 가운데·끝 4자리 칸 */
@@ -846,4 +863,197 @@
 .my-summary__links {
   display: flex;
   gap: 20px;
+}
+
+/* ===== 로그인·회원가입·계정 찾기 틀(AuthSplitLayout) — 연한 회색 바탕 위 가운데 흰 카드(폼 폭 420px) ===== */
+.auth-split {
+  /* 페이지 바탕(--bg) 위 가운데 흰 카드 하나. 높이는 상단 바를 뺀 한 화면 이상 */
+  min-height: calc(100vh - 69px - var(--sp-7) - var(--sp-8));
+}
+
+.auth-split__main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 40px 0 64px;
+}
+
+.auth-split__inner {
+  width: 100%;
+  max-width: 480px;
+  padding: 40px 30px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--panel);
+}
+
+/* 로그인·회원가입 전환 — 위쪽 미니멀 탭 */
+.auth-split__tabs {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-6);
+  margin-bottom: 40px;
+  border-bottom: 1px solid var(--ff-line);
+}
+
+.auth-split__tabs a {
+  margin-bottom: -1px;
+  padding: 0 0 12px;
+  border-bottom: 2px solid transparent;
+  color: var(--mut2);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.auth-split__tabs a:hover {
+  color: var(--fg);
+}
+
+.auth-split__tabs a[aria-current='page'] {
+  border-color: var(--ff-navy);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* 분할 안의 화면들 — 가운데 좁은 상자 모양을 걷어 내고 흰 바탕에 바로 놓는다 */
+.auth-split .auth-page {
+  max-width: none;
+  gap: var(--sp-5);
+  padding: 0;
+}
+
+.auth-split .auth-page__title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-align: center;
+}
+
+.auth-split .auth-page__message,
+.auth-split .signup-page__sub {
+  margin: -8px 0 var(--sp-2);
+  color: var(--mut);
+  font-size: 15px;
+  text-align: left;
+}
+
+.auth-split .auth-form {
+  gap: var(--sp-5);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.auth-split .login-form__actions {
+  display: flex;
+}
+
+.auth-split .login-form__actions > * {
+  flex: 1;
+}
+
+/* 링크(아이디 찾기·비밀번호 찾기) — 상자 없는 텍스트 링크 */
+.auth-split .auth-links__list {
+  justify-content: center;
+  gap: var(--sp-5);
+}
+
+.auth-split .auth-links__link {
+  color: var(--mut);
+  font-size: 13.5px;
+  text-decoration: none;
+}
+
+.auth-split .auth-links__link:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+/* 소셜 로그인 — 세 버튼 모두 같은 흰 바탕·1px 테두리, 브랜드 색은 작은 아이콘에만 */
+.auth-split .social-login {
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.auth-split .social-login__button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  border: 1px solid var(--ff-line);
+  border-radius: 999px;
+  background: var(--ff-white);
+  color: var(--fg);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.auth-split .social-login__button:hover {
+  border-color: var(--line2);
+  background: var(--ff-bg);
+}
+
+.social-login__icon {
+  flex: none;
+}
+
+@media (max-width: 1023px) {
+  .auth-split__main {
+    padding: 40px var(--sp-4) 56px;
+  }
+}
+
+/* 단계형 회원가입 — 머리(step-head)는 finForm.css에 있다(데이터 입력과 같이 쓴다) */
+.signup-form__slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* 흰 카드 바로 위 가운데 로고 */
+.auth-split__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  color: var(--fg);
+  font: 800 22px var(--f-d);
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.auth-split__logo span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--pri);
+  color: var(--pri-fg);
+  font-size: 17px;
+}
+
+/* [로그인]과 소셜 로그인 사이 — 얇은 선 가운데 '또는' */
+.auth-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0;
+  color: var(--mut2);
+  font-size: 13px;
+}
+
+.auth-or::before,
+.auth-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
 }

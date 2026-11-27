@@ -51,9 +51,8 @@
   cursor: not-allowed;
 }
 
-/* 보조 버튼·링크(데모 .btn) */
-.alt-data-source__disconnect,
-.data-input-page__next-link {
+/* 보조 버튼(데모 .btn) */
+.alt-data-source__disconnect {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -71,8 +70,7 @@
   cursor: pointer;
 }
 
-.alt-data-source__disconnect:hover,
-.data-input-page__next-link:hover {
+.alt-data-source__disconnect:hover {
   border-color: var(--acc);
   color: var(--fg);
 }
@@ -133,13 +131,38 @@
   cursor: pointer;
 }
 
+.job-select-form__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.job-select-form__text small {
+  color: var(--mut);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.job-select-form__option {
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s, border-color 0.2s;
+}
+
+/* 마우스를 올리거나 고른 카드는 살짝 떠오른다(볼록) */
 .job-select-form__option:hover {
   border-color: var(--vio);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
 }
 
 .job-select-form__option:has(input:checked) {
   border-color: var(--vio);
   background: var(--sel);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .job-select-form__option { transition: none; }
 }
 
 .job-select-form__option input {
@@ -174,8 +197,7 @@
   top: 12px;
 }
 
-.data-input-page__calculate,
-.data-input-page__next-link {
+.data-input-page__calculate {
   justify-self: start;
 }
 
@@ -295,7 +317,15 @@
   min-width: 0;
 }
 
-/* 입력 완료 현황 = 단계 리모컨(FP-227) — 단계마다 동그라미(완료 초록 채움 · 미완료 빈 동그라미 · 지금 단계 강조) */
+/* 입력 진행 단계 = 단계 리모컨(FP-227) — 세로 타임라인. 완료: 초록 체크 · 지금: 파란 번호 뱃지 + 연한 바탕 · 미완료: 연한 회색 번호.
+   번호 동그라미 사이를 1px 세로선으로 잇는다. */
+.input-status {
+  --st-navy: var(--pri);
+  --st-emerald: var(--mint);
+  --st-soft: var(--sel);
+  --st-line: var(--line);
+}
+
 .input-status__saved-at {
   color: var(--mut2);
   font-size: 12.5px;
@@ -304,79 +334,146 @@
 .input-status__list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 0;
+  margin: 4px 0 0;
   padding: 0;
   list-style: none;
 }
 
 .input-status__item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding-left: 22px;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 6px;
+}
+
+/* 번호 동그라미 사이 세로선(마지막 줄은 없음). 완료한 줄 아래 선은 에메랄드 */
+.input-status__item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 38px;
+  bottom: -2px;
+  left: 23px;
+  width: 1px;
+  background: var(--st-line);
+}
+
+.input-status__item--done:not(:last-child)::after {
+  background: var(--st-emerald);
+}
+
+/* 줄마다 누르는 버튼 — 번호 동그라미 + 단계 이름 */
+.input-status__step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--mut2);
+  font: inherit;
+  font-size: 14.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.input-status__step:not([aria-disabled='true']):hover {
+  background: var(--st-soft);
+  color: var(--fg);
+}
+
+.input-status__marker {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--st-line);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--mut2);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.input-status__item--done .input-status__step {
   color: var(--fg2);
 }
 
-.input-status__item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  margin-top: -6px;
-  border: 1.5px solid var(--warn);
-  border-radius: 50%;
+.input-status__item--done .input-status__marker {
+  border-color: var(--st-emerald);
+  background: var(--st-emerald);
+  color: var(--pri-fg);
 }
 
-.input-status__item--done::before {
-  border-color: var(--mint);
-  background: var(--mint);
+/* 지금 단계 — 연한 바탕 하이라이트 + 딥 네이비 번호 뱃지 */
+.input-status__step[aria-current='step'] {
+  background: var(--st-soft);
+  color: var(--fg);
+  font-weight: 600;
+  cursor: default;
+}
+
+.input-status__step[aria-current='step'] .input-status__marker {
+  border-color: var(--st-navy);
+  background: var(--st-navy);
+  color: var(--pri-fg);
 }
 
 .input-status__hint {
-  color: var(--warn);
+  margin: 0 0 4px 48px;
+  color: var(--mut);
   font-size: 12px;
 }
 
-/* 지금 단계 — 굵은 글자 + 강조색 테두리의 빈 동그라미(끝낸 단계로 돌아온 경우는 초록 채움을 그대로 둔다) */
-.input-status__item--current {
-  color: var(--fg);
-  font-weight: 700;
+/* 완료 애니메이션 — 단계가 완료되면 초록 동그라미가 톡 튀어나오고, 체크가 그려지고, 아래 세로선이 위에서부터 초록으로 찬다.
+   처음 화면에 들어올 때는 완료된 단계가 위에서부터 차례로(--i) 나타난다. 움직임 줄이기 설정이면 멈춘다. */
+.input-status__item--done .input-status__marker {
+  animation: status-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
 }
 
-.input-status__item--current:not(.input-status__item--done)::before {
-  border-width: 2px;
-  border-color: var(--acc);
+.input-status__item--done .input-status__marker path {
+  stroke-dasharray: 24;
+  animation: status-check 0.35s ease-out both;
+  animation-delay: calc(var(--i, 0) * 70ms + 0.2s);
 }
 
-/* 줄마다 누르는 버튼 — 버튼 기본 모양을 지우고 글자만 보이게 한다 */
-.input-status__step {
-  padding: 2px 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+.input-status__item--done:not(:last-child)::after {
+  transform-origin: top;
+  animation: status-line 0.4s ease-out both;
+  animation-delay: calc(var(--i, 0) * 70ms + 0.25s);
 }
 
-.input-status__step:not([aria-disabled='true']):not([aria-current='step']):hover {
-  color: var(--fg);
-  text-decoration: underline;
+@keyframes status-pop {
+  0% { transform: scale(0.4); }
+  100% { transform: scale(1); }
+}
+
+@keyframes status-check {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes status-line {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input-status__item--done .input-status__marker,
+  .input-status__item--done .input-status__marker path,
+  .input-status__item--done:not(:last-child)::after {
+    animation: none;
+  }
 }
 
 /* 누를 수 없는 줄 — 흐리게(이유는 title로 보여 준다) */
 .input-status__step[aria-disabled='true'] {
-  opacity: 0.45;
   cursor: not-allowed;
-}
-
-.input-status__step[aria-current='step'] {
-  cursor: default;
 }
 
 /* ===== 대안 데이터 불러오기 (N-05-6·N-05-9) — 5종을 카드로 나란히 ===== */
@@ -475,4 +572,77 @@
 
 .alt-data-consent__terms dd {
   margin: 0;
+}
+
+/* N-05-7 기간 — 년·개월 두 칸을 한 줄로(FieldControl PeriodInput) */
+.period-input {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.period-input__row {
+  display: flex;
+  gap: 12px;
+}
+
+.period-input__row > .form-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 칸 위 이름(재직 기간 년·개월)은 화면 낭독기만 읽고, 눈에는 칸 오른쪽 단위만 보인다 */
+.period-input__row .form-field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* N-05-6 전체 불러오기 — 버튼과 진행 상태(종류별 대기·불러오는 중·완료·실패) */
+.alt-data__bulk {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.alt-data__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.alt-data__progress-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alt-data__progress-list li {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--panel2);
+  color: var(--fg2);
+  font-size: 13px;
+}
+
+.alt-data__progress-list li.is-run b { color: var(--acc); }
+.alt-data__progress-list li.is-done b { color: var(--mint); }
+.alt-data__progress-list li.is-fail b { color: var(--bad); }
+
+.alt-data-bulk__pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
 }

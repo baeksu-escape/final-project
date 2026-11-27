@@ -389,6 +389,48 @@
 - 관리자 계정의 10회째 실패 자동 잠금 423과 2단계 인증 중 잠금(AdminAuthService)은 아직 회원과 같은 `ACCOUNT_LOCKED` 문구다. 이번 범위(잠긴 상태 + 맞는 비밀번호) 밖이다.
 - DDL `ACCOUNT_STATUS_CODE` 열 주석의 "LOCKED=비밀번호 5회 실패"도 옛 설명이다. 이번 지시 범위 밖이라 그대로 두었다.
 
+## 10차 — develop(#166 UI 개편) 반영 충돌 정리 (2026-11-27) 🆕 11/27
+- **관련 N-ID:** N-01-1, N-01-3, N-02-1
+- 병합 명령은 사용자가 실행했다(`git merge origin/develop`, #166 = FP-276·262: 단계형 가입, `AuthSplitLayout`).
+
+### 충돌 파일과 해결 원칙
+- 충돌은 `LoginPage.jsx` 3곳, `SignupPage.jsx` 5곳이다. `auth.css`·`validation.js`는 자동으로 합쳐졌다.
+- 화면 구조·배치·문구·디자인은 develop(#166)을 따랐다. 입력 검사·걸러내기·비밀번호 칸 동작은 이 브랜치를 그 위에 다시 얹었다.
+- #166이 새로 만든 동작은 그대로 두었다. 가입 직후 자동 로그인 → 직군 선택, 회원가입 전환은 분할 틀 탭이다.
+- 로그인
+  - 아이디 칸: 걸러내기(`useImeSafeFilter`·`filterLoginId`) + develop placeholder "아이디 입력"
+  - 비밀번호 칸: `PasswordField`(거르지 않음) + develop placeholder "비밀번호 입력"
+  - 잠금 안내 아래 [비밀번호 찾기] 링크는 남겼다. 주석은 develop의 분할 틀 탭 주석을 썼다.
+- 가입: 단계(`SIGNUP_STEPS`)·단계 머리·[이전]/[다음]·`DateSelect`·자동 로그인은 develop 그대로다. 단계별 칸(`renderField`)에 다음을 다시 얹었다.
+  - 아이디·이름·닉네임 걸러내기
+  - 비밀번호·확인 칸 `PasswordField rule="new"` + `usePasswordReveal`(칸마다 따로 보기)
+  - 가입 성공 시 자동 로그인 전 `hideAll()`
+- 지운 코드
+  - `SignupPage`의 `PasswordEye`·`showPassword`(두 칸이 함께 바뀌던 보기)
+  - 옛 생일 달력 칸과 `getBirthDateRange` import
+  - `LoginPage`의 `useNavigate` import와 옛 [회원가입] 버튼 주석
+- `auth.css`: `.fin-form` 안의 `PasswordField` 눈 버튼을 #166 모양(둥근 34px, `--mut2`, 오른쪽 7px, 칸 오른쪽 여백 52px)에 맞췄다.
+  - 마이페이지처럼 `.fin-form` 밖의 칸은 그대로다.
+  - 쓰지 않게 된 `.signup-form__eye` 규칙 3개는 공통 CSS(`common/styles/finForm.css`)에 있어 지우지 않았다(프론트 담당 결정).
+
+### 확인
+- `npm run lint` 오류 0, `npm run build` 성공, `./mvnw test`(-s) 541개 통과. 하나씩 돌렸다.
+- mock 개발 서버와 헤드리스 Edge로 가입 5단계를 끝까지 진행했다.
+  - 이름 "홍ㄱ" → 칸을 벗어나면 "이름을 완성해 입력해 주세요."
+  - 자모가 남으면 [다음]이 꺼진다(develop `stepReady`). 스크립트로 버튼을 켜고 눌러도 2단계에 머물고 같은 안내가 나온다.
+  - 아이디 `newid` + 한글 "무" → `newid` 유지
+  - 닉네임 "새별!" → `새별`
+  - 비밀번호 보기 + "ㅂ" → `q`. 확인 칸은 가린 채 그대로다(따로 보기).
+  - 눈 버튼: 34px·둥근 모양, 칸 가운데
+  - [가입하기] → `/select-job`
+- 로그인
+  - placeholder 2개
+  - 5회째 실패 → "로그인 시도가 너무 많습니다. 5분 뒤에 다시 시도해 주세요."
+  - 잠긴 회원 → 잠금 안내 + [비밀번호 찾기] 링크
+  - 비밀번호 칸 한글은 거르지 않음
+- 끝난 뒤 개발 서버·헤드리스 Edge가 남지 않았다.
+- 확인 못 함: 실제 Windows 한글 IME, 화면 모양의 눈 비교(수치만 봄)
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

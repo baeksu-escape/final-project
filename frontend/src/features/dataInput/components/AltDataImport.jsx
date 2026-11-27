@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Button, Card, Checkbox, FieldError, Modal } from '../../../common/components/index.js'
+import { useEffect, useRef, useState } from 'react'
+import { Button, Card, Checkbox, FieldError, Modal, ProgressBar } from '../../../common/components/index.js'
 import { formatWithComma } from '../../../common/utils/number.js'
 import { agreeConsent, fetchConsents, importAltData, withdrawConsent } from '../api/dataInputApi.js'
 import {
@@ -13,6 +13,8 @@ import {
 
 // 동의 창에서 필수 체크를 하지 않고 [동의하고 불러오기]를 눌렀을 때의 문구. FP-227부터 체크 전에는 버튼이 꺼져 있어 안전장치로만 쓴다.
 const CONSENT_REQUIRED_MESSAGE = '필수 동의에 체크해 주세요.'
+// 전체 불러오기의 종류별 진행 상태 글자.
+const BULK_STATUS_TEXT = { wait: '대기', run: '불러오는 중', done: '완료', fail: '실패' }
 // [연결 해제]가 끝났을 때의 안내 문구.
 const DISCONNECTED_MESSAGE = '연결을 해제하고 동의를 거뒀습니다.'
 
@@ -22,6 +24,40 @@ function formatCell(value, format) {
   if (format === 'count') return `${formatWithComma(value)}건`
   if (format === 'paymentStatus') return PAYMENT_STATUS_LABELS[value] ?? value
   return value
+}
+
+// 동의 목록의 체크 표시 — 상자 없이 체크만(체크하면 진하게)
+function CheckMark({ on }) {
+  return (
+    <svg className={`alt-consent__check${on ? ' is-on' : ''}`} viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  )
+}
+
+// 납부 상태의 의미 — 정상(좋음)·연체·미납(나쁨)·그 밖(주의). 코드(paymentStatusCode)가 있으면 코드로, 없으면 글자로 본다.
+const STATUS_TONE = { ON_TIME: 'ok', LATE: 'bad', UNPAID: 'bad', PARTIAL: 'warn', NOT_DUE: 'muted' }
+function statusTone(row) {
+  if (row.paymentStatusCode && STATUS_TONE[row.paymentStatusCode]) return STATUS_TONE[row.paymentStatusCode]
+  const text = String(row.paymentStatus ?? '')
+  if (/정상|정시/.test(text)) return 'ok'
+  if (/연체|미납/.test(text)) return 'bad'
+  return 'warn'
+}
+const isStatusColumn = (column) => /^paymentStatus/.test(column.key)
+
+// 카드 위 요약 한 줄 — 납부 내역은 '12개월 중 정상 납부 n건 · 월 평균 금액', 이용 내역(간편결제)은 '12개월 · 이용 n건 · 월 평균 금액'
+function summarize(source, rows) {
+  const money = source.columns.find((column) => column.format === 'money')
+  const average = money && rows.length ? Math.round(rows.reduce((sum, row) => sum + (Number(row[money.key]) || 0), 0) / rows.length) : 0
+  const averageText = `월 평균 ${formatWithComma(average)}원`
+  if (source.columns.some(isStatusColumn)) {
+    const okCount = rows.filter((row) => statusTone(row) === 'ok').length
+    return `${rows.length}개월 중 정상 납부 ${okCount}건 · ${averageText}`
+  }
+  const count = source.columns.find((column) => column.format === 'count')
+  const countText = count ? ` · 이용 ${formatWithComma(rows.reduce((sum, row) => sum + (Number(row[count.key]) || 0), 0))}건` : ''
+  return `${rows.length}개월${countText} · ${averageText}`
 }
 
 // 서버 시각 문자열(2026-11-12T05:30:00.000Z)에서 날짜(2026-11-12)만 보여 준다.
@@ -41,7 +77,7 @@ function findActiveConsent(consents, source) {
   )
 }
 
-// N-05 대안 데이터 모의 연동 — 종류마다 [불러오기]를 누르면 더미 데이터를 받아 표로 보여 준다. 실제 외부 기관은 호출하지 않는다.
+// N-05 대안 데이터 모의 연동 — [전체 불러오기]로 한 번에(동의 → 차례로 조회 → 실패만 다시 시도), 또는 종류마다 [불러오기]를 누르면 더미 데이터를 받아 표로 보여 준다. 실제 외부 기관은 호출하지 않는다.
 // N-05-9 항목별 정보 제공 동의 — 유효한 동의가 없으면 [불러오기] 전에 동의 창을 띄우고, 동의한 종류는 동의일과 [연결 해제]를 보여 준다.
 // imported: { [종류 key]: { importedAt, rows } }   onImported(key, { importedAt, rows }): 불러오기에 성공하면 부모에 알린다.
 // onDisconnected(key): [연결 해제]에 성공하면 부모에 알린다(부모는 그 종류의 표와 완료 현황을 비운다).
@@ -54,6 +90,20 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
   const [consentSource, setConsentSource] = useState(null)
   const [consentChecked, setConsentChecked] = useState(false)
   const [consentError, setConsentError] = useState('')
+  // N-05-6·N-05-9 동의 목록(토스 약관 방식) — 체크한 종류(하나씩 또는 전체 동의)·[보기]로 펼친 종류·종류별 진행 상태(null이면 아직 안 함)·진행 중 여부
+  const [bulkPicked, setBulkPicked] = useState([])
+  const [openTerms, setOpenTerms] = useState(null)
+  const [bulkStatus, setBulkStatus] = useState(null)
+  const [bulkRunning, setBulkRunning] = useState(false)
+  const busy = pendingKey !== null || bulkRunning
+  const sectionRef = useRef(null)
+  const progressRef = useRef(null)
+  // [동의하고 불러오기]를 누르면, 그리고 다 불러오면 아래 [다음] 버튼까지 부드럽게 내려간다(버튼 줄이 없으면 이 영역 끝까지)
+  useEffect(() => {
+    if (bulkStatus === null) return
+    const next = sectionRef.current?.parentElement?.querySelector('.fin-actions') ?? sectionRef.current
+    next?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [bulkRunning, bulkStatus === null]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 화면에 들어오면 이미 한 동의를 불러와, 동의한 종류는 [연결 해제] 상태로 보여 준다.
   useEffect(() => {
@@ -86,6 +136,7 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
       onImported(source.key, { importedAt, rows })
       // 기관 기록이 없는 계정이면 서버가 안내 문구(notice)를 보낸다 — 기존 안내 자리(표 위)에 보여 준다.
       if (notice) setMessages(source.key, { notice })
+      return true
     } catch (error) {
       setMessages(source.key, { error: error.message })
       if (error.data?.code === 'CONSENT_REQUIRED') {
@@ -93,10 +144,52 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
           .then(({ items }) => setConsents(items ?? []))
           .catch(() => {})
       }
+      return false
     } finally {
       setPendingKey(null)
     }
   }
+
+  // 전체 불러오기 — 고른 종류를 차례로 처리한다. 동의가 없는 종류는 동의를 저장한 뒤 불러오고, 종류마다 진행 상태를 바꾼다.
+  // 한 종류가 실패해도 나머지는 계속하고, 끝나면 실패한 종류만 [다시 시도]할 수 있다.
+  const importMany = async (sources) => {
+    setBulkRunning(true)
+    setBulkStatus((prev) => ({ ...(prev ?? {}), ...Object.fromEntries(sources.map((source) => [source.key, 'wait'])) }))
+    let known = consents
+    for (const source of sources) {
+      setBulkStatus((prev) => ({ ...prev, [source.key]: 'run' }))
+      let consent = findActiveConsent(known, source)
+      if (!consent) {
+        try {
+          const result = await agreeConsent(source.consent)
+          consent = { consentId: result.consentId, consentTypeCode: ALT_DATA_CONSENT_TYPE, ...source.consent, agreedAt: result.agreedAt, withdrawnAt: null }
+          known = [...known.filter((item) => item.consentId !== consent.consentId), consent]
+          setConsents(known)
+        } catch (error) {
+          setMessages(source.key, { error: error.message })
+          setBulkStatus((prev) => ({ ...prev, [source.key]: 'fail' }))
+          continue
+        }
+      }
+      const ok = await runImport(source, consent.consentId)
+      setBulkStatus((prev) => ({ ...prev, [source.key]: ok ? 'done' : 'fail' }))
+    }
+    setBulkRunning(false)
+  }
+
+  // 동의 목록 — 줄마다 체크(그 기관 정보 제공 동의)하거나 [전체 동의]로 모두 체크한 뒤 [동의하고 불러오기]. 하나 이상 체크해야 버튼이 켜진다.
+  const pickedSources = ALT_DATA_SOURCES.filter((source) => bulkPicked.includes(source.key))
+  const allPicked = bulkPicked.length === ALT_DATA_SOURCES.length
+  const togglePick = (key) => setBulkPicked((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]))
+  const toggleAll = () => setBulkPicked(allPicked ? [] : ALT_DATA_SOURCES.map((source) => source.key))
+  const handleBulkStart = (event) => {
+    event.preventDefault()
+    if (pickedSources.length === 0) return
+    importMany(pickedSources)
+  }
+  const failedSources = ALT_DATA_SOURCES.filter((source) => bulkStatus?.[source.key] === 'fail')
+  const bulkKeys = bulkStatus ? Object.keys(bulkStatus) : []
+  const bulkDone = bulkKeys.filter((key) => bulkStatus[key] === 'done' || bulkStatus[key] === 'fail').length
 
   // [불러오기] — 유효한 동의가 있으면 바로 불러오고, 없으면 동의 창을 연다.
   const handleImport = (source) => {
@@ -156,25 +249,144 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
   }
 
   return (
-    <section className="alt-data">
+    <section className="alt-data" ref={sectionRef}>
       <h2 className="alt-data__title">{ALT_DATA_TITLE}</h2>
       <p className="alt-data__notice">
         실제 외부 기관에 연결하지 않고, 기준월을 포함한 최근 {ALT_DATA_MONTHS}개월의 더미 데이터를 불러옵니다.
       </p>
       <FieldError message={consentLoadError} />
+      {/* N-05-6·N-05-9 정보 제공 동의 목록(토스 약관 방식) — [전체 동의] 또는 줄마다 체크, [보기]로 제공 기관·항목·목적·보관 기간을 펼친다.
+          체크한 종류만 동의를 저장하고 차례로 불러온다. 종류별 [불러오기]·[연결 해제]는 아래 카드에 그대로 둔다. */}
+      <form className="alt-data__bulk alt-consent" onSubmit={handleBulkStart} noValidate>
+        <button type="button" className="alt-consent__all" role="checkbox" aria-checked={allPicked} onClick={toggleAll} disabled={busy}>
+          <CheckMark on={allPicked} />
+          <b>전체 동의</b>
+          <span>아래 기관의 정보 제공에 모두 동의할게요.</span>
+        </button>
+        <ul className="alt-consent__list">
+          {ALT_DATA_SOURCES.map((source) => {
+            const on = bulkPicked.includes(source.key)
+            const agreed = Boolean(findActiveConsent(consents, source))
+            return (
+              <li key={source.key}>
+                <div className="alt-consent__row">
+                  <button type="button" className="alt-consent__pick" role="checkbox" aria-checked={on} onClick={() => togglePick(source.key)} disabled={busy}>
+                    <CheckMark on={on} />
+                    <em>{agreed ? '동의함' : '선택'}</em>
+                    <span>{source.label} 정보 제공 동의 ({source.consent.providerName})</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="alt-consent__view"
+                    aria-expanded={openTerms === source.key}
+                    onClick={() => setOpenTerms((prev) => (prev === source.key ? null : source.key))}
+                  >
+                    보기
+                  </button>
+                </div>
+                {openTerms === source.key && (
+                  <dl className="alt-consent__terms">
+                    <dt>불러오는 항목</dt>
+                    <dd>기준월을 포함한 최근 {ALT_DATA_MONTHS}개월의 {source.consent.itemsText}</dd>
+                    <dt>이용 목적</dt>
+                    <dd>{ALT_DATA_CONSENT_TERMS.purpose}</dd>
+                    <dt>보관 기간</dt>
+                    <dd>{ALT_DATA_CONSENT_TERMS.retention}</dd>
+                  </dl>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+        <button type="submit" className="auth-form__submit alt-consent__submit" disabled={!baseMonth || busy || pickedSources.length === 0}>
+          {bulkRunning ? '불러오는 중…' : pickedSources.length > 0 ? `동의하고 불러오기 (${pickedSources.length}개)` : '동의하고 불러오기'}
+        </button>
+        {bulkStatus && (
+          <div className="alt-data__progress" aria-live="polite" ref={progressRef}>
+            <ProgressBar label="전체 불러오기 진행" value={bulkDone} max={bulkKeys.length} />
+            <p className="hint">{bulkKeys.length}개 중 {bulkDone}개 처리{failedSources.length > 0 && !bulkRunning ? ` · 실패 ${failedSources.length}개` : ''}</p>
+            <ul className="alt-data__progress-list">
+              {ALT_DATA_SOURCES.filter((source) => bulkStatus[source.key]).map((source) => (
+                <li key={source.key} className={`is-${bulkStatus[source.key]}`}>{source.label} <b>{BULK_STATUS_TEXT[bulkStatus[source.key]]}</b></li>
+              ))}
+            </ul>
+            {failedSources.length > 0 && !bulkRunning && (
+              <Button size="sm" onClick={() => importMany(failedSources)}>실패한 항목만 다시 시도</Button>
+            )}
+          </div>
+        )}
+      </form>
       {ALT_DATA_SOURCES.map((source) => {
         const result = imported?.[source.key]
         const consent = findActiveConsent(consents, source)
+        // 불러온 기관 — 한 줄 머리(기관명 + 연동 완료 배지 | 다시 불러오기·연결 해제), 요약 박스, 높이를 고정한 월별 표
+        if (result) {
+          return (
+            <Card key={source.key} className={`alt-data-source alt-data-source--${source.key} is-imported`}>
+              <div className="alt-data-source__head">
+                <div className="alt-data-source__name">
+                  <b>{source.label}</b>
+                  <span className="alt-data-source__badge">연동 완료</span>
+                </div>
+                <div className="alt-data-source__links">
+                  <button type="button" className="alt-data-source__text-btn" onClick={() => handleImport(source)} disabled={!baseMonth || busy} aria-label={`${source.label} 다시 불러오기`}>
+                    다시 불러오기
+                  </button>
+                  {consent && (
+                    <button type="button" className="alt-data-source__text-btn is-muted" onClick={() => handleDisconnect(source, consent)} disabled={busy} aria-label={`${source.label} 연결 해제`}>
+                      연결 해제
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="alt-data-source__summary">{summarize(source, result.rows)}</p>
+              {notices[source.key] && (
+                <p className="alt-data-source__result" role="status">
+                  {notices[source.key]}
+                </p>
+              )}
+              <FieldError message={errors[source.key]} />
+              <div className="alt-data-source__scroll" tabIndex={0} aria-label={`${source.label} 월별 내역`}>
+                <table className="alt-data-table">
+                  <thead>
+                    <tr>
+                      {source.columns.map((column) => (
+                        <th key={column.key} scope="col">
+                          {column.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.rows.map((row, index) => (
+                      <tr key={`${row.month ?? row.billMonth}-${index}`}>
+                        {source.columns.map((column) => (
+                          <td key={column.key}>
+                            {isStatusColumn(column) ? (
+                              <span className={`alt-data-status is-${statusTone(row)}`}>{formatCell(row[column.key], column.format)}</span>
+                            ) : (
+                              formatCell(row[column.key], column.format)
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )
+        }
         return (
           <Card key={source.key} title={source.label} className={`alt-data-source alt-data-source--${source.key}`}>
             <button
               type="button"
               className="alt-data-source__import"
               onClick={() => handleImport(source)}
-              disabled={!baseMonth || pendingKey !== null}
+              disabled={!baseMonth || busy}
               aria-label={`${source.label} 불러오기`}
             >
-              {result ? '다시 불러오기' : '불러오기'}
+              불러오기
             </button>
             {consent && (
               <>
@@ -183,7 +395,7 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
                   type="button"
                   className="alt-data-source__disconnect"
                   onClick={() => handleDisconnect(source, consent)}
-                  disabled={pendingKey !== null}
+                  disabled={busy}
                   aria-label={`${source.label} 연결 해제`}
                 >
                   연결 해제
@@ -196,28 +408,6 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
               </p>
             )}
             <FieldError message={errors[source.key]} />
-            {result && (
-              <table className="alt-data-table">
-                <thead>
-                  <tr>
-                    {source.columns.map((column) => (
-                      <th key={column.key} scope="col">
-                        {column.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.rows.map((row, index) => (
-                    <tr key={`${row.month ?? row.billMonth}-${index}`}>
-                      {source.columns.map((column) => (
-                        <td key={column.key}>{formatCell(row[column.key], column.format)}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
           </Card>
         )
       })}

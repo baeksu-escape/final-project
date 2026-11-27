@@ -19,4 +19,7 @@ export const VALIDATION_LIMITS = Object.freeze({
   INCOME_END_MONTHS_AGO: 1,
   // 임시 — N-05-7 재직·운영·활동 기간 상한(개월, 50년). TODO(D-24) 기간의 단위와 상한을 팀이 정하면 바꾼다.
   WORK_PERIOD_MONTHS_MAX: 600,
+  // 확정 — 기준월은 이번 달부터 이 개월 수 전까지만 받는다. 서버 점수 산출의 최신성 한도(DB APP_SETTING INPUT_MAX_AGE_MONTHS)와 같은 값이어야 한다.
+  //   더 오래된 기준월로 저장하면 점수 산출에서 '입력한 자료가 오래되었습니다'(STALE_INPUT)로 막히기 때문이다. 설정값을 바꾸면 여기도 같이 바꾼다.
+  BASE_MONTH_MAX_AGE: 6,
 })
