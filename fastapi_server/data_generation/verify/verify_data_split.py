@@ -7,7 +7,7 @@ from pathlib import Path
 import json
 import numpy as np
 import pandas as pd
-from generate.build_data_split import assign_splits
+from generate.build_data_split import assign_splits, strata_frame, keep_train_ids
 
 ROOT = Path(__file__).resolve().parents[1]
 SPLITS = ['TRAIN', 'VALID', 'TEST']
@@ -35,10 +35,16 @@ def main():
         assert split.data_split.isin(SPLITS).all(), (folder, 'values')
         assert list(split.customer_id) == list(prof.customer_id), (folder, 'same row order as profiles')
         t = prof.merge(split, on='customer_id', validate='one_to_one')
-        for key, g in t.groupby(strata):
+        # v3.7.0 층화 표(씬파일은 원래 라벨)와 TRAIN 고정 목록을 생성기와 같은 설정에서 읽는다.
+        layered = strata_frame(ROOT/folder, strata, folder in cfg['original_label_strata']['value'])
+        for key, g in layered.merge(split, on='customer_id', validate='one_to_one').groupby(strata):
             got = g.data_split.value_counts().reindex(SPLITS, fill_value=0).to_dict()
             assert got == expected_counts(len(g), ratios), (folder, key, got)
-        again = assign_splits(prof[['customer_id'] + strata], ratios, strata, np.random.default_rng([seed, i]))
+        kept = keep_train_ids(cfg, folder)
+        if kept is not None:
+            old = split[split.customer_id.isin(kept)]
+            assert len(old) == len(kept) and (old.data_split == 'TRAIN').all(), (folder, 'previous customers must all be TRAIN')
+        again = assign_splits(layered, ratios, strata, np.random.default_rng([seed, i]), kept)
         pd.testing.assert_frame_equal(again, split, check_dtype=False, obj=f'{folder} rerun')
         lab = cfg['strata']['value'][1]
         rows = {s: dict(n=int((t.data_split == s).sum()), label_rate=round(float(t.loc[t.data_split == s, lab].mean()), 4)) for s in SPLITS}
