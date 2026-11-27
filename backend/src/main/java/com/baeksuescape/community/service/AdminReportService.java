@@ -120,8 +120,10 @@ public class AdminReportService {
         notificationService.notifyQuietly(reportMapper.selectReporterUserId(reportId), "REPORT_RESULT",
                 "신고 처리 결과가 있어요", "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=" + postId);
         if (!VISIBLE.equals(after) && !after.equals(before) && target.ownerUserId() != null) {
-            String title = DELETED.equals(after) ? "내 글이 운영 정책에 따라 삭제됐어요" : "내 글이 운영 정책에 따라 숨겨졌어요";
-            String content = DELETED.equals(after) ? "운영 정책에 따라 게시물이 삭제 처리되었어요." : "운영 정책에 따라 게시물이 숨김 처리되었어요.";
+            // D-23 대상이 댓글이면(부모 글이 있으면) '댓글', 아니면 '글'로 안내한다.
+            String noun = target.parentPostId() == null ? "글" : "댓글";
+            String title = DELETED.equals(after) ? "내 " + noun + "이 운영 정책에 따라 삭제됐어요" : "내 " + noun + "이 운영 정책에 따라 숨겨졌어요";
+            String content = DELETED.equals(after) ? "운영 정책에 따라 " + noun + "이 삭제 처리되었어요." : "운영 정책에 따라 " + noun + "이 숨김 처리되었어요.";
             notificationService.notifyQuietly(target.ownerUserId(), "REPORT_RESULT", title, content, "/lounge?post=" + postId);
         }
         return new ReportDtos.ReportProcessed(result, after, handled);

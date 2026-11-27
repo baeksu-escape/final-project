@@ -1,14 +1,22 @@
 package com.baeksuescape.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.concurrent.Executor;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +24,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
+import org.springframework.core.task.TaskRejectedException;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.notification.dto.NotificationCreatedEvent;
@@ -29,21 +43,81 @@ class NotificationServiceTest {
     private NotificationMapper mapper;
     private ApplicationEventPublisher eventPublisher;
     private NotificationService service;
+    private Executor executor;
+    private TransactionTemplate transactionTemplate;
+    private Clock clock;
 
     @Test
     @DisplayName("알림 저장 실패를 삼켜 원래 처리를 계속한다")
     void notifyQuietly_swallowsCreateFailure() {
         given(mapper.insert(any())).willThrow(new IllegalStateException("database failure"));
+        doAnswer(invocation -> { ((Runnable) invocation.getArgument(0)).run(); return null; })
+                .when(executor).execute(any(Runnable.class));
 
         org.assertj.core.api.Assertions.assertThatCode(() -> service.notifyQuietly(7L, "WELCOME", "환영", "시작", "/data-input"))
                 .doesNotThrowAnyException();
     }
 
+    // FP-301·D-23 요청 커밋 뒤에는 실행기에만 넘기고, 요청 콜백 안에서는 저장하지 않는지 확인한다.
+    @Test
+    @DisplayName("커밋 뒤 알림 저장을 실행기에 넘긴다")
+    void notifyQuietly_커밋뒤실행기로위임() {
+        given(mapper.insert(any())).willAnswer(invocation -> {
+            NotificationRow row = invocation.getArgument(0);
+            row.setNotificationId(31L);
+            return 1;
+        });
+        doAnswer(invocation -> { ((Runnable) invocation.getArgument(0)).run(); return null; })
+                .when(executor).execute(any(Runnable.class));
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.notifyQuietly(7L, "WELCOME", "환영", "시작해 보세요", "/data-input");
+
+            verify(executor, never()).execute(any(Runnable.class));
+            verify(mapper, never()).insert(any());
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+
+            verify(executor).execute(any(Runnable.class));
+            verify(mapper).insert(any());
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    // FP-301·D-23 풀 크기보다 많은 알림 제출도 큐 등록 뒤 요청 호출자를 붙들지 않는지 확인한다.
+    @Test
+    @DisplayName("여러 알림 작업을 요청 스레드에서 기다리지 않고 제출한다")
+    void notifyQuietly_다수작업즉시제출() {
+        for (int i = 0; i < 20; i++) {
+            service.notifyQuietly(7L, "WELCOME", "환영", "시작해 보세요", "/data-input");
+        }
+
+        verify(executor, times(20)).execute(any(Runnable.class));
+        verify(mapper, never()).insert(any());
+    }
+
+    // FP-301·D-23 큐 포화 거부가 가입 등 원래 처리를 실패시키지 않는지 확인한다.
+    @Test
+    @DisplayName("실행기 큐가 가득 차도 알림 실패를 호출자에게 전파하지 않는다")
+    void notifyQuietly_실행기거부삼킴() {
+        doThrow(new TaskRejectedException("queue full")).when(executor).execute(any(Runnable.class));
+
+        assertThatCode(() -> service.notifyQuietly(7L, "WELCOME", "환영", "시작해 보세요", "/data-input"))
+                .doesNotThrowAnyException();
+        verify(mapper, never()).insert(any());
+    }
     @BeforeEach
     void setUp() {
         mapper = mock(NotificationMapper.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
-        service = new NotificationService(mapper, eventPublisher);
+        executor = mock(Executor.class);
+        clock = Clock.fixed(Instant.parse("2026-11-27T10:00:00Z"), ZoneOffset.UTC);
+        transactionTemplate = mock(TransactionTemplate.class);
+        doAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        }).when(transactionTemplate).execute(any());
+        service = new NotificationService(mapper, eventPublisher, transactionTemplate, executor, clock);
     }
 
     @Test
@@ -95,7 +169,7 @@ class NotificationServiceTest {
     void markRead_ownedNotification() {
         given(mapper.markRead(eq(7L), eq(31L), any())).willReturn(1);
         service.markRead(7L, 31L);
-        verify(mapper).markRead(eq(7L), eq(31L), any());
+        verify(mapper).markRead(eq(7L), eq(31L), eq(LocalDateTime.now(clock)));
     }
 
     @Test
@@ -122,6 +196,7 @@ class NotificationServiceTest {
     void markAllRead_returnsUpdatedCount() {
         given(mapper.markAllRead(eq(7L), any())).willReturn(3);
         assertThat(service.markAllRead(7L)).isEqualTo(3);
+        verify(mapper).markAllRead(eq(7L), eq(LocalDateTime.now(clock)));
     }
 
     @Test
@@ -137,6 +212,7 @@ class NotificationServiceTest {
 
         assertThat(result.notificationId()).isEqualTo(31L);
         assertThat(result.read()).isFalse();
+        assertThat(result.createdAt()).isEqualTo(LocalDateTime.now(clock));
         verify(eventPublisher).publishEvent(any(NotificationCreatedEvent.class));
     }
 

@@ -157,7 +157,7 @@ class AdminReportServiceTest {
         verify(notificationService).notifyQuietly(9L, "REPORT_RESULT", "신고 처리 결과가 있어요",
                 "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=1");
         verify(notificationService).notifyQuietly(OTHER, "REPORT_RESULT", "내 글이 운영 정책에 따라 삭제됐어요",
-                "운영 정책에 따라 게시물이 삭제 처리되었어요.", "/lounge?post=1");
+                "운영 정책에 따라 글이 삭제 처리되었어요.", "/lounge?post=1");
         verify(reportMapper).closeOpenReports("POST", 1L, "DONE", "DELETE", ADMIN, null, NOW);
     }
 
