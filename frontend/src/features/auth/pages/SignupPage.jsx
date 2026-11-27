@@ -310,6 +310,7 @@ export default function SignupPage() {
         <div {...fieldProps('password')}>
           <PasswordField
             label="비밀번호"
+            rule="new"
             value={form.password}
             onChange={update('password')}
             error={errorOf('password')}
@@ -322,6 +323,7 @@ export default function SignupPage() {
         <div {...fieldProps('passwordConfirm')} className="auth-field">
           <PasswordField
             label="비밀번호 확인"
+            rule="new"
             value={form.passwordConfirm}
             onChange={update('passwordConfirm')}
             error={errorOf('passwordConfirm')}

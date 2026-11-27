@@ -11,7 +11,7 @@ export function isValidPassword(value) {
   return PASSWORD_RULES.every((rule) => rule.test(value ?? ''))
 }
 
-// FP-258 이메일 형식 — 소문자로 바꾼 값을 '앞부분@도메인'으로 나눠 판정한다(서버 AccountRules.isValidEmail과 같은 규칙, 전체 100자 이하).
+// FP-258 N-02-1 이메일 형식 — 소문자로 바꾼 값을 '앞부분@도메인'으로 나눠 판정한다(서버 AccountRules.isValidEmail과 같은 규칙, 전체 100자 이하).
 // 앞부분: a-z0-9 . _ - 만, 처음·끝은 a-z0-9, 점 연속 불가. 도메인: 점으로 나눈 덩어리마다 a-z0-9로 시작·끝(가운데 - 가능), 마지막은 영문 2자 이상.
 export const EMAIL_MAX = 100
 export const EMAIL_LOCAL_MAX = 64
@@ -33,7 +33,7 @@ export function isValidEmail(value) {
   return text.length <= EMAIL_MAX && parts.length === 2 && isValidEmailLocal(parts[0]) && isValidEmailDomain(parts[1])
 }
 
-// FP-258 서버(AccountRules.normalizeEmail·normalizeLoginId)와 같이 앞뒤 공백을 빼고 소문자로 바꾼다. mock이 요청 값을 이 함수로 정리한 뒤 쓴다.
+// FP-258 N-02-1 서버(AccountRules.normalizeEmail·normalizeLoginId)와 같이 앞뒤 공백을 빼고 소문자로 바꾼다. mock이 요청 값을 이 함수로 정리한 뒤 쓴다.
 export function normalizeEmail(value) {
   return String(value ?? '').trim().toLowerCase()
 }
@@ -41,15 +41,15 @@ export function normalizeLoginId(value) {
   return String(value ?? '').trim().toLowerCase()
 }
 
-// ===== FP-258 칸별 걸러내기 — 입력·붙여넣기 모두 onChange에서 이 함수를 거친다. 판정(isValid…·validate…)은 따로 한다. =====
+// ===== FP-258 N-02-1 칸별 걸러내기 — 입력·붙여넣기 모두 onChange에서 이 함수를 거친다. 판정(isValid…·validate…)은 따로 한다. =====
 // 한글 칸은 조합 중인 자모(ㄱ-ㅎ, ㅏ-ㅣ)를 남기므로 값이 바뀌지 않아 한글 조합이 끊기지 않는다.
 
-// FP-258 비밀번호: ASCII 출력 문자(영문·숫자·키보드 기호)와 공백만 남긴다. 보기 상태(type=text)에서 켜진 한글 IME 입력·붙여넣기를 막는다.
+// FP-258 N-02-1 새 비밀번호: ASCII 출력 문자(영문·숫자·키보드 기호)와 공백만 남긴다. 보기 상태(type=text)에서 켜진 한글 IME 입력·붙여넣기를 막는다.
 // 공백은 지금 비밀번호 규칙(PASSWORD_RULES, 서버 isValidPassword)이 막지 않으므로 남긴다.
 export function filterPassword(value) {
   return String(value ?? '').replace(/[^\x20-\x7E]/g, '')
 }
-// FP-258 두벌식 자판 기준으로 한글을 그 자리의 영문 키로 바꾼다(예: 가→rk, ㅂ→q). 가린 칸은 브라우저가 한글 IME를 끄므로, 보기 상태에서 친 한글도 같은 값이 되게 한다.
+// FP-258 N-02-1 두벌식 자판 기준으로 한글을 그 자리의 영문 키로 바꾼다(예: 가→rk, ㅂ→q). 가린 칸은 브라우저가 한글 IME를 끄므로, 보기 상태에서 친 한글도 같은 값이 되게 한다.
 const CHO_KEYS = ['r', 'R', 's', 'e', 'E', 'f', 'a', 'q', 'Q', 't', 'T', 'd', 'w', 'W', 'c', 'z', 'x', 'v', 'g']
 const JUNG_KEYS = ['k', 'o', 'i', 'O', 'j', 'p', 'u', 'P', 'h', 'hk', 'ho', 'hl', 'y', 'n', 'nj', 'np', 'nl', 'b', 'm', 'ml', 'l']
 const JONG_KEYS = ['', 'r', 'R', 'rt', 's', 'sw', 'sg', 'e', 'f', 'fr', 'fa', 'fq', 'ft', 'fx', 'fv', 'fg', 'a', 'q', 'qt', 't', 'T', 'd', 'w', 'c', 'z', 'x', 'v', 'g']
@@ -70,27 +70,27 @@ export function hangulToQwerty(value) {
     return char
   }).join('')
 }
-// 가입 아이디: 소문자로 바꾸고 a-z0-9만, 20자.
+// N-02-1 가입 아이디: 소문자로 바꾸고 a-z0-9만, 20자.
 export function filterSignupLoginId(value) {
   return String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)
 }
-// 로그인·비밀번호 찾기 아이디: 시드(demo_employee)·관리자 아이디에 밑줄이 있어 _도 남긴다. 20자.
+// N-01-1·N-03-2 로그인·비밀번호 찾기 아이디: 시드(demo_employee)·관리자 아이디에 밑줄이 있어 _도 남긴다. 20자.
 export function filterLoginId(value) {
   return String(value ?? '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20)
 }
-// 이름: 한글 완성형과 조합 중 자모만, 20자. 판정은 NAME_PATTERN(완성형 2~20자).
+// N-02-1 이름: 한글 완성형과 조합 중 자모만, 20자. 판정은 NAME_PATTERN(완성형 2~20자).
 export function filterName(value) {
   return String(value ?? '').replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ]/g, '').slice(0, 20)
 }
-// 이메일 앞부분: 소문자로 바꾸고 a-z0-9 . _ - 만, 64자.
+// N-02-1 이메일 앞부분: 소문자로 바꾸고 a-z0-9 . _ - 만, 64자.
 export function filterEmailLocal(value) {
   return String(value ?? '').toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, EMAIL_LOCAL_MAX)
 }
-// 이메일 도메인(직접 입력): 소문자로 바꾸고 a-z0-9 . - 만.
+// N-02-1 이메일 도메인(직접 입력): 소문자로 바꾸고 a-z0-9 . - 만.
 export function filterEmailDomain(value) {
   return String(value ?? '').toLowerCase().replace(/[^a-z0-9.-]/g, '')
 }
-// 한 칸 이메일(마이페이지 이메일 변경): 첫 @ 앞뒤를 따로 거르고 @는 하나만 남긴다.
+// N-04-3 한 칸 이메일(마이페이지 이메일 변경): 첫 @ 앞뒤를 따로 거르고 @는 하나만 남긴다.
 export function filterEmail(value) {
   const text = String(value ?? '')
   const at = text.indexOf('@')
@@ -149,7 +149,7 @@ export const NICKNAME_PATTERN = /^[A-Za-z0-9가-힣]{2,7}$/
 export const NICKNAME_RULE_MESSAGE = '닉네임은 한글·영문·숫자 2~7자로 입력해 주세요.'
 export const WITHDRAWN_NICKNAME_PREFIX = '탈퇴'
 
-// FP-258 닉네임 걸러내기: 한글(조합 중 자모 포함)·영문·숫자만, 7자. 판정은 validateNickname.
+// FP-258 N-02-1 닉네임 걸러내기: 한글(조합 중 자모 포함)·영문·숫자만, 7자. 판정은 validateNickname.
 export function filterNickname(value) {
   return String(value ?? '').replace(/[^가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9]/g, '').slice(0, NICKNAME_MAX)
 }

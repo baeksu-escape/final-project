@@ -100,6 +100,7 @@ export default function FindPasswordPage() {
         <form className="auth-form reset-password-form" onSubmit={handleReset} noValidate>
           <PasswordField
             label="새 비밀번호"
+            rule="new"
             value={password}
             onChange={setPassword}
             error={passwordErrors.password}
@@ -109,6 +110,7 @@ export default function FindPasswordPage() {
           <PasswordRuleList password={password} />
           <PasswordField
             label="새 비밀번호 확인"
+            rule="new"
             value={passwordConfirm}
             onChange={setPasswordConfirm}
             error={passwordErrors.passwordConfirm}

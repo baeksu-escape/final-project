@@ -19,7 +19,8 @@ function EyeIcon({ crossed }) {
 
 // FP-258 N-01-1 비밀번호 칸 — 칸 안 오른쪽 눈 버튼으로 type을 password ↔ text로 바꾼다. 보이는지(visible)는 부모(usePasswordReveal)가 들고 있다.
 // 공통 TextInput에는 칸 안에 버튼 자리가 없어 같은 공통 클래스(form-field·text-input__control·FieldError)로 직접 그린다.
-// 사용 예: <PasswordField label="비밀번호" value={password} onChange={setPassword} error={errors.password} autoComplete="current-password" {...reveal('password')} />
+// rule="new"는 새로 정하는 비밀번호 칸(가입·재설정·변경)에만 붙인다. 없으면 로그인·현재 비밀번호처럼 친 값을 그대로 둔다(걸러내기·변환 없음).
+// 사용 예: <PasswordField label="새 비밀번호" rule="new" value={password} onChange={setPassword} autoComplete="new-password" {...reveal('password')} />
 export default function PasswordField({
   label,
   value,
@@ -32,13 +33,15 @@ export default function PasswordField({
   disabled = false,
   visible = false,
   onToggleVisible,
+  rule,
 }) {
   const id = useId()
   const errorId = `${id}-error`
   const hintId = `${id}-hint`
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined
-  // ASCII 밖 글자는 걸러 내고(filterPassword), 보기 상태에서 조합한 한글은 조합이 끝날 때 영문 키로 바꾼다(finishPassword).
-  const passwordInput = useImeSafeFilter()(onChange, filterPassword, finishPassword)
+  // 새 비밀번호 칸만 ASCII 밖 글자를 걸러 내고(filterPassword), 보기 상태에서 조합한 한글은 조합이 끝날 때 영문 키로 바꾼다(finishPassword).
+  const bindFilter = useImeSafeFilter()
+  const passwordInput = rule === 'new' ? bindFilter(onChange, filterPassword, finishPassword) : { onChange, compositionProps: {} }
   // 값이 있을 때만 눈 버튼과 오른쪽 여백을 둔다.
   const filled = (value ?? '') !== ''
   return (

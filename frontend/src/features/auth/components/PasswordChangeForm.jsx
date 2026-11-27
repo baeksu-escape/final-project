@@ -65,6 +65,7 @@ export default function PasswordChangeForm({ onSaved, onCancel }) {
       />
       <PasswordField
         label="새 비밀번호"
+        rule="new"
         value={form.password}
         onChange={update('password')}
         error={errors.password}
@@ -74,6 +75,7 @@ export default function PasswordChangeForm({ onSaved, onCancel }) {
       <PasswordRuleList password={form.password} />
       <PasswordField
         label="새 비밀번호 확인"
+        rule="new"
         value={form.passwordConfirm}
         onChange={update('passwordConfirm')}
         error={errors.passwordConfirm}
