@@ -41,17 +41,18 @@ function waitUntilVisible(signal) {
   })
 }
 
-// D-23 서버 목록과 조회 도중 도착한 SSE를 ID로 합치고 새 항목 수를 전체 배지에 더한다.
-function mergePendingNotifications(response, pendingItems, pendingAtStart) {
+// D-23 응답에 없는 SSE 항목은 목록에 보태고, 서버 응답 뒤 도착한 더 큰 ID만 배지에 보수적으로 더한다.
+function mergePendingNotifications(response, pendingItems, responseReceivedAt) {
   const items = [...response.items]
-  let arrivedDuringRequest = 0
+  const maxResponseId = response.items.reduce((max, item) => Math.max(max, item.notificationId), 0)
+  let confirmedAfterResponse = 0
   pendingItems.forEach((item, id) => {
     if (items.some((row) => row.notificationId === id)) return
-    items.push(item)
-    if (!pendingAtStart.has(id)) arrivedDuringRequest += 1
+    items.push(item.notification)
+    if (id > maxResponseId && item.receivedAt > responseReceivedAt) confirmedAfterResponse += 1
   })
-  items.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-  return { ...response, items, unreadCount: response.unreadCount + arrivedDuringRequest }
+  items.sort((a, b) => b.notificationId - a.notificationId)
+  return { ...response, items, unreadCount: response.unreadCount + confirmedAfterResponse }
 }
 
 // D-23 알림 목록·읽음 상태를 관리하고 SSE 연결 시 새 항목을 추가할 수 있는 함수를 제공한다.
@@ -60,12 +61,13 @@ export function useNotifications(enabled = true) {
   const pendingSse = useRef(new Map())
   const seenIds = useRef(new Set())
   const firstListRequest = useRef(null)
-  // D-23 최초 목록 요청을 SSE 연결에서도 기다려 중복 조회를 막는다.
+  // D-23 최초 목록 응답 시점을 SSE 연결 완료와 비교해 누락 보충 조회를 보장한다.
   const refresh = useCallback(async () => {
-    const pendingAtStart = new Set(pendingSse.current.keys())
-    setState((current) => ({ ...current, error: '', loading: current.items.length === 0 ? true : current.loading }))
+    setState((current) => ({ ...current, error: '' }))
     try {
-      const response = mergePendingNotifications(adaptNotifications(await fetchNotifications({ unreadOnly: true })), pendingSse.current, pendingAtStart)
+      const data = await fetchNotifications({ unreadOnly: true })
+      const receivedAt = Date.now()
+      const response = mergePendingNotifications(adaptNotifications(data), pendingSse.current, receivedAt)
       response.items.forEach((item) => seenIds.current.add(item.notificationId))
       response.items.forEach((item) => pendingSse.current.delete(item.notificationId))
       setState({ ...response, loading: false, error: '' })
@@ -76,12 +78,14 @@ export function useNotifications(enabled = true) {
   useEffect(() => {
     if (!enabled) return undefined
     let active = true
-    const pendingAtStart = new Set(pendingSse.current.keys())
     const request = fetchNotifications({ unreadOnly: true })
-    firstListRequest.current = request
+    const initialRequest = { promise: request, settled: false }
+    firstListRequest.current = initialRequest
+    request.then(() => { initialRequest.settled = true }, () => { initialRequest.settled = true })
     request.then((data) => {
       if (active) {
-        const response = mergePendingNotifications(adaptNotifications(data), pendingSse.current, pendingAtStart)
+        const receivedAt = Date.now()
+        const response = mergePendingNotifications(adaptNotifications(data), pendingSse.current, receivedAt)
         response.items.forEach((item) => seenIds.current.add(item.notificationId))
         response.items.forEach((item) => pendingSse.current.delete(item.notificationId))
         setState({ ...response, loading: false, error: '' })
@@ -115,7 +119,7 @@ export function useNotifications(enabled = true) {
       createdAt: item.createdAt ?? new Date().toISOString(),
     }
     seenIds.current.add(notificationId)
-    pendingSse.current.set(notificationId, notification)
+    pendingSse.current.set(notificationId, { notification, receivedAt: Date.now() })
     setState((current) => current.items.some((row) => row.notificationId === notificationId)
       ? current : { ...current, items: [notification, ...current.items], unreadCount: current.unreadCount + 1 })
     emitNotificationsChanged('bell')
@@ -147,16 +151,23 @@ export function useNotifications(enabled = true) {
           }
           if (!response.ok) throw new Error('알림 스트림 연결 실패')
           retryDelay = 1000
-          if (firstConnection) {
-            firstConnection = false
-            if (firstListRequest.current) await firstListRequest.current
-            else await refresh()
-          } else await refresh()
+          let connectedRefresh = null
           let replaced = false
           await readNotificationEvents(response, addNotification, controller.signal, (eventName) => {
+            if (eventName === 'connected') {
+              if (firstConnection) {
+                firstConnection = false
+                const initialRequest = firstListRequest.current
+                connectedRefresh = (async () => {
+                  if (initialRequest && !initialRequest.settled) await initialRequest.promise.catch(() => undefined)
+                  await refresh()
+                })()
+              } else connectedRefresh = refresh()
+            }
             if (eventName === 'replaced') replaced = true
             // expired 이벤트 뒤에는 서버가 스트림을 닫고 다음 요청에서 401을 돌려 로그아웃 흐름을 탄다.
           })
+          if (connectedRefresh) await connectedRefresh
           if (replaced) {
             waitingForVisible = true
             const visible = await waitUntilVisible(controller.signal)

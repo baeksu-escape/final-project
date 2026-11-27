@@ -55,7 +55,8 @@ export default function NotificationsPage() {
         })
       }
     }).catch(() => {
-      if (sequence.current === requestId) setHistory({ type, items: [], unreadCount: 0, hasMore: false, loading: false, error: '알림을 불러오지 못했어요.' })
+      // D-23 새 목록 요청이 실패해도 이미 표시 중인 기록은 남기고 오류 안내만 갱신한다.
+      if (sequence.current === requestId) setHistory((current) => ({ ...current, type, loading: false, error: '알림을 불러오지 못했어요.' }))
     })
     return () => { sequence.current += 1 }
   }, [type, refreshVersion])
@@ -145,10 +146,10 @@ export default function NotificationsPage() {
         </ul>
       </nav>
       <Card title="알림 기록">
-        {visible.loading ? <p className="hint" role="status">알림을 불러오는 중이에요.</p>
-          : visible.error ? <p className="hint" role="status">{visible.error}</p>
-            : visible.items.length === 0 ? <p className="hint">{selectedTab.empty}</p>
-              : <ul className="nt-list">{visible.items.map((item) => <li key={item.notificationId}>
+        {visible.loading ? <p className="hint" role="status">알림을 불러오는 중이에요.</p> : <>
+          {visible.error && <p className="hint" role="status">{visible.error}</p>}
+          {visible.items.length === 0 ? (visible.error ? null : <p className="hint">{selectedTab.empty}</p>)
+            : <ul className="nt-list">{visible.items.map((item) => <li key={item.notificationId}>
                 <button type="button" className={item.read ? 'nt-item' : 'nt-item nt-item--unread'} onClick={() => selectItem(item)}>
                   <span className="nt-item__heading">
                     <strong className="nt-item__title">{item.title}</strong>
@@ -159,6 +160,7 @@ export default function NotificationsPage() {
                   <span className="nt-item__time"><time dateTime={item.createdAt}>{dateTime(item.createdAt)}</time> · {relativeTime(item.createdAt)}</span>
                 </button>
               </li>)}</ul>}
+        </>}
         {actionError && <p className="hint" role="status">{actionError}</p>}
         {visible.hasMore && <div className="nt-more"><Button variant="weak" size="sm" disabled={loadingMore} onClick={loadMore}>{loadingMore ? '불러오는 중…' : '더 보기'}</Button></div>}
       </Card>

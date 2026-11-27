@@ -11,7 +11,7 @@ export async function readNotificationEvents(response, onNotification, signal, o
     if (line === '') {
       if (eventName === 'notification' && dataLines.length) {
         try { onNotification(JSON.parse(dataLines.join('\n'))) } catch { /* 잘못된 이벤트는 건너뛴다. */ }
-      } else if (eventName === 'replaced' || eventName === 'expired') onControlEvent(eventName)
+      } else if (eventName === 'connected' || eventName === 'replaced' || eventName === 'expired') onControlEvent(eventName)
       eventName = ''
       dataLines = []
       return

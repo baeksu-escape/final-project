@@ -9,6 +9,8 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
@@ -108,18 +110,24 @@ class NotificationStreamServiceTest {
         assertTrue(created.get(1).sent.stream().anyMatch(s -> s.contains("32")));
     }
 
+    // D-23 FP-284 한 연결의 지연 전송 중에도 다른 연결의 하트비트와 실패 정리가 진행되는지 확인한다.
     @Test
     @DisplayName("하트비트는 모든 연결에 ping 주석을 보내고, 실패한 연결은 정리한다")
-    void heartbeat_pingsAndCleansUp() {
+    void heartbeat_slowConnectionDoesNotBlockOthers() throws Exception {
         service.register(7L);
-        service.register(8L);
-        created.get(1).failSend = true;
+        service.register(7L);
+        service.register(7L);
+        created.get(0).blockSend = true;
+        created.get(2).failSend = true;
 
         service.sendHeartbeat();
 
-        assertTrue(created.get(0).sent.stream().anyMatch(s -> s.contains("ping")));
-        assertEquals(1, service.connectionCount(7L));
-        assertEquals(0, service.connectionCount(8L));
+        assertTrue(created.get(0).sendEntered.await(1, TimeUnit.SECONDS));
+        assertTrue(created.get(1).pingSent.await(1, TimeUnit.SECONDS));
+        assertTrue(created.get(2).completedSignal.await(1, TimeUnit.SECONDS));
+        created.get(0).releaseSend.countDown();
+        assertTrue(created.get(0).pingSent.await(1, TimeUnit.SECONDS));
+        assertEquals(2, service.connectionCount(7L));
     }
 
     @Test
@@ -138,6 +146,11 @@ class NotificationStreamServiceTest {
     private static class RecordingEmitter extends SseEmitter {
         final List<String> sent = new ArrayList<>();
         final long timeoutMillis;
+        final CountDownLatch sendEntered = new CountDownLatch(1);
+        final CountDownLatch releaseSend = new CountDownLatch(1);
+        final CountDownLatch pingSent = new CountDownLatch(1);
+        final CountDownLatch completedSignal = new CountDownLatch(1);
+        boolean blockSend;
         boolean failSend;
         boolean completed;
 
@@ -146,15 +159,31 @@ class NotificationStreamServiceTest {
             timeoutMillis = timeout;
         }
 
+        // D-23 FP-284 느린 연결을 막아 두고 다른 emitter의 ping·정리가 진행되는지 가짜 연결에서 확인한다.
         @Override
         public synchronized void send(SseEventBuilder builder) throws IOException {
+            if (blockSend) {
+                sendEntered.countDown();
+                try {
+                    releaseSend.await(2, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("전송 대기 중단", e);
+                }
+            }
             if (failSend) throw new IOException("끊긴 연결");
-            builder.build().forEach(part -> sent.add(String.valueOf(part.getData())));
+            builder.build().forEach(part -> {
+                String value = String.valueOf(part.getData());
+                sent.add(value);
+                if (value.contains("ping")) pingSent.countDown();
+            });
         }
 
+        // D-23 FP-284 종료 신호를 남겨 비동기 연결 정리 완료를 시험에서 기다릴 수 있게 한다.
         @Override
         public synchronized void complete() {
             completed = true;
+            completedSignal.countDown();
         }
     }
 }

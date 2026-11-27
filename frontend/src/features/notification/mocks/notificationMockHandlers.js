@@ -4,10 +4,10 @@ import { ApiError } from '../../../common/api/ApiError.js'
 const now = Date.now()
 const ago = (minutes) => new Date(now - minutes * 60000).toISOString()
 const seeded = [
-  { notificationId: 28401, typeCode: 'SCORE_NEW', title: '새 신용 점수가 나왔어요', content: '내 신용에서 새 평가 결과를 확인해 보세요.', linkUrl: '/report', read: false, createdAt: ago(3) },
-  { notificationId: 28402, typeCode: 'COMMENT_NEW', title: '내 글에 새 댓글이 달렸어요', content: '시나리오 공유 글에 댓글이 달렸어요.', linkUrl: '/lounge', read: false, createdAt: ago(47) },
-  { notificationId: 28403, typeCode: 'REPORT_RESULT', title: '신고 처리 결과가 있어요', content: '접수한 신고의 처리 결과를 확인해 주세요.', linkUrl: '/lounge', read: true, createdAt: ago(1500) },
-  { notificationId: 28404, typeCode: 'WELCOME', title: 'Avenue에 오신 것을 환영해요', content: '내 정보를 입력하고 재무 진단을 시작해 보세요.', linkUrl: '/data-input', read: true, createdAt: ago(4200) },
+  { notificationId: 28404, typeCode: 'SCORE_NEW', title: '새 신용 점수가 나왔어요', content: '내 신용에서 새 평가 결과를 확인해 보세요.', linkUrl: '/report', read: false, createdAt: ago(3) },
+  { notificationId: 28403, typeCode: 'COMMENT_NEW', title: '내 글에 새 댓글이 달렸어요', content: '시나리오 공유 글에 댓글이 달렸어요.', linkUrl: '/lounge', read: false, createdAt: ago(47) },
+  { notificationId: 28402, typeCode: 'REPORT_RESULT', title: '신고 처리 결과가 있어요', content: '접수한 신고의 처리 결과를 확인해 주세요.', linkUrl: '/lounge', read: true, createdAt: ago(1500) },
+  { notificationId: 28401, typeCode: 'WELCOME', title: 'Avenue에 오신 것을 환영해요', content: '내 정보를 입력하고 재무 진단을 시작해 보세요.', linkUrl: '/data-input', read: true, createdAt: ago(4200) },
 ]
 const stores = new Map()
 const storeFor = (token) => {
@@ -23,7 +23,7 @@ function snapshot(items, { unreadOnly = false, type, before, size = 20 } = {}) {
     const message = '알림 목록 조건을 확인해 주세요.'
     throw new ApiError(400, message, { code: 'INVALID_INPUT', message })
   }
-  const sorted = structuredClone(items).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.notificationId - a.notificationId)
+  const sorted = structuredClone(items).sort((a, b) => b.notificationId - a.notificationId)
   const filtered = sorted.filter((item) => (!unreadOnly || !item.read)
     && (!type || item.typeCode === type)
     && (before == null || item.notificationId < Number(before)))
