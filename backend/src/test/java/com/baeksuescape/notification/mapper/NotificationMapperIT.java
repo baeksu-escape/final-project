@@ -1,4 +1,4 @@
-package com.baeksuescape.notification;
+package com.baeksuescape.notification.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -15,7 +15,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.baeksuescape.notification.dto.NotificationRow;
-import com.baeksuescape.notification.mapper.NotificationMapper;
 
 /** FP-300·D-23 알림 조건 목록 SQL을 Oracle에서 확인하며 시험 자료는 트랜잭션 롤백으로 되돌린다(-Ddb.it=true 전용). */
 @SpringBootTest
