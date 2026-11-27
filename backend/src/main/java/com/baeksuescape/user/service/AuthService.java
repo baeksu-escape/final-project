@@ -30,8 +30,16 @@ import com.baeksuescape.user.service.social.DevSocialStore;
 @Service
 public class AuthService {
 
-    static final int MAX_LOGIN_FAILURES = 5;
+    // FP-258 단계적 제한: 5회 실패하면 5분 동안 로그인을 막고, 누적 10회면 잠근다(비밀번호 찾기 재설정이나 관리자가 푼다).
+    static final int TEMP_BLOCK_FAILURES = 5;
+    static final int TEMP_BLOCK_MINUTES = 5;
+    static final int MAX_LOGIN_FAILURES = 10;
+    // FP-258 AUTH-09 아이디 찾기 방법(프론트 authConstants.js FIND_ID_METHODS와 같은 값)
+    static final String FIND_ID_PHONE = "PHONE";
+    static final String FIND_ID_EMAIL = "EMAIL";
     static final String LOG_SOURCE = "auth-service";
+    // 아이디 형식 오류 문구 — 가입(AUTH-06)과 아이디 중복 확인(AUTH-16)이 같이 쓴다(프론트 validateLoginId와 같은 문구).
+    static final String LOGIN_ID_RULE_MESSAGE = "아이디는 영문 소문자로 시작하는 4~20자 영문 소문자·숫자로 입력해 주세요.";
 
     private final UserAccountMapper userMapper;
     private final UserConsentMapper consentMapper;
@@ -47,11 +55,12 @@ public class AuthService {
     private final Clock clock;
     private final AdminAuthService adminAuth;
     private final SystemLogService systemLog;
+    private final LoginAttemptService loginAttempts;
 
     public AuthService(UserAccountMapper userMapper, UserConsentMapper consentMapper, UserSocialAccountMapper socialMapper,
             EmailVerificationService emailVerification, PhoneVerificationService phoneVerification, DevSocialStore socialStore,
             UserViewFactory userViews, JwtTokenProvider tokenProvider, PasswordEncoder passwordEncoder, PiiCrypto crypto, PiiHmac hmac, Clock clock,
-            AdminAuthService adminAuth, SystemLogService systemLog) {
+            AdminAuthService adminAuth, SystemLogService systemLog, LoginAttemptService loginAttempts) {
         this.userMapper = userMapper;
         this.consentMapper = consentMapper;
         this.socialMapper = socialMapper;
@@ -66,50 +75,77 @@ public class AuthService {
         this.clock = clock;
         this.adminAuth = adminAuth;
         this.systemLog = systemLog;
+        this.loginAttempts = loginAttempts;
     }
 
     // AUTH-01 로그인. 일반 사용자는 토큰을 준다(응답 그대로).
     // FP-80 관리자는 비밀번호가 맞아도 토큰을 주지 않고, 업무 이메일로 6자리 번호를 보낸 뒤 2단계 인증 대기 응답을 준다(AUTH-11로 이어짐).
-    @Transactional(noRollbackFor = ApiException.class)
+    // FP-258 트랜잭션을 걸지 않는다 — 계정 행 잠금과 일반 회원의 성공 처리는 LoginAttemptService 안에서 끝내고, 로그·토큰은 그 뒤에 한다.
     public AuthResponses.LoginResult login(AuthRequests.Login request) {
-        UserAccount account = authenticate(request.loginId(), request.password());
+        UserAccount account = authenticate(request.loginId(), request.password(), true);
         if (account.isAdmin()) {
             return adminAuth.startLogin(account);
         }
         return loginResponse(account);
     }
 
-    // 아이디·비밀번호를 확인한다. 로그인과 간편 로그인 연결(AUTH-05)이 같은 규칙을 쓴다.
+    // 아이디·비밀번호를 확인한다. 로그인·관리자 로그인과 간편 로그인 연결(AUTH-05)이 같은 규칙을 쓴다(FP-258 단계적 제한).
     //   없는 계정·탈퇴·비밀번호 없는 계정·틀린 비밀번호 → 401(어느 쪽이 틀렸는지 알리지 않음)
-    //   틀리면 실패 횟수 +1, 5회째면 잠그고 423. 잠긴 계정은 비밀번호가 맞을 때만 423으로 알린다(프론트 mock과 같은 순서).
-    @Transactional(noRollbackFor = ApiException.class)
+    //   잠긴 계정은 횟수를 세지 않고, 비밀번호가 맞을 때만 423(관리자는 ADMIN_ACCOUNT_LOCKED). 5회째 실패부터 5분 동안 429, 10회째면 잠그고 423.
+    //   DB 처리(행 잠금 뒤 다시 읽기, FP-290)는 LoginAttemptService 트랜잭션에서 끝내고, 로그(REQUIRES_NEW)는 커넥션을 돌려준 뒤 남긴다.
+    //   그래서 부르는 쪽도 트랜잭션 밖에서 불러야 한다(안에서 부르면 잠금과 커넥션을 그 트랜잭션 끝까지 쥔다).
+    //   간편 로그인 연결은 성공 처리를 하지 않고 확인만 한다(연결을 저장한 뒤 confirmLogin).
     public UserAccount authenticate(String loginId, String password) {
-        UserAccount account = userMapper.selectByLoginId(loginId.strip());
-        if (account == null || account.isWithdrawn() || account.getPasswordHash() == null) throw AuthErrors.loginFailed();
-        if (!passwordEncoder.matches(password, account.getPasswordHash())) {
-            if (!account.isLocked()) {
-                int failures = account.getLoginFailCount() + 1;
-                boolean lock = failures >= MAX_LOGIN_FAILURES;
-                userMapper.updateLoginFailure(account.getUserId(), failures, lock, LocalDateTime.now(clock));
-                // FP-80 N-28-1 로그인 실패 n/5회, 5회째 자동 잠금(WARN). 아이디는 가린 값만 남긴다.
-                String masked = SystemLogService.maskLoginId(account.getLoginId());
-                systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 실패 " + failures + "/" + MAX_LOGIN_FAILURES + "회 (" + masked + ")",
-                        account.getUserId());
-                if (lock) {
-                    systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, "로그인 " + MAX_LOGIN_FAILURES + "회 실패로 계정 자동 잠금 (" + masked + ")",
-                            account.getUserId());
-                    throw AuthErrors.accountLocked();
-                }
-            }
-            throw AuthErrors.loginFailed();
-        }
-        if (account.isLocked()) throw AuthErrors.accountLocked();
-        return account;
+        return authenticate(loginId, password, false);
     }
 
-    // 로그인 성공 처리(실패 횟수 0, 마지막 로그인 시각)와 응답. 간편 로그인도 쓴다.
-    public AuthResponses.Login loginResponse(UserAccount account) {
-        userMapper.updateLoginSuccess(account.getUserId(), LocalDateTime.now(clock));
+    // recordSuccess면 비밀번호가 맞은 일반 회원의 성공 처리를 확인과 같은 잠금 안에서 한다(관리자는 2단계 인증 뒤).
+    private UserAccount authenticate(String loginId, String password, boolean recordSuccess) {
+        LoginAttemptService.Attempt attempt = loginAttempts.attempt(loginId, password, recordSuccess);
+        UserAccount account = attempt.account();
+        switch (attempt.outcome()) {
+            case SUCCESS:
+                return account;
+            case REJECTED:
+                throw AuthErrors.loginFailed();
+            case LOCKED:
+                throw lockedError(account);
+            case BLOCKED:
+                throw AuthErrors.loginTemporarilyBlocked(attempt.blockedMinutes());
+            default:
+                break;
+        }
+        // FP-80 N-28-1 로그인 실패 n/10회(WARN), 5회째 5분 제한, 10회째 자동 잠금. 아이디는 가린 값만 남긴다.
+        warn("로그인 실패 " + attempt.failures() + "/" + MAX_LOGIN_FAILURES + "회", account);
+        if (attempt.outcome() == LoginAttemptService.Outcome.AUTO_LOCKED) {
+            warn("로그인 " + MAX_LOGIN_FAILURES + "회 실패로 계정 자동 잠금", account);
+            throw lockedError(account);
+        }
+        if (attempt.outcome() == LoginAttemptService.Outcome.TEMP_BLOCKED) {
+            warn("로그인 " + TEMP_BLOCK_FAILURES + "회 실패로 " + TEMP_BLOCK_MINUTES + "분 제한", account);
+            throw AuthErrors.loginTemporarilyBlocked(TEMP_BLOCK_MINUTES);
+        }
+        throw AuthErrors.loginFailed();
+    }
+
+    // 로그인 실패 WARN 로그 한 줄 — 끝에 가린 아이디를 붙인다(예: "로그인 실패 1/10회 (abc***)").
+    private void warn(String text, UserAccount account) {
+        systemLog.record(SystemLogService.Type.WARN, LOG_SOURCE, text + " (" + SystemLogService.maskLoginId(account.getLoginId()) + ")", account.getUserId());
+    }
+
+    // FP-258 잠긴 계정 안내 — 관리자는 다른 관리자에게 풀어 달라는 문구(423 ADMIN_ACCOUNT_LOCKED), 회원은 비밀번호 찾기 안내(423 ACCOUNT_LOCKED).
+    private static ApiException lockedError(UserAccount account) {
+        return account.isAdmin() ? AuthErrors.adminAccountLocked() : AuthErrors.accountLocked();
+    }
+
+    // FP-258 비밀번호 확인 없이 들어오는 로그인 성공(간편 로그인·연결) — 잠금 안에서 성공 처리하고, 그사이 잠겼으면 423(관리자는 ADMIN_ACCOUNT_LOCKED).
+    public AuthResponses.Login confirmLogin(UserAccount account) {
+        if (!loginAttempts.recordSuccess(account.getUserId())) throw lockedError(account);
+        return loginResponse(account);
+    }
+
+    // 로그인 성공 로그와 응답(토큰). 성공 처리(실패 횟수 0, 마지막 로그인 시각)는 부르기 전에 계정 잠금 안에서 끝낸다(LoginAttemptService).
+    private AuthResponses.Login loginResponse(UserAccount account) {
         systemLog.record(SystemLogService.Type.AUTH, LOG_SOURCE, "로그인 성공 (" + SystemLogService.maskLoginId(account.getLoginId()) + ")",
                 account.getUserId());
         return new AuthResponses.Login(tokenProvider.issue(account.getUserId(), account.getRoleCode()), userViews.of(account));
@@ -132,6 +168,16 @@ public class AuthService {
         return new AuthResponses.NicknameAvailability(userMapper.countByNickname(request.nickname().strip()) == 0);
     }
 
+    // AUTH-16 N-02-1 아이디 중복 확인(FP-258) — 가입(AUTH-06)과 같은 형식 검사·문구로 틀리면 400(loginId 칸), 아니면 가입 중복 검사와 같은 countByLoginId로 쓸 수 있는지만 돌려준다.
+    // 가입처럼 값을 바꾸지 않고 그대로 본다(형식이 영문 소문자만 받으므로 대소문자 차이가 없고, 탈퇴 회원 아이디는 표시값으로 덮여 잡히지 않는다).
+    public AuthResponses.LoginIdAvailability checkLoginId(AuthRequests.LoginIdCheck request) {
+        String loginId = request.loginId();
+        String loginIdError = isBlank(loginId) ? "아이디를 입력해 주세요."
+                : AccountRules.isValidLoginId(loginId) ? null : LOGIN_ID_RULE_MESSAGE;
+        if (loginIdError != null) throw AuthErrors.invalidField("loginId", loginIdError);
+        return new AuthResponses.LoginIdAvailability(userMapper.countByLoginId(loginId) == 0);
+    }
+
     // AUTH-06 회원가입 — 칸 검사 → 중복(아이디·이메일·닉네임 순) → 간편 로그인 키 → 이메일·휴대폰 인증 토큰 사용 → 계정·동의·간편 로그인 연결 저장을 한 트랜잭션으로 한다.
     @Transactional
     public AuthResponses.Signup signup(AuthRequests.Signup request) {
@@ -139,7 +185,8 @@ public class AuthService {
         validateSignup(request, now.getYear());
 
         String loginId = request.loginId();
-        String email = request.email().strip();
+        // FP-258 이메일은 소문자로 바꿔 HMAC·암호문(EMAIL_ENC) 모두 같은 값으로 저장한다.
+        String email = AccountRules.normalizeEmail(request.email());
         String nickname = request.nickname().strip();
         String phone = AccountRules.normalizePhone(request.phone());
         String emailHmac = hmac.email(email);
@@ -180,9 +227,8 @@ public class AuthService {
         return new AuthResponses.Signup(account.getUserId());
     }
 
-    // N-02-2 가입 동의 3행(필수 2·선택 1, 더미 시드와 같은 모양).
-    // TODO(프론트) 지금 화면은 체크 하나(agreeCreditInfo)뿐이라 이용약관(TERMS_OF_SERVICE) 동의를 그 체크로 대신 기록한다 — 시연용 임시 처리다.
-    //   실제로 쓰기 전에 가입 화면에 필수 2개(이용약관·개인정보 수집·이용)와 선택 1개(점수 변동 알림·혜택 안내) 체크박스를 반드시 추가해야 한다.
+    // N-02-2 가입 동의 기록(USER_CONSENT). FP-258 가입 화면이 필수 2개(이용약관·개인정보 수집·이용)와 선택 1개(점수 변동 알림·혜택 안내)를 따로 받는다.
+    //   필수 2개는 검사(validateSignup)를 통과해야 여기까지 오므로 동의(Y)로 남긴다. 선택 동의는 체크하지 않아도 N·동의 시각 없음으로 한 행을 남겨 늘 3행이다(더미 시드와 같은 모양).
     private void saveSignupConsents(long userId, boolean agreeMarketing, LocalDateTime now) {
         consentMapper.insertSignupConsent(userId, "TERMS_OF_SERVICE", "Y", "Y", now, now);
         consentMapper.insertSignupConsent(userId, "PRIVACY_COLLECTION", "Y", "Y", now, now);
@@ -194,7 +240,7 @@ public class AuthService {
         List<FieldErrorItem> errors = new ArrayList<>();
         if (isBlank(r.loginId())) errors.add(new FieldErrorItem("loginId", "아이디를 입력해 주세요."));
         else if (!AccountRules.isValidLoginId(r.loginId())) {
-            errors.add(new FieldErrorItem("loginId", "아이디는 영문 소문자로 시작하는 4~20자 영문 소문자·숫자로 입력해 주세요."));
+            errors.add(new FieldErrorItem("loginId", LOGIN_ID_RULE_MESSAGE));
         }
         // 11/18 1차 시연 후속: 이름은 완성형 한글 2~20자만 받는다(화면과 같은 문구).
         String nameError = AccountRules.nameError(r.name());
@@ -210,10 +256,15 @@ public class AuthService {
         else if (!AccountRules.isValidEmail(r.email().strip())) errors.add(new FieldErrorItem("email", "이메일 형식이 올바르지 않습니다. 예) name@example.com"));
         else if (isBlank(r.emailVerificationToken())) errors.add(new FieldErrorItem("email", "이메일 인증을 완료해 주세요."));
         if (isBlank(r.password())) errors.add(new FieldErrorItem("password", "비밀번호를 입력해 주세요."));
-        else if (!AccountRules.isValidPassword(r.password())) errors.add(new FieldErrorItem("password", "비밀번호 규칙을 모두 지켜 주세요."));
+        else {
+            String passwordError = AccountRules.newPasswordError(r.password(), "비밀번호 규칙을 모두 지켜 주세요.");
+            if (passwordError != null) errors.add(new FieldErrorItem("password", passwordError));
+        }
         String birthYearError = AccountRules.birthYearError(r.birthYear(), thisYear);
         if (birthYearError != null) errors.add(new FieldErrorItem("birthYear", birthYearError));
-        if (!Boolean.TRUE.equals(r.agreeCreditInfo())) errors.add(new FieldErrorItem("agreeCreditInfo", "필수 동의 항목입니다."));
+        // FP-258 필수 동의 2개는 각각 true여야 한다(예전 agreeCreditInfo 하나로 대신하지 않는다). 빠진 칸마다 알린다.
+        if (!Boolean.TRUE.equals(r.agreeTerms())) errors.add(new FieldErrorItem("agreeTerms", "필수 동의 항목입니다."));
+        if (!Boolean.TRUE.equals(r.agreePrivacy())) errors.add(new FieldErrorItem("agreePrivacy", "필수 동의 항목입니다."));
         if (!errors.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", errors.get(0).message(), errors);
     }
 
@@ -225,29 +276,48 @@ public class AuthService {
         return AuthErrors.duplicateLoginId();
     }
 
-    // AUTH-09 아이디 찾기(이름·휴대폰). 휴대폰 HMAC으로 후보를 찾고 이름을 복호화해 비교한다. 탈퇴·관리자 계정은 찾지 않는다.
+    // AUTH-09 N-03-1 아이디 찾기(FP-258) — 이름 + 휴대폰 또는 이메일 인증(FIND_ID 토큰)으로 찾은 일반 회원의 아이디를 가리지 않고 준다.
+    // 일치하는 계정이 없으면 404이고 트랜잭션이 되돌아가 토큰은 다시 쓸 수 있다. 탈퇴·관리자 계정은 찾지 않는다.
+    @Transactional
     public AuthResponses.FoundId findId(AuthRequests.FindId request) {
-        String phone = AccountRules.normalizePhone(request.phone());
-        String name = request.name().strip();
-        if (phone.isEmpty()) throw AuthErrors.accountNotFound();
-        return userMapper.selectUsersByPhoneHmac(hmac.phone(phone)).stream()
-                .filter(account -> name.equals(crypto.decrypt(account.getNameEnc())))
+        // 이름 형식을 먼저 본다(틀리면 400 name 칸, 토큰은 쓰지 않음).
+        AuthErrors.requireValidName(request.name());
+        String method = request.method() == null ? "" : request.method().strip();
+        if (!FIND_ID_PHONE.equals(method) && !FIND_ID_EMAIL.equals(method)) throw AuthErrors.invalidField("method", "아이디를 찾을 방법을 골라 주세요.");
+        // 토큰이 없으면 가입과 같은 오류로 막는다: 휴대폰은 400 INVALID_INPUT(phone 칸), 이메일은 400 EMAIL_VERIFICATION_REQUIRED.
+        if (isBlank(request.verificationToken())) {
+            throw FIND_ID_PHONE.equals(method) ? PhoneVerificationService.verificationRequired() : EmailVerificationService.verificationRequired();
+        }
+        List<UserAccount> candidates;
+        if (FIND_ID_PHONE.equals(method)) {
+            String phone = AccountRules.normalizePhone(request.phone());
+            phoneVerification.consume(request.verificationToken(), PhonePurpose.FIND_ID, phone);
+            candidates = userMapper.selectUsersByPhoneHmac(hmac.phone(phone));
+        } else {
+            String email = AccountRules.normalizeEmail(request.email());
+            emailVerification.consume(request.verificationToken(), EmailPurpose.FIND_ID, email, null);
+            UserAccount account = userMapper.selectUserByEmailHmac(hmac.email(email));
+            candidates = account == null ? List.of() : List.of(account);
+        }
+        return candidates.stream()
+                .filter(account -> AccountRules.nameMatches(request.name(), crypto.decrypt(account.getNameEnc())))
                 .findFirst()
-                .map(account -> new AuthResponses.FoundId(AccountRules.maskLoginId(account.getLoginId())))
+                .map(account -> new AuthResponses.FoundId(AccountRules.maskLoginId(account.getLoginId()), account.getLoginId()))
                 .orElseThrow(AuthErrors::accountNotFound);
     }
 
     // AUTH-10 비밀번호 재설정 — 이메일 인증 토큰(재설정 목적, 확인 때 찾은 계정)을 한 번 쓰고 새 비밀번호로 바꾼다. 잠긴 계정은 풀린다.
+    // FP-258 아이디·이메일에 이름(복호화 비교)까지 같은 계정만 통과한다. 하나라도 다르면 같은 404.
     // FP-80 관리자는 쓸 수 없다: 조회가 일반 회원만 찾으므로(selectUserByLoginIdAndEmailHmac) 관리자 아이디는 "없는 계정"과 같은 404가 된다.
     @Transactional
     public void resetPassword(AuthRequests.PasswordReset request) {
-        if (!AccountRules.isValidPassword(request.newPassword())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "비밀번호 규칙을 지켜 주세요.",
-                    List.of(new FieldErrorItem("newPassword", "비밀번호 규칙을 지켜 주세요.")));
-        }
-        String email = request.email().strip();
-        UserAccount account = userMapper.selectUserByLoginIdAndEmailHmac(request.loginId().strip(), hmac.email(email));
-        if (account == null) throw AuthErrors.accountNotFound();
+        // 이름 형식(가입과 같은 규칙)을 먼저 본다.
+        AuthErrors.requireValidName(request.name());
+        String passwordError = AccountRules.newPasswordError(request.newPassword(), "비밀번호 규칙을 지켜 주세요.");
+        if (passwordError != null) throw AuthErrors.invalidField("newPassword", passwordError);
+        String email = AccountRules.normalizeEmail(request.email());
+        UserAccount account = userMapper.selectUserByLoginIdAndEmailHmac(AccountRules.normalizeLoginId(request.loginId()), hmac.email(email));
+        if (account == null || !AccountRules.nameMatches(request.name(), crypto.decrypt(account.getNameEnc()))) throw AuthErrors.accountNotFound();
         emailVerification.consume(request.emailVerificationToken(), EmailPurpose.RESET_PASSWORD, email, account.getUserId());
         userMapper.updatePasswordAndUnlock(account.getUserId(), passwordEncoder.encode(request.newPassword()), LocalDateTime.now(clock));
     }

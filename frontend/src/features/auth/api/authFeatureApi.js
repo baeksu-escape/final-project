@@ -11,11 +11,13 @@ export const AUTH_FEATURE_API = Object.freeze({
   FIND_ID: '/api/auth/find-id',
   PASSWORD_RESET: '/api/auth/password/reset',
   NICKNAME_CHECK: '/api/auth/nickname/check',
+  LOGIN_ID_CHECK: '/api/auth/login-id/check',
   PHONE_SEND: '/api/auth/phone/send',
   PHONE_VERIFY: '/api/auth/phone/verify',
 })
 
-// N-02 회원가입 — { loginId, name, nickname, phone, email, password, birthYear, ageGroup, agreeCreditInfo, emailVerificationToken, phoneVerificationToken } → { userId }
+// N-02 회원가입 — { loginId, name, nickname, phone, email, password, birthYear, ageGroup, agreeTerms, agreePrivacy, agreeMarketing, emailVerificationToken, phoneVerificationToken } → { userId }
+//   FP-258 agreeTerms·agreePrivacy: 필수 동의 2개(각각 true여야 가입), agreeMarketing: 선택 동의. 예전 agreeCreditInfo는 서버가 보지 않는다.
 //   name: 완성형 한글 2~20자(validation.js validateName).
 //   nickname: 닉네임(앞뒤 공백을 뺀 2~12자, '탈퇴'로 시작할 수 없음). 신용 라운지에 작성자로 보인다.
 //   phone: 숫자만 남긴 휴대폰(010XXXXXXXX). phoneVerificationToken: 휴대폰 인증 확인에서 받은 토큰(필수).
@@ -31,6 +33,12 @@ export function requestSignup(payload) {
 //   가입할 때 서버가 다시 중복을 막으므로(409 DUPLICATE_NICKNAME), 이 결과는 안내용이다.
 export function checkNicknameAvailability(nickname) {
   return apiPost(AUTH_FEATURE_API.NICKNAME_CHECK, { nickname })
+}
+
+// AUTH-16 N-02-1 아이디 중복 확인(FP-258) — { loginId } → { available }. 닉네임 확인과 같은 모양이고, 형식이 틀리면 400(data.fieldErrors의 field 'loginId').
+//   가입할 때 서버가 다시 중복을 막으므로(409 DUPLICATE_LOGIN_ID), 이 결과는 안내용이다.
+export function checkLoginIdAvailability(loginId) {
+  return apiPost(AUTH_FEATURE_API.LOGIN_ID_CHECK, { loginId })
 }
 
 // N-02 휴대폰 인증번호 발송 — { phone, purpose } → { expiresInSeconds }   (purpose: PHONE_PURPOSES.SIGNUP)
@@ -49,17 +57,17 @@ export function requestEmailCode(payload) {
   return apiPost(AUTH_FEATURE_API.EMAIL_SEND, payload)
 }
 
-// 이메일 인증코드 확인 — { email, code, purpose, loginId? } → { verificationToken }
+// 이메일 인증코드 확인 — { email, code, purpose, loginId?, name?(재설정, FP-258) } → { verificationToken }
 export function verifyEmailCode(payload) {
   return apiPost(AUTH_FEATURE_API.EMAIL_VERIFY, payload)
 }
 
-// N-03 아이디 찾기 — { name, phone } → { maskedLoginId }
+// N-03-1 아이디 찾기(FP-258) — { method: PHONE|EMAIL, name, phone 또는 email, verificationToken } → { maskedLoginId, loginId }
 export function requestFindId(payload) {
   return apiPost(AUTH_FEATURE_API.FIND_ID, payload)
 }
 
-// N-03 비밀번호 재설정 — { loginId, email, emailVerificationToken, newPassword } → {}
+// N-03 비밀번호 재설정 — { loginId, name(FP-258), email, emailVerificationToken, newPassword } → {}
 export function requestPasswordReset(payload) {
   return apiPost(AUTH_FEATURE_API.PASSWORD_RESET, payload)
 }

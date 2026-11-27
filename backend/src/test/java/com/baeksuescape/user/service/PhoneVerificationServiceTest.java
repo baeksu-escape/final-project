@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.transaction.support.TransactionOperations;
 
 import com.baeksuescape.global.TestKeys;
 import com.baeksuescape.global.config.AvenueProperties;
@@ -58,7 +59,8 @@ class PhoneVerificationServiceTest {
     void setUp() {
         properties = TestKeys.properties();
         tokenService = new VerificationTokenService(properties, CLOCK);
-        service = new PhoneVerificationService(codeMapper, tokenService, (phone, code, purpose) -> sentCodes.add(code), ENCODER, HMAC, properties, CLOCK);
+        service = new PhoneVerificationService(codeMapper, tokenService, (phone, code, purpose) -> sentCodes.add(code), ENCODER, HMAC, properties, CLOCK,
+                new CodeSendGuard(TransactionOperations.withoutTransaction()));
     }
 
     private static String codeOf(Runnable action) {
@@ -103,6 +105,16 @@ class PhoneVerificationServiceTest {
         assertThat(value.getCodeHash()).isNotEqualTo(code);
         assertThat(ENCODER.matches(code, value.getCodeHash())).isTrue();
         assertThat(value.getExpiresAt()).isEqualTo(NOW.plusSeconds(300));
+    }
+
+    // FP-258 N-02-3 같은 번호로 오늘 0시부터 10회 보냈으면 429이고 보내지 않는다(9회까지는 보낸다).
+    @Test
+    void 같은_번호로_오늘_10회_보냈으면_429이고_보내지_않는다() {
+        given(codeMapper.countSentSince("PHONE", HMAC.phone(PHONE), NOW.toLocalDate().atStartOfDay())).willReturn(9);
+        assertThat(codeOf(() -> service.send(new AuthRequests.PhoneSend(PHONE, "FIND_ID")))).isEqualTo("no error");
+        given(codeMapper.countSentSince("PHONE", HMAC.phone(PHONE), NOW.toLocalDate().atStartOfDay())).willReturn(10);
+        assertThat(codeOf(() -> service.send(new AuthRequests.PhoneSend(PHONE, "SIGNUP")))).startsWith("429 CODE_SEND_DAILY_LIMIT");
+        verify(codeMapper, org.mockito.Mockito.times(1)).insertCode(any());
     }
 
     @Test
@@ -186,6 +198,26 @@ class PhoneVerificationServiceTest {
 
         assertThat(codeOf(() -> service.consume(token, PhonePurpose.SIGNUP, "010-1234-5678"))).isEqualTo("no error");
         assertThat(codeOf(() -> service.consume(token, PhonePurpose.SIGNUP, PHONE))).isEqualTo("400 INVALID_INPUT phone");
+    }
+
+    @Test
+    void 아이디_찾기_목적은_FIND_ID로_보내고_확인하며_그_토큰은_가입에_쓰지_못한다() {
+        service.send(new AuthRequests.PhoneSend(PHONE, "FIND_ID"));
+        ArgumentCaptor<VerificationCode> saved = ArgumentCaptor.forClass(VerificationCode.class);
+        verify(codeMapper).insertCode(saved.capture());
+        assertThat(saved.getValue().getPurposeCode()).isEqualTo("FIND_ID");
+
+        VerificationCode findRow = row(9L, "123456", 0, NOW.plusMinutes(3));
+        findRow.setPurposeCode("FIND_ID");
+        given(codeMapper.selectLatest("FIND_ID", HMAC.phone(PHONE))).willReturn(findRow);
+        String token = service.verify(new AuthRequests.PhoneVerify(PHONE, "123456", "FIND_ID")).verificationToken();
+        assertThat(tokenService.parsePhone(token)).contains(new VerificationTokenService.Claim(9L, "FIND_ID", HMAC.phone(PHONE)));
+
+        findRow.setVerifiedAt(NOW);
+        given(codeMapper.selectById(9L)).willReturn(findRow);
+        given(codeMapper.consume(eq(9L), any())).willReturn(1);
+        assertThat(codeOf(() -> service.consume(token, PhonePurpose.SIGNUP, PHONE))).isNotEqualTo("no error");
+        assertThat(codeOf(() -> service.consume(token, PhonePurpose.FIND_ID, PHONE))).isEqualTo("no error");
     }
 
     @Test
