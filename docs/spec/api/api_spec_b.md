@@ -4,7 +4,7 @@
 - **범위:** B팀이 맡는 API의 요청·응답 상세. 전체 목록은 [API 정의서](api_definition.md), 문서 관계는 [README](README.md)에 있다.
   - **Spring 공개 API (3장):** RPT-01 점수 산출, RPT-02 내 리포트, RPT-03 지난 평가 상세, MEM-06 진단 내역(응답 매핑만)
   - **Spring → FastAPI 내부 API (4장):** ML-01 ~ ML-04. 화면은 직접 부르지 않는다
-- **기준:** DDL `docs/spec/sql/avenue_ddl.sql`(v0.3.2, 표 48개 — 11/19 N-25 평가 표본 `MODEL_EVAL_SAMPLE` 추가 🆕 11/20), 피처 정의서 v1.0 `docs/spec/feature_definition.md`. `features.md`·`decisions.md`와 다르면 DDL을 따른다.
+- **기준:** DDL `docs/spec/sql/avenue_ddl.sql`(v0.3.2, 표 50개 — 11/19 N-25 평가 표본 `MODEL_EVAL_SAMPLE` 추가 🆕 11/20, 11/27 채팅 표 2개 추가 🆕 11/27), 피처 정의서 v1.0 `docs/spec/feature_definition.md`. `features.md`·`decisions.md`와 다르면 DDL을 따른다.
 - **장 번호는 바꾸지 않는다.** 코드 주석이 "B팀 명세서 4-3"처럼 이 번호를 가리킨다.
 - 상태 표시: ✅ 확정 · 🟡 임시값·제안(설정 한 곳에 둔다) · ⛔ 미정(9장)
 
@@ -575,3 +575,48 @@ C팀 SIM-02 `POST /api/members/me/credit-care-recalculate`가 부른다(11/19 �
 | `[]` (빈 배열) | "목록인데 들어 있는 게 없음". 예: 대출 목록 없음 |
 | DIM_FEATURE | 피처 이름·단위·대안 여부를 적어 둔 사전 표 |
 | `FS-DRAFT` / `FS-V1` | 피처 사전의 버전 이름. 정의서 v1.0 임시본(39개) / 확정본 |
+
+---
+
+## 10. 1:1 문의 채팅 API (N-07, FP-287) 🆕 11/27
+
+- 상태: ✅ 서버 구현. DB는 DDL C19(`CHAT_ROOM`, `CHAT_MESSAGE`), 기존 DB는 `docs/spec/sql/create_chat_tables.sql`.
+- 회원 API는 `ROLE_USER`(`/api/members/me/**`), 관리자 API는 `ROLE_ADMIN`(`/api/admin/**`, 비밀번호 변경이 필요하면 403 `PASSWORD_CHANGE_REQUIRED`).
+
+| ID | 메서드 · 경로 | 요청 | 응답 | 기능 |
+|---|---|---|---|---|
+| CHAT-01 | `GET /api/members/me/chat/messages?afterId&beforeId` | 쿼리 둘 다 선택 | 메시지 묶음 | N-07-2 |
+| CHAT-02 | `POST /api/members/me/chat/messages` | `{ content }` | 메시지 1건 | N-07-1 |
+| CHAT-03 | `POST /api/members/me/chat/read` | `{ lastMessageId }` | `{}` | N-07-5 |
+| CHAT-04 | `GET /api/members/me/chat/unread-count` | — | `{ unreadCount }` | N-07-5 |
+| CHAT-05 | `GET /api/admin/chat/rooms?page&size` | `page` 1부터, `size` 기본 20·최대 50 | 문의 목록 | N-07-3 |
+| CHAT-06 | `GET /api/admin/chat/rooms/{roomId}/messages?afterId&beforeId` | CHAT-01과 같음 | 메시지 묶음 | N-07-2 |
+| CHAT-07 | `POST /api/admin/chat/rooms/{roomId}/messages` | `{ content }` | 메시지 1건 | N-07-4 |
+| CHAT-08 | `POST /api/admin/chat/rooms/{roomId}/read` | `{ lastMessageId }` | `{}` | N-07-5 |
+| CHAT-09 | `GET /api/admin/chat/unread-count` | — | `{ unreadCount }` | N-07-5 |
+
+**메시지 묶음** (오래된 것부터 최대 50개. 문의한 적 없는 회원은 `roomId` null)
+
+```json
+{ "roomId": 3, "hasMore": false,
+  "messages": [{ "messageId": 11, "senderType": "USER", "content": "문의 내용", "createdAt": "2026-11-28T10:00:00" }] }
+```
+
+- `afterId`가 있으면 그 뒤의 새 메시지이고 `hasMore`는 더 새 메시지가 남았다는 뜻이다. 없으면 최신(또는 `beforeId` 앞) 메시지이고 `hasMore`는 이전 메시지가 남았다는 뜻이다. 둘 다 있으면 `afterId`만 쓴다.
+- `senderType`은 `USER`·`ADMIN`. 어느 관리자인지는 보내지 않는다.
+- `content`는 공백만 있으면 안 되고 500자까지다. 앞뒤 공백은 지우고 저장한다.
+
+**문의 목록** `{ items: [{ roomId, nickname, lastMessage, lastMessageAt, unreadCount }], page, size, totalCount }` — 마지막 메시지가 최근인 순. 탈퇴 회원의 `nickname`은 "탈퇴한 회원".
+
+| HTTP | code | 언제 |
+|---|---|---|
+| 400 | `INVALID_INPUT` | 빈 내용, 500자 초과, `lastMessageId` 없음 |
+| 404 | `CHAT_ROOM_NOT_FOUND` | 없는 방(CHAT-06~08) |
+| 409 | `MEMBER_WITHDRAWN` | 탈퇴한 회원에게 답장(CHAT-07) |
+
+**웹소켓 `/ws/chat`** (N-07-6)
+
+1. 연결한 뒤 10초 안에 `{ "type": "AUTH", "token": "<액세스 토큰>" }`을 보낸다. 주소에는 토큰을 넣지 않는다.
+2. 성공하면 `{ "type": "AUTH_OK" }`. 토큰이 틀리거나 계정이 잠금·탈퇴면 닫기 코드 `4401`.
+3. 메시지가 저장(커밋)되면 방 주인과 접속한 관리자에게 `{ "type": "MESSAGE", "roomId": 3 }`을 보낸다. 본문은 CHAT-01·06으로 읽는다.
+4. 허용 출처는 `avenue.cors.allowed-origins`와 같다. 연결 목록은 서버 메모리에 있다(서버 한 대).

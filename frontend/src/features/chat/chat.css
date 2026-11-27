@@ -1,0 +1,175 @@
+/* N-07 1:1 채팅(FP-287) 전용 스타일 — 말풍선, 관리자 문의 목록, 안 읽은 개수. 클래스 접두어 chat-, tokens.css 변수만 쓴다.
+   팀 규칙에 따라 프론트 담당에게 먼저 알린다. 공통 CSS는 고치지 않는다. */
+
+/* 회원 화면 오른쪽 아래의 용어 도우미 버튼(52px)이 [보내기]를 가리지 않게 아래를 비운다 */
+.chat-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding-bottom: calc(52px + var(--sp-8));
+}
+
+.chat-conversation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.chat-messages {
+  height: min(52vh, 520px);
+  overflow-y: auto;
+  padding: var(--sp-4);
+  border-radius: var(--r);
+  background: var(--panel2);
+}
+
+.chat-messages__older {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--sp-3);
+}
+
+.chat-messages__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+}
+
+.chat-message--mine {
+  align-items: flex-end;
+}
+
+.chat-message__name,
+.chat-message__time {
+  color: var(--mut2);
+  font-size: var(--fs-xs);
+}
+
+.chat-message__bubble {
+  max-width: min(75%, 560px);
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--panel);
+  color: var(--fg);
+  font-size: var(--fs-md);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-message--mine .chat-message__bubble {
+  border-color: var(--pri);
+  background: var(--pri);
+  color: var(--pri-fg);
+}
+
+.chat-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: var(--sp-3);
+}
+
+/* 입력 칸 라벨 높이만큼 내려 입력 칸과 나란히 둔다 */
+.chat-form > .button {
+  margin-top: var(--sp-6);
+}
+
+.chat-admin {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 2fr;
+  align-items: start;
+  gap: var(--sp-5);
+}
+
+.chat-rooms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-height: 60vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-room {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-1) var(--sp-3);
+  width: 100%;
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-room:hover {
+  background: var(--panel2);
+}
+
+.chat-room[aria-current='true'] {
+  border-color: var(--acc);
+  background: var(--sel);
+}
+
+.chat-room__name {
+  font-weight: 700;
+}
+
+.chat-room__time {
+  color: var(--mut2);
+  font-size: var(--fs-xs);
+}
+
+.chat-room__last {
+  overflow: hidden;
+  color: var(--mut);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  background: var(--bad);
+  color: var(--pri-fg);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.chat-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+@media (max-width: 760px) {
+  .chat-admin {
+    grid-template-columns: 1fr;
+  }
+}

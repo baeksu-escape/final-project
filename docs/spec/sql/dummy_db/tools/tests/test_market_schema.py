@@ -29,7 +29,7 @@ class MarketSchemaTests(unittest.TestCase):
 
     def test_only_market_tables_are_absent_and_references_resolve(self):
         """상권 표는 없고 다른 기능용 공공통계·회원·평가 표와 참조는 유효해야 한다."""
-        self.assertEqual(len(self.tables), 48)
+        self.assertEqual(len(self.tables), 50)
         self.assertFalse(MARKET_TABLES & self.tables.keys())
         for name in ('FACT_HFS_STAT', 'FACT_HFS_WORKER_STAT', 'FACT_INDUSTRY_AGE_INCOME',
                      'FACT_POLICY_RATE', 'APP_USER', 'ASSESSMENT', 'ASSESSMENT_FACTOR'):
@@ -45,7 +45,7 @@ class MarketSchemaTests(unittest.TestCase):
         self.assertEqual(self.ddl, (DB_DIR / '01_create_tables.sql').read_bytes())
         report = json.loads((DB_DIR / 'seed_report.json').read_text(encoding='utf-8'))
         self.assertEqual(report['ddl_sha256'], hashlib.sha256(self.ddl.replace(b'\r\n', b'\n')).hexdigest())
-        self.assertEqual(report['table_count'], 48)
+        self.assertEqual(report['table_count'], 50)
         self.assertEqual(set(report['rows']), set(self.tables))
         ddl_insert_count = sum(
             line.lstrip().upper().startswith('INSERT INTO ')
@@ -56,11 +56,11 @@ class MarketSchemaTests(unittest.TestCase):
         self.assertEqual(report['rows']['LOAN_PRODUCT_FEATURE'], 34)
 
     def test_published_cleanup_and_checks_match_schema(self):
-        """배포된 정리·검사 SQL이 제거된 표를 참조하지 않고 48개 표를 다룬다."""
+        """배포된 정리·검사 SQL이 제거된 표를 참조하지 않고 50개 표를 다룬다."""
         drop = (DB_DIR / '00_drop_all.sql').read_text(encoding='utf-8')
         check = (DB_DIR / '99_check.sql').read_text(encoding='utf-8')
         self.assertEqual(set(re.findall(r'DROP TABLE (\w+)', drop)), set(self.tables))
-        self.assertIn('SELECT 48 AS EXPECTED_TABLES', check)
+        self.assertIn('SELECT 50 AS EXPECTED_TABLES', check)
         counts = dict((name, int(count)) for name, count in re.findall(
             r"SELECT '(\w+)' AS TABLE_NAME, (\d+) AS EXPECTED", check))
         report = json.loads((DB_DIR / 'seed_report.json').read_text(encoding='utf-8'))
@@ -73,7 +73,7 @@ class MarketSchemaTests(unittest.TestCase):
         """빈 고정 예제를 메모리에서만 처리해 생성기의 표 수가 하드코딩되지 않았음을 확인한다."""
         empty = {name: [] for name in self.tables}
         files, report = db.bundle_files(self.ddl, self.tables, empty, empty, [])
-        self.assertEqual(report['table_count'], 48)
+        self.assertEqual(report['table_count'], 50)
         _, lf_report = db.bundle_files(self.ddl.replace(b'\r\n', b'\n'), self.tables, empty, empty, [])
         self.assertEqual(report['ddl_sha256'], lf_report['ddl_sha256'])
         self.assertEqual(files['01_create_tables.sql'], self.ddl)

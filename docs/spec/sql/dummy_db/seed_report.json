@@ -1,6 +1,6 @@
 {
-  "ddl_sha256": "5e371524f8e23dd311348e92526091aae61efd217cbc1328f64a9665ce7ed063",
-  "table_count": 48,
+  "ddl_sha256": "db410846b47bc2b971280a53c46794fb08ca574acac07f0b839f4a99f9695e0d",
+  "table_count": 50,
   "rows": {
     "DIM_WORKER_TYPE": 3,
     "DIM_ROLE": 2,
@@ -49,7 +49,9 @@
     "CHATBOT_PRESET_QUESTION": 0,
     "CHATBOT_QUESTION_LOG": 0,
     "ACCESS_AUDIT_LOG": 0,
-    "SYSTEM_LOG": 0
+    "SYSTEM_LOG": 0,
+    "CHAT_ROOM": 0,
+    "CHAT_MESSAGE": 0
   },
   "omitted_missing_ddl": [],
   "base_month": "2026-08",

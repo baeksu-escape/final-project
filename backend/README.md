@@ -83,6 +83,11 @@ throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "입력값을 �
 - `PiiMasking.name/phone/email`: 화면·로그에 보낼 가린 값을 만든다. 값이 없으면 null이다.
 - 원문은 로그에 남기지 않는다.
 
+### 웹소켓 (N-07-6 1:1 채팅, FP-287)
+- 경로는 `/ws/chat` 하나다. `/api` 밖이라 `SecurityConfig`가 막지 않고, `chat/websocket/ChatWebSocketHandler`가 연결 뒤 첫 메시지의 토큰으로 로그인을 확인한다.
+- 웹소켓으로는 방 번호 신호만 보내고 채팅 글은 REST(`/api/members/me/chat/**`, `/api/admin/chat/**`)로 주고받는다. 요청·응답은 `docs/spec/api/api_spec_b.md` 10장.
+- DB에 `CHAT_ROOM`·`CHAT_MESSAGE`가 필요하다(`docs/spec/sql/create_chat_tables.sql`).
+
 ### 다른 팀 경로 임시 개방
 지금 기본값은 `/api/finance/**`(C팀 FP-152), `/api/diagnosis/**`(C팀 FP-183), `/api/simulation/**`(C팀 프론트 FP-176)이다. 이 경로들은 로그인 없이 열려 있다.
 

@@ -310,7 +310,7 @@ class CardLimitTests(unittest.TestCase):
 
 
 class SchemaTests(unittest.TestCase):
-    """N-24 상권 표 제거와 평가 표본 표 추가 후 48개 테이블과 SQL NULL·복합 제약을 검증한다."""
+    """N-24 상권 표 제거와 평가 표본 표·채팅 표 추가 후 50개 테이블과 SQL NULL·복합 제약을 검증한다."""
     def setUp(self):
         """각 테스트에 독립 DDL 정의·기준 행을 제공한다."""
         self.tables,self.base=db.parse_ddl(DDL.read_text(encoding='utf-8-sig'))
@@ -318,7 +318,7 @@ class SchemaTests(unittest.TestCase):
     def test_received_ddl_and_base_inserts(self):
         """DDL의 기준 INSERT와 선택 기능 세 개가 실제 파서에 반영됐는지 확인한다."""
         ddl_insert_count=sum(line.lstrip().upper().startswith('INSERT INTO ') for line in DDL.read_text(encoding='utf-8-sig').splitlines())
-        self.assertEqual(len(self.tables),48);self.assertIn('SYSTEM_LOG',self.tables);self.assertIn('USER_UTILITY_PAYMENT',self.tables);self.assertEqual(sum(map(len,self.base.values())),ddl_insert_count)
+        self.assertEqual(len(self.tables),50);self.assertIn('SYSTEM_LOG',self.tables);self.assertIn('USER_UTILITY_PAYMENT',self.tables);self.assertEqual(sum(map(len,self.base.values())),ddl_insert_count)
         db.validate_rows(self.tables,self.base)
         self.assertIn('LOAN_PRODUCT_FEATURE',self.tables)
         self.assertIn('TERM_TEXT',self.tables['LOAN_PRODUCT']['columns'])

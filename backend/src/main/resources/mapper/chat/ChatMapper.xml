@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-287 N-07 1:1 채팅 (CHAT_ROOM, CHAT_MESSAGE) -->
+<mapper namespace="com.baeksuescape.chat.mapper.ChatMapper">
+
+    <sql id="roomSelect">
+        SELECT R.ROOM_ID AS roomId, R.USER_ID AS userId, U.ACCOUNT_STATUS_CODE AS ownerStatusCode, R.CREATED_AT AS createdAt
+          FROM CHAT_ROOM R
+          JOIN APP_USER U ON U.USER_ID = R.USER_ID
+    </sql>
+
+    <sql id="messageSelect">
+        SELECT MESSAGE_ID AS messageId, ROOM_ID AS roomId, SENDER_USER_ID AS senderUserId,
+               SENDER_TYPE_CODE AS senderTypeCode, CONTENT AS content, CREATED_AT AS createdAt
+          FROM CHAT_MESSAGE
+    </sql>
+
+    <select id="selectRoomByUserId" resultType="com.baeksuescape.chat.dto.ChatRoomRow">
+        <include refid="roomSelect"/>
+         WHERE R.USER_ID = #{userId}
+    </select>
+
+    <select id="selectRoom" resultType="com.baeksuescape.chat.dto.ChatRoomRow">
+        <include refid="roomSelect"/>
+         WHERE R.ROOM_ID = #{roomId}
+    </select>
+
+    <insert id="insertRoom" useGeneratedKeys="true" keyProperty="roomId" keyColumn="ROOM_ID">
+        INSERT INTO CHAT_ROOM (USER_ID, LAST_MESSAGE_AT, CREATED_AT)
+        VALUES (#{userId}, #{createdAt}, #{createdAt})
+    </insert>
+
+    <update id="touchRoom">
+        UPDATE CHAT_ROOM
+           SET LAST_MESSAGE_AT = #{now}
+         WHERE ROOM_ID = #{roomId}
+    </update>
+
+    <insert id="insertMessage" useGeneratedKeys="true" keyProperty="messageId" keyColumn="MESSAGE_ID">
+        INSERT INTO CHAT_MESSAGE (ROOM_ID, SENDER_USER_ID, SENDER_TYPE_CODE, CONTENT, CREATED_AT)
+        VALUES (#{roomId}, #{senderUserId}, #{senderTypeCode}, #{content}, #{createdAt})
+    </insert>
+
+    <select id="selectMessagesAfter" resultType="com.baeksuescape.chat.dto.ChatMessageRow">
+        <include refid="messageSelect"/>
+         WHERE ROOM_ID = #{roomId}
+           AND MESSAGE_ID &gt; #{afterId}
+         ORDER BY MESSAGE_ID
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
+
+    <select id="selectMessagesBefore" resultType="com.baeksuescape.chat.dto.ChatMessageRow">
+        <include refid="messageSelect"/>
+         WHERE ROOM_ID = #{roomId}
+        <if test="beforeId != null">
+           AND MESSAGE_ID &lt; #{beforeId}
+        </if>
+         ORDER BY MESSAGE_ID DESC
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
+
+    <!-- 요청한 번호 이하에서 이 방의 가장 큰 번호. 없으면 NULL이라 비교가 거짓이 되어 아무것도 바뀌지 않는다. -->
+    <sql id="readTarget">
+        (SELECT MAX(M.MESSAGE_ID) FROM CHAT_MESSAGE M WHERE M.ROOM_ID = #{roomId} AND M.MESSAGE_ID &lt;= #{lastMessageId})
+    </sql>
+
+    <update id="updateUserRead">
+        UPDATE CHAT_ROOM
+           SET USER_LAST_READ_MESSAGE_ID = <include refid="readTarget"/>
+         WHERE ROOM_ID = #{roomId}
+           AND USER_LAST_READ_MESSAGE_ID &lt; <include refid="readTarget"/>
+    </update>
+
+    <update id="updateAdminRead">
+        UPDATE CHAT_ROOM
+           SET ADMIN_LAST_READ_MESSAGE_ID = <include refid="readTarget"/>
+         WHERE ROOM_ID = #{roomId}
+           AND ADMIN_LAST_READ_MESSAGE_ID &lt; <include refid="readTarget"/>
+    </update>
+
+    <select id="countUserUnread" resultType="int">
+        SELECT COUNT(*)
+          FROM CHAT_ROOM R
+          JOIN CHAT_MESSAGE M ON M.ROOM_ID = R.ROOM_ID AND M.MESSAGE_ID &gt; R.USER_LAST_READ_MESSAGE_ID
+         WHERE R.USER_ID = #{userId}
+           AND M.SENDER_TYPE_CODE = 'ADMIN'
+    </select>
+
+    <select id="countAdminUnread" resultType="int">
+        SELECT COUNT(*)
+          FROM CHAT_ROOM R
+          JOIN CHAT_MESSAGE M ON M.ROOM_ID = R.ROOM_ID AND M.MESSAGE_ID &gt; R.ADMIN_LAST_READ_MESSAGE_ID
+         WHERE M.SENDER_TYPE_CODE = 'USER'
+    </select>
+
+    <select id="countRooms" resultType="int">
+        SELECT COUNT(*) FROM CHAT_ROOM
+    </select>
+
+    <!-- 탈퇴 회원은 '탈퇴한 회원'으로 표시한다(BoardMapper의 작성자 표시와 같은 규칙). -->
+    <select id="selectRooms" resultType="com.baeksuescape.chat.dto.ChatRoomSummaryRow">
+        SELECT R.ROOM_ID AS roomId,
+               CASE WHEN U.ACCOUNT_STATUS_CODE = 'WITHDRAWN' THEN '탈퇴한 회원' ELSE U.NICKNAME END AS nickname,
+               M.CONTENT AS lastMessage,
+               R.LAST_MESSAGE_AT AS lastMessageAt,
+               (SELECT COUNT(*) FROM CHAT_MESSAGE N
+                 WHERE N.ROOM_ID = R.ROOM_ID AND N.SENDER_TYPE_CODE = 'USER'
+                   AND N.MESSAGE_ID &gt; R.ADMIN_LAST_READ_MESSAGE_ID) AS unreadCount
+          FROM CHAT_ROOM R
+          JOIN APP_USER U ON U.USER_ID = R.USER_ID
+          JOIN (SELECT ROOM_ID, MAX(MESSAGE_ID) AS LAST_MESSAGE_ID FROM CHAT_MESSAGE GROUP BY ROOM_ID) L ON L.ROOM_ID = R.ROOM_ID
+          JOIN CHAT_MESSAGE M ON M.MESSAGE_ID = L.LAST_MESSAGE_ID
+         ORDER BY R.LAST_MESSAGE_AT DESC, R.ROOM_ID DESC
+        OFFSET #{offset} ROWS FETCH NEXT #{limit} ROWS ONLY
+    </select>
+</mapper>
