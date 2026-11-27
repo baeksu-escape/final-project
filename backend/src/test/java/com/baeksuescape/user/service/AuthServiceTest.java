@@ -137,7 +137,7 @@ class AuthServiceTest {
     void 제한_중에는_맞는_비밀번호도_429이고_횟수를_올리지_않으며_남은_분을_올림해_알린다() {
         UserAccount account = UserFixtures.user(7L, "employee");
         account.setLoginFailCount(5);
-        account.setUpdatedAt(java.time.LocalDateTime.now(CLOCK).minusSeconds(61));
+        account.setLastLoginFailAt(java.time.LocalDateTime.now(CLOCK).minusSeconds(61));
         given(userMapper.selectByLoginId("employee")).willReturn(account);
 
         assertThatThrownBy(() -> service.login(new AuthRequests.Login("employee", PASSWORD)))
@@ -154,12 +154,32 @@ class AuthServiceTest {
     void 제한이_끝나면_맞는_비밀번호로_로그인되고_틀리면_6회째는_401() {
         UserAccount account = UserFixtures.user(7L, "employee");
         account.setLoginFailCount(5);
-        account.setUpdatedAt(java.time.LocalDateTime.now(CLOCK).minusMinutes(5));
+        account.setLastLoginFailAt(java.time.LocalDateTime.now(CLOCK).minusMinutes(5));
         given(userMapper.selectByLoginId("employee")).willReturn(account);
 
         assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))).isEqualTo("401 LOGIN_FAILED");
         verify(userMapper).updateLoginFailure(eq(7L), eq(6), eq(false), any());
         assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", PASSWORD)))).isEqualTo("no error");
+    }
+
+    // FP-258 PR #164 검수 — 5분 제한은 마지막 실패 시각으로만 잰다. 닉네임·이메일 변경으로 UPDATED_AT이 바뀌어도 늘어나거나 다시 시작되지 않는다.
+    @Test
+    void 다섯_번_실패_뒤_다른_정보를_고쳐도_제한은_마지막_실패_5분_뒤에_끝난다() {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(CLOCK);
+        UserAccount changedAfterFailure = UserFixtures.user(7L, "employee");
+        changedAfterFailure.setLoginFailCount(5);
+        changedAfterFailure.setLastLoginFailAt(now.minusMinutes(5));
+        changedAfterFailure.setUpdatedAt(now); // 방금 닉네임을 바꿈
+        given(userMapper.selectByLoginId("employee")).willReturn(changedAfterFailure);
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", PASSWORD)))).isEqualTo("no error");
+
+        UserAccount recentFailure = UserFixtures.user(8L, "seconduser");
+        recentFailure.setLoginFailCount(5);
+        recentFailure.setLastLoginFailAt(now.minusSeconds(61));
+        recentFailure.setUpdatedAt(now.minusDays(1));
+        given(userMapper.selectByLoginId("seconduser")).willReturn(recentFailure);
+        assertThatThrownBy(() -> service.login(new AuthRequests.Login("seconduser", PASSWORD)))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("4분"));
     }
 
     @Test

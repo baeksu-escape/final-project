@@ -91,6 +91,8 @@
 --     기존 DB는 alter_board_post_category.sql(이미 있는 글은 모두 FREE).
 --  C16 [2026-11-26 · A팀 우찬] VERIFICATION_CODE.CK_VCD_PURPOSE에 'FIND_ID' 추가(N-03-1 아이디 찾기 휴대폰·이메일 인증, FP-258). 열·표 수(48)는 그대로다.
 --     기존 DB는 alter_verification_code_find_id.sql(제약만 다시 만든다, 인증 기록은 그대로).
+--  C17 [2026-11-27 · A팀 우찬] APP_USER에 마지막 로그인 실패 시각 LAST_LOGIN_FAIL_AT 추가(N-01-3 로그인 5분 제한, FP-258). 표 수(48)는 그대로다.
+--     5분 제한을 UPDATED_AT 대신 이 시각으로 잰다. 기존 DB는 alter_app_user_last_login_fail_at.sql(이미 있는 행은 NULL).
 -- ====================================================================
 
 
@@ -168,6 +170,8 @@ CREATE TABLE APP_USER (
     LOGIN_FAIL_COUNT       NUMBER(2)            DEFAULT 0 NOT NULL,
     PASSWORD_CHANGE_REQUIRED_YN CHAR(1)         DEFAULT 'N' NOT NULL,
     LAST_LOGIN_AT          TIMESTAMP,
+    -- v0.3.2 (C17) 마지막 로그인 실패 시각(5분 제한 기준)
+    LAST_LOGIN_FAIL_AT     TIMESTAMP,
     WITHDRAWN_AT           TIMESTAMP,
     DUMMY_YN               CHAR(1)              DEFAULT 'N' NOT NULL,
     CREATED_AT             TIMESTAMP            DEFAULT SYSTIMESTAMP NOT NULL,
@@ -214,6 +218,7 @@ COMMENT ON COLUMN APP_USER.WORK_PERIOD_MONTHS IS '재직·운영·활동 기간 
 COMMENT ON COLUMN APP_USER.ACCOUNT_STATUS_CODE IS 'v0.3.2 (W1) 계정 상태 (ACTIVE, LOCKED=비밀번호 5회 실패 또는 관리자 잠금, WITHDRAWN=탈퇴. 탈퇴해도 행은 지우지 않고 개인정보 칸을 표시값으로 덮어쓴다(CK_APU_PII_BY_STATUS), N-04-7)';
 COMMENT ON COLUMN APP_USER.WITHDRAWN_AT IS 'v0.3.2 (W1) 탈퇴 시각 (WITHDRAWN일 때만 값). 탈퇴 때 개인정보 칸은 CK_APU_PII_BY_STATUS의 표시값으로 덮어쓴다';
 COMMENT ON COLUMN APP_USER.LOGIN_FAIL_COUNT IS '연속 로그인 실패 횟수 (5회면 잠금, 재설정으로 해제)';
+COMMENT ON COLUMN APP_USER.LAST_LOGIN_FAIL_AT IS 'v0.3.2 (C17) 마지막 로그인 실패 시각 (N-01-3). 실패할 때마다 기록하고, 실패 횟수를 0으로 돌릴 때(로그인 성공·잠금 해제·비밀번호 재설정) 함께 비운다. 5회 실패 뒤 5분 제한은 이 시각부터 잰다';
 COMMENT ON COLUMN APP_USER.PASSWORD_CHANGE_REQUIRED_YN IS '첫 로그인 때 비밀번호 변경 필요 (관리자 임시 비밀번호, N-27-4)';
 COMMENT ON COLUMN APP_USER.DUMMY_YN IS '더미·시연 계정 여부';
 

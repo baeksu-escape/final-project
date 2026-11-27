@@ -126,10 +126,10 @@ public class AuthService {
         return account;
     }
 
-    // FP-258 5분 제한의 남은 분(올림). 실패가 정확히 5회이고 그 시각(UPDATED_AT)에서 5분이 안 지났을 때만 0보다 크다.
+    // FP-258 5분 제한의 남은 분(올림). 실패가 정확히 5회이고 마지막 실패 시각(LAST_LOGIN_FAIL_AT)에서 5분이 안 지났을 때만 0보다 크다.
     private static long remainingBlockMinutes(UserAccount account, LocalDateTime now) {
-        if (account.getLoginFailCount() != TEMP_BLOCK_FAILURES || account.getUpdatedAt() == null) return 0;
-        long seconds = Duration.between(now, account.getUpdatedAt().plusMinutes(TEMP_BLOCK_MINUTES)).getSeconds();
+        if (account.getLoginFailCount() != TEMP_BLOCK_FAILURES || account.getLastLoginFailAt() == null) return 0;
+        long seconds = Duration.between(now, account.getLastLoginFailAt().plusMinutes(TEMP_BLOCK_MINUTES)).getSeconds();
         if (seconds <= 0) return 0;
         return (seconds + 59) / 60;
     }

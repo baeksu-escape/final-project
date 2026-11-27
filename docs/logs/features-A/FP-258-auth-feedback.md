@@ -264,6 +264,57 @@
 - 확인 못 함
   - 실제 Windows 한글 IME로 연달아 칠 때. 음절이 넘어가는 순간에 조합이 끝나고 바로 다음 조합이 시작된다.
 
+## 8차 — PR #164 검수 반영: 로그인 제한 시각, 기존 비밀번호 칸 거르지 않기 (2026-11-27) 🆕 11/27
+- **관련 N-ID:** N-01-1, N-01-3, N-02-1, N-03-3, N-04-3
+
+### 무엇을, 왜 바꿨나
+- **로그인 5분 제한 시각(N-01-3):** 마지막 실패 시각을 `APP_USER.UPDATED_AT`으로 재서, 닉네임·이메일 변경 같은 다른 수정이 제한을 늘리거나 다시 시작시켰다.
+  - 로그인 실패만 기록하는 시각 열이 없어 `LAST_LOGIN_FAIL_AT`(TIMESTAMP, NULL 허용, DDL C17)을 더했다.
+  - 실패할 때마다 실패 횟수와 함께 이 시각을 지금으로 남긴다.
+  - 실패 횟수를 0으로 돌리는 곳은 모두 이 시각도 비운다: 로그인 성공(관리자 포함), 비밀번호 재설정, 관리자 잠금 해제, 관리자 임시 비밀번호 재발급.
+  - 제한 조건(정확히 5회째 실패에만, 11/26 결정 그대로), 10회 잠금(423) 등 다른 동작은 바꾸지 않았다.
+  - mock도 맞췄다: 로그인 성공·재설정 때 시각을 비우고, 관리자 잠금 해제는 실패 횟수와 시각을 비운다.
+- **기존 비밀번호 칸은 거르지 않음(N-01-1·N-02-1):** `PasswordField`가 모든 칸에서 입력을 거르고 한글을 영문 키로 바꿨다.
+  - `rule="new"`일 때만 `filterPassword`와 `hangulToQwerty`를 쓴다. 붙이는 곳은 가입·재설정·비밀번호 변경의 새 비밀번호와 확인 칸이다.
+  - 로그인, 현재 비밀번호(비밀번호 변경·내정보 확인), 탈퇴 비밀번호는 친 값을 그대로 보낸다.
+  - 서버는 로그인·현재 비밀번호·탈퇴 비밀번호를 받은 그대로 `passwordEncoder.matches`에 넘긴다(확인만 함).
+- `validation.js`에서 이 브랜치가 더한 함수 머리 주석에 세부 N-ID를 붙였다.
+
+### 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `docs/spec/sql/alter_app_user_last_login_fail_at.sql` | 새 파일. 기존 DB에 `LAST_LOGIN_FAIL_AT` 추가(다시 실행 가능) |
+| `docs/spec/sql/avenue_ddl.sql`, `dummy_db/01_create_tables.sql` | APP_USER 열·열 주석, 변경 이력 C17 |
+| `docs/spec/sql/dummy_db/seed_report.json` | `ddl_sha256` 새 값 |
+| `docs/spec/sql/README.md` | 기존 DB 적용 표에 alter 1행 |
+| `backend/.../user/mapper/UserAccountMapper.xml`, `admin/AdminAccountMapper.xml` | 실패 때 시각 기록, 실패 횟수 0인 곳마다 시각 NULL |
+| `backend/.../user/dto/UserAccount.java`, `user/mapper/UserAccountMapper.java` | `lastLoginFailAt`, 주석 |
+| `backend/.../user/service/AuthService.java` | 제한 계산을 `lastLoginFailAt`으로 |
+| `backend/src/test/.../user/service/AuthServiceTest.java` | 기존 2개를 새 시각으로, 다른 수정과 상관없음 1개 추가 |
+| `backend/src/test/.../user/mapper/UserAccountMapperLoginFailXmlTest.java` | 새 파일. 매퍼 XML에서 시각 기록·비우기 확인(DB 없음) |
+| `backend/src/test/.../user/mapper/UserAccountLoginFailIT.java` | 새 파일. 실제 DB 확인(`-Ddb.it=true`일 때만) |
+| `frontend/src/features/auth/mocks/authMockHandlers.js`, `admin/mocks/adminMockHandlers.js` | 실패 시각 비우기, 잠금 해제 때 실패 횟수 0 |
+| `frontend/src/features/auth/components/PasswordField.jsx` | `rule="new"`일 때만 걸러내기·영문 키 변환 |
+| `SignupPage.jsx`, `FindPasswordPage.jsx`, `PasswordChangeForm.jsx` | 새 비밀번호·확인 칸에 `rule="new"` |
+| `frontend/src/features/auth/validation.js` | 주석에 N-ID |
+| `docs/ai/features.md`, `docs/ai/decisions.md` | N-01-1·N-01-3·N-02-1, '가입 입력' 줄 |
+
+### DB·API 변경
+- DB: `APP_USER.LAST_LOGIN_FAIL_AT TIMESTAMP` 추가(C17). 기존 DB는 `alter_app_user_last_login_fail_at.sql`로 추가하고, 이미 있는 행은 NULL이다.
+  - **계정 조회 SQL이 이 열을 읽으므로, 열이 없는 DB에서 새 코드로 로그인하면 ORA-00904가 난다.** 공용 DB는 PR 작성자가 병합 직후 실행한다.
+- API: 경로·필드·응답은 그대로다.
+
+### 확인
+- 확인함
+  - `./mvnw test`(-s) 539개 통과. 새 테스트 3개 포함, IT는 `-Ddb.it` 없이 건너뜀.
+  - `python -B -m unittest discover -s docs/spec/sql/dummy_db/tools/tests`: 54개 중 오류 1건(`No module named 'bcrypt'`, README에 적힌 PC 환경 문제), 그 밖은 통과.
+  - `cmp`로 DDL 사본이 원본과 같음.
+  - `npm run lint` 오류 0, `npm run build` 성공.
+- 확인 못 함
+  - 로컬 DB(avenue_local) alter 실행. 사용자가 SQL Developer에서 실행한다.
+  - `UserAccountLoginFailIT` 실행(DB 필요).
+  - 화면 동작(mock 개발 서버로 직접 확인 필요).
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

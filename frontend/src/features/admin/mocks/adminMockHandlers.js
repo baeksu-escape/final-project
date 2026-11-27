@@ -51,6 +51,11 @@ function registerUserHandlers(userId) {
       const account = findAccount(userId)
       if (toStatus(account) === ACCOUNT_STATUS.WITHDRAWN) throw new ApiError(409, '탈퇴한 계정은 바꿀 수 없습니다.', { code: 'ACCOUNT_WITHDRAWN' })
       account.locked = locked
+      // FP-258 잠금 해제는 서버(updateUnlocked)처럼 실패 횟수와 마지막 실패 시각도 비운다.
+      if (!locked) {
+        account.loginFailCount = 0
+        account.lastLoginFailureAt = null
+      }
       addSystemLog('AUTH', 'admin-service', `관리자가 ${locked ? '계정 잠금' : '계정 잠금 해제'} (${maskLogLoginId(account.loginId)})`)
       return toAdminRow(account)
     },

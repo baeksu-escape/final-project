@@ -213,6 +213,7 @@ registerMockHandlers({
       throw new ApiError(401, LOGIN_FAILED_MESSAGE)
     }
     account.loginFailCount = 0
+    account.lastLoginFailureAt = null
     if (account.user.role === ROLES.ADMIN) return startAdminLoginChallenge(account)
     return { accessToken: toMockToken(account.user.userId), user: structuredClone(account.user) }
   },
@@ -390,6 +391,7 @@ registerMockHandlers({
     account.password = body.newPassword
     account.locked = false
     account.loginFailCount = 0
+    account.lastLoginFailureAt = null
     return {}
   },
 })
