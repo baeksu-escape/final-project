@@ -58,7 +58,7 @@ function handleScenarioRecalculate({ body }) {
   const incomeChangePercent = Number(body?.incomeChangePercent ?? 0) // 예: -10%
   const expenseChangePercent = Number(body?.expenseChangePercent ?? 0) // 예: +5%
 
-  // 기존 월 이자 및 월 잉여금
+  // 기존 월 이자 및 월 여유 자금
   const currentMonthlyInterest = Math.round((baseLoanBalance * (baseRate / 100)) / 12)
   const currentMonthlySurplus = baseMonthlyIncome - baseMonthlyFixedExpense - currentMonthlyInterest
   const currentBurden = baseMonthlyIncome > 0 ? (currentMonthlyInterest / baseMonthlyIncome) * 100 : 0
@@ -334,6 +334,7 @@ function handleScenarioBase({ token }) {
     monthlyIncomeAmount: b.monthlyIncomeAmount,
     monthlyExpenseAmount: b.monthlyExpenseAmount,
     monthlyPaymentAmount: b.monthlyPaymentAmount,
+    loanItems: b.loanItems,
     variableLoanBalanceAmount: b.variableLoanBalanceAmount,
     totalAssetAmount: b.totalAssetAmount,
     policyRate: b.policyRate,
@@ -402,6 +403,7 @@ function handleMemberScenarioRecalculate({ body, token }) {
   return {
     current,
     changed,
+    loanItems: b.loanItems,
     monthlyInterestChangeAmount: interestChange,
     surplusDiffAmount,
     survivableMonths,
