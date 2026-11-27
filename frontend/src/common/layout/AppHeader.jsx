@@ -44,7 +44,7 @@ export default function AppHeader() {
             {!admin && (
               <>
                 {/* D-23 헤더 알림은 읽지 않은 개수와 최근 알림 목록을 보여 준다. */}
-                <NotificationBell />
+                <NotificationBell enabled={Boolean(user)} />
                 <NavLink to={PATHS.MY_PAGE} className="app-header__text-btn">마이페이지</NavLink>
               </>
             )}

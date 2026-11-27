@@ -69,7 +69,7 @@ public class NotificationService {
             throw new IllegalStateException("알림 저장 결과에 생성된 번호가 없습니다.");
         }
         NotificationItemResponse response = toResponse(row);
-        eventPublisher.publishEvent(new NotificationCreatedEvent(response));
+        eventPublisher.publishEvent(new NotificationCreatedEvent(userId, response));
         return response;
     }
 

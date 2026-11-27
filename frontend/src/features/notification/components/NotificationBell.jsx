@@ -14,12 +14,12 @@ const relativeTime = (value) => {
 }
 
 // D-23 헤더 알림 패널은 읽음 처리 후 내부 화면으로 이동하고 바깥 클릭·Esc로 닫는다.
-export default function NotificationBell() {
+export default function NotificationBell({ enabled = true }) {
   const [open, setOpen] = useState(false)
   const [actionError, setActionError] = useState('')
   const rootRef = useRef(null)
   const navigate = useNavigate()
-  const notifications = useNotifications()
+  const notifications = useNotifications(enabled)
 
   useEffect(() => {
     const closeOutside = (event) => { if (!rootRef.current?.contains(event.target)) setOpen(false) }
