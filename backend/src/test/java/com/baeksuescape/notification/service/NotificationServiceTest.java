@@ -38,6 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.notification.config.NotificationExecutionConfig;
 import com.baeksuescape.notification.dto.NotificationCreatedEvent;
 import com.baeksuescape.notification.dto.NotificationRow;
 import com.baeksuescape.notification.mapper.NotificationMapper;
@@ -113,16 +114,27 @@ class NotificationServiceTest {
         verify(mapper, never()).insert(any());
     }
 
-    // D-23 FP-301 작은 알림 실행기가 막혀 있어도 호출 작업은 빠르게 반환하고 큐 초과는 예외로 번지지 않는지 확인한다.
+    // D-23 FP-301 운영 실행기는 처리 스레드 수를 고정해 큐가 차기 전에도 네 건을 병렬 처리한다.
+    @Test
+    @DisplayName("알림 실행기는 네 개의 고정 스레드와 500건 큐를 쓴다")
+    void notificationExecutor_고정스레드설정() {
+        ThreadPoolTaskExecutor configured = new NotificationExecutionConfig().notificationExecutor();
+
+        assertThat(configured.getCorePoolSize()).isEqualTo(4);
+        assertThat(configured.getMaxPoolSize()).isEqualTo(4);
+        assertThat(configured.getQueueCapacity()).isEqualTo(500);
+    }
+
+    // D-23 FP-301 네 개의 작업자가 막혀 있어도 호출 작업은 빠르게 반환하고 작은 시험 큐 초과는 예외로 번지지 않는지 확인한다.
     @Test
     @DisplayName("실행기 큐가 차도 여러 알림 요청을 빠르게 반환한다")
     void notifyQuietly_실제실행기포화시빠른반환() throws Exception {
         ThreadPoolTaskExecutor smallExecutor = new ThreadPoolTaskExecutor();
-        smallExecutor.setCorePoolSize(1);
-        smallExecutor.setMaxPoolSize(1);
+        smallExecutor.setCorePoolSize(4);
+        smallExecutor.setMaxPoolSize(4);
         smallExecutor.setQueueCapacity(2);
         smallExecutor.initialize();
-        CountDownLatch workerStarted = new CountDownLatch(1);
+        CountDownLatch workerStarted = new CountDownLatch(4);
         CountDownLatch releaseWorker = new CountDownLatch(1);
         TransactionTemplate blockedTransaction = mock(TransactionTemplate.class);
         doAnswer(invocation -> {
@@ -135,7 +147,9 @@ class NotificationServiceTest {
         ExecutorService callers = Executors.newFixedThreadPool(50);
 
         try {
-            asyncService.notifyQuietly(7L, "WELCOME", "환영", "시작", "/data-input");
+            for (int i = 0; i < 4; i++) {
+                asyncService.notifyQuietly(7L, "WELCOME", "환영", "시작", "/data-input");
+            }
             assertThat(workerStarted.await(1, TimeUnit.SECONDS)).isTrue();
             List<Future<Long>> elapsedMillis = new java.util.ArrayList<>();
             for (int i = 0; i < 50; i++) {

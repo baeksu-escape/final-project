@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -39,15 +40,17 @@ public class NotificationStreamService {
     static final long HEARTBEAT_SECONDS = 25;
     /** 회원 한 명의 동시 연결 상한. 넘으면 가장 오래된 연결을 닫는다. */
     static final int MAX_CONNECTIONS_PER_USER = 5;
+    /** 하트비트와 연결별 전송이 한 느린 연결에 묶이지 않도록 유지할 스케줄러 작업자 수. */
+    static final int SCHEDULER_THREAD_COUNT = 4;
 
     private final Map<Long, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
     private final Map<SseEmitter, ScheduledFuture<?>> expirationTasks = new ConcurrentHashMap<>();
     private ScheduledExecutorService heartbeatExecutor;
 
-    /** 하트비트 스케줄을 시작한다. @Scheduled가 켜져 있지 않아 서비스 안의 실행기로 가장 단순하게 돌린다. */
+    /** D-23 FP-284 하트비트·토큰 만료 예약과 연결별 전송을 네 작업 스레드로 분산한다. */
     @PostConstruct
     void startHeartbeat() {
-        heartbeatExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        heartbeatExecutor = Executors.newScheduledThreadPool(SCHEDULER_THREAD_COUNT, runnable -> {
             Thread thread = new Thread(runnable, "notification-sse-heartbeat");
             thread.setDaemon(true);
             return thread;
@@ -111,11 +114,16 @@ public class NotificationStreamService {
         }
     }
 
-    /** 모든 연결에 하트비트 주석을 보낸다. 보내지 못한 연결은 정리된다. */
+    /** D-23 FP-284 연결마다 하트비트 전송을 별도 작업으로 넘겨 느린 연결이 나머지를 막지 않게 한다. */
     void sendHeartbeat() {
+        ensureHeartbeatExecutor();
         emitters.forEach((userId, list) -> {
             for (SseEmitter emitter : new ArrayList<>(list)) {
-                send(userId, emitter, SseEmitter.event().comment("ping"));
+                try {
+                    heartbeatExecutor.execute(() -> send(userId, emitter, SseEmitter.event().comment("ping")));
+                } catch (RejectedExecutionException e) {
+                    log.debug("알림 SSE 하트비트 작업을 넘기지 못했습니다: userId={}", userId);
+                }
             }
         });
     }
@@ -180,7 +188,7 @@ public class NotificationStreamService {
         if (expirationTask != null) expirationTask.cancel(false);
     }
 
-    // D-23 FP-284 토큰 만료 예약에 필요한 단일 스케줄 실행기를 준비한다.
+    // D-23 FP-284 토큰 만료 예약과 하트비트 전송에 필요한 다중 스레드 실행기를 준비한다.
     private void ensureHeartbeatExecutor() {
         if (heartbeatExecutor == null || heartbeatExecutor.isShutdown()) startHeartbeat();
     }

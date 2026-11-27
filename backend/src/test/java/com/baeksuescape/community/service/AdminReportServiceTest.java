@@ -146,11 +146,12 @@ class AdminReportServiceTest {
         verify(notificationService, never()).notifyQuietly(eq(OTHER), eq("REPORT_RESULT"), anyString(), anyString(), anyString());
     }
 
+    // D-23 FP-301 신고자가 작성자이기도 하면 처리 결과·작성자 알림을 합쳐 한 건만 보낸다.
     @Test
     void 삭제하면_글을_지우고_처리_완료로_닫는다() {
         given(reportMapper.selectReport(12L)).willReturn(report(12, "POST", 1, "SPAM", "RECEIVED", "HIDDEN_BY_REPORT", NOW));
         given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "HIDDEN_BY_REPORT"));
-        given(reportMapper.selectOpenReporterUserIds("POST", 1L)).willReturn(List.of(9L, 9L));
+        given(reportMapper.selectOpenReporterUserIds("POST", 1L)).willReturn(List.of(9L, OTHER));
         given(reportMapper.countOpenByTarget("POST", 1L)).willReturn(5);
         given(boardMapper.updatePostStatus(1L, "HIDDEN_BY_REPORT", "DELETED", NOW)).willReturn(1);
 
@@ -163,6 +164,8 @@ class AdminReportServiceTest {
 
         verify(notificationService).notifyQuietly(OTHER, "REPORT_RESULT", "내 글이 운영 정책에 따라 삭제됐어요",
                 "운영 정책에 따라 글이 삭제 처리됐어요.", "/lounge");
+        verify(notificationService, never()).notifyQuietly(eq(OTHER), eq("REPORT_RESULT"), eq("신고 처리 결과가 있어요"),
+                anyString(), anyString());
         verify(reportMapper).selectOpenReporterUserIds("POST", 1L);
         verify(reportMapper, never()).selectReporterUserId(anyLong());
         verify(reportMapper).closeOpenReports("POST", 1L, "DONE", "DELETE", ADMIN, null, NOW);

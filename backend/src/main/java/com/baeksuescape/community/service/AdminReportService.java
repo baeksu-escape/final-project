@@ -89,7 +89,7 @@ public class AdminReportService {
     }
 
     // N-34-3 처리 결과 저장 — 삭제는 대상에 반영하고, 반려는 숨김을 푼다(FP-224부터 숨김 유지 없음). 처리자·시각·메모를 남긴다.
-    // D-23 FP-301 처리 결과와 삭제·숨김 알림을 해당 회원에게 보낸다.
+    // D-23 FP-301 처리 결과와 삭제·숨김 알림을 해당 회원에게 보내며, 신고자이자 작성자면 한 건만 보낸다.
     @Transactional
     public ReportDtos.ReportProcessed process(long adminUserId, long reportId, ReportDtos.ReportProcess request) {
         ReportRow report = requireReport(reportId);
@@ -117,6 +117,11 @@ public class AdminReportService {
         String reportStatus = RESULT_REJECT.equals(result) ? REPORT_REJECTED : REPORT_DONE;
         int handled = reportMapper.closeOpenReports(type, id, reportStatus, result, adminUserId, blankToNull(request.memo()), now);
         long postId = target.parentPostId() == null ? target.targetId() : target.parentPostId();
+        Long ownerUserId = target.ownerUserId();
+        boolean ownerGetsStateNotification = !VISIBLE.equals(after) && !after.equals(before) && ownerUserId != null;
+        if (ownerGetsStateNotification) {
+            reporterUserIds = reporterUserIds.stream().filter(reporterUserId -> !ownerUserId.equals(reporterUserId)).toList();
+        }
         // D-23 대상이 댓글이면(부모 글이 있으면) '댓글', 아니면 '글'로 안내한다. 삭제된 대상은 열 수 없어 라운지 목록으로 보낸다.
         String noun = target.parentPostId() == null ? "글" : "댓글";
         String link = DELETED.equals(after) ? "/lounge" : "/lounge?post=" + postId;
@@ -126,10 +131,10 @@ public class AdminReportService {
                 : "신고하신 " + noun + "은 운영 정책 위반이 아니라고 판단했어요.";
         reporterUserIds.forEach(reporterUserId ->
                 notificationService.notifyQuietly(reporterUserId, "REPORT_RESULT", "신고 처리 결과가 있어요", reporterContent, link));
-        if (!VISIBLE.equals(after) && !after.equals(before) && target.ownerUserId() != null) {
+        if (ownerGetsStateNotification) {
             String title = DELETED.equals(after) ? "내 " + noun + "이 운영 정책에 따라 삭제됐어요" : "내 " + noun + "이 운영 정책에 따라 숨겨졌어요";
             String content = DELETED.equals(after) ? "운영 정책에 따라 " + noun + "이 삭제 처리됐어요." : "운영 정책에 따라 " + noun + "이 숨김 처리됐어요.";
-            notificationService.notifyQuietly(target.ownerUserId(), "REPORT_RESULT", title, content, link);
+            notificationService.notifyQuietly(ownerUserId, "REPORT_RESULT", title, content, link);
         }
         return new ReportDtos.ReportProcessed(result, after, handled);
     }
