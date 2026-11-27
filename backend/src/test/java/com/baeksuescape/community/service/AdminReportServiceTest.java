@@ -162,7 +162,7 @@ class AdminReportServiceTest {
                 "신고하신 글이 운영 정책에 따라 삭제 처리됐어요.", "/lounge");
 
         verify(notificationService).notifyQuietly(OTHER, "REPORT_RESULT", "내 글이 운영 정책에 따라 삭제됐어요",
-                "운영 정책에 따라 글이 삭제 처리되었어요.", "/lounge");
+                "운영 정책에 따라 글이 삭제 처리됐어요.", "/lounge");
         verify(reportMapper).selectOpenReporterUserIds("POST", 1L);
         verify(reportMapper, never()).selectReporterUserId(anyLong());
         verify(reportMapper).closeOpenReports("POST", 1L, "DONE", "DELETE", ADMIN, null, NOW);

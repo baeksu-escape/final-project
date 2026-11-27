@@ -128,7 +128,7 @@ public class AdminReportService {
                 notificationService.notifyQuietly(reporterUserId, "REPORT_RESULT", "신고 처리 결과가 있어요", reporterContent, link));
         if (!VISIBLE.equals(after) && !after.equals(before) && target.ownerUserId() != null) {
             String title = DELETED.equals(after) ? "내 " + noun + "이 운영 정책에 따라 삭제됐어요" : "내 " + noun + "이 운영 정책에 따라 숨겨졌어요";
-            String content = DELETED.equals(after) ? "운영 정책에 따라 " + noun + "이 삭제 처리되었어요." : "운영 정책에 따라 " + noun + "이 숨김 처리되었어요.";
+            String content = DELETED.equals(after) ? "운영 정책에 따라 " + noun + "이 삭제 처리됐어요." : "운영 정책에 따라 " + noun + "이 숨김 처리됐어요.";
             notificationService.notifyQuietly(target.ownerUserId(), "REPORT_RESULT", title, content, link);
         }
         return new ReportDtos.ReportProcessed(result, after, handled);
