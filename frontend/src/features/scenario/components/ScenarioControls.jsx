@@ -44,7 +44,7 @@ export default function ScenarioControls({ values, presetId, inputError, calcErr
           return (
             <div key={field.key} className="sc-row-field">
               {slider}
-              <MoneyInput label="금액 직접 입력" value={amount}
+              <MoneyInput label={`${field.label} 금액 직접 입력`} value={amount}
                 error={outOfRange ? `${won(min)}~${won(max)}` : undefined}
                 onChange={(v) => onChange(field.key, v === null ? null : pctFromAmount(base, v))} />
               <span className="sc-hint sc-row-field__help">

@@ -45,27 +45,29 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
   })
 
   // 숫자만 변환해 기존 숫자·null 계약으로 전달하고, 값이 같아 다시 그려지지 않아도 커서를 복원한다.
-  const updateValue = (input, text, cursor, insertedText = null) => {
-    if ((text.match(/\d/g) ?? []).length > 15) {
-      input.value = formatWithComma(value)
+  const updateValue = (input, rawText, cursor, insertedText = null) => {
+    if ((rawText.match(/\d/g) ?? []).length > 15) {
+      input.value = text
       input.setSelectionRange(previousSelection.current.start, previousSelection.current.end)
       cursorRef.current = null
       showBlocked('15자리까지 입력할 수 있어요.')
       return
     }
     if (insertedText && !/\d/.test(insertedText)) {
-      input.value = formatWithComma(value)
+      input.value = text
       input.setSelectionRange(previousSelection.current.start, previousSelection.current.end)
       cursorRef.current = null
       showBlocked('숫자만 입력할 수 있어요.')
       return
     }
     clearBlocked()
-    const digitsBefore = (text.slice(0, cursor).match(/\d/g) ?? []).length
-    const nextValue = parseDigits(text)
+    const digitsBefore = (rawText.slice(0, cursor).match(/\d/g) ?? []).length
+    const nextValue = parseDigits(rawText)
     cursorRef.current = digitsBefore
     onChange(nextValue)
-    const displayText = formatDigitText(text)
+    const displayText = formatDigitText(rawText)
+    // 표시 글자가 그대로면 다시 그려지지 않으므로, 남은 커서 위치를 비워 나중에 옛 위치로 옮겨지지 않게 한다.
+    if (displayText === text) cursorRef.current = null
     setText(displayText)
     input.value = displayText
     restoreCursor(input, digitsBefore)
