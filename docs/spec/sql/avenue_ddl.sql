@@ -89,9 +89,12 @@
 --     점수대별 금리·한도(SCORE_BAND_OFFER)와 대출 상품 최소 점수(LOAN_PRODUCT.MIN_ALT_SCORE)도 새 경계에 맞춘다(더미 시드 21·22). 기존 DB는 activate_cutoff_cut_0_3.sql, 되돌리기는 rollback_cutoff_cut_0_3_to_0_1.sql.
 --  C15 [2026-11-25 · C조 동주] BOARD_POST에 글 카테고리 열 CATEGORY_CODE 추가(N-06, FP-261). 기본값 FREE(자유), CHECK 4개 값. 표 수(48)는 그대로다.
 --     기존 DB는 alter_board_post_category.sql(이미 있는 글은 모두 FREE).
---  C16 [2026-11-26 · A팀 우찬] VERIFICATION_CODE.CK_VCD_PURPOSE에 'FIND_ID' 추가(N-03-1 아이디 찾기 휴대폰·이메일 인증, FP-258). 열·표 수(48)는 그대로다.
+--  C16 [2026-11-27 · B팀 재욱] 서비스 등급 구간을 CUT-0.4(0~644 / 645~711 / 712~1000)로 전환 (FP-285, 구조 변경 없음). 모델 0.3(LGBM-BASE-0.3) 점수 분포의 25/50/25 경계.
+--     기준 데이터만 바뀐다: CUT-0.4 추가(ACTIVE), CUT-0.3 ACTIVE→RETIRED. 점수대별 금리·한도와 대출 상품 최소 점수(727→712, 654→645)도 새 경계에 맞춘다(더미 시드 21·22).
+--     기존 DB는 add_cutoff_cut_0_4.sql → activate_cutoff_cut_0_4.sql, 되돌리기는 rollback_cutoff_cut_0_4_to_0_3.sql.
+--  C17 [2026-11-26 · A팀 우찬] VERIFICATION_CODE.CK_VCD_PURPOSE에 'FIND_ID' 추가(N-03-1 아이디 찾기 휴대폰·이메일 인증, FP-258). 열·표 수(48)는 그대로다.
 --     기존 DB는 alter_verification_code_find_id.sql(제약만 다시 만든다, 인증 기록은 그대로).
---  C17 [2026-11-27 · A팀 우찬] APP_USER에 마지막 로그인 실패 시각 LAST_LOGIN_FAIL_AT 추가(N-01-3 로그인 5분 제한, FP-258). 표 수(48)는 그대로다.
+--  C18 [2026-11-27 · A팀 우찬] APP_USER에 마지막 로그인 실패 시각 LAST_LOGIN_FAIL_AT 추가(N-01-3 로그인 5분 제한, FP-258). 표 수(48)는 그대로다.
 --     5분 제한을 UPDATED_AT 대신 이 시각으로 잰다. 기존 DB는 alter_app_user_last_login_fail_at.sql(이미 있는 행은 NULL).
 --     LOGIN_FAIL_COUNT 열 주석도 지금 동작(5회째 5분 제한, 누적 10회 잠금)으로 고쳤다(기존 DB는 같은 alter 끝의 COMMENT ON COLUMN).
 -- ====================================================================
@@ -171,7 +174,7 @@ CREATE TABLE APP_USER (
     LOGIN_FAIL_COUNT       NUMBER(2)            DEFAULT 0 NOT NULL,
     PASSWORD_CHANGE_REQUIRED_YN CHAR(1)         DEFAULT 'N' NOT NULL,
     LAST_LOGIN_AT          TIMESTAMP,
-    -- v0.3.2 (C17) 마지막 로그인 실패 시각(5분 제한 기준)
+    -- v0.3.2 (C18) 마지막 로그인 실패 시각(5분 제한 기준)
     LAST_LOGIN_FAIL_AT     TIMESTAMP,
     WITHDRAWN_AT           TIMESTAMP,
     DUMMY_YN               CHAR(1)              DEFAULT 'N' NOT NULL,
@@ -218,8 +221,8 @@ COMMENT ON COLUMN APP_USER.WORKER_TYPE_CODE IS '직군 (로그인 후 선택, �
 COMMENT ON COLUMN APP_USER.WORK_PERIOD_MONTHS IS '재직·운영·활동 기간 (개월, 소득 입력에서 받음)';
 COMMENT ON COLUMN APP_USER.ACCOUNT_STATUS_CODE IS 'v0.3.2 (W1) 계정 상태 (ACTIVE, LOCKED=비밀번호 5회 실패 또는 관리자 잠금, WITHDRAWN=탈퇴. 탈퇴해도 행은 지우지 않고 개인정보 칸을 표시값으로 덮어쓴다(CK_APU_PII_BY_STATUS), N-04-7)';
 COMMENT ON COLUMN APP_USER.WITHDRAWN_AT IS 'v0.3.2 (W1) 탈퇴 시각 (WITHDRAWN일 때만 값). 탈퇴 때 개인정보 칸은 CK_APU_PII_BY_STATUS의 표시값으로 덮어쓴다';
-COMMENT ON COLUMN APP_USER.LOGIN_FAIL_COUNT IS 'v0.3.2 (C17) 연속 로그인 실패 횟수 (5회째 5분 제한, 누적 10회 잠금, 재설정으로 해제)';
-COMMENT ON COLUMN APP_USER.LAST_LOGIN_FAIL_AT IS 'v0.3.2 (C17) 마지막 로그인 실패 시각 (N-01-3). 실패할 때마다 기록하고, 실패 횟수를 0으로 돌릴 때(로그인 성공·잠금 해제·비밀번호 재설정) 함께 비운다. 5회 실패 뒤 5분 제한은 이 시각부터 잰다';
+COMMENT ON COLUMN APP_USER.LOGIN_FAIL_COUNT IS 'v0.3.2 (C18) 연속 로그인 실패 횟수 (5회째 5분 제한, 누적 10회 잠금, 재설정으로 해제)';
+COMMENT ON COLUMN APP_USER.LAST_LOGIN_FAIL_AT IS 'v0.3.2 (C18) 마지막 로그인 실패 시각 (N-01-3). 실패할 때마다 기록하고, 실패 횟수를 0으로 돌릴 때(로그인 성공·잠금 해제·비밀번호 재설정) 함께 비운다. 5회 실패 뒤 5분 제한은 이 시각부터 잰다';
 COMMENT ON COLUMN APP_USER.PASSWORD_CHANGE_REQUIRED_YN IS '첫 로그인 때 비밀번호 변경 필요 (관리자 임시 비밀번호, N-27-4)';
 COMMENT ON COLUMN APP_USER.DUMMY_YN IS '더미·시연 계정 여부';
 
@@ -283,7 +286,7 @@ CREATE TABLE VERIFICATION_CODE (
     CREATED_AT             TIMESTAMP            DEFAULT SYSTIMESTAMP NOT NULL,
     CONSTRAINT PK_VERIFICATION_CODE PRIMARY KEY (VERIFICATION_ID),
     CONSTRAINT FK_VCD_USER FOREIGN KEY (USER_ID) REFERENCES APP_USER (USER_ID),
-    -- v0.3.2 (C16) FIND_ID 추가: 아이디 찾기 휴대폰·이메일 인증(FP-258)
+    -- v0.3.2 (C17) FIND_ID 추가: 아이디 찾기 휴대폰·이메일 인증(FP-258)
     CONSTRAINT CK_VCD_PURPOSE CHECK (PURPOSE_CODE IN ('SIGNUP', 'FIND_PASSWORD', 'CHANGE_EMAIL', 'ADMIN_LOGIN', 'FIND_ID')),
     CONSTRAINT CK_VCD_CHANNEL CHECK (CHANNEL_CODE IN ('EMAIL', 'PHONE'))
 );
@@ -1437,11 +1440,16 @@ INSERT INTO SCORE_CUTOFF_VERSION (CUTOFF_VERSION, STATUS_CODE, NOTE, ACTIVATED_A
 INSERT INTO SCORE_GRADE_BAND (CUTOFF_VERSION, GRADE_BAND_CODE, MIN_SCORE, MAX_SCORE, DISPLAY_ORDER) VALUES ('CUT-0.2', 'CAUTION', 0, 659, 1);
 INSERT INTO SCORE_GRADE_BAND (CUTOFF_VERSION, GRADE_BAND_CODE, MIN_SCORE, MAX_SCORE, DISPLAY_ORDER) VALUES ('CUT-0.2', 'STANDARD', 660, 730, 2);
 INSERT INTO SCORE_GRADE_BAND (CUTOFF_VERSION, GRADE_BAND_CODE, MIN_SCORE, MAX_SCORE, DISPLAY_ORDER) VALUES ('CUT-0.2', 'GOOD', 731, 1000, 3);
--- v0.3.2 (C12·C14) 등급 구간 버전 CUT-0.3 = 모델 0.2 점수 분포(기존 집단 VALID, 대안 모델 p25/p75=653/727)로 다시 계산한 25/50/25 경계. 11/23 서비스 전환으로 ACTIVE이고 CUT-0.1은 RETIRED다(C14).
-INSERT INTO SCORE_CUTOFF_VERSION (CUTOFF_VERSION, STATUS_CODE, NOTE, ACTIVATED_AT) VALUES ('CUT-0.3', 'ACTIVE', '25/50/25 임시 결정 (D-01, 11/20). 모델 0.2 대안 모델 VALID 점수 p25/p75=653/727. 11/23 서비스 전환(FP-248), 최종 값은 FP-144 이후 다시 확인', SYSTIMESTAMP);
+-- v0.3.2 (C12·C14·C16) 등급 구간 버전 CUT-0.3 = 모델 0.2 점수 분포(기존 집단 VALID, 대안 모델 p25/p75=653/727)로 다시 계산한 25/50/25 경계. 11/23 서비스 전환(C14), 11/27 CUT-0.4 전환으로 RETIRED(C16).
+INSERT INTO SCORE_CUTOFF_VERSION (CUTOFF_VERSION, STATUS_CODE, NOTE, ACTIVATED_AT) VALUES ('CUT-0.3', 'RETIRED', '25/50/25 임시 결정 (D-01, 11/20). 모델 0.2 대안 모델 VALID 점수 p25/p75=653/727. 11/23 서비스 전환(FP-248), 11/27 CUT-0.4 전환으로 RETIRED', SYSTIMESTAMP);
 INSERT INTO SCORE_GRADE_BAND (CUTOFF_VERSION, GRADE_BAND_CODE, MIN_SCORE, MAX_SCORE, DISPLAY_ORDER) VALUES ('CUT-0.3', 'CAUTION', 0, 653, 1);
 INSERT INTO SCORE_GRADE_BAND (CUTOFF_VERSION, GRADE_BAND_CODE, MIN_SCORE, MAX_SCORE, DISPLAY_ORDER) VALUES ('CUT-0.3', 'STANDARD', 654, 726, 2);
 INSERT INTO SCORE_GRADE_BAND (CUTOFF_VERSION, GRADE_BAND_CODE, MIN_SCORE, MAX_SCORE, DISPLAY_ORDER) VALUES ('CUT-0.3', 'GOOD', 727, 1000, 3);
+-- v0.3.2 (C16) 등급 구간 버전 CUT-0.4 = 모델 0.3 점수 분포(데이터 v3.7.0 기존 집단 VALID, 대안 모델 p25/p75=645/712)의 25/50/25 경계. 11/27 서비스 전환(FP-285)으로 ACTIVE.
+INSERT INTO SCORE_CUTOFF_VERSION (CUTOFF_VERSION, STATUS_CODE, NOTE, ACTIVATED_AT) VALUES ('CUT-0.4', 'ACTIVE', '25/50/25 임시 결정 (D-01, 11/27). 모델 0.3 대안 모델 VALID 점수 p25/p75=645/712. 모델 0.3 전환과 함께 ACTIVE(FP-285)', SYSTIMESTAMP);
+INSERT INTO SCORE_GRADE_BAND (CUTOFF_VERSION, GRADE_BAND_CODE, MIN_SCORE, MAX_SCORE, DISPLAY_ORDER) VALUES ('CUT-0.4', 'CAUTION', 0, 644, 1);
+INSERT INTO SCORE_GRADE_BAND (CUTOFF_VERSION, GRADE_BAND_CODE, MIN_SCORE, MAX_SCORE, DISPLAY_ORDER) VALUES ('CUT-0.4', 'STANDARD', 645, 711, 2);
+INSERT INTO SCORE_GRADE_BAND (CUTOFF_VERSION, GRADE_BAND_CODE, MIN_SCORE, MAX_SCORE, DISPLAY_ORDER) VALUES ('CUT-0.4', 'GOOD', 712, 1000, 3);
 -- v0.2 (B4) 산출 불가 사유
 INSERT INTO DIM_NOT_SCORABLE_REASON (REASON_CODE, REASON_NAME, DISPLAY_ORDER) VALUES ('CONSENT_REQUIRED', '외부 조회 동의 없음', 1);
 INSERT INTO DIM_NOT_SCORABLE_REASON (REASON_CODE, REASON_NAME, DISPLAY_ORDER) VALUES ('INPUT_INCOMPLETE', '필수 입력 부족 (소득 개월 수 미달 등)', 2);

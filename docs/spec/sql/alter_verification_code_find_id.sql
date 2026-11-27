@@ -1,4 +1,4 @@
--- v0.3.2 (C16) N-03-1 아이디 찾기 휴대폰·이메일 인증(FP-258): 기존 DB의 VERIFICATION_CODE.CK_VCD_PURPOSE에 'FIND_ID'를 추가한다.
+-- v0.3.2 (C17) N-03-1 아이디 찾기 휴대폰·이메일 인증(FP-258): 기존 DB의 VERIFICATION_CODE.CK_VCD_PURPOSE에 'FIND_ID'를 추가한다.
 --   허용 값: SIGNUP, FIND_PASSWORD, CHANGE_EMAIL, ADMIN_LOGIN, FIND_ID
 -- 누가·언제·어디에: PR 작성자가 병합 후 공용 DB에 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」). 로컬 DB는 각자 실행한다.
 --   스키마 소유자로 실행한다. 새로 DDL(avenue_ddl.sql)을 실행하는 DB는 필요 없다.

@@ -601,6 +601,19 @@
 ### DB·API 변경
 - 없음(DDL·API 그대로).
 
+## develop 최신화(#169·#171) — DDL 변경 번호 C17·C18로 옮김 (2026-11-27) 🆕 11/27
+- FP-285(#171, 모델 0.3·CUT-0.4)가 DDL 변경 번호 C16을 먼저 써서, FIND_ID는 C17, LAST_LOGIN_FAIL_AT은 C18로 번호를 옮겼다. 내용은 바뀌지 않았다.
+  - 위 1차·8차·9차 기록의 C16·C17은 그때 번호 그대로 둔다.
+- **충돌 3개**
+  - `avenue_ddl.sql` 변경 기록: develop의 C16(B팀 재욱, CUT-0.4) 아래에 우리 C17(FIND_ID, 11/26)·C18(LAST_LOGIN_FAIL_AT, 11/27) 순서로 둔다.
+  - `dummy_db/01_create_tables.sql`: 정리한 DDL과 바이트 단위로 같은 사본이다.
+  - `dummy_db/seed_report.json`: develop 쪽 내용에 `ddl_sha256`만 새 DDL 지문으로 넣었다(CRLF→LF 뒤 SHA-256, `build_db.py`와 같은 방식). 행 수는 develop 그대로다.
+- **번호를 바꾼 곳**
+  - DDL·사본: 본문 주석 `APP_USER.LAST_LOGIN_FAIL_AT`·`LOGIN_FAIL_COUNT` 열 주석, `CK_VCD_PURPOSE` 주석
+  - `alter_verification_code_find_id.sql`(C17), `alter_app_user_last_login_fail_at.sql`(C18, COMMENT 문 포함)
+  - `docs/spec/sql/README.md` 두 행, `features.md` N-01-3·N-03-1, `decisions.md` 이메일 인증 행, `api_spec_a.md` 최근 변경 줄
+- DB: 구조 변경 없음. 이미 alter를 실행한 DB의 열 주석은 'v0.3.2 (C17)'로 남는다(동작에는 영향 없음, alter를 다시 실행하면 C18로 바뀐다).
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

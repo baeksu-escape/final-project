@@ -87,7 +87,7 @@ public class MemberFinanceController {
         return ResponseEntity.ok(scenarioService.base(user.userId()));
     }
 
-    /** N-17-2~4 DIAG-04 금리·소득·지출 변화를 반영한 상환 여력(월 잉여·상환 부담률·이자 변화·버틸 개월). 점수는 구하지 않고 저장하지 않는다. */
+    /** N-17-2~4 DIAG-04 금리·소득·지출 변화를 반영한 상환 여력(월 여유 자금·상환 부담률·이자 변화·버틸 개월). 점수는 구하지 않고 저장하지 않는다. */
     @PostMapping("/scenario-recalculate")
     public ResponseEntity<ScenarioRecalculateResponse> recalculateScenario(@AuthenticationPrincipal AuthUser user,
             @RequestBody(required = false) ScenarioRecalculateRequest request) {

@@ -17,8 +17,8 @@ export const GRADE_LABELS = Object.freeze({
 // 기존·대안 모델 점수 범위 — DDL v0.3.2 CHECK와 같은 0~1000. TODO(D-01) 모형 학습 후 환산식이 정해지면 다시 맞춘다.
 export const SCORE_RANGE = Object.freeze({ MIN: 0, MAX: 1000 })
 
-// 등급 경계 점수 — Good 727 이상, Standard 654 이상, 그 아래는 Caution(등급 구간 CUT-0.3, 11/23 전환 FP-248). TODO(D-01) FP-144 이후 다시 정한다.
-export const GRADE_BOUNDARIES = Object.freeze({ GOOD: 727, STANDARD: 654 })
+// 등급 경계 점수 — Good 712 이상, Standard 645 이상, 그 아래는 Caution(등급 구간 CUT-0.4, 11/27 전환 FP-285). TODO(D-01) 25/50/25는 임시 결정이다.
+export const GRADE_BOUNDARIES = Object.freeze({ GOOD: 712, STANDARD: 645 })
 
 // 점수로 등급 코드를 정한다. mock과 참고 표시용이며, 실제 등급은 서버 응답을 쓴다.
 export function getGradeByScore(score) {

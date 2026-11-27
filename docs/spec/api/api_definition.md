@@ -57,7 +57,7 @@
 | 평가 식별자 | 화면과 URL에는 `ASSESSMENT_ID` 대신 **`REQUEST_ID`(소문자 UUID)**만 쓴다. 번호를 추측해 남의 결과를 보는 것을 막기 위해서다 | DDL `ASSESSMENT.REQUEST_ID` 주석 |
 | 형식 | JSON, UTF-8. 필드는 camelCase, 경로는 kebab-case. 코드값은 DB 코드 그대로 쓴다(`SELF_EMPLOYED`, `SCORED` 등) | 기존 코드 |
 | 금액·비율 | 금액은 원 단위 정수, 금리는 연 %(8.9 = 8.9%), 확률은 0~1 | DDL 머리말 |
-| 점수 | **0~1000** 정수. 등급은 `GOOD` / `STANDARD` / `CAUTION`(ACTIVE CUT-0.3: 0~653 / 654~726 / 727~1000, 🟡 임시값. 11/23 `CUT-0.1`(0~664 / 665~779 / 780~1000)에서 전환, FP-248 🆕 11/23. `CUT-0.2` 0~659 / 660~730 / 731~1000은 DRAFT) | DDL v0.3.1 A-1 |
+| 점수 | **0~1000** 정수. 등급은 `GOOD` / `STANDARD` / `CAUTION`(ACTIVE CUT-0.4: 0~644 / 645~711 / 712~1000, 🟡 임시값. 🆕 11/27 모델 0.3과 함께 `CUT-0.3`(0~653 / 654~726 / 727~1000)에서 전환, FP-285 — 전환 SQL을 아직 실행하지 않은 DB는 CUT-0.3. 11/23 `CUT-0.1`(0~664 / 665~779 / 780~1000)에서 전환, FP-248 🆕 11/23. `CUT-0.2` 0~659 / 660~730 / 731~1000은 DRAFT) | DDL v0.3.1 A-1 |
 | 날짜 | 월 `"YYYY-MM"`, 날짜 `"YYYY-MM-DD"`, 시각은 ISO-8601 | DDL CHECK |
 | 오류 응답 | HTTP 상태 + `{ "code", "message", "fieldErrors": [{ "field", "message" }] }`. ✅ 전 API 공통(FP-87 `GlobalExceptionHandler`, D-20 확정 🆕 11/20) | 프론트 `serverErrors.js` |
 | 개인정보 | 이름·휴대폰·이메일은 마스킹해서 응답한다. 원문은 로그에 남기지 않는다. 관리자가 회원 신용정보를 열람하면 `ACCESS_AUDIT_LOG`에 남긴다 | AGENTS.md 5장, DDL N-35 |
@@ -204,7 +204,7 @@
 | DIAG-02 | `GET /api/finance/peer-benchmark/all` | N-15-3 나와 평균 비교 막대 | — | USER | 동주 | ⛔ 만들지 않음 — 화면은 DIAG-01 `sameWorkerType`을 쓴다 🆕 11/20 |
 | DIAG-03 | `POST /api/diagnosis/financial-health/calculate` | N-16-1 건전성 지표 계산, N-16-2 위험 단계 판정, N-16-3 값 바꿔 보기 (요청 본문 `{ totalAsset, annualIncome, totalDebt, annualDebtService }`로 계산, DB 안 읽음) | — | USER | 광희 (FP-166) | ✅ |
 | DIAG-03-1 | `GET /api/members/me/financial-health` 🆕 11/20 | N-16-1·2·4 저장값 조회: 총자산·연소득·총부채·연 원리금·보유 대출 목록 (로그인 회원 본인, 미입력은 null). 비율·위험 단계는 이 값으로 DIAG-03을 부른다 | `USER_INCOME_MONTH`, `USER_ASSET_SNAPSHOT`, `USER_LOAN`, `DIM_LOAN_TYPE` | USER | 광희 (FP-239) | ✅ |
-| DIAG-04 | `GET /api/members/me/scenario-base`, `POST /api/members/me/scenario-recalculate` 🆕 11/20 | N-17-1 저장값 조회, N-17-2~5 금리·소득·지출 조건으로 상환 여력 재계산(점수 안 구함, 저장 안 함). 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다 | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM`, `USER_LOAN`, `USER_ASSET_SNAPSHOT`, `FACT_POLICY_RATE` | USER | 광희 (FP-167) | ✅ (PR #118) |
+| DIAG-04 | `GET /api/members/me/scenario-base`, `POST /api/members/me/scenario-recalculate` 🆕 11/20 | N-17-1 기준월 대출 `loanItems[]`(잔액 `balanceAmount` 포함), N-17-2~5 재계산 응답에도 현재 대출 `loanItems[]` 추가(11/26). 상환 여력을 다시 계산한다(점수 안 구함, 저장 안 함). 옛 경로 `POST /api/diagnosis/scenario/recalculate`(프론트 mock만 있던 것)를 대신한다 | `USER_INCOME_MONTH`, `USER_EXPENSE_ITEM`, `USER_LOAN`, `USER_ASSET_SNAPSHOT`, `FACT_POLICY_RATE` | USER | 광희 (FP-167) | ✅ (PR #118) |
 | DIAG-05 | `GET /api/finance/policy-rates` | N-17-2 시나리오 입력 (기준금리) | `FACT_POLICY_RATE` | USER | 동주 | ⛔ 만들지 않음 — 기준금리는 `GET /api/members/me/scenario-base`의 `policyRate`(광희 FP-167, 원천 `FACT_POLICY_RATE` 동주 FP-153)로 받는다 🆕 11/20 |
 | DIAG-06 | `POST /api/diagnosis/dsr/calculate` | N-20-4 DSR 계산·위험 단계 (요청 본문 `{ annualIncome, annualDebtService }`) | — | USER | 광희 (FP-166) | ✅ |
 | DIAG-07 | `POST /api/diagnosis/income-volatility` | N-22-3 변동성 지표 계산(월 소득 표준편차 `standardDeviation` 포함), N-22-4 성수기·비수기 소득 격차 계산, N-22-5 소득 부족 달 확인 (요청 본문으로 계산, DB 안 읽음) | — | USER | 광희 (FP-203) | ✅ |
@@ -329,7 +329,7 @@
 
 - FastAPI는 DB를 읽거나 쓰지 않는다. 저장은 Spring이 한다. 상세는 B팀 명세서 4장에 있다.
 - **모델 선택 (PR #74):** Spring이 보내는 모델 버전(= DB `MODEL_REGISTRY`의 ACTIVE)으로 FastAPI가 계산기를 고른다. `DEV-DUMMY` → Mock(`FS-DRAFT` 39개), `LGBM-BASE-0.1` → 실제 모델(`FS-V1` 38개), 그 밖 → 409 `VERSION_MISMATCH`. 실제 모델 파일이 없으면 Mock으로 바꾸지 않고 503 `MODEL_NOT_READY`.
-- **모델 파일 확인 (PR #77):** `fastapi_server/artifacts/SHA256SUMS.txt`가 있으면 서버가 켜질 때 모델 파일 해시를 대조하고, 다르면 열지 않는다. 공용 DB는 11/18 `LGBM-BASE-0.1`(FP-216, PR #88)에 이어 **11/20 `LGBM-BASE-0.2`로 전환**(FP-237, PR #110·#113) 🆕 11/20. `/v1/health`의 해시 확인 표시(`hashVerified`)는 2차 후보(FP-215).
+- **모델 파일 확인 (PR #77):** `fastapi_server/artifacts/SHA256SUMS.txt`가 있으면 서버가 켜질 때 모델 파일 해시를 대조하고, 다르면 열지 않는다. 공용 DB는 11/18 `LGBM-BASE-0.1`(FP-216, PR #88)에 이어 **11/20 `LGBM-BASE-0.2`로 전환**(FP-237, PR #110·#113) 🆕 11/20. `LGBM-BASE-0.3` 전환 SQL은 FP-285에서 추가했고 공용 DB 전환은 병합 뒤에 한다 🆕 11/27. `/v1/health`의 해시 확인 표시(`hashVerified`)는 2차 후보(FP-215).
 
 ### 2-12. 내부 연동: Spring → 가상 기관(mock 서버) — A팀
 

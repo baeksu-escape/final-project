@@ -63,12 +63,12 @@ export const SAMPLE_CASH_FLOW_BASE = Object.freeze({
 })
 
 // N-21-8 DIAG-09 예상 점수 mock의 현재 점수(11/25 팀 결정으로 현금흐름 화면은 쓰지 않으며 API·mock만 남겨 둠. 점수가 나온 최근 평가 예시, 시뮬레이터 mock과 같은 588점).
-// 등급 경계는 CUT-0.3(654·727). 예상 점수는 mock 규칙으로만 계산하며 진짜 모델 점수가 아니다.
+// 등급 경계는 CUT-0.4(645·712). 예상 점수는 mock 규칙으로만 계산하며 진짜 모델 점수가 아니다.
 export const SAMPLE_EXPECTED_SCORE_BASE = Object.freeze({
   baseRequestId: '00000000-0000-4000-8000-000000000588',
   modelVersion: 'DEV-DUMMY',
   score: 588,
-  gradeCutoffs: Object.freeze({ standard: 654, good: 727 }),
+  gradeCutoffs: Object.freeze({ standard: 645, good: 712 }),
   incomePointPerPercent: 1, // 평균 소득이 1% 늘 때 +1점
   expensePointPerPercent: 0.5, // 월 지출이 1% 늘 때 −0.5점
   storedDelinquencyCount: 0, // 저장된 최근 1년 30일 이상 연체 건수 예시(밀림이면 +1)
@@ -89,21 +89,23 @@ export const SAMPLE_MEMBER_FINANCIAL_HEALTH = Object.freeze({
   ]),
 })
 
-// N-17-1 DIAG-04 시나리오 기준값 mock. 소득·지출은 위 현금흐름 예시(시드 회원 2번)와 같고,
-// 상환액·변동금리 대출·총자산은 금리 변화를 화면에서 볼 수 있게 넣은 예시값이다(실제 저장 데이터 아님).
-// 정책금리는 develop의 한국은행 기준금리 적재 SQL의 가장 최근 값이다. 버틸 개월 수는 D-33에 따라 총자산 15%를 쓴다.
+// N-17-1 DIAG-04 시나리오 기준값 mock. 소득·지출은 위 현금흐름 예시를 사용한다.
+// 월 상환액과 변동금리 잔액은 자산·부채 mock의 대출 목록에서 계산하며, 실제 저장 데이터는 아니다.
+// 정책금리는 최근 적재값 예시이고, 버틸 개월 수는 D-33에 따라 총자산 15%를 사용한다.
 export const SAMPLE_SCENARIO_BASE = Object.freeze({
   monthlyIncomeAmount: 2099498,
   monthlyExpenseAmount: 1315514,
-  monthlyPaymentAmount: 350000,
-  variableLoanBalanceAmount: 12000000,
+  monthlyPaymentAmount: SAMPLE_MEMBER_FINANCIAL_HEALTH.loans.reduce((sum, loan) => sum + loan.monthlyPaymentAmount, 0),
+  variableLoanBalanceAmount: SAMPLE_MEMBER_FINANCIAL_HEALTH.loans.filter((loan) => loan.rateTypeCode === 'VARIABLE').reduce((sum, loan) => sum + loan.balanceAmount, 0),
   totalAssetAmount: 30000000,
   policyRate: Object.freeze({ baseDate: '2026-10-31', ratePct: 3 }),
   survivableAssetRatioPct: 15,
-  // mock 계산용 변동금리 대출 행(응답에는 넣지 않음). 전체 상환액 35만 중 변동 20만, 나머지 15만은 고정금리로 본다.
-  variableLoans: Object.freeze([
-    Object.freeze({ balanceAmount: 12000000, annualRatePct: 5, monthlyPaymentAmount: 200000 }),
-  ]),
+  // mock 계산용 variableLoans에는 변동금리 대출만 담고, 응답 loanItems에는 모든 대출을 담는다.
+  // N-17-1 대출 상세와 계산용 변동금리 목록은 자산·부채 mock의 동일 대출 자료에서 만든다.
+  loanItems: Object.freeze(SAMPLE_MEMBER_FINANCIAL_HEALTH.loans.map(({ loanId, loanTypeName, balanceAmount, annualRatePct, rateTypeCode, monthlyPaymentAmount }) =>
+    Object.freeze({ loanId, loanTypeName, balanceAmount, annualRatePct, rateTypeCode, monthlyPaymentAmount }))),
+  variableLoans: Object.freeze(SAMPLE_MEMBER_FINANCIAL_HEALTH.loans.filter((loan) => loan.rateTypeCode === 'VARIABLE').map(({ balanceAmount, annualRatePct, monthlyPaymentAmount }) =>
+    Object.freeze({ balanceAmount, annualRatePct, monthlyPaymentAmount }))),
   assumptions: Object.freeze([
     '금리 변화는 변동금리 대출에만 반영하고, 고정금리·금리 방식을 모르는 대출의 상환액은 바꾸지 않습니다.',
     '월 이자 변화는 변동금리 대출 잔액 × 금리 변화 ÷ 12로 간단히 어림한 값이며, 대출마다 금리는 0% 아래로 내려가지 않는 것으로 봅니다.',

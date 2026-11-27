@@ -8,13 +8,15 @@ from pathlib import Path
 import pandas as pd
 
 from training import config
-from training.export_eval_scores import LABEL_COLUMNS, LOAD_COLUMNS, SCORE_COLUMNS, SEGMENT_TO_WORKER_TYPE, render_load_sql
+from training.export_eval_scores import (
+    LABEL_COLUMNS, LOAD_COLUMNS, SCORE_COLUMNS, SEGMENT_TO_WORKER_TYPE, render_load_sql, sample_legacy_rows,
+)
 
 SQL_DIR = Path(__file__).resolve().parents[2] / "docs/spec/sql"
 DB_DIR = SQL_DIR / "dummy_db"
 DDL = (SQL_DIR / "avenue_ddl.sql").read_text(encoding="utf-8").replace("\r\n", "\n")
 CREATE_SQL = (SQL_DIR / "create_model_eval_sample.sql").read_text(encoding="utf-8").replace("\r\n", "\n")
-LOAD_SQL_FILES = {"LGBM-BASE-0.1": "load_model_eval_sample_lgbm_base_0_1.sql", "LGBM-BASE-0.2": "load_model_eval_sample_lgbm_base_0_2.sql"}
+LOAD_SQL_FILES = {f"LGBM-BASE-0.{n}": f"load_model_eval_sample_lgbm_base_0_{n}.sql" for n in (1, 2, 3)}
 UPDATE_SQL_0_2 = (SQL_DIR / "update_model_metrics_same_label_lgbm_base_0_2.sql").read_text(encoding="utf-8").replace("\r\n", "\n")
 INSERT = re.compile(r"^INSERT INTO MODEL_EVAL_SAMPLE \(([^)]*)\) VALUES \((.*)\);$", re.MULTILINE)
 
@@ -70,7 +72,7 @@ class SqlFilesTests(unittest.TestCase):
 
 
 class LoadSqlChecks:
-    """모델 버전마다 만든 적재 SQL(0.1, 0.2)이 같은 규칙을 지키는지 본다. 서브클래스가 model_version을 정한다."""
+    """모델 버전마다 만든 적재 SQL(0.1, 0.2, 0.3)이 같은 규칙을 지키는지 본다. 서브클래스가 model_version을 정한다."""
     model_version = ""
 
     def setUp(self):
@@ -130,6 +132,18 @@ class LoadSql02Tests(LoadSqlChecks, unittest.TestCase):
         self.assertEqual(counts, {"legacy/VALID": "1800", "thinfile/VALID": "228", "thinfile/TRAIN": "1057"})
 
 
+class LoadSql03Tests(LoadSqlChecks, unittest.TestCase):
+    model_version = "LGBM-BASE-0.3"
+
+    def test_samples_3000_legacy_rows_and_all_thinfile_rows(self):
+        # FP-285 데이터 v3.7.0은 기존 집단 VALID가 20,903행이라 3,000행만 뽑는다. 씬파일(학습에 안 씀)은 0.2와 같은 구성이다.
+        header = re.search(r"행 수: (\d+), 집단/분할별: ([^\n]+)", self.load_sql)
+        self.assertEqual(int(header.group(1)), 4285)
+        counts = dict(re.findall(r"(\w+/\w+) (\d+)", header.group(2)))
+        self.assertEqual(counts, {"legacy/VALID": "3000", "thinfile/VALID": "228", "thinfile/TRAIN": "1057"})
+        self.assertIn("VALID 20903행 중", self.load_sql)
+
+
 class UpdateSql02Tests(unittest.TestCase):
     """모델 0.2의 같은 라벨 AUC 갱신 SQL — JSON_MERGEPATCH로 same_label_comparison만 더하고, AUC 열과 기존 JSON 항목은 건드리지 않는다."""
 
@@ -167,6 +181,39 @@ class UpdateSql02Tests(unittest.TestCase):
 
     def test_longest_line_fits_sqlplus_limit(self):
         self.assertLess(max(len(line) for line in UPDATE_SQL_0_2.splitlines()), 2499)
+
+
+class SampleLegacyRowsTests(unittest.TestCase):
+    """FP-285 --max-rows: 기존 집단만 직군×라벨 비율을 지켜 줄이고, 씬파일은 그대로 두며, 같은 입력이면 같은 행이 뽑힌다."""
+
+    def make_rows(self):
+        rows = []
+        for segment, delinq, nonfin, count in (("wage", 0, 0, 600), ("wage", 1, 0, 60), ("selfemp", 0, 1, 237), ("freelance", 1, 1, 103)):
+            rows += [("legacy", segment, delinq, nonfin)] * count
+        rows += [("thinfile", "wage", 0, 0)] * 50
+        frame = pd.DataFrame(rows, columns=["group", "segment", *LABEL_COLUMNS.values()])
+        frame["customer_id"] = [f"C{i:05d}" for i in range(len(frame))]
+        return frame
+
+    def test_keeps_ratio_and_thinfile(self):
+        rows = self.make_rows()
+        sampled = sample_legacy_rows(rows, 100)
+        legacy = sampled[sampled["group"] == "legacy"]
+        self.assertEqual(len(legacy), 100)
+        self.assertEqual(int((sampled["group"] == "thinfile").sum()), 50)
+        counts = legacy.groupby(["segment", *LABEL_COLUMNS.values()]).size()
+        self.assertEqual({key: int(value) for key, value in counts.items()},
+                         {("freelance", 1, 1): 10, ("selfemp", 0, 1): 24, ("wage", 0, 0): 60, ("wage", 1, 0): 6})
+        self.assertTrue(sampled["customer_id"].is_monotonic_increasing)     # 원래 순서를 지킨다
+
+    def test_same_input_same_rows(self):
+        rows = self.make_rows()
+        self.assertEqual(list(sample_legacy_rows(rows, 100)["customer_id"]), list(sample_legacy_rows(rows, 100)["customer_id"]))
+
+    def test_no_limit_or_small_group_is_unchanged(self):
+        rows = self.make_rows()
+        for max_rows in (None, 1000, 5000):
+            self.assertEqual(len(sample_legacy_rows(rows, max_rows)), len(rows), max_rows)
 
 
 class RenderTests(unittest.TestCase):
