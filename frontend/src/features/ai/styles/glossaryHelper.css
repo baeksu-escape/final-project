@@ -1,10 +1,19 @@
 /* N-32 용어 도우미(FP-207) 전용 스타일 — 오른쪽 아래에 떠 있는 아이콘 버튼과 그 위 패널(11/06 UI). 클래스 접두어 gh-, tokens.css 변수만 쓴다.
    11/27 프론트 담당 허락. z-index는 공통 Modal(40)·메가메뉴(39~40)·Toast(50)보다 낮게 두어 다른 창이 열리면 그 아래에 깔린다. */
 
-/* 떠 있는 아이콘 버튼 — 스크롤해도 화면 오른쪽 아래 같은 자리 */
+/* 버튼·패널의 오른쪽 위치 — 본문 카드의 오른쪽 끝(layout.css --page-max·--page-pad, 가운데 1440px 안)에 맞춘다.
+   fixed 요소의 right %는 스크롤바를 뺀 화면 폭 기준이라 본문 가운데 정렬과 같은 폭으로 계산된다.
+   기본은 카드 오른쪽 끝 안쪽(노트북·휴대폰은 바깥에 자리가 없음), 넓은 화면에서는 카드 바로 바깥(12px 띄움)에 붙인다(11/27 광희 결정). */
+.gh-fab,
+.gh-panel {
+  --gh-card-edge: calc((100% - min(100%, var(--page-max))) / 2 + var(--page-pad));
+  --gh-right: var(--gh-card-edge);
+}
+
+/* 떠 있는 아이콘 버튼 — 스크롤해도 같은 자리(화면 아래, 카드 오른쪽 끝) */
 .gh-fab {
   position: fixed;
-  right: var(--sp-6);
+  right: var(--gh-right);
   bottom: var(--sp-6);
   z-index: 30;
   display: grid;
@@ -31,7 +40,7 @@
 /* 버튼 바로 위 패널 — 내용이 길면 패널 안에서 스크롤 */
 .gh-panel {
   position: fixed;
-  right: var(--sp-6);
+  right: var(--gh-right);
   bottom: calc(var(--sp-6) + 52px + var(--sp-3));
   z-index: 30;
   display: flex;
@@ -90,9 +99,16 @@
 }
 
 /* 휴대폰 너비 — 양옆 16px만 남기고 패널을 넓힌다 */
+/* 넓은 화면(본문 1440px 바깥에 버튼 자리가 남음) — 카드 오른쪽 끝 바로 바깥에 붙인다 */
+@media (min-width: 1500px) {
+  .gh-fab,
+  .gh-panel {
+    --gh-right: calc(var(--gh-card-edge) - 52px - var(--sp-3));
+  }
+}
+
 @media (max-width: 480px) {
   .gh-fab {
-    right: var(--sp-4);
     bottom: var(--sp-4);
   }
 
