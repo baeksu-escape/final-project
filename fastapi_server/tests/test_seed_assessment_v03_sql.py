@@ -84,5 +84,39 @@ class SeedAssessmentSqlTests(unittest.TestCase):
         self.assertLess(max(len(line.encode("utf-8")) for line in SQL.split("\n")), 2499)
 
 
+# FP-285 검토 반영 — 다른 회원에게 평가가 붙지 않도록 USER_ID·LOGIN_ID 대조와 ACTIVE 모델 확인이 적재보다 앞서는지 본다.
+class TargetCheckTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        seed = (SQL_DIR / "dummy_db/10_seed_app_user.sql").read_text(encoding="utf-8")
+        cls.login = {int(user): name for user, name in re.findall(r"INSERT INTO APP_USER \([^)]*\) VALUES \((\d+), '([^']*)'", seed)}
+        cls.before, _, cls.after = SQL.partition("INSERT INTO ASSESSMENT ")
+
+    def test_guard_lists_every_target_with_the_seed_login_id(self):
+        pairs = re.findall(r"SELECT (\d+) AS USER_ID, '(\w+)' AS LOGIN_ID FROM DUAL", self.before)
+        self.assertEqual({int(user) for user, _ in pairs}, {p["user"] for p in PEOPLE.values()})
+        self.assertEqual(len(pairs), 318)
+        for user, name in pairs:
+            self.assertEqual(name, self.login[int(user)], user)
+
+    def test_stops_before_loading_when_a_check_fails(self):
+        self.assertIn("E ON E.USER_ID = U.USER_ID AND E.LOGIN_ID = U.LOGIN_ID", self.before)
+        self.assertIn("IF v_cnt <> 318 THEN RAISE_APPLICATION_ERROR(-20205", self.before)
+        self.assertIn("MODEL_VERSION = 'LGBM-BASE-0.3' AND STATUS_CODE = 'ACTIVE';", self.before)
+        self.assertIn("RAISE_APPLICATION_ERROR(-20204", self.before)
+        self.assertIn("WHENEVER SQLERROR EXIT FAILURE ROLLBACK", self.before)
+
+    def test_final_query_pairs_each_request_with_its_member(self):
+        found = dict((request, name) for name, request in re.findall(r"SELECT '(\w+)' AS LOGIN_ID, '([0-9a-f-]{36})' AS REQUEST_ID FROM DUAL", SQL))
+        self.assertEqual(found, {request: self.login[p["user"]] for request, p in PEOPLE.items()})
+        self.assertIn("AS 다른_회원", SQL)
+
+    # 다시 뽑은 파일에도 같은 검사가 들어가야 한다.
+    def test_export_script_writes_the_same_checks(self):
+        export = (SQL_DIR / "export_seed_assessment.sql").read_text(encoding="utf-8")
+        for text in ("-20204", "-20205", "E ON E.USER_ID = U.USER_ID AND E.LOGIN_ID = U.LOGIN_ID", "AS 다른_회원"):
+            self.assertIn(text, export)
+
+
 if __name__ == "__main__":
     unittest.main()
