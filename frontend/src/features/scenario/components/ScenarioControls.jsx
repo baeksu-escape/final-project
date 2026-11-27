@@ -60,7 +60,7 @@ export default function ScenarioControls({ values, presetId, inputError, calcErr
           <div key={field.key} className="sc-row-field">
             {/* 직접 입력 값이 슬라이더 범위를 넘으면 슬라이더는 끝에 두고 실제 값은 숫자 칸에 그대로 둔다. */}
             {slider}
-            <NumberInput label={`직접 입력 (${field.inputMin}~${field.inputMax}${field.unit})`} min={field.inputMin} max={field.inputMax} step={field.step} unit={field.unit}
+            <NumberInput label={`${field.label} 직접 입력 (${field.inputMin}~${field.inputMax}${field.unit})`} min={field.inputMin} max={field.inputMax} step={field.step} unit={field.unit}
               value={value} onChange={(v) => {
                 // N-17-2 직접 입력이 범위를 넘으면 경계값으로 맞추고, 빈칸은 다시 입력할 수 있도록 허용한다.
                 if (v === null) onChange(field.key, null)
@@ -83,7 +83,7 @@ export default function ScenarioControls({ values, presetId, inputError, calcErr
         {inputError || (!Number.isSafeInteger(variableLoanBalanceAmount)
           ? '변동금리 대출 정보가 없어 대출 갚는 돈과 여유 자금은 계산하지 않아요.'
           : variableLoanBalanceAmount === 0
-            ? '금리는 변동금리 대출에만 적용돼요. 지금 대출은 모두 고정금리라 금리를 바꿔도 결과는 그대로예요.'
+            ? '금리는 변동금리 대출에만 적용돼요. 지금은 변동금리 대출이 없어서 금리를 바꿔도 결과는 그대로예요.'
             : `금리 변화는 변동금리 대출 ${variableLoanBalanceAmount.toLocaleString('ko-KR')}원에만 적용돼요.`)}
         {calcError && <> <Button size="sm" onClick={onRetry}>다시 시도</Button></>}
       </p>
