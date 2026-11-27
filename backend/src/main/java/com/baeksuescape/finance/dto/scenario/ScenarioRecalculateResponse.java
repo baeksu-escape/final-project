@@ -14,9 +14,18 @@ public record ScenarioRecalculateResponse(
         Long surplusDiffAmount,
         Long survivableMonths,
         String verdict,
-        List<String> assumptions) {
+        List<String> assumptions,
+        List<ScenarioBaseResponse.ScenarioLoanItem> loanItems) {
 
-    /** 한쪽(지금 또는 조건 반영 후)의 월 소득·지출·상환액·잉여(원)와 상환 부담률(%, 소득이 0 이하이면 null) */
+    /** 기존 일곱 인자 호출부를 보존하며 대출 상세는 빈 목록으로 둔다. */
+    public ScenarioRecalculateResponse(Side current, Side changed, Long monthlyInterestChangeAmount,
+                                       Long surplusDiffAmount, Long survivableMonths, String verdict,
+                                       List<String> assumptions) {
+        this(current, changed, monthlyInterestChangeAmount, surplusDiffAmount, survivableMonths, verdict,
+                assumptions, List.of());
+    }
+
+    /** 한쪽(지금 또는 조건 반영 후)의 월 소득·지출·상환액·여유 자금(원)와 상환 부담률(%, 소득이 0 이하이면 null) */
     public record Side(Long monthlyIncomeAmount, Long monthlyExpenseAmount, Long monthlyPaymentAmount,
             Long monthlySurplusAmount, BigDecimal dsrPct) {
     }

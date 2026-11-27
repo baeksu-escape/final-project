@@ -15,9 +15,23 @@ public record ScenarioBaseResponse(
         Long variableLoanBalanceAmount,
         Long totalAssetAmount,
         PolicyRate policyRate,
-        List<String> assumptions) {
+        List<String> assumptions,
+        List<ScenarioLoanItem> loanItems) {
+
+    /** 기존 일곱 인자 호출부와의 호환을 유지하며 대출 상세는 빈 목록으로 둔다. */
+    public ScenarioBaseResponse(Long monthlyIncomeAmount, Long monthlyExpenseAmount, Long monthlyPaymentAmount,
+                                Long variableLoanBalanceAmount, Long totalAssetAmount, PolicyRate policyRate,
+                                List<String> assumptions) {
+        this(monthlyIncomeAmount, monthlyExpenseAmount, monthlyPaymentAmount, variableLoanBalanceAmount,
+                totalAssetAmount, policyRate, assumptions, List.of());
+    }
 
     /** 시나리오 출발 금리: 기준일과 연 % (예: 2026-10-31, 3.000) */
     public record PolicyRate(LocalDate baseDate, BigDecimal ratePct) {
+    }
+
+    /** N-17-1 기준월별 상환액 안내용 대출 항목. 금리 방식이 없으면 UNKNOWN으로 제공한다. */
+    public record ScenarioLoanItem(long loanId, String loanTypeName, BigDecimal annualRatePct,
+                                   String rateTypeCode, long monthlyPaymentAmount, long balanceAmount) {
     }
 }

@@ -121,7 +121,7 @@ export function validateEmailParts(local, domain) {
   return ''
 }
 
-// N-02-1 생일 — 달력(<input type="date">)으로 고를 수 있는 범위. 하한은 DB BIRTH_YEAR 하한(1930)과 같고,
+// N-02-1 생일 — 연·월·일 숫자 칸(DateSelect)으로 받을 수 있는 범위. 하한은 DB BIRTH_YEAR 하한(1930)과 같고,
 // 상한은 팀 결정 A안 '올해 20세가 되는 해까지'(올해 − 20년 12월 31일)다. 연도는 실행 시점의 올해로 계산한다.
 // 서버로는 연도(birthYear)만 보낸다. 월·일은 저장하지 않는다(생일 전체 저장은 DDL 변경·팀 승인이 필요).
 export function getBirthDateRange() {
@@ -130,7 +130,11 @@ export function getBirthDateRange() {
 export function validateBirthDate(value) {
   const text = String(value ?? '')
   if (!text) return '생일을 선택해 주세요.'
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '생일을 달력에서 골라 주세요.'
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '생일의 연·월·일을 모두 입력해 주세요.'
+  // 숫자 칸이라 13월·99일도 들어가므로, 실제로 있는 날짜인지 본다(윤년의 2월 29일은 허용, 평년은 거절). 월·일은 서버가 검사하지 않아 화면이 막는다.
+  const [year, month, day] = text.split('-').map(Number)
+  if (month < 1 || month > 12) return '월은 1~12 사이로 입력해 주세요.'
+  if (day < 1 || day > new Date(year, month, 0).getDate()) return `${month}월은 ${new Date(year, month, 0).getDate()}일까지 있습니다.`
   const { min, max } = getBirthDateRange()
   if (text > max) return `올해 기준 ${MIN_SIGNUP_AGE}세 이상만 가입할 수 있습니다.`
   if (text < min) return `${BIRTH_YEAR_MIN}년 1월 1일 이후로 골라 주세요.`

@@ -390,7 +390,7 @@
 
 ## N-17 시나리오 테스트 (FP-167, 담당 광희) 🆕 11/20
 
-로그인 회원의 저장 데이터에 금리·소득·지출 변화를 넣어 **상환 여력**(월 잉여, 상환 부담률, 월 이자 변화, 버틸 수 있는 개월 수)을 다시 계산한다. **점수는 구하지 않고**(점수 예측은 N-21 DIAG-09) **저장하지 않는다**.
+로그인 회원의 저장 데이터에 금리·소득·지출 변화를 넣어 **상환 여력**(월 여유 자금, 상환 부담률, 월 이자 변화, 버틸 수 있는 개월 수)을 다시 계산한다. **점수는 구하지 않고**(점수 예측은 N-21 DIAG-09) **저장하지 않는다**.
 
 - 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(DIAG-04, 프론트 mock만 있음)를 아래 두 경로로 대신한다. 기준값을 서버가 저장 데이터에서 읽으므로 요청에 기준값을 보내지 않는다.
 - 로그인 확인은 보안 설정이 한다: 토큰 없음 `401 UNAUTHORIZED`, 관리자 계정 `403 FORBIDDEN`(`/api/members/me/**`는 `ROLE_USER` 전용).
@@ -402,7 +402,8 @@
 | 월 소득 | `USER_INCOME_MONTH` 최근 12개월 평균(급여소득자는 월급 그대로). DIAG-08-1과 같은 함수 | 소득이 하나도 없으면 404 |
 | 월 지출 | `USER_EXPENSE_ITEM` 기준월 합계 | 0 |
 | 월 상환액 | `USER_LOAN` 기준월 월 원리금 합계 | 0 |
-| 변동금리 대출 | `USER_LOAN` 기준월 `RATE_TYPE_CODE = 'VARIABLE'` 행의 잔액·연 금리·월 원리금(고정·`UNKNOWN` 제외). 기준값 응답에는 잔액 합계만 준다 | 잔액 0(행 없음) |
+| 기준 응답의 월 상환액 | `loanItems[].monthlyPaymentAmount` 합계와 같다. 재계산 응답의 현재 월 상환액도 같은 목록의 합계다 | 대출이 없으면 0 |
+| 변동금리 대출 | `loanItems` 중 `rateTypeCode = 'VARIABLE'`인 항목의 잔액·연 금리·월 원리금만 계산에 사용한다(고정·`UNKNOWN` 제외). 기준값 응답에는 잔액 합계를 준다 | 잔액 0(행 없음) |
 | 총자산 | `USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT` 기준월 | `null`(미입력, 0으로 바꾸지 않음) |
 | 현재 정책금리 | `FACT_POLICY_RATE`의 '한국은행 기준금리' 중 기준일이 가장 늦은 행(FP-153 적재 SQL) | `null` |
 
@@ -417,6 +418,21 @@
   | `totalAssetAmount` | 정수(원) 또는 `null` | 총자산. 미입력이면 `null`(버틸 개월 수를 구하지 않음) |
   | `policyRate` | 객체 또는 `null` | `{ baseDate: "2026-10-31", ratePct: 3.000 }` 출발 금리(연 %) |
   | `assumptions` | 문자열 배열 | 화면에 그대로 보여 줄 계산 가정 4개 |
+  | `loanItems` | 배열 | 기준월 `LOAN_ID` 순 대출 항목: `loanId`, `loanTypeName`, `annualRatePct`(연 %, 예: 8.9), `rateTypeCode`(`FIXED`·`VARIABLE`·`UNKNOWN`), `monthlyPaymentAmount`(원), `balanceAmount`(잔액 원). 대출이 없으면 빈 배열 |
+
+  `monthlyPaymentAmount`는 `loanItems[].monthlyPaymentAmount`의 합이다.
+  변동금리 대출은 `loanItems` 중 `rateTypeCode = 'VARIABLE'`인 항목만 계산에 사용한다.
+
+  ```json
+  { "monthlyIncomeAmount": 2099498, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 350000,
+    "variableLoanBalanceAmount": 12000000, "totalAssetAmount": 30000000,
+    "policyRate": { "baseDate": "2026-10-31", "ratePct": 3.000 },
+    "assumptions": ["금리 변화는 변동금리 대출에만 반영하고, …"],
+    "loanItems": [
+      { "loanId": 101, "loanTypeName": "신용대출", "annualRatePct": 5, "rateTypeCode": "VARIABLE", "monthlyPaymentAmount": 200000, "balanceAmount": 12000000 },
+      { "loanId": 102, "loanTypeName": "주택담보대출", "annualRatePct": 4.2, "rateTypeCode": "FIXED", "monthlyPaymentAmount": 150000, "balanceAmount": 18000000 }
+    ] }
+  ```
 
 - 오류: `404 NOT_FOUND` "저장된 소득 데이터가 없습니다."(현금흐름 전망과 같음)
 
@@ -434,7 +450,7 @@
   - 바뀐 소득·지출 = 기준값 × (1 + % ÷ 100)
   - 월 이자 변화 = Σ 변동금리 잔액 × (max(금리 + 변화, 0) − 금리) ÷ 100 ÷ 12. **대출마다 금리는 0% 아래로 내려가지 않는다.** 합계를 낸 뒤 한 번만 반올림한다(HALF_UP, −0.5원 → −1원. 프론트 mock도 같음)
   - 바뀐 상환액 = 고정 상환액 + max(0, 변동 상환액 + 월 이자 변화). 변동 상환액은 변동금리 대출 월 원리금 합계, 고정 상환액은 전체 월 상환액에서 그것을 뺀 값(고정·`UNKNOWN`)이다. **금리가 내려가도 고정 상환액은 줄지 않는다**
-  - 월 잉여 = 소득 − 지출 − 상환액. 상환 부담률 = 연 원리금 ÷ 연소득 × 100(소수 둘째 자리, N-16-1·N-20-4와 같은 함수). 소득이 0 이하면 `null`
+  - 월 여유 자금 = 소득 − 지출 − 상환액. 상환 부담률 = 연 원리금 ÷ 연소득 × 100(소수 둘째 자리, N-16-1·N-20-4와 같은 함수). 소득이 0 이하면 `null`
   - 버틸 수 있는 개월 수 = ⌊총자산 × **15%** ÷ 월 부족액⌋. 조건 반영 후 **적자일 때만** 값이 있고, 흑자이거나 총자산 미입력이면 `null`
     - 15%는 D-33 11/20 합의다(`ScenarioService.SURVIVABLE_ASSET_RATIO_PCT`).
 - 응답 `200`:
@@ -443,15 +459,18 @@
   |---|---|---|
   | `current`, `changed` | 객체 | 지금·조건 반영 후. 각각 `monthlyIncomeAmount`, `monthlyExpenseAmount`, `monthlyPaymentAmount`, `monthlySurplusAmount`(원), `dsrPct`(%, 또는 `null`) |
   | `monthlyInterestChangeAmount` | 정수(원) | 월 이자 변화(±, 대출마다 금리 하한 0% 적용) |
-  | `surplusDiffAmount` | 정수(원) | 조건 반영 후 월 잉여 − 지금 월 잉여 |
+  | `surplusDiffAmount` | 정수(원) | 조건 반영 후 월 여유 자금 − 지금 월 여유 자금 |
   | `survivableMonths` | 정수 또는 `null` | 버틸 수 있는 개월 수(위 규칙) |
-  | `verdict` | 문자열 | `SHORTFALL`(조건 반영 후 적자), `IMPROVED`(지금보다 잉여 증가), `STILL_POSITIVE`(그 밖, 흑자 유지) |
+  | `verdict` | 문자열 | `SHORTFALL`(조건 반영 후 적자), `IMPROVED`(지금보다 여유 자금 증가), `STILL_POSITIVE`(그 밖, 흑자 유지) |
   | `assumptions` | 문자열 배열 | 기준값 응답과 같은 계산 가정 |
+  | `loanItems` | 배열 | 현재 기준월 대출 항목. `scenario-base`와 같은 형식이며 `current.monthlyPaymentAmount`는 이 목록의 월 원리금 합계 |
 
   ```json
   { "current": { "monthlyIncomeAmount": 2099498, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 350000, "monthlySurplusAmount": 433984, "dsrPct": 16.67 },
     "changed": { "monthlyIncomeAmount": 1259699, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 370000, "monthlySurplusAmount": -425815, "dsrPct": 29.37 },
     "monthlyInterestChangeAmount": 20000, "surplusDiffAmount": -859799, "survivableMonths": 10, "verdict": "SHORTFALL",
+    "loanItems": [ { "loanId": 101, "loanTypeName": "신용대출", "annualRatePct": 5, "rateTypeCode": "VARIABLE", "monthlyPaymentAmount": 200000, "balanceAmount": 12000000 },
+                   { "loanId": 102, "loanTypeName": "주택담보대출", "annualRatePct": 4.2, "rateTypeCode": "FIXED", "monthlyPaymentAmount": 150000, "balanceAmount": 18000000 } ],
     "assumptions": ["금리 변화는 변동금리 대출 잔액에만 반영하고, …"] }
   ```
   (예: 변동금리 대출 1,200만 원·연 5%·월 원리금 20만 원(전체 상환액 35만 원 중), 총자산 3,000만 원, `{ "ratePctPoint": 2, "incomePct": -40 }`. 같은 기준값에 `-5`%p면 금리가 0%까지만 내려가 월 이자 −50,000원, 상환액은 고정 15만 원이 남아 30만 원)
