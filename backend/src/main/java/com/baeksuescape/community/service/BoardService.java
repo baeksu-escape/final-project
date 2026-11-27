@@ -162,9 +162,8 @@ public class BoardService {
         row.setCreatedAt(LocalDateTime.now(clock));
         boardMapper.insertComment(row);
         if (!Objects.equals(post.getUserId(), userId)) {
-            String postTitle = post.getTitle();
-            String excerpt = postTitle.substring(0, postTitle.offsetByCodePoints(0, Math.min(30, postTitle.codePointCount(0, postTitle.length()))));
-            // D-23 글쓴이 본인 댓글은 제외하고 글 제목 일부로 새 댓글 알림을 보낸다.
+            // D-23 글쓴이 본인 댓글은 제외하고 "글 제목 앞부분 + 댓글 앞부분"으로 새 댓글 알림을 보낸다(닉네임은 넣지 않음).
+            String excerpt = "「" + leadingText(post.getTitle(), 20) + "」에 달린 댓글: " + leadingText(row.getContent(), 30);
             notificationService.notifyQuietly(post.getUserId(), "COMMENT_NEW", "내 글에 새 댓글이 달렸어요", excerpt,
                     "/lounge?post=" + postId);
         }
@@ -253,5 +252,13 @@ public class BoardService {
 
     private static boolean isMine(Long ownerUserId, long userId) {
         return Objects.equals(ownerUserId, userId);
+    }
+
+    // D-23 알림 미리보기용 — 줄바꿈을 공백으로 바꾸고 앞에서 max 글자(코드 포인트)까지만 남기며, 잘리면 "…"를 붙인다.
+    private static String leadingText(String text, int max) {
+        String oneLine = text == null ? "" : text.replaceAll("\\s+", " ").trim();
+        int count = oneLine.codePointCount(0, oneLine.length());
+        if (count <= max) return oneLine;
+        return oneLine.substring(0, oneLine.offsetByCodePoints(0, max)) + "…";
     }
 }

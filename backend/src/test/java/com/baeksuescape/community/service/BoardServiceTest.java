@@ -260,7 +260,7 @@ class BoardServiceTest {
         }).given(boardMapper).insertComment(any());
 
         assertThat(service.addComment(ME, 1L, new BoardDtos.CommentWrite(" 좋은 정보네요 ")).commentId()).isEqualTo(21L);
-        verify(notificationService).notifyQuietly(OTHER, "COMMENT_NEW", "내 글에 새 댓글이 달렸어요", "제목1", "/lounge?post=1");
+        verify(notificationService).notifyQuietly(OTHER, "COMMENT_NEW", "내 글에 새 댓글이 달렸어요", "「제목1」에 달린 댓글: 좋은 정보네요", "/lounge?post=1");
         verify(boardMapper, never()).insertPostLog(anyLong(), anyString(), anyString(), any(), any(), anyString(), isNull(), eq(NOW));
     }
 
