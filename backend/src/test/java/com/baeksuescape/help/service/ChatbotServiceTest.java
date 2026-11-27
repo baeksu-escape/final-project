@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -188,6 +189,46 @@ class ChatbotServiceTest {
         }
         assertEquals(1, aiCalls.get());
         verify(mapper).insertQuestionLog(2L, NOW, "Y");
+    }
+
+    @Test
+    @DisplayName("경계: 오늘 9회 쓴 회원이 거의 동시에 2번 보내면 1번만 성공(10회째)하고 나머지는 409라 11회가 되지 않는다(PR #170 검수)")
+    void ninthUsedTwoConcurrent() throws Exception {
+        AtomicInteger used = new AtomicInteger(9);
+        CountDownLatch aiStarted = new CountDownLatch(1);
+        CountDownLatch releaseAi = new CountDownLatch(1);
+        // 기록이 들어가면 센 값도 늘어나게 해서 실제 DB처럼 동작시킨다
+        when(mapper.countSuccessSince(2L, TODAY)).thenAnswer((invocation) -> used.get());
+        when(mapper.insertQuestionLog(2L, NOW, "Y")).thenAnswer((invocation) -> used.incrementAndGet());
+        when(openAi.complete(anyString(), anyString(), anyInt())).thenAnswer((invocation) -> {
+            aiStarted.countDown();
+            releaseAi.await(5, TimeUnit.SECONDS);
+            return "답";
+        });
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ChatbotQuestionResponse> first = pool.submit(() -> service.ask(2L, "첫 번째"));
+            assertTrue(aiStarted.await(5, TimeUnit.SECONDS));
+            Future<String> second = pool.submit(() -> {
+                try {
+                    service.ask(2L, "두 번째");
+                    return "OK";
+                } catch (ApiException e) {
+                    return e.getStatus().value() + " " + e.getCode();
+                }
+            });
+            assertEquals("409 " + ChatbotService.QUESTION_IN_PROGRESS, second.get(5, TimeUnit.SECONDS));
+            releaseAi.countDown();
+            assertEquals(0, first.get(5, TimeUnit.SECONDS).remainingCount());
+        } finally {
+            releaseAi.countDown();
+            pool.shutdownNow();
+        }
+        assertEquals(10, used.get(), "성공 기록은 10회에서 멈춘다");
+        // 처리가 끝난 뒤 다시 보내면 이제 하루 횟수 초과다
+        ApiException limit = assertThrows(ApiException.class, () -> service.ask(2L, "세 번째"));
+        assertEquals("DAILY_LIMIT_EXCEEDED", limit.getCode());
+        verify(openAi, times(1)).complete(anyString(), anyString(), anyInt());
     }
 
     @Test
