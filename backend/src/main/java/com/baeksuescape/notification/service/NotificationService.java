@@ -4,6 +4,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,17 +28,56 @@ import com.baeksuescape.notification.mapper.NotificationMapper;
 /** FP-284·D-23 본인 알림 조회·읽음 처리와 공통 알림 생성을 맡는다. */
 @Service
 public class NotificationService {
+    private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
     private static final int LIST_LIMIT = 20;
     private static final Set<String> TYPE_CODES = Set.of("SCORE_NEW", "COMMENT_NEW", "REPORT_RESULT", "WELCOME");
 
     private final NotificationMapper notificationMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final TransactionTemplate notificationTransaction;
 
     public NotificationService(NotificationMapper notificationMapper, ApplicationEventPublisher eventPublisher) {
-        this.notificationMapper = notificationMapper;
-        this.eventPublisher = eventPublisher;
+        this(notificationMapper, eventPublisher, (TransactionTemplate) null);
     }
 
+    @Autowired
+    public NotificationService(NotificationMapper notificationMapper, ApplicationEventPublisher eventPublisher,
+            PlatformTransactionManager transactionManager) {
+        this(notificationMapper, eventPublisher, new TransactionTemplate(transactionManager));
+        this.notificationTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
+
+    public NotificationService(NotificationMapper notificationMapper, ApplicationEventPublisher eventPublisher,
+            TransactionTemplate notificationTransaction) {
+        this.notificationMapper = notificationMapper;
+        this.eventPublisher = eventPublisher;
+        this.notificationTransaction = notificationTransaction;
+    }
+
+    // FP-301·D-23 원 업무 커밋 뒤 별도 트랜잭션으로 알림을 저장해 FK 의존을 지키고 실패가 원 업무를 되돌리지 않게 한다.
+    public void notifyQuietly(long userId, String typeCode, String title, String content, String linkUrl) {
+        Runnable save = () -> {
+            try {
+                if (notificationTransaction == null) {
+                    create(userId, typeCode, title, content, linkUrl);
+                } else {
+                    notificationTransaction.execute(status -> create(userId, typeCode, title, content, linkUrl));
+                }
+            } catch (RuntimeException e) {
+                log.warn("알림 생성 실패 typeCode={} userId={}", typeCode, userId);
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    save.run();
+                }
+            });
+        } else {
+            save.run();
+        }
+    }
     /** FP-284·D-23 최근 20건과 회원의 안 읽은 개수를 조회한다. */
     @Transactional(readOnly = true)
     public NotificationListResponse list(long userId) {

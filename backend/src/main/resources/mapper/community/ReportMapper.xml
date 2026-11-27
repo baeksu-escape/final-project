@@ -74,6 +74,10 @@
          ORDER BY R.REPORTED_AT DESC, R.REPORT_ID DESC
     </select>
 
+    <select id="selectReporterUserId" resultType="long">
+        SELECT REPORTER_USER_ID FROM CONTENT_REPORT WHERE REPORT_ID = #{reportId}
+    </select>
+
     <select id="selectReport" resultType="com.baeksuescape.community.dto.ReportRow">
         <include refid="reportSelect"/>
          WHERE R.REPORT_ID = #{reportId}

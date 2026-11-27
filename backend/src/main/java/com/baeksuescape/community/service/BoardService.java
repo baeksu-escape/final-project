@@ -24,6 +24,7 @@ import com.baeksuescape.community.dto.CommentRow;
 import com.baeksuescape.community.dto.PostRow;
 import com.baeksuescape.community.mapper.BoardMapper;
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.notification.service.NotificationService;
 
 // FP-192 N-06 신용 라운지 글·댓글 — 목록·상세(N-06-1), 글 작성(N-06-2), 댓글(N-06-3), 내 글 수정·삭제(N-06-5·6, 11/15 추가).
 // 내가 쓴 댓글 목록과 내 댓글 수정·삭제(N-06, FP-279·280). 숨김 글·댓글은 제목·내용을 비워서 보내고, 삭제 글은 목록·상세에서 뺀다.
@@ -39,11 +40,13 @@ public class BoardService {
     private final BoardMapper boardMapper;
     private final ContentStatusService contentStatus;
     private final Clock clock;
+    private final NotificationService notificationService;
 
-    public BoardService(BoardMapper boardMapper, ContentStatusService contentStatus, Clock clock) {
+    public BoardService(BoardMapper boardMapper, ContentStatusService contentStatus, Clock clock, NotificationService notificationService) {
         this.boardMapper = boardMapper;
         this.contentStatus = contentStatus;
         this.clock = clock;
+        this.notificationService = notificationService;
     }
 
     // N-06-1 글 목록 한 쪽(최신순, 기본 10개). 검색어는 보이는 글의 제목·내용에서 찾는다.
@@ -158,6 +161,13 @@ public class BoardService {
         row.setContent(request.content().trim());
         row.setCreatedAt(LocalDateTime.now(clock));
         boardMapper.insertComment(row);
+        if (!Objects.equals(post.getUserId(), userId)) {
+            String postTitle = post.getTitle();
+            String excerpt = postTitle.substring(0, postTitle.offsetByCodePoints(0, Math.min(30, postTitle.codePointCount(0, postTitle.length()))));
+            // D-23 글쓴이 본인 댓글은 제외하고 글 제목 일부로 새 댓글 알림을 보낸다.
+            notificationService.notifyQuietly(post.getUserId(), "COMMENT_NEW", "내 글에 새 댓글이 달렸어요", excerpt,
+                    "/lounge?post=" + postId);
+        }
         return new BoardDtos.CommentCreated(row.getCommentId());
     }
 

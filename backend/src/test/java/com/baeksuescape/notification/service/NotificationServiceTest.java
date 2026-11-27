@@ -30,6 +30,15 @@ class NotificationServiceTest {
     private ApplicationEventPublisher eventPublisher;
     private NotificationService service;
 
+    @Test
+    @DisplayName("알림 저장 실패는 notifyQuietly에서 삼켜 원래 처리를 계속한다")
+    void notifyQuietly_swallowsCreateFailure() {
+        given(mapper.insert(any())).willThrow(new IllegalStateException("database failure"));
+
+        org.assertj.core.api.Assertions.assertThatCode(() -> service.notifyQuietly(7L, "WELCOME", "환영", "시작", "/data-input"))
+                .doesNotThrowAnyException();
+    }
+
     @BeforeEach
     void setUp() {
         mapper = mock(NotificationMapper.class);
@@ -52,6 +61,7 @@ class NotificationServiceTest {
         assertThat(result.items().get(0).notificationId()).isEqualTo(31L);
         assertThat(result.items().get(0).read()).isFalse();
     }
+
 
     @Test
     @DisplayName("본인 안 읽은 알림을 읽음 처리한다")

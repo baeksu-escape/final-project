@@ -33,6 +33,7 @@ import com.baeksuescape.community.dto.CommentRow;
 import com.baeksuescape.community.dto.PostRow;
 import com.baeksuescape.community.mapper.BoardMapper;
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.notification.service.NotificationService;
 
 // FP-192 N-06 신용 라운지 글·댓글 규칙 — 목록·상세(N-06-1), 작성(N-06-2), 댓글(N-06-3), 내 글 수정·삭제(N-06-5·6). DB는 mock으로 대신한다.
 @ExtendWith(MockitoExtension.class)
@@ -46,12 +47,14 @@ class BoardServiceTest {
 
     @Mock
     private BoardMapper boardMapper;
+    @Mock
+    private NotificationService notificationService;
 
     private BoardService service;
 
     @BeforeEach
     void setUp() {
-        service = new BoardService(boardMapper, new ContentStatusService(boardMapper), CLOCK);
+        service = new BoardService(boardMapper, new ContentStatusService(boardMapper), CLOCK, notificationService);
     }
 
     static PostRow post(long postId, long userId, String status) {
@@ -257,7 +260,21 @@ class BoardServiceTest {
         }).given(boardMapper).insertComment(any());
 
         assertThat(service.addComment(ME, 1L, new BoardDtos.CommentWrite(" 좋은 정보네요 ")).commentId()).isEqualTo(21L);
+        verify(notificationService).notifyQuietly(OTHER, "COMMENT_NEW", "내 글에 새 댓글이 달렸어요", "제목1", "/lounge?post=1");
         verify(boardMapper, never()).insertPostLog(anyLong(), anyString(), anyString(), any(), any(), anyString(), isNull(), eq(NOW));
+    }
+
+    @Test
+    void commentByAuthor_doesNotNotify() {
+        given(boardMapper.selectPost(1L)).willReturn(post(1, ME, "VISIBLE"));
+        willAnswer(invocation -> {
+            ((CommentRow) invocation.getArgument(0)).setCommentId(22L);
+            return 1;
+        }).given(boardMapper).insertComment(any());
+
+        service.addComment(ME, 1L, new BoardDtos.CommentWrite("내 글에 다는 댓글"));
+
+        verify(notificationService, never()).notifyQuietly(anyLong(), anyString(), anyString(), anyString(), anyString());
     }
 
     @Test

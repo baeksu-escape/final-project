@@ -36,6 +36,7 @@ import com.baeksuescape.community.dto.ReportRow;
 import com.baeksuescape.community.mapper.ReportMapper;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.util.PiiMasking;
+import com.baeksuescape.notification.service.NotificationService;
 
 // FP-193 N-34 신고 접수 게시판(관리자) — 같은 대상의 신고를 묶은 목록(N-34-1), 상세(N-34-2), 처리 결과 저장(N-34-3).
 // 처리는 대상 단위다: 신고 한 건을 골라 처리하면 그 글·댓글의 미처리 신고가 모두 같은 결과로 닫힌다.
@@ -46,12 +47,15 @@ public class AdminReportService {
     private final ContentStatusService contentStatus;
     private final AppSettingService settings;
     private final Clock clock;
+    private final NotificationService notificationService;
 
-    public AdminReportService(ReportMapper reportMapper, ContentStatusService contentStatus, AppSettingService settings, Clock clock) {
+    public AdminReportService(ReportMapper reportMapper, ContentStatusService contentStatus, AppSettingService settings, Clock clock,
+            NotificationService notificationService) {
         this.reportMapper = reportMapper;
         this.contentStatus = contentStatus;
         this.settings = settings;
         this.clock = clock;
+        this.notificationService = notificationService;
     }
 
     // N-34-1 신고 목록 — 필터(상태·사유·기간, 모두 선택)에 맞는 신고를 대상별로 묶는다. 숨김 대상이 먼저, 그다음 최근 신고순.
@@ -85,7 +89,7 @@ public class AdminReportService {
     }
 
     // N-34-3 처리 결과 저장 — 삭제는 대상에 반영하고, 반려는 숨김을 푼다(FP-224부터 숨김 유지 없음). 처리자·시각·메모를 남긴다.
-    // 알림(신고자·작성자)은 D-25에 따라 만들지 않는다.
+    // D-23 FP-301 처리 결과와 삭제·숨김 알림을 해당 회원에게 보낸다.
     @Transactional
     public ReportDtos.ReportProcessed process(long adminUserId, long reportId, ReportDtos.ReportProcess request) {
         ReportRow report = requireReport(reportId);
@@ -111,6 +115,15 @@ public class AdminReportService {
 
         String reportStatus = RESULT_REJECT.equals(result) ? REPORT_REJECTED : REPORT_DONE;
         int handled = reportMapper.closeOpenReports(type, id, reportStatus, result, adminUserId, blankToNull(request.memo()), now);
+        long postId = target.parentPostId() == null ? target.targetId() : target.parentPostId();
+        // D-23 처리 결과는 신고자에게 알리고, 실제 숨김·삭제된 대상의 작성자에게도 별도 안내한다.
+        notificationService.notifyQuietly(reportMapper.selectReporterUserId(reportId), "REPORT_RESULT",
+                "신고 처리 결과가 있어요", "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=" + postId);
+        if (!VISIBLE.equals(after) && !after.equals(before) && target.ownerUserId() != null) {
+            String title = DELETED.equals(after) ? "내 글이 운영 정책에 따라 삭제됐어요" : "내 글이 운영 정책에 따라 숨겨졌어요";
+            String content = DELETED.equals(after) ? "운영 정책에 따라 게시물이 삭제 처리되었어요." : "운영 정책에 따라 게시물이 숨김 처리되었어요.";
+            notificationService.notifyQuietly(target.ownerUserId(), "REPORT_RESULT", title, content, "/lounge?post=" + postId);
+        }
         return new ReportDtos.ReportProcessed(result, after, handled);
     }
 
