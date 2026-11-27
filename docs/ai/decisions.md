@@ -42,7 +42,7 @@
 | Git | `feature/기능명`(Jira 키 권장 `feature/FP-12-…`) → PR → `develop` → `main`, PR은 형상 관리자 확인을 거쳐 병합. 커밋 `행위 - 내용` (D-17, 🆕 11/20 미정에서 확정으로) |
 | 오류 응답 형식 (D-20) | 성공 응답은 감싸지 않고 본문 그대로 보낸다. 오류는 HTTP 상태 + `{ code, message, fieldErrors: [{ field, message }] }`로 **전 API 공통**이다(FP-87 `GlobalExceptionHandler`). FastAPI 내부 오류는 추적용 `requestId`를 더한다 🆕 11/20 |
 | 차트 (D-15) | 차트 라이브러리를 쓰지 않고 SVG로 직접 그린다(`frontend/package.json`에 차트 라이브러리 없음) 🆕 11/20 |
-| 외부 호출 타임아웃 (D-18) | Spring → FastAPI 호출은 연결·읽기 타임아웃을 설정값으로 분리했다(`PredictionClient`) 🆕 11/20. Spring → OpenAI 호출은 같은 방식으로 **연결 2초 / 응답 15초**다(`OpenAiClient`, `avenue.ai.openai.*`, 문장을 만드는 데 몇 초 걸려 FastAPI보다 길다). 넘으면 502 `AI_FAILED` 🆕 11/26 FP-181 |
+| 외부 호출 타임아웃 (D-18) | Spring → FastAPI 호출은 연결·읽기 타임아웃을 설정값으로 분리했다(`PredictionClient`) 🆕 11/20. Spring → OpenAI 호출은 같은 방식으로 **연결 2초 / 응답 15초**다(`OpenAiClient`, `avenue.ai.openai.*`, 문장을 만드는 데 몇 초 걸려 FastAPI보다 길다). 넘으면 502 `AI_FAILED` 🆕 11/26 FP-181. 🆕 11/27 OpenAI 값은 FP-181 담당 광희 결정(담당 기능의 값은 담당자 우선, PR #170 리뷰 확인 요청에 대한 답) |
 
 ### 1-2. 계정·인증·개인정보
 
@@ -165,7 +165,7 @@
 | D-15 | 차트는 라이브러리 없이 SVG (11/20 확정) | 1-1 차트 |
 | D-16 | 월별 데이터 | 1-4 월별 데이터 |
 | D-17 | 커밋 메시지 `행위 - 내용` (11/20 확정) | 1-1 Git |
-| D-18 | 외부 호출 타임아웃 (FastAPI 11/20, OpenAI 11/26 확정) | 1-1 외부 호출 타임아웃 |
+| D-18 | 외부 호출 타임아웃 (FastAPI 11/20, OpenAI 11/26 확정 — 담당 광희 결정) | 1-1 외부 호출 타임아웃 |
 | D-20 | 오류 응답 형식 (11/20 확정) | 1-1 오류 응답 형식 |
 | D-24 | 직군별 추가 입력은 월 소득만 다르다 (11/12 결정) | 1-3 직군별 입력 |
 | D-25 | 추가 필요 테이블(옛 D-09) | 1-1 추가 필요 테이블 |

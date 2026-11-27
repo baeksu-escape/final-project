@@ -117,6 +117,7 @@
 | 409 | `NOT_SCORED` | RPT-04: 점수가 산출되지 않은(SCORED가 아닌) 평가는 요약하지 않음 🆕 11/26 |
 | 429 | `DAILY_LIMIT_EXCEEDED` | HELP-03: 오늘 성공한 자유 질문이 하루 횟수(`CHATBOT_DAILY_LIMIT`, 기본 10)에 이름 — 신고(COMM)와 같은 코드 🆕 11/26 |
 | 502 | `AI_FAILED` | HELP-03·RPT-04: OpenAI 연결 실패·시간 초과(D-18)·4xx·5xx·빈 답. 자유 질문은 실패로 기록하고 횟수는 줄지 않음, 요약은 저장하지 않음 🆕 11/26 |
+| 409 | `QUESTION_IN_PROGRESS` | HELP-03: 같은 사용자의 앞 질문이 아직 AI 답을 기다리는 중(한 번에 1개만 처리해 하루 횟수를 넘기지 않게 함) 🆕 11/27 |
 | 503 | `AI_UNAVAILABLE` | HELP-03·RPT-04: 서버에 OpenAI 키(`avenue.ai.openai.api-key`)가 없음. 백엔드는 켜지고 두 API만 이 응답 🆕 11/26 |
 
 - 커뮤니티(동주, PR #80) 오류 code: 403 `NOT_OWNER`(남의 글 수정·삭제), 404 `POST_NOT_FOUND`·`TARGET_NOT_FOUND`·`REPORT_NOT_FOUND`·`COMMENT_NOT_FOUND`(없거나 삭제된 댓글, 다른 글의 댓글 🆕 11/25), 409 `OWN_CONTENT`(본인 글 신고)·`DUPLICATE_REPORT`·`POST_HIDDEN`·`COMMENT_HIDDEN`(신고로 숨겨진 댓글 수정·삭제 🆕 11/25)·`STATUS_CHANGED`·`ALREADY_HANDLED`, 429 `DAILY_LIMIT_EXCEEDED`(하루 3번 초과).

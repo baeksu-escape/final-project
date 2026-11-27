@@ -1038,7 +1038,8 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 - 지시 문장(서버에 고정): 금융 용어·개념을 쉬운 한국어 3~5문장으로 설명, 개인 재무 상담·상품 추천·투자 권유 안 함, 금융과 관계없는 질문은 범위를 안내, 모르면 지어내지 않음. 답 길이 상한 400토큰.
 - **하루 횟수**: `APP_SETTING.CHATBOT_DAILY_LIMIT`(행이 없거나 숫자가 아니면 10). 오늘 0시(서버 시각 Asia/Seoul)부터 **성공한 호출(`SUCCESS_YN = 'Y'`)만** 센다. 질문 버튼(HELP-02)은 세지 않는다.
 - 기록: 성공하면 `Y`, AI가 실패하면 `N`으로 한 줄 남긴다(시각·성공 여부만). 키가 없어서(503) 부르지 못한 경우는 남기지 않는다.
-- 같은 사용자가 동시에 여러 번 보내면 하루 횟수를 1회쯤 넘을 수 있다(시연 범위에서 허용).
+- 🆕 11/27 같은 사용자는 **한 번에 질문 1개만** 처리한다. 앞 질문이 AI 답을 기다리는 동안 들어온 요청은 409 `QUESTION_IN_PROGRESS`로 거절한다(세기 → AI 호출 → 기록 사이에 끼어들어 하루 횟수를 넘기지 않게 함, PR #170 리뷰). 서버 1대 기준이며 여러 대로 늘리면 공용 잠금이 필요하다.
+- 🆕 11/27 AI 답이 길이 상한에서 잘리면(`finish_reason = length`) 502 `AI_FAILED`로 본다(실패로 기록, 횟수 안 줄어듦).
 - 호출 설정: `avenue.ai.openai.api-key=${OPENAI_API_KEY:}`(강사 제공 키 값은 환경변수 `OPENAI_API_KEY`에만, properties·코드에 쓰지 않음), 모델 기본 `gpt-5.6-luna`(`avenue.ai.openai.model`로 바꿀 수 있음), 시간 제한 연결 2초·응답 15초(D-18).
 
 응답 `200`:
@@ -1059,8 +1060,9 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 |---|---|---|
 | 400 | `INVALID_INPUT` | `question`이 없음·공백만·200자 초과(`fieldErrors[0].field = "question"`) |
 | 401 | `UNAUTHORIZED` | 토큰 없음·만료 |
+| 409 | `QUESTION_IN_PROGRESS` | 같은 사용자의 앞 질문이 아직 처리 중 → "이전 질문에 답하고 있습니다. 잠시 후 다시 시도해 주세요." 🆕 11/27 |
 | 429 | `DAILY_LIMIT_EXCEEDED` | 오늘 성공한 질문이 하루 횟수에 이름 → "자유 질문은 하루 10번까지 할 수 있습니다. 내일 다시 이용해 주세요." |
-| 502 | `AI_FAILED` | OpenAI 연결 실패·시간 초과·4xx(키 오류·한도)·5xx·빈 답. 횟수는 줄지 않는다 |
+| 502 | `AI_FAILED` | OpenAI 연결 실패·시간 초과·4xx(키 오류·한도)·5xx·빈 답·길이 상한에서 잘린 답(🆕 11/27). 횟수는 줄지 않는다 |
 | 503 | `AI_UNAVAILABLE` | 서버에 OpenAI 키가 없음 |
 
 - 프론트: `features/ai/api/chatbotApi.js`의 `askChatbotQuestion(question)`. mock은 고정 예시 답을 주고 같은 입력 검사·10회 초과 429를 흉내 낸다(새로고침하면 다시 10회).
@@ -1102,7 +1104,7 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 | 401 / 403 | `UNAUTHORIZED` / `FORBIDDEN` | 토큰 없음 / 관리자 계정 |
 | 404 | `ASSESSMENT_NOT_FOUND` | 없는 평가·남의 평가 |
 | 409 | `NOT_SCORED` | 점수가 산출되지 않은 평가 |
-| 502 | `AI_FAILED` | OpenAI 실패. 저장하지 않으므로 다시 요청하면 다시 만든다 |
+| 502 | `AI_FAILED` | OpenAI 실패, 또는 요약이 길이 상한에서 잘림(🆕 11/27, 끊긴 문장이 저장돼 계속 보이지 않게). 저장하지 않으므로 다시 요청하면 다시 만든다 |
 | 503 | `AI_UNAVAILABLE` | 서버에 OpenAI 키가 없음 |
 
 - 구현 위치: 범영 님 `ReportController`·`AssessmentMapper`를 고치지 않으려고 `help` 패키지의 `AiSummaryController`·`AiSummaryService`·`AiSummaryMapper`에 둔다.
