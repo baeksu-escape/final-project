@@ -186,29 +186,3 @@
   color: var(--fg);
   outline: none;
 }
-
-/* 휴대폰 너비 — 버튼·안내는 16px 안쪽, 패널은 양옆 16px만 남기고 넓힌다. 말풍선은 한 줄(넘치면 …) */
-@media (max-width: 480px) {
-  .gh-fab {
-    right: var(--sp-4);
-    bottom: var(--sp-4);
-  }
-
-  .gh-panel {
-    right: 16px;
-    left: 16px;
-    bottom: calc(var(--sp-4) + 52px + var(--sp-3));
-    width: auto;
-  }
-
-  .gh-teaser {
-    right: var(--sp-4);
-    bottom: calc(var(--sp-4) + 52px + var(--sp-3));
-  }
-
-  .gh-chip {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-}
