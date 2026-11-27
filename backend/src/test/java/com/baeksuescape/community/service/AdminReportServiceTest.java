@@ -140,9 +140,9 @@ class AdminReportServiceTest {
         assertThat(result.handledCount()).isEqualTo(5);
         verify(boardMapper).insertPostLog(1L, "RESTORE", "ADMIN", ADMIN, "HIDDEN_BY_REPORT", "VISIBLE", 12L, NOW);
         verify(notificationService).notifyQuietly(9L, "REPORT_RESULT", "신고 처리 결과가 있어요",
-                "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=1");
+                "신고하신 글은 운영 정책 위반이 아니라고 판단했어요.", "/lounge?post=1");
         verify(notificationService).notifyQuietly(10L, "REPORT_RESULT", "신고 처리 결과가 있어요",
-                "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=1");
+                "신고하신 글은 운영 정책 위반이 아니라고 판단했어요.", "/lounge?post=1");
         verify(notificationService, never()).notifyQuietly(eq(OTHER), eq("REPORT_RESULT"), anyString(), anyString(), anyString());
     }
 
@@ -159,10 +159,10 @@ class AdminReportServiceTest {
         assertThat(result.targetStatus()).isEqualTo("DELETED");
         verify(boardMapper).insertPostLog(1L, "DELETE", "ADMIN", ADMIN, "HIDDEN_BY_REPORT", "DELETED", 12L, NOW);
         verify(notificationService).notifyQuietly(9L, "REPORT_RESULT", "신고 처리 결과가 있어요",
-                "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=1");
+                "신고하신 글이 운영 정책에 따라 삭제 처리됐어요.", "/lounge");
 
         verify(notificationService).notifyQuietly(OTHER, "REPORT_RESULT", "내 글이 운영 정책에 따라 삭제됐어요",
-                "운영 정책에 따라 글이 삭제 처리되었어요.", "/lounge?post=1");
+                "운영 정책에 따라 글이 삭제 처리되었어요.", "/lounge");
         verify(reportMapper).selectOpenReporterUserIds("POST", 1L);
         verify(reportMapper, never()).selectReporterUserId(anyLong());
         verify(reportMapper).closeOpenReports("POST", 1L, "DONE", "DELETE", ADMIN, null, NOW);

@@ -117,16 +117,19 @@ public class AdminReportService {
         String reportStatus = RESULT_REJECT.equals(result) ? REPORT_REJECTED : REPORT_DONE;
         int handled = reportMapper.closeOpenReports(type, id, reportStatus, result, adminUserId, blankToNull(request.memo()), now);
         long postId = target.parentPostId() == null ? target.targetId() : target.parentPostId();
-        // D-23 FP-301 닫히는 신고자 모두에게 결과를 알리고 작성자 알림은 아래에서 별도로 보낸다.
+        // D-23 대상이 댓글이면(부모 글이 있으면) '댓글', 아니면 '글'로 안내한다. 삭제된 대상은 열 수 없어 라운지 목록으로 보낸다.
+        String noun = target.parentPostId() == null ? "글" : "댓글";
+        String link = DELETED.equals(after) ? "/lounge" : "/lounge?post=" + postId;
+        // D-23 FP-301 닫히는 신고자 모두에게 처리 결과(삭제·반려)를 문구로 바로 알리고, 작성자 알림은 아래에서 별도로 보낸다.
+        String reporterContent = RESULT_DELETE.equals(result)
+                ? "신고하신 " + noun + "이 운영 정책에 따라 삭제 처리됐어요."
+                : "신고하신 " + noun + "은 운영 정책 위반이 아니라고 판단했어요.";
         reporterUserIds.forEach(reporterUserId ->
-                notificationService.notifyQuietly(reporterUserId, "REPORT_RESULT",
-                "신고 처리 결과가 있어요", "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=" + postId));
+                notificationService.notifyQuietly(reporterUserId, "REPORT_RESULT", "신고 처리 결과가 있어요", reporterContent, link));
         if (!VISIBLE.equals(after) && !after.equals(before) && target.ownerUserId() != null) {
-            // D-23 대상이 댓글이면(부모 글이 있으면) '댓글', 아니면 '글'로 안내한다.
-            String noun = target.parentPostId() == null ? "글" : "댓글";
             String title = DELETED.equals(after) ? "내 " + noun + "이 운영 정책에 따라 삭제됐어요" : "내 " + noun + "이 운영 정책에 따라 숨겨졌어요";
             String content = DELETED.equals(after) ? "운영 정책에 따라 " + noun + "이 삭제 처리되었어요." : "운영 정책에 따라 " + noun + "이 숨김 처리되었어요.";
-            notificationService.notifyQuietly(target.ownerUserId(), "REPORT_RESULT", title, content, "/lounge?post=" + postId);
+            notificationService.notifyQuietly(target.ownerUserId(), "REPORT_RESULT", title, content, link);
         }
         return new ReportDtos.ReportProcessed(result, after, handled);
     }
