@@ -9,11 +9,17 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
   const errorId = `${id}-error`
   const blockedId = `${id}-blocked`
   const [blockedMessage, setBlockedMessage] = useState('')
+  const [text, setText] = useState(() => formatWithComma(value))
   const timer = useRef(null)
   const inputRef = useRef(null)
   const cursorRef = useRef(null)
   const previousSelection = useRef({ start: 0, end: 0 })
   const pastedText = useRef(null)
+  const numericValue = value == null ? null : Number(value)
+  const canSync = numericValue === null || Number.isFinite(numericValue)
+  const syncedText = numericValue === null ? '' : formatWithComma(numericValue)
+  // 외부 숫자가 바뀐 경우만 표시 문자열을 맞춰 입력 중인 같은 숫자 표기는 보존한다.
+  if (canSync && (numericValue === null ? text !== '' : text === '' || Number(parseDigits(text)) !== numericValue)) setText(syncedText)
 
   // 컴포넌트가 사라지면 막힌 입력 안내 타이머를 정리한다.
   useEffect(() => () => clearTimeout(timer.current), [])
@@ -59,9 +65,10 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
     const nextValue = parseDigits(text)
     cursorRef.current = digitsBefore
     onChange(nextValue)
-    input.value = formatWithComma(nextValue)
+    const displayText = formatDigitText(text)
+    setText(displayText)
+    input.value = displayText
     restoreCursor(input, digitsBefore)
-    if (nextValue === value) cursorRef.current = null
   }
   return (
     <div className="form-field money-input">
@@ -76,7 +83,7 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
         inputMode="numeric"
         autoComplete="off"
         className="money-input__control"
-        value={formatWithComma(value)}
+        value={text}
         onSelect={(event) => {
           previousSelection.current = { start: event.target.selectionStart, end: event.target.selectionEnd }
         }}
@@ -89,14 +96,19 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
         }}
         onChange={(event) => {
           const input = event.target
-          const previous = formatWithComma(value)
+          const previous = text
           const { start, end } = previousSelection.current
           const insertedText = pastedText.current ?? event.nativeEvent.data
             ?? input.value.slice(start, input.value.length - (previous.length - end))
           pastedText.current = null
           updateValue(input, input.value, input.selectionStart ?? 0, insertedText)
         }}
-        onBlur={clearBlocked}
+        onBlur={(event) => {
+          clearBlocked()
+          const digits = parseDigits(event.currentTarget.value)
+          // 쉼표가 든 표시 문자열은 Number()로 읽히지 않으므로 숫자 파서로 앞자리 0을 정리한다.
+          if (digits !== null) setText(formatWithComma(digits))
+        }}
         onKeyDown={(event) => {
           const input = event.currentTarget
           const cursor = input.selectionStart
@@ -123,6 +135,11 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
 }
 
 // 입력 위치 앞에 있던 숫자 수를 쉼표가 포함된 문자열의 커서 위치로 바꾼다.
+// 입력 중에는 숫자로 바꾸지 않고 자릿수 문자열 그대로 묶어 선행 0을 보존한다.
+function formatDigitText(text) {
+  return String(text ?? '').replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
 function restoreCursor(input, digitCount) {
   let position = 0
   let digits = 0
