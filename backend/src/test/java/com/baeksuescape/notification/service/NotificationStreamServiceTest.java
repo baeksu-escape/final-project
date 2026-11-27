@@ -119,6 +119,7 @@ class NotificationStreamServiceTest {
         service.register(7L);
         created.get(0).blockSend = true;
         created.get(2).failSend = true;
+        service.startHeartbeat();
 
         service.sendHeartbeat();
 

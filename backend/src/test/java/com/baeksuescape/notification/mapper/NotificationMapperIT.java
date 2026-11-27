@@ -59,6 +59,24 @@ class NotificationMapperIT {
                 Long.class, userId, "fp284-it-comment-1"));
     }
 
+    // D-23 FP-300 안 읽은 목록과 같은 문장에서 센 전체 안 읽은 개수(unreadTotal)가 실제 개수와 같은지 확인한다.
+    @Test
+    @DisplayName("안 읽은 목록과 같은 시점의 전체 안 읽은 개수를 함께 조회한다")
+    void selectUnreadWithTotal_countMatchesUnread() {
+        insert("COMMENT_NEW", false, "u1");
+        insert("COMMENT_NEW", true, "r1");
+        long newest = insert("WELCOME", false, "u2");
+        sqlSession.clearCache();
+        long expected = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM USER_NOTIFICATION WHERE USER_ID = ? AND READ_AT IS NULL", Long.class, userId);
+
+        List<NotificationRow> rows = mapper.selectUnreadWithTotal(userId, 1);
+
+        assertEquals(1, rows.size());
+        assertEquals(newest, rows.get(0).getNotificationId());
+        assertEquals(expected, rows.get(0).getUnreadTotal());
+    }
+
     // D-23 FP-300 롤백 대상 알림 한 건을 넣고 생성된 알림 번호를 돌려준다.
     private long insert(String typeCode, boolean read, String suffix) {
         String title = "fp284-it-" + suffix;

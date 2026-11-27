@@ -41,19 +41,29 @@ function waitUntilVisible(signal) {
   })
 }
 
-// D-23 응답에 없는 SSE 항목은 목록에 보태고, 서버 응답 뒤 도착한 더 큰 ID만 배지에 보수적으로 더한다.
-function mergePendingNotifications(response, pendingItems, responseReceivedAt) {
+// D-23 조회 중 SSE로 받은 항목 중 응답에 없는 것을 목록에 보탠다. 서버는 목록과 안 읽은 개수를 한 문장(같은 시점)으로 세므로,
+// 그 시점에 있었다면 목록(최신순)에 들어갔어야 할 항목 — 목록이 전부(hasMore 아님)이거나 목록의 가장 작은 번호보다 큰 항목 — 은
+// 아직 개수에 없던 알림이라 배지에 더한다.
+function mergePendingNotifications(response, pendingItems) {
   const items = [...response.items]
-  const maxResponseId = response.items.reduce((max, item) => Math.max(max, item.notificationId), 0)
-  let confirmedAfterResponse = 0
+  const minResponseId = response.items.reduce((min, item) => Math.min(min, item.notificationId), Infinity)
+  let notCounted = 0
+  let uncertain = 0
   pendingItems.forEach((item, id) => {
     if (items.some((row) => row.notificationId === id)) return
     items.push(item.notification)
-    if (id > maxResponseId && item.receivedAt > responseReceivedAt) confirmedAfterResponse += 1
+    if (!response.hasMore || id > minResponseId) notCounted += 1
+    else uncertain += 1
   })
   items.sort((a, b) => b.notificationId - a.notificationId)
-  return { ...response, items, unreadCount: response.unreadCount + confirmedAfterResponse }
+  // uncertain: 안 읽은 게 많아 목록이 잘렸고 번호가 목록보다 작은 항목. 번호와 커밋 순서가 다르면 개수에 없을 수 있어 호출한 쪽이 한 번 다시 조회한다.
+  return { response: { ...response, items, unreadCount: response.unreadCount + notCounted }, uncertain }
 }
+
+// D-23 커밋 순서가 뒤바뀌었을 수 있는 알림이 있을 때 다시 조회하기까지 기다리는 시간(ms).
+const UNCERTAIN_RECHECK_MS = 1000
+// D-23 이 시간(ms) 이상 유지된 연결만 정상 연결로 보고 재연결 대기를 초기화한다.
+const STABLE_CONNECTION_MS = 10000
 
 // D-23 알림 목록·읽음 상태를 관리하고 SSE 연결 시 새 항목을 추가할 수 있는 함수를 제공한다.
 export function useNotifications(enabled = true) {
@@ -61,39 +71,54 @@ export function useNotifications(enabled = true) {
   const pendingSse = useRef(new Map())
   const seenIds = useRef(new Set())
   const firstListRequest = useRef(null)
-  // D-23 최초 목록 응답 시점을 SSE 연결 완료와 비교해 누락 보충 조회를 보장한다.
-  const refresh = useCallback(async () => {
-    setState((current) => ({ ...current, error: '' }))
+  // D-23 진행 중인 목록 조회 수. 조회 중에 온 SSE만 pendingSse에 잠시 보관하고, 조회가 모두 끝나면 비운다.
+  const inFlight = useRef(0)
+  // D-23 조회마다 번호를 매겨, 늦게 도착한 오래된 응답이 더 최신 응답을 덮지 않게 한다.
+  const requestSeq = useRef(0)
+  const appliedSeq = useRef(0)
+  // D-23 화면 생명주기 번호. 조회는 시작할 때의 번호와 지금 번호가 같을 때만 결과를 반영한다(언마운트·StrictMode 재실행 뒤 늦게 끝난 조회는 버림).
+  const generation = useRef(0)
+  // D-23 읽음 처리 뒤 다시 조회할 때 최신 load 함수를 부르기 위한 참조.
+  const loadRef = useRef(null)
+
+  // D-23 안 읽은 목록을 불러와 조회 중 받은 SSE를 합친다. 오류는 밖으로 던지지 않는다.
+  const load = useCallback(async () => {
+    const seq = ++requestSeq.current
+    const gen = generation.current
+    inFlight.current += 1
+    let merged
     try {
-      const data = await fetchNotifications({ unreadOnly: true })
-      const receivedAt = Date.now()
-      const response = mergePendingNotifications(adaptNotifications(data), pendingSse.current, receivedAt)
-      response.items.forEach((item) => seenIds.current.add(item.notificationId))
-      response.items.forEach((item) => pendingSse.current.delete(item.notificationId))
-      setState({ ...response, loading: false, error: '' })
+      merged = mergePendingNotifications(adaptNotifications(await fetchNotifications({ unreadOnly: true })), pendingSse.current)
+    } catch {
+      merged = null
     }
-    catch { setState((current) => ({ ...current, loading: false, error: '알림을 불러오지 못했어요.' })) }
+    inFlight.current -= 1
+    if (inFlight.current === 0) pendingSse.current.clear()
+    if (gen !== generation.current || seq <= appliedSeq.current) return
+    appliedSeq.current = seq
+    if (!merged) {
+      setState((current) => ({ ...current, loading: false, error: '알림을 불러오지 못했어요.' }))
+      return
+    }
+    const { response, uncertain } = merged
+    response.items.forEach((item) => seenIds.current.add(item.notificationId))
+    setState({ ...response, loading: false, error: '' })
+    // 드문 경우(목록이 잘렸고 커밋 순서가 뒤바뀐 알림)만 1초 뒤 한 번 다시 조회해 서버 개수로 맞춘다. 다시 조회할 땐 보관 SSE가 비어 반복되지 않는다.
+    if (uncertain > 0) window.setTimeout(() => loadRef.current?.(), UNCERTAIN_RECHECK_MS)
   }, [])
+  // D-23 밖에서 부르는 목록 다시 불러오기(인자 없이 처음부터 조회한다).
+  const refresh = useCallback(() => load(), [load])
+
+  useEffect(() => { loadRef.current = load }, [load])
 
   useEffect(() => {
     if (!enabled) return undefined
-    let active = true
-    const request = fetchNotifications({ unreadOnly: true })
-    const initialRequest = { promise: request, settled: false }
+    generation.current += 1
+    const initialRequest = { promise: null, settled: false }
+    initialRequest.promise = load().finally(() => { initialRequest.settled = true })
     firstListRequest.current = initialRequest
-    request.then(() => { initialRequest.settled = true }, () => { initialRequest.settled = true })
-    request.then((data) => {
-      if (active) {
-        const receivedAt = Date.now()
-        const response = mergePendingNotifications(adaptNotifications(data), pendingSse.current, receivedAt)
-        response.items.forEach((item) => seenIds.current.add(item.notificationId))
-        response.items.forEach((item) => pendingSse.current.delete(item.notificationId))
-        setState({ ...response, loading: false, error: '' })
-      }
-    })
-      .catch(() => { if (active) setState((current) => ({ ...current, loading: false, error: '알림을 불러오지 못했어요.' })) })
-    return () => { active = false }
-  }, [enabled])
+    return () => { generation.current += 1 }
+  }, [enabled, load])
 
   useEffect(() => {
     if (!enabled) return undefined
@@ -119,7 +144,7 @@ export function useNotifications(enabled = true) {
       createdAt: item.createdAt ?? new Date().toISOString(),
     }
     seenIds.current.add(notificationId)
-    pendingSse.current.set(notificationId, { notification, receivedAt: Date.now() })
+    if (inFlight.current > 0) pendingSse.current.set(notificationId, { notification })
     setState((current) => current.items.some((row) => row.notificationId === notificationId)
       ? current : { ...current, items: [notification, ...current.items], unreadCount: current.unreadCount + 1 })
     emitNotificationsChanged('bell')
@@ -139,6 +164,7 @@ export function useNotifications(enabled = true) {
       while (!stopped && !controller.signal.aborted) {
         const token = tokenStorage.get()
         if (!token) break
+        let connectedAt = null
         try {
           const response = await fetch(`${API_BASE_URL}/api/members/me/notifications/stream`, {
             headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' },
@@ -150,7 +176,8 @@ export function useNotifications(enabled = true) {
             break
           }
           if (!response.ok) throw new Error('알림 스트림 연결 실패')
-          retryDelay = 1000
+          // D-23 연결이 일정 시간 이상 유지됐을 때만 재연결 대기를 1초로 되돌린다(연결 직후 끊기면 대기를 늘려 반복 접속 방지).
+          connectedAt = Date.now()
           let connectedRefresh = null
           let replaced = false
           await readNotificationEvents(response, addNotification, controller.signal, (eventName) => {
@@ -179,6 +206,7 @@ export function useNotifications(enabled = true) {
         } catch {
           if (stopped || controller.signal.aborted) break
         }
+        if (connectedAt && Date.now() - connectedAt >= STABLE_CONNECTION_MS) retryDelay = 1000
         if (stopped || controller.signal.aborted) break
         await waitForReconnect(controller.signal, retryDelay)
         retryDelay = Math.min(retryDelay * 2, 30000)
@@ -198,6 +226,11 @@ export function useNotifications(enabled = true) {
 
   const markRead = useCallback(async (id) => {
     await markNotificationRead(id)
+    // 읽음 전에 시작한 조회 응답이 늦게 와서 읽은 알림을 되살리지 않도록 그 조회들을 무효로 하고,
+    // 무효로 한 조회가 있었으면(첫 연결 보충 조회일 수 있음) 읽음 반영 뒤 한 번 다시 조회한다.
+    const hadInFlight = inFlight.current > 0
+    appliedSeq.current = requestSeq.current
+    if (hadInFlight) loadRef.current?.()
     pendingSse.current.delete(id)
     setState((current) => {
       const wasUnread = current.items.some((item) => item.notificationId === id && !item.read)
@@ -208,6 +241,9 @@ export function useNotifications(enabled = true) {
   }, [])
   const markAllRead = useCallback(async () => {
     await markAllNotificationsRead()
+    const hadInFlight = inFlight.current > 0
+    appliedSeq.current = requestSeq.current
+    if (hadInFlight) loadRef.current?.()
     pendingSse.current.clear()
     setState((current) => ({ ...current, items: [], unreadCount: 0 }))
     emitNotificationsChanged('bell', { readAll: true })

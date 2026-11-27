@@ -146,6 +146,23 @@ class AdminReportServiceTest {
         verify(notificationService, never()).notifyQuietly(eq(OTHER), eq("REPORT_RESULT"), anyString(), anyString(), anyString());
     }
 
+    // D-23 FP-301 반려는 작성자 알림이 없으므로, 자기 글을 신고한 작성자도 신고자 결과 알림 1건을 받는다.
+    @Test
+    void 반려할_때_작성자가_신고자이면_신고자_결과_알림만_받는다() {
+        given(reportMapper.selectReport(12L)).willReturn(report(12, "POST", 1, "SPAM", "RECEIVED", "HIDDEN_BY_REPORT", NOW));
+        given(reportMapper.selectOpenReporterUserIds("POST", 1L)).willReturn(List.of(OTHER));
+        given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "HIDDEN_BY_REPORT"));
+        given(reportMapper.countOpenByTarget("POST", 1L)).willReturn(1);
+        given(boardMapper.updatePostStatus(1L, "HIDDEN_BY_REPORT", "VISIBLE", NOW)).willReturn(1);
+        given(reportMapper.closeOpenReports("POST", 1L, "REJECTED", "REJECT", ADMIN, null, NOW)).willReturn(1);
+
+        service.process(ADMIN, 12L, new ReportDtos.ReportProcess("REJECT", null));
+
+        verify(notificationService).notifyQuietly(OTHER, "REPORT_RESULT", "신고 처리 결과가 있어요",
+                "신고하신 글은 운영 정책 위반이 아니라고 판단했어요.", "/lounge?post=1");
+        verify(notificationService, never()).notifyQuietly(eq(OTHER), eq("REPORT_RESULT"), eq("내 글이 운영 정책에 따라 숨겨졌어요"), anyString(), anyString());
+    }
+
     // D-23 FP-301 신고자가 작성자이기도 하면 처리 결과·작성자 알림을 합쳐 한 건만 보낸다.
     @Test
     void 삭제하면_글을_지우고_처리_완료로_닫는다() {

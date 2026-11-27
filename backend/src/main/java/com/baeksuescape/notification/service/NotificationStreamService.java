@@ -45,7 +45,9 @@ public class NotificationStreamService {
 
     private final Map<Long, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
     private final Map<SseEmitter, ScheduledFuture<?>> expirationTasks = new ConcurrentHashMap<>();
-    private ScheduledExecutorService heartbeatExecutor;
+    private volatile ScheduledExecutorService heartbeatExecutor;
+    // D-23 서버 종료(stop) 뒤에는 실행기를 다시 만들지 않는다.
+    private volatile boolean stopped;
 
     /** D-23 FP-284 하트비트·토큰 만료 예약과 연결별 전송을 네 작업 스레드로 분산한다. */
     @PostConstruct
@@ -61,6 +63,7 @@ public class NotificationStreamService {
     /** FP-284·D-23 서버가 내려갈 때 하트비트와 만료 예약을 멈추고 남은 연결을 닫는다. */
     @PreDestroy
     void stop() {
+        stopped = true;
         if (heartbeatExecutor != null) heartbeatExecutor.shutdownNow();
         emitters.values().forEach(list -> new ArrayList<>(list).forEach(this::completeQuietly));
         emitters.clear();
@@ -93,7 +96,7 @@ public class NotificationStreamService {
             completeQuietly(old);
         });
         send(userId, emitter, SseEmitter.event().name("connected").data("ok"));
-        if (tokenExpiresAt != null && emitters.getOrDefault(userId, List.of()).contains(emitter)) {
+        if (tokenExpiresAt != null && !stopped && emitters.getOrDefault(userId, List.of()).contains(emitter)) {
             ensureHeartbeatExecutor();
             long delayMillis = Math.max(0, Duration.between(Instant.now(), tokenExpiresAt).toMillis());
             expirationTasks.put(emitter, heartbeatExecutor.schedule(() -> expire(userId, emitter), delayMillis,
@@ -116,11 +119,13 @@ public class NotificationStreamService {
 
     /** D-23 FP-284 연결마다 하트비트 전송을 별도 작업으로 넘겨 느린 연결이 나머지를 막지 않게 한다. */
     void sendHeartbeat() {
-        ensureHeartbeatExecutor();
+        // 서버 종료(stop) 뒤 실행기를 다시 만들지 않도록, 실행기가 없거나 멈췄으면 아무것도 하지 않는다.
+        ScheduledExecutorService executor = heartbeatExecutor;
+        if (executor == null || executor.isShutdown()) return;
         emitters.forEach((userId, list) -> {
             for (SseEmitter emitter : new ArrayList<>(list)) {
                 try {
-                    heartbeatExecutor.execute(() -> send(userId, emitter, SseEmitter.event().comment("ping")));
+                    executor.execute(() -> send(userId, emitter, SseEmitter.event().comment("ping")));
                 } catch (RejectedExecutionException e) {
                     log.debug("알림 SSE 하트비트 작업을 넘기지 못했습니다: userId={}", userId);
                 }
@@ -190,6 +195,6 @@ public class NotificationStreamService {
 
     // D-23 FP-284 토큰 만료 예약과 하트비트 전송에 필요한 다중 스레드 실행기를 준비한다.
     private void ensureHeartbeatExecutor() {
-        if (heartbeatExecutor == null || heartbeatExecutor.isShutdown()) startHeartbeat();
+        if (!stopped && (heartbeatExecutor == null || heartbeatExecutor.isShutdown())) startHeartbeat();
     }
 }

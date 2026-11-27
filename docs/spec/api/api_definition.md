@@ -299,7 +299,7 @@
 
 | ID | 메서드 · 경로 | 기능 | 주요 표 | 인증 | 상태 |
 |---|---|---|---|---|---|
-| NOTI-01 | `GET /api/members/me/notifications` | 알림 목록(최신 20건, `unreadOnly`·`type`·`before` 선택, `size` 기본 20·최대 50)·전체 안 읽은 개수 `unreadCount`·다음 페이지 여부 `hasMore` (D-23, 11/27) | `USER_NOTIFICATION` | USER | ✅ 🆕 11/27 |
+| NOTI-01 | `GET /api/members/me/notifications` | 알림 목록(최신 20건, `unreadOnly`·`type`·`before` 선택, `size` 기본 20·최대 50)·전체 안 읽은 개수 `unreadCount`·다음 페이지 여부 `hasMore` (D-23, 11/27). `unreadOnly`만 쓰고 `type`·`before`가 없는 조회(헤더 드롭다운)는 목록과 `unreadCount`를 같은 시점 기준으로 센다 | `USER_NOTIFICATION` | USER | ✅ 🆕 11/27 |
 | NOTI-02 | `PATCH /api/members/me/notifications/{notificationId}/read` | 알림 읽음 처리(본인 것만, 이미 읽었으면 그대로 200, 남의 것·없는 번호는 404 `NOT_FOUND`) | `USER_NOTIFICATION` | USER | ✅ 🆕 11/27 |
 | NOTI-03 | `PATCH /api/members/me/notifications/read-all` | 안 읽은 알림 모두 읽음 처리, 응답 `updatedCount` | `USER_NOTIFICATION` | USER | ✅ 🆕 11/27 |
 | NOTI-04 | `GET /api/members/me/notifications/stream` | 새 알림 SSE 스트림(`text/event-stream`). 이벤트: `connected`(연결 직후), `notification`(알림 1건, NOTI-01 항목과 같은 모양), 회원 연결 상한 초과로 종료할 때 `replaced`(`{"reason":"limit"}`), 토큰 만료 때 `expired`(`{"reason":"token"}`), 25초마다 `ping` 주석. 로그인은 `Authorization` 헤더(화면은 `fetch` 스트림으로 읽음). 연결 30분 제한·회원당 5개 상한(넘으면 가장 오래된 연결에 `replaced`를 보낸 뒤 종료). 끊기면 화면이 목록을 다시 불러온다 | `USER_NOTIFICATION` | USER | ✅ 🆕 11/27 |

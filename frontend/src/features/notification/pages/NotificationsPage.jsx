@@ -55,8 +55,10 @@ export default function NotificationsPage() {
         })
       }
     }).catch(() => {
-      // D-23 새 목록 요청이 실패해도 이미 표시 중인 기록은 남기고 오류 안내만 갱신한다.
-      if (sequence.current === requestId) setHistory((current) => ({ ...current, type, loading: false, error: '알림을 불러오지 못했어요.' }))
+      // D-23 같은 탭을 다시 불러오다 실패하면 표시 중인 기록은 남기고 오류 안내만, 탭을 바꾸다 실패하면 이전 탭 목록을 보이지 않는다.
+      if (sequence.current === requestId) setHistory((current) => current.type === type
+        ? { ...current, loading: false, error: '알림을 불러오지 못했어요.' }
+        : { type, items: [], unreadCount: 0, hasMore: false, loading: false, error: '알림을 불러오지 못했어요.' })
     })
     return () => { sequence.current += 1 }
   }, [type, refreshVersion])
