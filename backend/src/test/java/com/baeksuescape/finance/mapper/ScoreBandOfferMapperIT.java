@@ -24,24 +24,24 @@ class ScoreBandOfferMapperIT {
     private ScoreBandOfferMapper mapper;
 
     @Test
-    @DisplayName("등급 구간(DDL 기준 데이터): ACTIVE 버전 CUT-0.3(11/23 전환, FP-248)에서 경계별 등급")
+    @DisplayName("등급 구간(DDL 기준 데이터): ACTIVE 버전 CUT-0.4(11/27 전환, FP-285)에서 경계별 등급")
     void selectActiveGradeBand() {
-        GradeBandRow caution = mapper.selectActiveGradeBand(653);
+        GradeBandRow caution = mapper.selectActiveGradeBand(644);
         assertNotNull(caution, "SCORE_GRADE_BAND가 비어 있다. DDL을 실행했는지 확인");
         assertEquals("CAUTION", caution.getGradeBandCode());
-        assertEquals("CUT-0.3", caution.getCutoffVersion());
-        assertEquals("STANDARD", mapper.selectActiveGradeBand(654).getGradeBandCode());
-        assertEquals("STANDARD", mapper.selectActiveGradeBand(726).getGradeBandCode());
-        assertEquals("GOOD", mapper.selectActiveGradeBand(727).getGradeBandCode());
+        assertEquals("CUT-0.4", caution.getCutoffVersion());
+        assertEquals("STANDARD", mapper.selectActiveGradeBand(645).getGradeBandCode());
+        assertEquals("STANDARD", mapper.selectActiveGradeBand(711).getGradeBandCode());
+        assertEquals("GOOD", mapper.selectActiveGradeBand(712).getGradeBandCode());
     }
 
     @Test
     @DisplayName("점수대 금리·한도(시드): 3개 점수대 값이 시드와 같다")
     void selectOfferByScore() {
-        ScoreBandOfferRow standard = mapper.selectOfferByScore(720);
+        ScoreBandOfferRow standard = mapper.selectOfferByScore(700);
         assertNotNull(standard, "SCORE_BAND_OFFER가 비어 있다. dummy_db/run_all.sql 적재 필요");
-        assertEquals(654, standard.getMinScore());   // CUT-0.3 전환(FP-248)으로 금리·한도 점수 구간도 0~653 / 654~726 / 727~1000
-        assertEquals(726, standard.getMaxScore());
+        assertEquals(645, standard.getMinScore());   // CUT-0.4 전환(FP-285)으로 금리·한도 점수 구간도 0~644 / 645~711 / 712~1000
+        assertEquals(711, standard.getMaxScore());
         assertEquals(0, new java.math.BigDecimal("5.28").compareTo(standard.getRateMinPct()));
         assertEquals(47000000L, standard.getLimitAmt());
         assertEquals(LocalDate.of(2026, 9, 18), standard.getBaseDate());
