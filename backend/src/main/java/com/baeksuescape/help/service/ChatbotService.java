@@ -10,6 +10,8 @@ import com.baeksuescape.help.mapper.ChatbotMapper;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -36,10 +38,14 @@ public class ChatbotService {
             "모르는 내용은 지어내지 말고 모른다고 말한다.",
             "화면에 글자 그대로 보이므로 굵게(**), 제목(#), 목록 기호 같은 마크다운을 쓰지 않고 평범한 문장으로만 쓴다.");
 
+    public static final String QUESTION_IN_PROGRESS = "QUESTION_IN_PROGRESS";
+
     private final ChatbotMapper chatbotMapper;
     private final OpenAiClient openAiClient;
     private final AppSettingService settings;
     private final Clock clock;
+    // 지금 AI 답을 기다리는 회원 번호. 서버 1대 기준이다(서버를 여러 대 두면 DB 등 공용 잠금이 필요하다).
+    private final Set<Long> inFlight = ConcurrentHashMap.newKeySet();
 
     /** N-32-1 질문 버튼 전체(표시 순서대로)와 오늘 남은 자유 질문 횟수 */
     public ChatbotPresetResponse findPresets(long userId) {
@@ -51,13 +57,26 @@ public class ChatbotService {
     }
 
     /**
-     * N-32-2 HELP-03 자유 질문. 오류: 키 없음 503 AI_UNAVAILABLE(기록 없음), 오늘 횟수를 다 씀 429 DAILY_LIMIT_EXCEEDED,
-     * AI 실패 502 AI_FAILED(실패로 기록하고 횟수는 줄지 않음).
+     * N-32-2 HELP-03 자유 질문. 오류: 키 없음 503 AI_UNAVAILABLE(기록 없음), 같은 사용자의 앞 질문이 처리 중 409 QUESTION_IN_PROGRESS,
+     * 오늘 횟수를 다 씀 429 DAILY_LIMIT_EXCEEDED, AI 실패·잘린 답 502 AI_FAILED(실패로 기록하고 횟수는 줄지 않음).
      */
     public ChatbotQuestionResponse ask(long userId, String question) {
         if (!openAiClient.enabled()) {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, OpenAiClient.AI_UNAVAILABLE, "AI 기능이 아직 준비되지 않았습니다.");
         }
+        // 횟수 확인 → AI 호출(몇 초) → 기록 사이에 같은 사용자의 다른 요청이 끼어들면 하루 횟수를 넘길 수 있어, 처리 중인 질문을 1개로 막는다
+        if (!inFlight.add(userId)) {
+            throw new ApiException(HttpStatus.CONFLICT, QUESTION_IN_PROGRESS, "이전 질문에 답하고 있습니다. 잠시 후 다시 시도해 주세요.");
+        }
+        try {
+            return askOnce(userId, question);
+        } finally {
+            inFlight.remove(userId);
+        }
+    }
+
+    // 처리 중 잠금 안에서 하루 횟수 확인 → AI 호출 → 기록을 한 번에 한다.
+    private ChatbotQuestionResponse askOnce(long userId, String question) {
         int dailyLimit = dailyLimit();
         LocalDateTime now = LocalDateTime.now(clock);
         int used = chatbotMapper.countSuccessSince(userId, now.toLocalDate().atStartOfDay());

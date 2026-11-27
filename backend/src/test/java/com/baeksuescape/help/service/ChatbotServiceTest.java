@@ -25,7 +25,14 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -139,6 +146,61 @@ class ChatbotServiceTest {
         assertSame(failed, error);
         verify(mapper).insertQuestionLog(2L, NOW, "N");
         verify(mapper, never()).insertQuestionLog(2L, NOW, "Y");
+    }
+
+    @Test
+    @DisplayName("같은 사용자가 동시에 50번 보내도 AI는 1번만 부르고 나머지는 409 QUESTION_IN_PROGRESS다(PR #170 리뷰 재현)")
+    void concurrentAskIsOneAtATime() throws Exception {
+        CountDownLatch aiStarted = new CountDownLatch(1);
+        CountDownLatch releaseAi = new CountDownLatch(1);
+        AtomicInteger aiCalls = new AtomicInteger();
+        when(mapper.countSuccessSince(2L, TODAY)).thenReturn(0);
+        when(openAi.complete(anyString(), anyString(), anyInt())).thenAnswer((invocation) -> {
+            aiCalls.incrementAndGet();
+            aiStarted.countDown();
+            releaseAi.await(5, TimeUnit.SECONDS);
+            return "답";
+        });
+        ExecutorService pool = Executors.newFixedThreadPool(50);
+        try {
+            // 첫 질문이 AI 답을 기다리는 동안 49번을 더 보낸다
+            Future<ChatbotQuestionResponse> first = pool.submit(() -> service.ask(2L, "첫 질문"));
+            assertTrue(aiStarted.await(5, TimeUnit.SECONDS));
+            List<Future<String>> others = new ArrayList<>();
+            for (int i = 0; i < 49; i++) {
+                others.add(pool.submit(() -> {
+                    try {
+                        service.ask(2L, "같은 사람의 다른 질문");
+                        return "OK";
+                    } catch (ApiException e) {
+                        return e.getStatus().value() + " " + e.getCode();
+                    }
+                }));
+            }
+            for (Future<String> other : others) {
+                assertEquals("409 " + ChatbotService.QUESTION_IN_PROGRESS, other.get(5, TimeUnit.SECONDS));
+            }
+            releaseAi.countDown();
+            assertEquals("답", first.get(5, TimeUnit.SECONDS).answer());
+        } finally {
+            releaseAi.countDown();
+            pool.shutdownNow();
+        }
+        assertEquals(1, aiCalls.get());
+        verify(mapper).insertQuestionLog(2L, NOW, "Y");
+    }
+
+    @Test
+    @DisplayName("앞 질문이 끝나면(성공·실패 모두) 같은 사용자가 다시 물을 수 있고, 다른 사용자는 처리 중 잠금과 상관없다")
+    void inFlightIsReleased() {
+        when(mapper.countSuccessSince(anyLong(), eq(TODAY))).thenReturn(0);
+        when(openAi.complete(anyString(), anyString(), anyInt()))
+                .thenThrow(new ApiException(HttpStatus.BAD_GATEWAY, OpenAiClient.AI_FAILED, "실패"))
+                .thenReturn("두 번째 답", "다른 사람 답");
+
+        assertThrows(ApiException.class, () -> service.ask(2L, "첫 질문"));
+        assertEquals("두 번째 답", service.ask(2L, "다시 질문").answer());
+        assertEquals("다른 사람 답", service.ask(3L, "다른 사람 질문").answer());
     }
 
     @Test
