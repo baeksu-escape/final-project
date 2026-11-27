@@ -101,7 +101,8 @@ export default function GlossaryHelperDialog() {
   useEffect(() => {
     if (!open) return undefined
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      // 공통 Modal(aria-modal)이 떠 있으면 Esc는 그 Modal만 닫게 두고 패널은 그대로 둔다(PR 리뷰 11/27).
+      if (event.key === 'Escape' && !document.querySelector('[aria-modal="true"]')) {
         setOpen(false)
         fabRef.current?.focus()
       }
@@ -186,7 +187,7 @@ export default function GlossaryHelperDialog() {
       >
         <div className="gh-panel__head">
           <div>
-            <p className="gh-panel__tag">HELP</p>
+            <p className="gh-panel__tag">도움말</p>
             <h2 id={titleId} ref={titleRef} tabIndex={-1} className="gh-panel__title">금융 용어 도우미</h2>
           </div>
           <Button size="sm" onClick={close}>닫기 ×</Button>
