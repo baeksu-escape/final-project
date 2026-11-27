@@ -92,10 +92,15 @@ public class AuthService {
     //   없는 계정·탈퇴·비밀번호 없는 계정·틀린 비밀번호 → 401(어느 쪽이 틀렸는지 알리지 않음)
     //   잠긴 계정은 횟수를 세지 않고, 비밀번호가 맞을 때만 423으로 알린다(프론트 mock과 같은 순서). 관리자는 423 ADMIN_ACCOUNT_LOCKED(FP-258).
     //   5회째 실패하면 그때부터 5분 동안 비밀번호와 상관없이 429(제한 중에는 횟수를 올리지 않음). 10회째면 잠그고 423.
+    //   FP-258 13차 같은 계정 행을 잠근(lockUser) 뒤 다시 읽은 횟수로 판단한다. 동시에 보낸 로그인은 커밋까지 줄을 서므로 실패 횟수가 덜 오르지 않는다(FP-290).
     @Transactional(noRollbackFor = ApiException.class)
     public UserAccount authenticate(String loginId, String password) {
         // FP-258 가입 아이디는 소문자만 받으므로 소문자로 바꿔 조회한다.
-        UserAccount account = userMapper.selectByLoginId(AccountRules.normalizeLoginId(loginId));
+        String normalizedLoginId = AccountRules.normalizeLoginId(loginId);
+        UserAccount account = userMapper.selectByLoginId(normalizedLoginId);
+        if (account == null) throw AuthErrors.loginFailed();
+        userMapper.lockUser(account.getUserId());
+        account = userMapper.selectByLoginId(normalizedLoginId);
         if (account == null || account.isWithdrawn() || account.getPasswordHash() == null) throw AuthErrors.loginFailed();
         boolean passwordMatches = passwordEncoder.matches(password, account.getPasswordHash());
         if (account.isLocked()) {
@@ -222,13 +227,12 @@ public class AuthService {
         return new AuthResponses.Signup(account.getUserId());
     }
 
-    // N-02-2 가입 동의 3행(필수 2·선택 1, 더미 시드와 같은 모양).
-    // TODO(프론트) 지금 화면은 체크 하나(agreeCreditInfo)뿐이라 이용약관(TERMS_OF_SERVICE) 동의를 그 체크로 대신 기록한다 — 시연용 임시 처리다.
-    //   실제로 쓰기 전에 가입 화면에 필수 2개(이용약관·개인정보 수집·이용)와 선택 1개(점수 변동 알림·혜택 안내) 체크박스를 반드시 추가해야 한다.
+    // N-02-2 가입 동의 기록(USER_CONSENT). FP-258 13차 가입 화면이 필수 2개(이용약관·개인정보 수집·이용)와 선택 1개(점수 변동 알림·혜택 안내)를 따로 받는다.
+    //   필수 2개는 검사(validateSignup)를 통과해야 여기까지 오므로 동의(Y)로 남기고, 선택 동의는 체크했을 때만 남긴다(체크한 것만 기록).
     private void saveSignupConsents(long userId, boolean agreeMarketing, LocalDateTime now) {
         consentMapper.insertSignupConsent(userId, "TERMS_OF_SERVICE", "Y", "Y", now, now);
         consentMapper.insertSignupConsent(userId, "PRIVACY_COLLECTION", "Y", "Y", now, now);
-        consentMapper.insertSignupConsent(userId, "NOTIFICATION_MARKETING", "N", agreeMarketing ? "Y" : "N", agreeMarketing ? now : null, now);
+        if (agreeMarketing) consentMapper.insertSignupConsent(userId, "NOTIFICATION_MARKETING", "N", "Y", now, now);
     }
 
     // 가입 칸 검사 — 프론트 validateSignup과 같은 규칙·문구. 틀린 칸을 모두 모아 400 INVALID_INPUT으로 돌려준다.
@@ -255,7 +259,13 @@ public class AuthService {
         else if (!AccountRules.isValidPassword(r.password())) errors.add(new FieldErrorItem("password", "비밀번호 규칙을 모두 지켜 주세요."));
         String birthYearError = AccountRules.birthYearError(r.birthYear(), thisYear);
         if (birthYearError != null) errors.add(new FieldErrorItem("birthYear", birthYearError));
-        if (!Boolean.TRUE.equals(r.agreeCreditInfo())) errors.add(new FieldErrorItem("agreeCreditInfo", "필수 동의 항목입니다."));
+        // FP-258 13차 필수 동의 2개를 따로 받으면 칸도 따로 알린다. 예전 요청(agreeCreditInfo 하나)은 지금처럼 그 칸으로 알린다.
+        if (r.separateConsents()) {
+            if (!r.termsAgreed()) errors.add(new FieldErrorItem("agreeTerms", "필수 동의 항목입니다."));
+            if (!r.privacyAgreed()) errors.add(new FieldErrorItem("agreePrivacy", "필수 동의 항목입니다."));
+        } else if (!Boolean.TRUE.equals(r.agreeCreditInfo())) {
+            errors.add(new FieldErrorItem("agreeCreditInfo", "필수 동의 항목입니다."));
+        }
         if (!errors.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", errors.get(0).message(), errors);
     }
 

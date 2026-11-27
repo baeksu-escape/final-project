@@ -62,11 +62,16 @@ public class PhoneVerificationService {
         if (!AccountRules.isValidPhone(phone)) throw invalidPhone();
 
         LocalDateTime now = LocalDateTime.now(clock);
+        String target = hmac.phone(phone);
+        // FP-258 13차 같은 번호로 오늘(0시부터) 보낸 횟수가 상한이면 429(가입·아이디 찾기 목적을 함께 센다).
+        if (codeMapper.countSentSince(CHANNEL_PHONE, target, now.toLocalDate().atStartOfDay()) >= AuthErrors.DAILY_CODE_SEND_LIMIT) {
+            throw AuthErrors.codeSendDailyLimit("번호");
+        }
         String code = newCode();
         VerificationCode row = new VerificationCode();
         row.setPurposeCode(purpose.dbCode());
         row.setChannelCode(CHANNEL_PHONE);
-        row.setTargetHmac(hmac.phone(phone));
+        row.setTargetHmac(target);
         row.setCodeHash(passwordEncoder.encode(code));
         row.setExpiresAt(now.plusSeconds(CODE_TTL_SECONDS));
         row.setCreatedAt(now);

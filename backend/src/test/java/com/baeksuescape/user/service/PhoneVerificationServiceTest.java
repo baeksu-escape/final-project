@@ -105,6 +105,16 @@ class PhoneVerificationServiceTest {
         assertThat(value.getExpiresAt()).isEqualTo(NOW.plusSeconds(300));
     }
 
+    // FP-258 13차 N-02-3 같은 번호로 오늘 0시부터 10회 보냈으면 429이고 보내지 않는다(9회까지는 보낸다).
+    @Test
+    void 같은_번호로_오늘_10회_보냈으면_429이고_보내지_않는다() {
+        given(codeMapper.countSentSince("PHONE", HMAC.phone(PHONE), NOW.toLocalDate().atStartOfDay())).willReturn(9);
+        assertThat(codeOf(() -> service.send(new AuthRequests.PhoneSend(PHONE, "FIND_ID")))).isEqualTo("no error");
+        given(codeMapper.countSentSince("PHONE", HMAC.phone(PHONE), NOW.toLocalDate().atStartOfDay())).willReturn(10);
+        assertThat(codeOf(() -> service.send(new AuthRequests.PhoneSend(PHONE, "SIGNUP")))).startsWith("429 CODE_SEND_DAILY_LIMIT");
+        verify(codeMapper, org.mockito.Mockito.times(1)).insertCode(any());
+    }
+
     @Test
     void 번호_형식이_틀리거나_목적을_모르면_400() {
         assertThat(codeOf(() -> service.send(new AuthRequests.PhoneSend("02-123-4567", "SIGNUP")))).isEqualTo("400 INVALID_INPUT phone");

@@ -11,6 +11,7 @@ import {
   SOCIAL_PATHS,
 } from '../socialLoginConfig.js'
 import { authenticateMockAccount, findMockAccountByUserId } from './authMockHandlers.js'
+import { countMockFailures } from './authMockRateLimits.js'
 import { MOCK_SOCIAL_PROFILE, mockLinkKeys, mockSocialLinks, mockSocialSettings } from './socialLoginMockData.js'
 
 // 내준 일회용 코드 → 제공자 key. 교환하면 지운다.
@@ -71,7 +72,8 @@ registerMockHandlers({
     if (!mockLinkKeys.has(body?.linkKey)) {
       throw new ApiError(400, '소셜 로그인을 처음부터 다시 진행해 주세요.', { code: SOCIAL_ERROR_CODES.LINK_EXPIRED })
     }
-    const account = authenticateMockAccount(body.loginId, body.password)
+    // FP-258 13차 로그인과 같은 접속지별 실패 제한을 함께 센다.
+    const account = countMockFailures(() => authenticateMockAccount(body.loginId, body.password))
     if (account.user.role === ROLES.ADMIN) throw adminBlockedError()
     account.loginFailCount = 0
     account.lastLoginFailureAt = null

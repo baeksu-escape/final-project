@@ -10,8 +10,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.baeksuescape.user.dto.AuthRequests;
 import com.baeksuescape.user.dto.AuthResponses;
+import com.baeksuescape.user.service.ClientRateLimiter;
+import com.baeksuescape.user.service.ClientRateLimiter.Rule;
 import com.baeksuescape.user.service.social.SocialLoginService;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 // FP-87 N-01-6 간편 로그인 API (AUTH-04·05) + 시작 주소. 경로는 프론트 socialLoginConfig.js SOCIAL_API와 같다.
@@ -20,9 +23,11 @@ import jakarta.validation.Valid;
 public class SocialLoginController {
 
     private final SocialLoginService socialLoginService;
+    private final ClientRateLimiter rateLimiter;
 
-    public SocialLoginController(SocialLoginService socialLoginService) {
+    public SocialLoginController(SocialLoginService socialLoginService, ClientRateLimiter rateLimiter) {
         this.socialLoginService = socialLoginService;
+        this.rateLimiter = rateLimiter;
     }
 
     // N-01-6 시작 주소 — 브라우저가 이동해 오면 프론트 콜백(/oauth/callback?code=…)으로 돌려보낸다. 외부 제공자로 나가지 않는다.
@@ -38,8 +43,9 @@ public class SocialLoginController {
     }
 
     // AUTH-05 기존 계정에 연결
+    // FP-258 13차 아이디·비밀번호를 받으므로 로그인과 같은 IP 실패 제한을 함께 센다(ClientRateLimiter LOGIN_FAILURE).
     @PostMapping("/api/auth/social/link")
-    public AuthResponses.Login link(@Valid @RequestBody AuthRequests.SocialLink request) {
-        return socialLoginService.link(request);
+    public AuthResponses.Login link(@Valid @RequestBody AuthRequests.SocialLink request, HttpServletRequest http) {
+        return rateLimiter.countFailures(Rule.LOGIN_FAILURE, http.getRemoteAddr(), () -> socialLoginService.link(request));
     }
 }

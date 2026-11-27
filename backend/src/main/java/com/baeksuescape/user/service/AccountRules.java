@@ -32,6 +32,8 @@ public final class AccountRules {
     private static final Pattern PHONE = Pattern.compile("^01[016-9]\\d{7,8}$");
     private static final Pattern LETTER = Pattern.compile("[A-Za-z]");
     private static final Pattern DIGIT = Pattern.compile("\\d");
+    // FP-258 13차 N-02-4 새 비밀번호에 쓸 수 있는 글자 — ASCII 출력 문자(영문·숫자·키보드 기호)와 공백(프론트 filterPassword와 같음). 64자라 BCrypt 72바이트 안이다.
+    private static final Pattern PRINTABLE_ASCII = Pattern.compile("^[\\x20-\\x7E]*$");
 
     private AccountRules() {
     }
@@ -78,8 +80,9 @@ public final class AccountRules {
     }
 
     // 비밀번호: 영문과 숫자를 섞어 8자 이상(decisions.md 1-2). 기호는 요구하지 않는다.
+    // FP-258 13차 새 비밀번호(가입·재설정·변경·관리자 비밀번호 설정)에만 쓴다 — 64자 이하, ASCII 출력 문자만. 로그인·현재 비밀번호 확인·탈퇴는 이 검사를 하지 않는다.
     public static boolean isValidPassword(String value) {
-        return value != null && value.length() >= 8 && value.length() <= PASSWORD_MAX
+        return value != null && value.length() >= 8 && value.length() <= PASSWORD_MAX && PRINTABLE_ASCII.matcher(value).matches()
                 && LETTER.matcher(value).find() && DIGIT.matcher(value).find();
     }
 

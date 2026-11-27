@@ -41,6 +41,15 @@ public final class AuthErrors {
                 "로그인 시도가 너무 많습니다. " + minutes + "분 뒤에 다시 시도해 주세요.");
     }
 
+    // FP-258 13차 N-02-3 같은 이메일·휴대폰으로 하루에 보낼 수 있는 인증코드 수(가입·찾기·이메일 변경 등 모든 목적을 함께 센다, 관리자 로그인 번호 제외).
+    public static final int DAILY_CODE_SEND_LIMIT = 10;
+
+    // FP-258 13차 하루 발송 상한을 넘었을 때(429). target은 "이메일" 또는 "번호".
+    public static ApiException codeSendDailyLimit(String target) {
+        return new ApiException(HttpStatus.TOO_MANY_REQUESTS, "CODE_SEND_DAILY_LIMIT",
+                "오늘 이 " + target + "로 받을 수 있는 인증코드 " + DAILY_CODE_SEND_LIMIT + "회를 모두 받았습니다. 내일 다시 시도해 주세요.");
+    }
+
     public static ApiException accountNotFound() {
         return new ApiException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", NO_MATCH_MESSAGE);
     }

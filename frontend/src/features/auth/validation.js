@@ -6,9 +6,13 @@ export const PASSWORD_RULES = Object.freeze([
   { key: 'number', label: '숫자 포함', test: (value) => /\d/.test(value) },
 ])
 
-// 비밀번호가 모든 규칙을 지키는지 돌려준다.
+// FP-258 13차 N-02-4 새 비밀번호 최대 길이 — 서버 AccountRules.PASSWORD_MAX와 같다(BCrypt 72바이트 안).
+export const PASSWORD_MAX = 64
+
+// 비밀번호가 모든 규칙을 지키는지 돌려준다. FP-258 13차 64자 이하·ASCII 출력 문자만(서버 isValidPassword와 같음).
 export function isValidPassword(value) {
-  return PASSWORD_RULES.every((rule) => rule.test(value ?? ''))
+  const text = value ?? ''
+  return PASSWORD_RULES.every((rule) => rule.test(text)) && text.length <= PASSWORD_MAX && /^[\x20-\x7E]*$/.test(text)
 }
 
 // FP-258 N-02-1 이메일 형식 — 소문자로 바꾼 값을 '앞부분@도메인'으로 나눠 판정한다(서버 AccountRules.isValidEmail과 같은 규칙, 전체 100자 이하).
@@ -53,7 +57,7 @@ export function normalizeLoginId(value) {
 // FP-258 N-02-1 새 비밀번호: ASCII 출력 문자(영문·숫자·키보드 기호)와 공백만 남긴다. 보기 상태(type=text)에서 켜진 한글 IME 입력·붙여넣기를 막는다.
 // 공백은 지금 비밀번호 규칙(PASSWORD_RULES, 서버 isValidPassword)이 막지 않으므로 남긴다.
 export function filterPassword(value) {
-  return String(value ?? '').replace(/[^\x20-\x7E]/g, '')
+  return String(value ?? '').replace(/[^\x20-\x7E]/g, '').slice(0, PASSWORD_MAX)
 }
 // FP-258 N-02-1 두벌식 자판 기준으로 한글을 그 자리의 영문 키로 바꾼다(예: 가→rk, ㅂ→q). 가린 칸은 브라우저가 한글 IME를 끄므로, 보기 상태에서 친 한글도 같은 값이 되게 한다.
 const CHO_KEYS = ['r', 'R', 's', 'e', 'E', 'f', 'a', 'q', 'Q', 't', 'T', 'd', 'w', 'W', 'c', 'z', 'x', 'v', 'g']
@@ -270,7 +274,7 @@ export const SIGNUP_PENDING_MESSAGES = Object.freeze({
 })
 
 // N-02 가입 입력값 전체를 검사해 항목별 오류 객체를 돌려준다. 오류가 없으면 빈 객체.
-// form: { loginId, name, nickname, phoneMiddle, phoneLast, emailLocal, emailDomain, password, passwordConfirm, birthDate, agreeCreditInfo }
+// form: { loginId, name, nickname, phoneMiddle, phoneLast, emailLocal, emailDomain, password, passwordConfirm, birthDate, agreeTerms, agreePrivacy }
 //   emailDomain은 '직접 입력'까지 반영한 최종 도메인이다. 키 순서가 화면 칸 순서와 같아서, 첫 오류 칸을 찾을 때 이 순서를 쓴다.
 export function validateSignup(form, { emailVerified = false, phoneVerified = false, nicknameChecked = false, loginIdChecked = false } = {}) {
   const errors = {}
@@ -285,6 +289,7 @@ export function validateSignup(form, { emailVerified = false, phoneVerified = fa
   put('password', validateNewPassword(form.password, form.passwordConfirm).password)
   put('passwordConfirm', validatePasswordConfirm(form.password, form.passwordConfirm))
   put('birthDate', validateBirthDate(form.birthDate))
-  if (!form.agreeCreditInfo) errors.agreeCreditInfo = '필수 동의 항목입니다.'
+  // FP-258 13차 N-02-2 필수 동의 2개(이용약관·개인정보 수집·이용)를 모두 체크해야 한다. 선택 동의(agreeMarketing)는 보지 않는다.
+  if (!form.agreeTerms || !form.agreePrivacy) errors.agreements = '필수 동의 항목에 모두 동의해 주세요.'
   return errors
 }

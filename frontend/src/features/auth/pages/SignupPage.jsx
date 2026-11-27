@@ -4,7 +4,7 @@ import { useAuth } from '../../../common/auth/useAuth.js'
 import { PATHS } from '../../../common/config/navigation.js'
 import { Checkbox, DateSelect, FieldError, TextInput } from '../../../common/components/index.js'
 import { checkLoginIdAvailability, checkNicknameAvailability, requestSignup } from '../api/authFeatureApi.js'
-import { AUTH_ERROR_CODES, CREDIT_INFO_AGREEMENT_LABEL, EMAIL_PURPOSES, PHONE_PURPOSES, toAgeGroup } from '../authConstants.js'
+import { AUTH_ERROR_CODES, EMAIL_PURPOSES, PHONE_PURPOSES, SIGNUP_CONSENT_ITEMS, toAgeGroup } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
 import PasswordField from '../components/PasswordField.jsx'
@@ -42,11 +42,14 @@ const EMPTY_FORM = {
   password: '',
   passwordConfirm: '',
   birthDate: '',
-  agreeCreditInfo: false,
+  // FP-258 13차 N-02-2 필수 동의 2개(이용약관·개인정보 수집·이용)와 선택 동의 1개(점수 변동 알림·혜택 안내)
+  agreeTerms: false,
+  agreePrivacy: false,
+  agreeMarketing: false,
 }
 
 // 칸 순서(validateSignup 오류 키). [가입하기]에서 오류가 있으면 이 순서로 첫 오류 칸을 찾아 옮겨 간다.
-const FIELD_ORDER = ['loginId', 'name', 'nickname', 'phone', 'email', 'password', 'passwordConfirm', 'birthDate', 'agreeCreditInfo']
+const FIELD_ORDER = ['loginId', 'name', 'nickname', 'phone', 'email', 'password', 'passwordConfirm', 'birthDate', 'agreements']
 // 폼 값 키 → 검사 오류 키(휴대폰·이메일은 여러 칸이 오류 하나를 같이 쓴다).
 const ERROR_KEY_OF = {
   phoneMiddle: 'phone',
@@ -56,7 +59,8 @@ const ERROR_KEY_OF = {
   emailCustomDomain: 'email',
 }
 // 서버 칸별 오류 field → 화면 오류 키. 서버는 생일 대신 출생연도(birthYear)로 검사한다.
-const SERVER_FIELD_KEY = { birthYear: 'birthDate' }
+// FP-258 13차 필수 동의 칸 오류(agreeTerms·agreePrivacy, 예전 agreeCreditInfo)는 동의 묶음(agreements) 아래에 보인다.
+const SERVER_FIELD_KEY = { birthYear: 'birthDate', agreeTerms: 'agreements', agreePrivacy: 'agreements', agreeCreditInfo: 'agreements' }
 
 // 칸을 감싸는 요소의 id. 첫 오류 칸으로 옮겨 갈 때 이 id로 찾는다.
 const fieldWrapperId = (key) => `signup-field-${key}`
@@ -64,7 +68,7 @@ const fieldWrapperId = (key) => `signup-field-${key}`
 // 단계형 가입(토스 방식) — 한 화면에 한 가지 일. 제목은 질문형 두 줄, 칸은 그 단계에 필요한 것만.
 // fields는 검사 오류 키(FIELD_ORDER와 같은 이름)이고, [다음]은 그 단계 칸만 검사한다. 가입 요청은 마지막 단계에서 한 번만 보낸다.
 const SIGNUP_STEPS = [
-  { key: 'terms', title: ['Avenue를 시작하려면', '동의가 필요해요'], fields: ['agreeCreditInfo'], next: '동의하고 시작하기' },
+  { key: 'terms', title: ['Avenue를 시작하려면', '동의가 필요해요'], fields: ['agreements'], next: '동의하고 시작하기' },
   { key: 'identity', title: ['본인 확인을 위해', '휴대폰 인증을 시작할게요'], fields: ['name', 'birthDate', 'phone'], next: '다음' },
   { key: 'email', title: ['계정 안내를 받을', '이메일을 인증해 주세요'], fields: ['email'], next: '다음' },
   { key: 'account', title: ['로그인에 사용할', '아이디와 닉네임을 정해 주세요'], fields: ['loginId', 'nickname'], next: '다음' },
@@ -107,6 +111,8 @@ export default function SignupPage() {
   const [shownKeys, setShownKeys] = useState([])
   // 단계를 옮길 때 포커스를 줄 칸(없으면 그 단계 첫 입력)
   const [focusKey, setFocusKey] = useState(null)
+  // FP-258 13차 [보기]로 펼친 동의 항목(약관 전문 자리)
+  const [openConsent, setOpenConsent] = useState(null)
   // FP-258 비밀번호 보기·숨기기는 칸마다 따로 바뀐다(usePasswordReveal). 실패하면 보기 상태를 그대로 둔다.
   const { reveal, hideAll } = usePasswordReveal()
   const bindFilter = useImeSafeFilter()
@@ -253,7 +259,9 @@ export default function SignupPage() {
         password: form.password,
         birthYear,
         ageGroup: toAgeGroup(birthYear),
-        agreeCreditInfo: form.agreeCreditInfo,
+        agreeTerms: form.agreeTerms,
+        agreePrivacy: form.agreePrivacy,
+        agreeMarketing: form.agreeMarketing,
         emailVerificationToken: emailVerification.verificationToken,
         phoneVerificationToken: phoneVerification.verificationToken,
         ...(socialSignup?.linkKey ? { socialLinkKey: socialSignup.linkKey } : {}),
@@ -310,19 +318,41 @@ export default function SignupPage() {
   // 단계 칸 하나를 그린다(칸 모양·검사·인증은 예전 한 화면 가입과 같다)
   const renderField = (key) => {
     switch (key) {
-      case 'agreeCreditInfo':
+      case 'agreements': {
+        const allAgreed = SIGNUP_CONSENT_ITEMS.every((item) => form[item.key])
         return (
           <>
-            <div {...fieldProps('agreeCreditInfo')}>
-              <Checkbox
-                label={CREDIT_INFO_AGREEMENT_LABEL}
-                checked={form.agreeCreditInfo}
-                onChange={update('agreeCreditInfo')}
-                error={errorOf('agreeCreditInfo')}
-              />
+            {/* FP-258 13차 N-02-2 가입 동의 — [전체 동의] + 필수 2·선택 1. 필수 둘을 모두 체크해야 [동의하고 시작하기]가 켜진다.
+                칸을 오가는 중에는 안내를 띄우지 않으려고 손댄 칸 표시(onBlur)를 달지 않는다. 약관 전문은 아직 없어 [보기]는 자리만 있다. */}
+            <div id={fieldWrapperId('agreements')} className="signup-consent">
+              <div className="signup-consent__all">
+                <Checkbox
+                  label="전체 동의"
+                  checked={allAgreed}
+                  onChange={(checked) => patchForm(Object.fromEntries(SIGNUP_CONSENT_ITEMS.map((item) => [item.key, checked])))}
+                />
+              </div>
+              {SIGNUP_CONSENT_ITEMS.map((item) => (
+                <div key={item.key} className="signup-consent__item">
+                  <div className="signup-consent__row">
+                    <Checkbox label={item.label} checked={form[item.key]} onChange={update(item.key)} />
+                    <button
+                      type="button"
+                      className="signup-consent__view"
+                      aria-expanded={openConsent === item.key}
+                      onClick={() => setOpenConsent((prev) => (prev === item.key ? null : item.key))}
+                    >
+                      보기
+                    </button>
+                  </div>
+                  {openConsent === item.key && <p className="form-field__hint">약관 전문은 준비 중입니다.</p>}
+                </div>
+              ))}
+              <FieldError message={errorOf('agreements')} />
             </div>
           </>
         )
+      }
       case 'name':
         return (
           <>

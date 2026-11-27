@@ -13,9 +13,9 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -25,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -108,7 +109,9 @@ class AuthServiceTest {
         given(userMapper.selectByLoginId("demo_employee")).willReturn(UserFixtures.user(7L, "demo_employee"));
         AuthResponses.Login result = (AuthResponses.Login) service.login(new AuthRequests.Login(" Demo_Employee ", PASSWORD));
         assertThat(tokenProvider.parse(result.accessToken())).isPresent();
-        verify(userMapper).selectByLoginId("demo_employee");
+        // FP-258 13차 행을 잠근 뒤 한 번 더 읽으므로 두 번 모두 소문자 아이디로 조회한다.
+        verify(userMapper, org.mockito.Mockito.times(2)).selectByLoginId("demo_employee");
+        verify(userMapper, never()).selectByLoginId(" Demo_Employee ");
     }
 
     @Test
@@ -131,6 +134,38 @@ class AuthServiceTest {
                     assertThat(e.getMessage()).contains("5분");
                 });
         verify(userMapper).updateLoginFailure(eq(7L), eq(5), eq(false), any());
+    }
+
+    // FP-258 13차 FP-290 동시 로그인 순서 재현 — 잠그기 전에 읽은 횟수(3회)는 다른 요청이 그사이 올렸을 수 있다.
+    // 행을 잠근(lockUser) 뒤 다시 읽은 횟수(앞선 요청이 커밋한 4회)에 1을 더해 5회째 429가 되어야 한다(예전에는 3+1=4로 덜 올라갔다).
+    @Test
+    void 동시에_보낸_실패는_행을_잠근_뒤_다시_읽은_횟수로_센다() {
+        UserAccount readBeforeLock = UserFixtures.user(7L, "employee");
+        readBeforeLock.setLoginFailCount(3);
+        UserAccount readAfterLock = UserFixtures.user(7L, "employee");
+        readAfterLock.setLoginFailCount(4);
+        given(userMapper.selectByLoginId("employee")).willReturn(readBeforeLock, readAfterLock);
+
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))).isEqualTo("429 LOGIN_TEMPORARILY_BLOCKED");
+        InOrder order = inOrder(userMapper);
+        order.verify(userMapper).selectByLoginId("employee");
+        order.verify(userMapper).lockUser(7L);
+        order.verify(userMapper).selectByLoginId("employee");
+        order.verify(userMapper).updateLoginFailure(eq(7L), eq(5), eq(false), any());
+    }
+
+    // FP-258 13차 앞선 요청이 5회째로 제한을 건 뒤 잠금이 풀린 요청은, 다시 읽은 값으로 제한 중임을 알고 횟수를 올리지 않는다.
+    @Test
+    void 잠금을_기다린_요청은_앞선_요청이_건_5분_제한을_보고_횟수를_올리지_않는다() {
+        UserAccount readBeforeLock = UserFixtures.user(7L, "employee");
+        readBeforeLock.setLoginFailCount(4);
+        UserAccount readAfterLock = UserFixtures.user(7L, "employee");
+        readAfterLock.setLoginFailCount(5);
+        readAfterLock.setLastLoginFailAt(java.time.LocalDateTime.now(CLOCK));
+        given(userMapper.selectByLoginId("employee")).willReturn(readBeforeLock, readAfterLock);
+
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("employee", "wrong1234")))).isEqualTo("429 LOGIN_TEMPORARILY_BLOCKED");
+        verify(userMapper, never()).updateLoginFailure(anyLong(), anyInt(), anyBoolean(), any());
     }
 
     @Test
@@ -291,7 +326,7 @@ class AuthServiceTest {
     private static AuthRequests.Signup signup(String name, String nickname, Integer birthYear, String phone, Boolean agree, String socialLinkKey,
             String phoneToken) {
         return new AuthRequests.Signup("newbie01", name, nickname, phone, "Newbie@Example.com", "abcd1234", birthYear, "AGE_30S",
-                agree, null, "token", socialLinkKey, phoneToken);
+                agree, null, "token", socialLinkKey, phoneToken, null, null);
     }
 
     private void givenInsertReturnsId(long userId) {
@@ -302,7 +337,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void 가입하면_암호문_HMAC_동의_3행을_저장하고_인증_토큰을_쓴다() {
+    void 가입하면_암호문_HMAC_필수_동의를_저장하고_인증_토큰을_쓴다() {
         givenInsertReturnsId(100L);
         AuthResponses.Signup result = service.signup(signup("  새닉네임  ", 1990, PHONE, true, null));
 
@@ -321,7 +356,41 @@ class AuthServiceTest {
         verify(phoneVerification).consume(PHONE_TOKEN, PhonePurpose.SIGNUP, "01012345678");
         verify(consentMapper).insertSignupConsent(eq(100L), eq("TERMS_OF_SERVICE"), eq("Y"), eq("Y"), any(), any());
         verify(consentMapper).insertSignupConsent(eq(100L), eq("PRIVACY_COLLECTION"), eq("Y"), eq("Y"), any(), any());
-        verify(consentMapper).insertSignupConsent(eq(100L), eq("NOTIFICATION_MARKETING"), eq("N"), eq("N"), isNull(), any());
+        // FP-258 13차 선택 동의는 체크했을 때만 기록한다.
+        verify(consentMapper, never()).insertSignupConsent(eq(100L), eq("NOTIFICATION_MARKETING"), any(), any(), any(), any());
+    }
+
+    // FP-258 13차 N-02-2 필수 동의 2개·선택 1개를 따로 받는다 — 필수가 빠지면 그 칸 400, 모두 체크하면 3행(선택은 Y).
+    @Test
+    void 필수_동의를_따로_받아_빠진_칸을_알리고_체크한_것만_기록한다() {
+        AuthRequests.Signup noPrivacy = consentSignup(true, false, false);
+        assertThat(fieldOf(() -> service.signup(noPrivacy))).isEqualTo("agreePrivacy");
+        AuthRequests.Signup noTerms = consentSignup(false, true, true);
+        assertThat(fieldOf(() -> service.signup(noTerms))).isEqualTo("agreeTerms");
+        verify(userMapper, never()).insertUser(any());
+
+        givenInsertReturnsId(100L);
+        service.signup(consentSignup(true, true, true));
+        verify(consentMapper).insertSignupConsent(eq(100L), eq("TERMS_OF_SERVICE"), eq("Y"), eq("Y"), any(), any());
+        verify(consentMapper).insertSignupConsent(eq(100L), eq("PRIVACY_COLLECTION"), eq("Y"), eq("Y"), any(), any());
+        verify(consentMapper).insertSignupConsent(eq(100L), eq("NOTIFICATION_MARKETING"), eq("N"), eq("Y"), any(), any());
+    }
+
+    private static AuthRequests.Signup consentSignup(boolean terms, boolean privacy, boolean marketing) {
+        return new AuthRequests.Signup("newbie01", "홍길동", "새닉네임", PHONE, "newbie@example.com", "abcd1234", 1990, "AGE_30S",
+                null, marketing, "token", null, PHONE_TOKEN, terms, privacy);
+    }
+
+    // FP-258 13차 N-02-4 서버도 새 비밀번호를 화면과 같은 규칙으로 본다 — 한글·이모지 같은 ASCII 밖 글자, 64자 초과는 password 칸 400. 공백·기호는 된다.
+    @Test
+    void 새_비밀번호는_ASCII_출력_문자_64자_이하만_받는다() {
+        for (String password : new String[] { "abcd1234한", "abcd1234é", "abcd1234	", "a1" + "b".repeat(63) }) {
+            AuthRequests.Signup request = new AuthRequests.Signup("newbie01", "홍길동", "새닉네임", PHONE, "newbie@example.com", password, 1990,
+                    "AGE_30S", true, null, "token", null, PHONE_TOKEN, null, null);
+            assertThat(fieldOf(() -> service.signup(request))).as(password).isEqualTo("password");
+        }
+        assertThat(AccountRules.isValidPassword("ab cd!@#1234")).isTrue();
+        assertThat(AccountRules.isValidPassword("a1" + "b".repeat(62))).isTrue();
     }
 
     @Test
@@ -445,7 +514,7 @@ class AuthServiceTest {
         for (String email : new String[] { "홍길동@example.com", "a..b@example.com", ".ab@example.com", "ab.@example.com", "a+b@example.com",
                 "ab@ex_ample.com", "ab@-example.com", "ab@example.c", "ab@example.c1", "ab@example" }) {
             AuthRequests.Signup request = new AuthRequests.Signup("newbie01", "홍길동", "새닉네임", PHONE, email, "abcd1234", 1990, "AGE_30S",
-                    true, null, "token", null, PHONE_TOKEN);
+                    true, null, "token", null, PHONE_TOKEN, null, null);
             assertThat(fieldOf(() -> service.signup(request))).as(email).isEqualTo("email");
         }
         verify(userMapper, never()).insertUser(any());

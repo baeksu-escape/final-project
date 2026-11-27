@@ -175,6 +175,29 @@ class UserApiContractTest {
                 .andExpect(jsonPath("$.available").value(false));
     }
 
+    // FP-258 13차 같은 IP가 중복 확인을 1분에 30회 넘게 부르면 31회째는 429 TOO_MANY_REQUESTS이고 문구를 그대로 준다(다른 시험과 섞이지 않게 IP를 따로 쓴다).
+    @Test
+    void 같은_IP의_중복_확인이_1분에_30회를_넘으면_429() throws Exception {
+        given(authService.checkLoginId(any())).willReturn(new AuthResponses.LoginIdAvailability(true));
+        for (int i = 0; i < 30; i++) {
+            mvc.perform(json(post("/api/auth/login-id/check"), "{\"loginId\":\"newbie01\"}").with(remoteAddr("10.13.0.1")))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(json(post("/api/auth/login-id/check"), "{\"loginId\":\"newbie01\"}").with(remoteAddr("10.13.0.1")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("TOO_MANY_REQUESTS"))
+                .andExpect(jsonPath("$.message").value("확인 요청이 너무 많습니다. 1분 뒤에 다시 시도해 주세요."));
+        mvc.perform(json(post("/api/auth/nickname/check"), "{\"nickname\":\"테스트닉\"}").with(remoteAddr("10.13.0.2")))
+                .andExpect(status().isOk());
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor remoteAddr(String ip) {
+        return request -> {
+            request.setRemoteAddr(ip);
+            return request;
+        };
+    }
+
     @Test
     void 휴대폰_인증_발송과_확인은_토큰_없이_부르고_이메일과_같은_모양이다() throws Exception {
         given(phoneVerification.send(any())).willReturn(new AuthResponses.PhoneSent(300));

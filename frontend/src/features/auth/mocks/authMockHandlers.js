@@ -37,6 +37,7 @@ import {
   MOCK_PHONE_CODE,
   MOCK_PHONE_CODE_TTL_SECONDS,
 } from './authMockData.js'
+import { countMockDailySend, countMockFailures, hitMockRate } from './authMockRateLimits.js'
 import { mockLinkKeys } from './socialLoginMockData.js'
 import { startAdminLoginChallenge } from '../../admin/mocks/adminLoginChallenges.js'
 
@@ -223,7 +224,8 @@ registerMockHandlers({
   // FP-80 관리자는 토큰 대신 2단계 인증 시작 응답 { twoFactorRequired, challengeToken, maskedEmail }을 받는다(1분 안에 다시 부르면 429).
   'POST /api/auth/login': ({ body }) => {
     if (!body?.loginId || !body?.password) throw new ApiError(400, '아이디와 비밀번호를 입력해 주세요.')
-    const account = authenticateMockAccount(body.loginId, body.password)
+    // FP-258 13차 같은 접속지(mock은 이 탭)의 로그인 실패가 많으면 계정과 상관없이 429(서버 ClientRateLimiter LOGIN_FAILURE).
+    const account = countMockFailures(() => authenticateMockAccount(body.loginId, body.password))
     account.loginFailCount = 0
     account.lastLoginFailureAt = null
     if (account.user.role === ROLES.ADMIN) return startAdminLoginChallenge(account)
@@ -236,6 +238,8 @@ registerMockHandlers({
   // N-02·N-03 인증코드 발송 — 가입·이메일 변경(N-04-3) 목적이면 이미 가입된 이메일을 막는다. 재설정 목적은 계정이 있는지 알려 주지 않는다.
   // FP-258 이메일은 서버처럼 앞뒤 공백을 빼고 소문자로 바꾼 뒤 판정·저장한다(발송·확인·가입·찾기·재설정 모두 같다).
   'POST /api/auth/email/send': ({ body }) => {
+    // FP-258 13차 접속지별 1시간 요청 제한(CODE_SEND), 같은 이메일 하루 10회 상한(형식·중복 검사 뒤, 보내기 전)
+    hitMockRate('CODE_SEND')
     const email = normalizeEmail(body?.email)
     // FP-258 새 이메일 규칙은 가입·이메일 변경만. 아이디·비밀번호 찾기는 기존 이메일(+ 등)도 찾도록 기본 형식만 본다(서버 EmailPurpose.usesNewEmailRule).
     const blocksUsedEmail = body?.purpose === EMAIL_PURPOSES.SIGNUP || body?.purpose === EMAIL_PURPOSES.CHANGE_EMAIL
@@ -243,6 +247,7 @@ registerMockHandlers({
     if (blocksUsedEmail && accounts.some((item) => item.email === email)) {
       throw new ApiError(409, '이미 가입된 이메일입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_EMAIL })
     }
+    countMockDailySend('EMAIL', email, '이메일')
     sentCodes.set(`${body.purpose}:${email}`, Date.now() + MOCK_EMAIL_CODE_TTL_SECONDS * 1000)
     return { expiresInSeconds: MOCK_EMAIL_CODE_TTL_SECONDS }
   },
@@ -274,6 +279,8 @@ registerMockHandlers({
 
   // N-02-1 닉네임 중복 확인 — 형식이 틀리면 400(칸별 오류), 아니면 계정 목록(탈퇴 표시값 포함)의 닉네임과 비교한다.
   'POST /api/auth/nickname/check': ({ body }) => {
+    // FP-258 13차 접속지별 1분 확인 제한(AVAILABILITY_CHECK, 아이디 확인과 함께 센다)
+    hitMockRate('AVAILABILITY_CHECK')
     const nicknameError = validateNickname(body?.nickname)
     if (nicknameError) throw fieldError('nickname', nicknameError)
     const nickname = body.nickname.trim()
@@ -282,6 +289,7 @@ registerMockHandlers({
 
   // AUTH-16 N-02-1 아이디 중복 확인(FP-258) — 형식이 틀리면 400(loginId 칸), 아니면 가입 mock과 같은 기준(계정 목록의 아이디 그대로)으로 비교한다.
   'POST /api/auth/login-id/check': ({ body }) => {
+    hitMockRate('AVAILABILITY_CHECK')
     const loginIdError = validateLoginId(body?.loginId)
     if (loginIdError) throw fieldError('loginId', loginIdError)
     return { available: !accounts.some((item) => item.loginId === body.loginId) }
@@ -289,9 +297,11 @@ registerMockHandlers({
 
   // N-02 휴대폰 인증번호 발송 — 이메일 발송 mock과 같은 구조. 실제 문자는 보내지 않고 고정 코드(MOCK_PHONE_CODE)를 쓴다.
   'POST /api/auth/phone/send': ({ body }) => {
+    hitMockRate('CODE_SEND')
     const phone = normalizePhone(body?.phone)
     if (!isValidPhone(phone)) throw fieldError('phone', '휴대폰 번호 형식이 올바르지 않습니다. 예) 010-1234-5678')
     if (!Object.values(PHONE_PURPOSES).includes(body.purpose)) throw fieldError('purpose', '인증 목적이 올바르지 않습니다.')
+    countMockDailySend('PHONE', phone, '번호')
     sentPhoneCodes.set(`${body.purpose}:${phone}`, Date.now() + MOCK_PHONE_CODE_TTL_SECONDS * 1000)
     return { expiresInSeconds: MOCK_PHONE_CODE_TTL_SECONDS }
   },
@@ -313,7 +323,10 @@ registerMockHandlers({
 
   // N-02 회원가입 — 직군은 받지 않으므로 jobType은 null로 만든다(로그인 후 직군 선택 화면으로 간다).
   'POST /api/auth/signup': ({ body }) => {
-    if (body?.agreeCreditInfo !== true) throw new ApiError(400, '필수 동의 항목에 동의해 주세요.')
+    // FP-258 13차 N-02-2 필수 동의 2개를 따로 받는다(agreeTerms·agreePrivacy). 둘 다 없으면 예전 요청처럼 agreeCreditInfo 하나로 본다(서버와 같음).
+    const separateConsents = body?.agreeTerms !== undefined || body?.agreePrivacy !== undefined
+    const agreed = separateConsents ? body.agreeTerms === true && body.agreePrivacy === true : body?.agreeCreditInfo === true
+    if (!agreed) throw new ApiError(400, '필수 동의 항목에 동의해 주세요.')
     if (!isValidPassword(body.password)) throw new ApiError(400, '비밀번호 규칙을 지켜 주세요.')
     // 이름은 완성형 한글 2~20자 — 화면과 같은 규칙(validateName)이다.
     const nameError = validateName(body.name)

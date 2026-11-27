@@ -16,8 +16,9 @@ public final class AuthRequests {
 
     // AUTH-06 회원가입. 칸별 검사는 AuthService가 한 번에 한다(프론트와 같은 문구).
     //   ageGroup: 프론트가 birthYear로 계산해 함께 보내지만 서버는 쓰지 않는다(프론트 TODO(D-20)와 같음).
-    //   agreeCreditInfo: 지금 화면의 체크 하나. 시연용 임시로 필수 동의 2개(이용약관·개인정보)를 함께 기록한다.
-    //   agreeMarketing: 선택 동의(새 필드). 화면에 아직 없어 보내지 않으면 미동의로 기록한다.
+    //   FP-258 13차 N-02-2 agreeTerms·agreePrivacy: 필수 동의 2개(서비스 이용약관, 개인정보 수집·이용)를 따로 받는다. 둘 다 true여야 가입된다.
+    //   agreeCreditInfo: 예전 화면의 체크 하나. agreeTerms·agreePrivacy가 없는 예전 요청이면 이 체크를 필수 2개로 본다.
+    //   agreeMarketing: 선택 동의(점수 변동 알림·혜택 안내). 보내지 않으면 미동의다.
     //   phoneVerificationToken: 휴대폰 인증 확인(phone/verify)에서 받은 토큰. 필수(11/18 1차 시연 후속).
     public record Signup(
             String loginId,
@@ -32,7 +33,22 @@ public final class AuthRequests {
             Boolean agreeMarketing,
             String emailVerificationToken,
             String socialLinkKey,
-            String phoneVerificationToken) {
+            String phoneVerificationToken,
+            Boolean agreeTerms,
+            Boolean agreePrivacy) {
+
+        // FP-258 13차 필수 동의를 따로 보낸 새 요청인지(아니면 agreeCreditInfo 하나로 본다)
+        public boolean separateConsents() {
+            return agreeTerms != null || agreePrivacy != null;
+        }
+
+        public boolean termsAgreed() {
+            return separateConsents() ? Boolean.TRUE.equals(agreeTerms) : Boolean.TRUE.equals(agreeCreditInfo);
+        }
+
+        public boolean privacyAgreed() {
+            return separateConsents() ? Boolean.TRUE.equals(agreePrivacy) : Boolean.TRUE.equals(agreeCreditInfo);
+        }
     }
 
     // N-02-1 닉네임 중복 확인. 형식 검사는 서비스가 칸별 오류로 한다(화면과 같은 문구).

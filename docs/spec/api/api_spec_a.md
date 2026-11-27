@@ -3,6 +3,7 @@
 > A팀(우찬·경환) API의 요청·응답 상세다. 관리: A팀. 작성 규칙은 [README](README.md) 3장, 전체 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > - **원본:** 우찬 님 「A팀 API 명세 — 반영 요청(11/16)」. develop `bfe6b94`(PR #50·#52·#53 병합 후)의 실제 Spring Controller·DTO에서 뽑은 내용이다. 🆕 11/18 이 파일로 옮겼다(그 전에는 정의서에 요약만 있었다). 그 뒤 코드가 바뀌면 A팀이 이 파일을 고친다.
+> - 🆕 최근 변경 (11/27, FP-258 13차-1): 같은 IP 반복 시도 제한 429 `TOO_MANY_REQUESTS`(AUTH-01·05·07·13·14·16), 인증코드 하루 10회 상한 429 `CODE_SEND_DAILY_LIMIT`(AUTH-07·14), AUTH-06 필수 동의 2개 따로 받기(`agreeTerms`·`agreePrivacy`), 새 비밀번호 ASCII 출력 문자만(AUTH-06·10, MEM-04), AUTH-01·05 실패 횟수를 계정 행 잠금으로 셈
 > - 🆕 최근 변경 (11/27, FP-258 12차): AUTH-16 아이디 중복 확인 추가(가입 4단계 [중복 확인], AUTH-13과 같은 모양)
 > - 🆕 최근 변경 (11/27, FP-258 PR #164 검수): AUTH-01·05 잠긴 관리자 423 `ADMIN_ACCOUNT_LOCKED`, AUTH-07 목적별 이메일 형식(가입·이메일 변경만 새 규칙), AUTH-14·15 `purpose` 설명 정정
 > - 🆕 최근 변경 (11/26, FP-258): AUTH-01 단계적 로그인 제한(429 `LOGIN_TEMPORARILY_BLOCKED`, 10회 잠금), AUTH-09 휴대폰·이메일 인증 필수와 `loginId` 응답, AUTH-08·10 `name` 추가, 인증 목적 `FIND_ID`(DDL C16). 2차: 이메일 규칙 통일·소문자 저장(AUTH-06·07·08·09·10, MEM-03), AUTH-08(재설정)·09·10 이름 형식 400 `name` 칸, AUTH-01 아이디 소문자 조회
@@ -52,7 +53,7 @@
 | AUTH-13 | `POST /api/auth/nickname/check` | `{ nickname }` | `{ available }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) |
 | AUTH-14 | `POST /api/auth/phone/send` | `{ phone, purpose }` | `{ expiresInSeconds }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) 🆕 11/26 `purpose`는 `SIGNUP`·`FIND_ID` |
 | AUTH-15 | `POST /api/auth/phone/verify` | `{ phone, code, purpose }` | `{ verificationToken }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) 🆕 11/26 `FIND_ID` 토큰은 AUTH-09에 넣음 |
-| AUTH-16 🆕 11/27 | `POST /api/auth/login-id/check` | `{ loginId }` | `{ available }` | 없음 | ✅ (FP-258 12차) 정의서(api_definition.md) 행 추가 필요 |
+| AUTH-16 🆕 11/27 | `POST /api/auth/login-id/check` | `{ loginId }` | `{ available }` | 없음 | ✅ (FP-258 12차, 🆕 11/27 13차-1 정의서 행 추가) |
 
 - `user` = `{ userId, name, role, jobType, hasScore }`
 - AUTH-11·12의 토큰 필드 이름은 `token`이다(AUTH-01은 `accessToken`). 화면은 둘 다 받는다.
@@ -66,7 +67,13 @@
 - 🆕 11/27 **AUTH-16 아이디 중복 확인**(FP-258): AUTH-13과 같은 모양이고, 아이디를 주소에 남기지 않으려고 POST로 받는다.
   - 형식은 AUTH-06과 같다(영문 소문자로 시작하는 4~20자 영문 소문자·숫자). 비거나 틀리면 400 `INVALID_INPUT`(`loginId` 칸, 가입과 같은 문구)이고 DB는 보지 않는다.
   - 중복 기준은 가입 중복 검사와 같다(`countByLoginId`, 받은 값 그대로 비교). 탈퇴 회원 아이디는 표시값으로 덮여 있어 잡히지 않는다.
-  - 결과는 안내용이고, 가입 때 서버가 다시 막는다(409 `DUPLICATE_LOGIN_ID`). 반복 조회 제한은 AUTH-13처럼 없다.
+  - 결과는 안내용이고, 가입 때 서버가 다시 막는다(409 `DUPLICATE_LOGIN_ID`). 🆕 11/27 13차-1 같은 IP는 AUTH-13과 합쳐 1분 30회까지(넘으면 429 `TOO_MANY_REQUESTS`).
+- 🆕 11/27 **FP-258 13차-1 인증 보안**(멘토링 반영, DB 변경 없음)
+  - **같은 IP 반복 시도 제한**(서버 메모리 `ClientRateLimiter`, 서버를 다시 켜면 초기화, 서버가 여러 대면 대마다 따로 셈): AUTH-01·05 실패(401)는 10분 20회, AUTH-13·16은 1분 30회, AUTH-07·14는 1시간 20회. 넘으면 429 `TOO_MANY_REQUESTS`, 문구는 "로그인 시도가 너무 많습니다. / 확인 요청이 너무 많습니다. / 인증코드 요청이 너무 많습니다." + " N분 뒤에 다시 시도해 주세요."(N은 남은 분 올림). IP는 `getRemoteAddr()`로 읽으므로 프록시 뒤에서는 서버의 forward-headers 설정이 필요하다.
+  - **인증코드 하루 상한**(AUTH-07·14): 같은 이메일·휴대폰으로 오늘 0시부터 10회 보냈으면 429 `CODE_SEND_DAILY_LIMIT`("오늘 이 이메일(번호)로 받을 수 있는 인증코드 10회를 모두 받았습니다. 내일 다시 시도해 주세요."). `VERIFICATION_CODE`의 발송 기록으로 세고, 목적(가입·찾기·재설정·이메일 변경)을 가리지 않는다. 관리자 로그인 번호는 세지 않는다.
+  - **AUTH-06 동의**: `agreeTerms`(서비스 이용약관)·`agreePrivacy`(개인정보 수집·이용)는 필수, `agreeMarketing`(점수 변동 알림·혜택 안내)은 선택이다. 필수가 빠지면 400 `INVALID_INPUT`(그 칸). `USER_CONSENT`에는 필수 2개와, 체크했을 때만 선택 동의를 남긴다. 두 필드가 없는 예전 요청은 `agreeCreditInfo` 하나를 필수 2개로 본다(칸 이름도 `agreeCreditInfo`).
+  - **새 비밀번호**(AUTH-06·10, AUTH-12, MEM-04): 영문·숫자를 섞은 8~64자이고 ASCII 출력 문자(영문·숫자·키보드 기호·공백)만 쓸 수 있다. 틀리면 지금처럼 400(`password` 또는 `newPassword` 칸). 로그인·현재 비밀번호 확인·탈퇴는 검사하지 않는다.
+  - **AUTH-01·05 실패 횟수**: 같은 계정의 로그인은 계정 행을 잠근(`SELECT … FOR UPDATE`) 뒤 다시 읽은 횟수로 판단해, 동시에 보내도 덜 오르지 않는다(5회째 5분 제한·10회 잠금 규칙은 그대로).
 - 🆕 11/26 **FP-258 2차 이메일 규칙**(AUTH-06·07·08·09·10, MEM-03 공통): 앞뒤 공백을 빼고 소문자로 바꾼 뒤 판정·저장한다(`EMAIL_ENC`도 소문자).
   - 앞부분은 영문 소문자·숫자·`.`·`_`·`-`(64자)이고, 처음·끝은 영문·숫자, 점 연속은 안 된다.
   - 도메인은 점으로 나눈 덩어리마다 영문·숫자로 시작·끝(가운데 `-` 가능)하고, 마지막은 영문 2자 이상이다. 전체는 100자 이하.
@@ -189,6 +196,8 @@
 | 423 | `ADMIN_ACCOUNT_LOCKED` 🆕 11/27 | 잠긴 관리자 계정이 맞는 비밀번호로 로그인(AUTH-01·05) — "잠긴 관리자 계정입니다. 다른 관리자에게 잠금 해제를 요청해 주세요." |
 | 429 | `CODE_RESEND_TOO_SOON` | 인증번호 1분 안에 재요청 |
 | 429 | `LOGIN_TEMPORARILY_BLOCKED` 🆕 11/26 | 로그인 5회 실패 뒤 5분 제한(AUTH-01·05) — "로그인 시도가 너무 많습니다. N분 뒤에 다시 시도해 주세요." |
+| 429 | `TOO_MANY_REQUESTS` 🆕 11/27 | 같은 IP 반복 시도 제한(AUTH-01·05 실패, AUTH-13·16, AUTH-07·14) — "… 요청이 너무 많습니다. N분 뒤에 다시 시도해 주세요." |
+| 429 | `CODE_SEND_DAILY_LIMIT` 🆕 11/27 | 같은 이메일·휴대폰 인증코드 하루 10회 초과(AUTH-07·14) |
 | 503 | `ALT_DATA_SOURCE_UNAVAILABLE` | 기관 응답 파일 폴더 없음 |
 
 ## 6. 2차로 넘긴 것

@@ -111,6 +111,19 @@ class EmailVerificationServiceTest {
         assertThat(saved.getValue().getPurposeCode()).isEqualTo("FIND_PASSWORD");
     }
 
+    // FP-258 13차 N-02-3 같은 이메일로 오늘 0시부터 10회 보냈으면 429이고 보내지 않는다. 가입 여부와 상관없이 보내는 아이디 찾기(FIND_ID)도 같다.
+    @Test
+    void 같은_이메일로_오늘_10회_보냈으면_목적과_상관없이_429() {
+        LocalDateTime today = LocalDateTime.now(CLOCK).toLocalDate().atStartOfDay();
+        given(codeMapper.countSentSince("EMAIL", HMAC.email(EMAIL), today)).willReturn(10);
+        for (String purpose : new String[] { "FIND_ID", "RESET_PASSWORD", "SIGNUP" }) {
+            assertThat(codeOf(() -> service.send(new AuthRequests.EmailSend(EMAIL, purpose, "newbie01")))).as(purpose)
+                    .isEqualTo("429 CODE_SEND_DAILY_LIMIT");
+        }
+        verify(codeMapper, never()).insertCode(any());
+        assertThat(sentCodes).isEmpty();
+    }
+
     @Test
     void 모르는_목적과_틀린_이메일_형식은_400() {
         assertThat(codeOf(() -> service.send(new AuthRequests.EmailSend(EMAIL, "UNKNOWN", null)))).isEqualTo("400 INVALID_INPUT");

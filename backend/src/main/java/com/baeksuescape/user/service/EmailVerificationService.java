@@ -73,6 +73,10 @@ public class EmailVerificationService {
         if (purpose.blocksUsedEmail() && userMapper.countByEmailHmac(target) > 0) throw AuthErrors.duplicateEmail();
 
         LocalDateTime now = LocalDateTime.now(clock);
+        // FP-258 13차 같은 이메일로 오늘(0시부터) 보낸 횟수가 상한이면 429. 가입 여부와 상관없이 보내는 목적(FIND_ID·RESET_PASSWORD)도 같이 센다.
+        if (codeMapper.countSentSince(CHANNEL_EMAIL, target, now.toLocalDate().atStartOfDay()) >= AuthErrors.DAILY_CODE_SEND_LIMIT) {
+            throw AuthErrors.codeSendDailyLimit("이메일");
+        }
         String code = newCode();
         VerificationCode row = new VerificationCode();
         row.setPurposeCode(purpose.dbCode());

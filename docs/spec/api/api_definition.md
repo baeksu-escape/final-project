@@ -140,9 +140,10 @@
 | AUTH-13 | `POST /api/auth/nickname/check` | N-02-1 닉네임 중복 확인 `{ nickname }` → `{ available }` (주소에 닉네임을 남기지 않으려고 POST, 가입 때 서버가 다시 막음) | `APP_USER` | 없음 | ✅ (FP-219, PR #89) |
 | AUTH-14 | `POST /api/auth/phone/send` | N-02-3 휴대폰 인증번호 발송 `{ phone, purpose }` → `{ expiresInSeconds }` (`purpose`는 `SIGNUP`·`FIND_ID`(🆕 11/26 아이디 찾기, FP-258), 실제 문자 발송 없음 — 개발용 로그·고정 번호) | `VERIFICATION_CODE`(`PHONE`) | 없음 | ✅ (FP-219, PR #89) |
 | AUTH-15 | `POST /api/auth/phone/verify` | N-02-3 휴대폰 인증번호 확인 `{ phone, code, purpose }` → `{ verificationToken }` (10분, AUTH-06 `phoneVerificationToken`에 넣음. 🆕 11/26 `FIND_ID` 목적 토큰은 AUTH-09 `verificationToken`) | `VERIFICATION_CODE`(`PHONE`) | 없음 | ✅ (FP-219, PR #89) |
+| AUTH-16 🆕 11/27 | `POST /api/auth/login-id/check` | N-02-1 아이디 중복 확인 `{ loginId }` → `{ available }` (AUTH-13과 같은 모양, 형식이 틀리면 400 `loginId` 칸, 가입 때 서버가 다시 막음) | `APP_USER` | 없음 | ✅ (FP-258) |
 
 - `user` = `{ userId, name, role, jobType, hasScore }`. AUTH-11·12의 토큰 필드 이름은 `token`(AUTH-01은 `accessToken`), 화면은 둘 다 받는다.
-- AUTH-13~15 요청·응답·오류 상세는 [A팀 명세서](api_spec_a.md) 1장. 휴대폰 번호는 원문 없이 HMAC과 인증번호 해시만 저장한다.
+- AUTH-13~16(🆕 11/27 AUTH-16 추가) 요청·응답·오류 상세는 [A팀 명세서](api_spec_a.md) 1장. 휴대폰 번호는 원문 없이 HMAC과 인증번호 해시만 저장한다.
 
 ### 2-2. 마이페이지 — 담당 우찬 (FP-77)
 

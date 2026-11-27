@@ -17,6 +17,9 @@ public interface VerificationCodeMapper {
     // 같은 목적·대상으로 가장 최근에 보낸 코드. 없으면 null.
     VerificationCode selectLatest(@Param("purposeCode") String purposeCode, @Param("targetHmac") String targetHmac);
 
+    // FP-258 13차 N-02-3 하루 발송 상한 — since 뒤로 같은 채널(EMAIL·PHONE)·대상에 보낸 횟수(모든 목적, 관리자 로그인 번호 제외).
+    int countSentSince(@Param("channelCode") String channelCode, @Param("targetHmac") String targetHmac, @Param("since") LocalDateTime since);
+
     VerificationCode selectById(@Param("verificationId") long verificationId);
 
     // 틀린 코드를 넣으면 시도 횟수를 1 올린다.

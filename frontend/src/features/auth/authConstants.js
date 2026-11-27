@@ -83,3 +83,10 @@ export const FIND_ID_METHODS = Object.freeze({
 
 // N-02 필수 동의 문구.
 export const CREDIT_INFO_AGREEMENT_LABEL = '(필수) 개인신용정보 수집·이용에 동의합니다.'
+
+// FP-258 13차 N-02-2 가입 동의 항목(decisions.md 1-2 '가입 동의': 필수 2 + 선택 1). key는 가입 요청(AUTH-06) 필드 이름과 같다.
+export const SIGNUP_CONSENT_ITEMS = Object.freeze([
+  { key: 'agreeTerms', label: '(필수) 서비스 이용약관에 동의합니다.', required: true },
+  { key: 'agreePrivacy', label: '(필수) 개인정보 수집·이용에 동의합니다.', required: true },
+  { key: 'agreeMarketing', label: '(선택) 점수 변동 알림·혜택 안내를 받습니다.', required: false },
+])

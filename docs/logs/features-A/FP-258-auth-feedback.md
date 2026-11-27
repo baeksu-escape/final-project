@@ -494,6 +494,70 @@
   - 실제 Windows 한글 IME에서 이름 자모 안내(3번)
   - 실제 서버·DB로 AUTH-16 호출(시험은 mock 매퍼)
 
+## 13차-1 — 인증 보안 고도화(멘토링 반영) (2026-11-27, 기준 bfc6d4d) 🆕 11/27
+- **관련 N-ID:** N-01-3, N-02-1, N-02-2, N-02-3, N-02-4 (Jira FP-290, FP-294, FP-295·296 일부)
+- 조장 결정(11/27)으로 2차 개발에서 빠진 인증 고도화 중 팀 결정·DB 변경 없이 되는 것만 했다. DDL은 바꾸지 않았다.
+
+### 무엇을, 왜 바꿨나
+- **1. 동시 로그인 실패 횟수(FP-290):** 9차 "남은 것"의 동시 요청 문제다.
+  - `authenticate`가 계정을 찾은 뒤 기존 `lockUser`(SELECT … FOR UPDATE)로 행을 잠그고 다시 읽은 횟수로 판단한다.
+  - 같은 계정의 로그인은 커밋까지 줄을 서므로 횟수가 덜 오르지 않는다. 5회째 5분 제한·10회 잠금·`LAST_LOGIN_FAIL_AT` 규칙은 그대로다.
+  - SQL 한 문장 증가(`+ 1`) 방식은 쓰지 않았다. 동시에 올리면 5를 건너뛰어 "정확히 5회째" 5분 제한이 빠질 수 있어서다.
+- **2. 같은 IP 반복 시도 제한:** 새 `ClientRateLimiter`(서버 메모리, 숫자는 `Rule` 한 곳)를 만들었다.
+  - 로그인·간편 로그인 연결 실패(401)는 10분 20회, 닉네임·아이디 확인은 1분 30회, 이메일·휴대폰 발송은 1시간 20회다.
+  - 넘으면 429 `TOO_MANY_REQUESTS`와 남은 분 문구가 나간다. 화면은 서버 문구를 그대로 보인다.
+  - 서버를 다시 켜면 초기화되고, 서버가 여러 대면 대마다 따로 센다.
+  - IP는 `getRemoteAddr()`다(관리자 화면과 같음). 자바 설정과 `application.properties.example`에는 X-Forwarded-For 처리가 없다. `application.properties`는 열지 않아 확인하지 못했다.
+  - mock은 탭 하나를 한 접속지로 보고 같은 숫자로 센다(`authMockRateLimits.js`).
+- **3. 인증코드 하루 상한(FP-295 일부):** 같은 이메일·휴대폰으로 오늘 0시부터 10회 보냈으면 429 `CODE_SEND_DAILY_LIMIT`다.
+  - `VERIFICATION_CODE` 발송 기록을 `countSentSince`로 센다(목적 무관, 관리자 로그인 번호 제외).
+  - 서버의 일반 발송에는 원래 같은 대상 1분 1회 제한이 없었다. 관리자 번호에만 있다. 이번에도 더하지 않았다.
+- **4. 서버 비밀번호 규칙(FP-296 일부):** `isValidPassword`에 ASCII 출력 문자 제한을 더했다(64자 상한은 이미 있었다).
+  - 새 비밀번호(가입·재설정·변경·관리자 비밀번호 설정)에만 쓰고, 로그인·현재 비밀번호 확인·탈퇴는 검사하지 않는다.
+  - 화면은 64자에서 자르고 같은 규칙으로 본다.
+- **5. 가입 동의(FP-294):** 1단계를 [전체 동의] + 필수 2(이용약관, 개인정보 수집·이용) + 선택 1(점수 변동 알림·혜택 안내)로 나눴다.
+  - 서버는 `agreeTerms`·`agreePrivacy`·`agreeMarketing`을 따로 받는다. 필수 2개와, 체크했을 때만 선택 동의를 `USER_CONSENT`에 남긴다.
+  - 예전 요청(`agreeCreditInfo` 하나)도 받는다.
+  - `USER_CONSENT`의 `CK_UCS_TYPE`이 세 종류를 이미 받아서 DDL 변경은 없다.
+  - 약관 전문·링크는 저장소에 없어 [보기]는 "약관 전문은 준비 중입니다."만 보인다.
+
+### 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `backend/.../user/service/ClientRateLimiter.java` (새 파일) | 같은 IP 반복 시도 제한(규칙 3개) |
+| `backend/.../user/controller/AuthController.java`, `SocialLoginController.java` | 로그인·연결 실패, 확인, 발송에 제한 적용 |
+| `backend/.../user/service/AuthService.java` | 행 잠금 뒤 다시 읽기, 필수 동의 따로 검사, 선택 동의는 체크했을 때만 기록 |
+| `backend/.../user/dto/AuthRequests.java` | 가입 요청 `agreeTerms`·`agreePrivacy`(예전 `agreeCreditInfo` 호환) |
+| `backend/.../user/service/AuthErrors.java`, `EmailVerificationService.java`, `PhoneVerificationService.java` | 하루 발송 상한 |
+| `backend/.../user/mapper/VerificationCodeMapper.java`, `resources/mapper/user/VerificationCodeMapper.xml` | `countSentSince` |
+| `backend/.../user/service/AccountRules.java` | 새 비밀번호 ASCII 출력 문자만 |
+| `backend/src/test/.../ClientRateLimiterTest.java` (새 파일), `AuthServiceTest.java`, `EmailVerificationServiceTest.java`, `PhoneVerificationServiceTest.java`, `UserApiContractTest.java` | 새 시험 10개, 조회 횟수 시험 1개 고침 |
+| `frontend/src/features/auth/pages/SignupPage.jsx`, `authConstants.js`, `auth.css` | 동의 화면 |
+| `frontend/src/features/auth/validation.js` | 비밀번호 64자·ASCII, 필수 동의 검사 |
+| `frontend/src/features/auth/mocks/authMockRateLimits.js` (새 파일), `authMockHandlers.js`, `socialLoginMockHandlers.js`, `api/authFeatureApi.js` | mock 제한·상한·동의, 요청 설명 |
+| `docs/spec/api/api_definition.md`, `api_spec_a.md`, `docs/ai/features.md` | AUTH-16 행, 13차-1 설명, 오류 code 2개 |
+
+### DB·API 변경
+- DB: 없음. `VERIFICATION_CODE`·`USER_CONSENT`·`APP_USER`의 기존 열·제약으로 했다.
+- API
+  - 새 오류 code: 429 `TOO_MANY_REQUESTS`, 429 `CODE_SEND_DAILY_LIMIT`
+  - AUTH-06: `agreeTerms`·`agreePrivacy` 요청 필드를 더했다.
+  - 새 비밀번호에 ASCII 출력 문자 규칙을 더했다.
+
+### 확인
+- `./mvnw test`(-s) 553개 통과(새 시험 10개), `npm run lint` 오류 0, `npm run build` 성공. 하나씩 돌렸다.
+  - 동시 실패: 서비스 단위로 순서를 재현했다(잠그기 전 3회 → 잠근 뒤 4회를 읽어 5회째 429). DB에서 실제로 동시에 보내는 시험은 하지 않았다.
+- mock 개발 서버와 헤드리스 Edge로 확인했다.
+  - 동의: 처음 꺼짐 → 이용약관만 꺼짐 → 필수 둘 켜짐 → [전체 동의]로 네 칸 모두 체크·해제 → [보기]에 준비 중 문구 → 2단계로 이동
+  - 429 문구: "인증코드 요청이 너무 많습니다. 60분 뒤에…", "오늘 이 번호로 받을 수 있는 인증코드 10회를 모두 받았습니다…", "확인 요청이 너무 많습니다. 1분 뒤에…", "로그인 시도가 너무 많습니다. 10분 뒤에…"
+- 끝난 뒤 5199 개발 서버·헤드리스 Edge가 남지 않았다(사용자의 5173 서버는 건드리지 않음).
+
+### 남은 것
+- 프록시 뒤 배포라면 `server.forward-headers-strategy` 같은 설정이 있어야 IP 제한이 접속지별로 동작한다(설정 파일은 열지 않음).
+- 약관 전문·버전(`TERMS_VERSION`)은 팀 확인이 필요하다.
+- 일반 인증코드의 같은 대상 1분 1회 제한은 아직 없다.
+- 실제 DB에서 동시 로그인을 보내는 통합 시험은 만들지 않았다.
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

@@ -1046,6 +1046,42 @@
   gap: var(--sp-3);
 }
 
+/* FP-258 13차 가입 1단계 동의 — 맨 위 [전체 동의](아래 구분선), 그 아래 필수 2·선택 1 줄. 줄 오른쪽에 [보기] 글자 버튼. */
+.signup-consent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.signup-consent__all {
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.signup-consent__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.signup-consent__view {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mut);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.signup-consent__view:hover {
+  color: var(--fg);
+}
+
 /* 흰 카드 바로 위 가운데 로고 */
 .auth-split__logo {
   display: inline-flex;
