@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { TextInput } from '../../../common/components/index.js'
 import { requestEmailChange } from '../api/myPageApi.js'
 import { EMAIL_PURPOSES } from '../authConstants.js'
+import useImeSafeFilter from '../useImeSafeFilter.js'
+import { filterEmail } from '../validation.js'
 import EmailVerification from './EmailVerification.jsx'
 
 // N-04-3 이메일 바꾸기 폼 — 새 이메일을 FP-87 이메일 인증(N-02-3)으로 확인한 경우에만 저장을 요청한다.
@@ -11,6 +13,8 @@ export default function EmailChangeForm({ onSaved, onCancel }) {
   const [verification, setVerification] = useState(null) // { email, verificationToken }
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
+  // FP-258 가입과 같은 이메일 규칙(filterEmail)으로 입력을 거른다. 한글 조합은 끝날 때 거른다(useImeSafeFilter).
+  const emailInput = useImeSafeFilter()(setEmail, filterEmail)
 
   // 인증받은 뒤 이메일을 고치면 인증이 풀린 것으로 본다.
   const verified = verification !== null && verification.email === email
@@ -36,7 +40,9 @@ export default function EmailChangeForm({ onSaved, onCancel }) {
 
   return (
     <form className="account-form email-change-form" onSubmit={handleSubmit} noValidate>
-      <TextInput label="새 이메일" type="email" value={email} onChange={setEmail} autoComplete="email" />
+      <div {...emailInput.compositionProps}>
+        <TextInput label="새 이메일" type="email" value={email} onChange={emailInput.onChange} autoComplete="email" />
+      </div>
       <EmailVerification
         email={email}
         purpose={EMAIL_PURPOSES.CHANGE_EMAIL}

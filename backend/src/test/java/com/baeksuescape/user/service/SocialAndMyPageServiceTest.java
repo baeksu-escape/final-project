@@ -7,9 +7,11 @@ import static com.baeksuescape.user.service.UserFixtures.HMAC;
 import static com.baeksuescape.user.service.UserFixtures.PASSWORD;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,6 +21,8 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -72,7 +76,8 @@ class SocialAndMyPageServiceTest {
         // 휴대폰 인증(PhoneVerificationService)은 가입에서만 쓰므로 간편 로그인·마이 페이지 시험에서는 비워 둔다.
         AuthService auth = new AuthService(userMapper, consentMapper, socialMapper, emailVerification, null, store, views, tokenProvider,
                 ENCODER, CRYPTO, HMAC, CLOCK, null,
-                new SystemLogService(mock(SystemLogMapper.class), TransactionOperations.withoutTransaction(), CLOCK), mock(NotificationService.class));
+                new SystemLogService(mock(SystemLogMapper.class), TransactionOperations.withoutTransaction(), CLOCK),
+                new LoginAttemptService(userMapper, ENCODER, CLOCK), mock(NotificationService.class));
         social = new SocialLoginService(properties, store, socialMapper, userMapper, auth);
         myPage = new MyPageService(userMapper, financialInputMapper, emailVerification, views, ENCODER, CRYPTO, HMAC, CLOCK);
     }
@@ -133,9 +138,16 @@ class SocialAndMyPageServiceTest {
         assertThat(codeOf(() -> social.link(new AuthRequests.SocialLink(key, "employee", PASSWORD)))).isEqualTo("409 SOCIAL_ALREADY_LINKED");
 
         given(socialMapper.countByUserAndProvider(7L, "NAVER")).willReturn(0);
+        given(userMapper.selectById(7L)).willReturn(UserFixtures.user(7L, "employee"));
         AuthResponses.Login login = social.link(new AuthRequests.SocialLink(key, "employee", PASSWORD));
         assertThat(login.devMode()).isTrue();
         verify(socialMapper).insertLink(7L, "NAVER", "dev-naver-user");
+        // FP-258 연결을 저장한 뒤 성공 처리는 계정 행 잠금 안에서 한 번만 한다(409로 막힌 연결은 초기화하지 않는다).
+        InOrder order = inOrder(socialMapper, userMapper);
+        order.verify(socialMapper).insertLink(7L, "NAVER", "dev-naver-user");
+        order.verify(userMapper).lockUser(7L);
+        order.verify(userMapper).updateLoginSuccess(eq(7L), any());
+        verify(userMapper).updateLoginSuccess(anyLong(), any());
         assertThat(store.findLinkKey(key)).isEmpty();
         assertThat(codeOf(() -> social.link(new AuthRequests.SocialLink(key, "employee", PASSWORD)))).isEqualTo("400 SOCIAL_LINK_EXPIRED");
     }
@@ -178,6 +190,19 @@ class SocialAndMyPageServiceTest {
         myPage.changeEmail(7L, new MyPageDtos.EmailChange("new@example.com", "token"));
         verify(emailVerification).consume("token", EmailPurpose.CHANGE_EMAIL, "new@example.com", null);
         verify(userMapper).updateEmail(eq(7L), anyString(), eq(HMAC.email("new@example.com")), any());
+    }
+
+    // FP-258 대문자·앞뒤 공백이 있는 새 이메일은 소문자로 바꿔 판정·토큰 확인하고, 암호문(EMAIL_ENC)도 소문자로 저장한다. 한글 이메일은 400.
+    @Test
+    void 이메일_변경은_소문자로_저장하고_규칙에_맞지_않으면_400() {
+        given(userMapper.selectById(7L)).willReturn(UserFixtures.user(7L, "employee"));
+        assertThat(codeOf(() -> myPage.changeEmail(7L, new MyPageDtos.EmailChange("새주소@example.com", "token")))).isEqualTo("400 INVALID_INPUT");
+
+        myPage.changeEmail(7L, new MyPageDtos.EmailChange(" New.Mail@Example.COM ", "token"));
+        verify(emailVerification).consume("token", EmailPurpose.CHANGE_EMAIL, "new.mail@example.com", null);
+        ArgumentCaptor<String> emailEnc = ArgumentCaptor.forClass(String.class);
+        verify(userMapper).updateEmail(eq(7L), emailEnc.capture(), eq(HMAC.email("new.mail@example.com")), any());
+        assertThat(CRYPTO.decrypt(emailEnc.getValue())).isEqualTo("new.mail@example.com");
     }
 
     @Test

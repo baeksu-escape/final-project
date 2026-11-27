@@ -23,7 +23,7 @@ import com.baeksuescape.global.config.AvenueProperties;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 
 // FP-87 보안 설정 — 세션 없이 JWT로만 인증한다(N-01). 경로별 권한:
-//   인증 없음: 로그인·가입·이메일 인증·닉네임 중복 확인·휴대폰 인증·아이디 찾기·비밀번호 재설정·소셜 로그인·관리자 2단계 인증, 다른 팀 임시 개방 경로(avenue.auth.temporary-open-paths)
+//   인증 없음: 로그인·가입·이메일 인증·닉네임·아이디 중복 확인·휴대폰 인증·아이디 찾기·비밀번호 재설정·소셜 로그인·관리자 2단계 인증, 다른 팀 임시 개방 경로(avenue.auth.temporary-open-paths)
 //   /api/admin/** = ROLE_ADMIN, /api/members/me/**·/api/report/** = ROLE_USER, 그 밖의 /api/** = 로그인 필요
 @Configuration
 public class SecurityConfig {
@@ -35,6 +35,8 @@ public class SecurityConfig {
             "/api/auth/email/**",
             // 11/18 1차 시연 후속: 가입 화면의 닉네임 중복 확인과 휴대폰 인증(발송·확인)
             "/api/auth/nickname/check",
+            // FP-258 가입 4단계 아이디 중복 확인(AUTH-16)
+            "/api/auth/login-id/check",
             "/api/auth/phone/**",
             "/api/auth/find-id",
             "/api/auth/password/reset",

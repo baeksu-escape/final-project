@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { requestLogin } from '../../../common/api/authApi.js'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { TextInput, Toast } from '../../../common/components/index.js'
@@ -8,18 +8,25 @@ import AdminPasswordSetupForm from '../../admin/components/AdminPasswordSetupFor
 import AdminTwoFactorStep from '../components/AdminTwoFactorStep.jsx'
 // 로그인 mock 응답(잠긴 계정·가입자 포함)을 등록하기 위해 불러온다.
 import '../api/authFeatureApi.js'
-import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, LOGIN_FAILED_MESSAGE } from '../authConstants.js'
+import { ACCOUNT_LOCKED_MESSAGE, ADMIN_ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, LOGIN_FAILED_MESSAGE } from '../authConstants.js'
 import { AUTH_PATHS } from '../authPaths.js'
 import AuthLinks from '../components/AuthLinks.jsx'
+import PasswordField from '../components/PasswordField.jsx'
 import SocialLoginButtons from '../components/SocialLoginButtons.jsx'
+import useImeSafeFilter from '../useImeSafeFilter.js'
+import usePasswordReveal from '../usePasswordReveal.js'
+import { filterLoginId } from '../validation.js'
 import '../auth.css'
 
 // 로그인 실패 원인을 화면 문구로 바꾼다. 아이디·비밀번호 중 무엇이 틀렸는지는 알려 주지 않는다.
 function toLoginErrorMessage(error) {
   if (error?.data?.code === AUTH_ERROR_CODES.ACCOUNT_LOCKED) return ACCOUNT_LOCKED_MESSAGE
+  // FP-258 잠긴 관리자는 비밀번호 찾기로 풀 수 없어 다른 문구를 쓰고, 아래 [비밀번호 찾기] 링크도 나오지 않는다.
+  if (error?.data?.code === AUTH_ERROR_CODES.ADMIN_ACCOUNT_LOCKED) return ADMIN_ACCOUNT_LOCKED_MESSAGE
   // 관리자 로그인 준비 중 안내는 서버 문구를 그대로 보여 준다(비밀번호가 틀렸다고 잘못 보이지 않게).
   if (error?.data?.code === AUTH_ERROR_CODES.ADMIN_2FA_NOT_READY) return error.message
   // FP-80 관리자 인증번호를 1분 안에 다시 요청하면 429 — 서버 문구(잠시 뒤 다시 시도)를 그대로 보여 준다.
+  // FP-258 로그인 5회 실패 뒤 5분 제한(429 LOGIN_TEMPORARILY_BLOCKED)도 남은 분이 담긴 서버 문구를 그대로 보여 준다.
   if (error?.status === 0 || error?.status === 429) return error.message
   return LOGIN_FAILED_MESSAGE
 }
@@ -43,6 +50,8 @@ export default function LoginPage() {
   const [challenge, setChallenge] = useState(null)
   // FP-80 첫 비밀번호 설정 토큰. 있으면 비밀번호 설정 단계다.
   const [passwordSetupToken, setPasswordSetupToken] = useState(null)
+  const { reveal, hideAll } = usePasswordReveal()
+  const loginIdInput = useImeSafeFilter()(setLoginId, filterLoginId)
 
   // 맡아 둔 알림은 한 번만 쓴다. 꺼낸 뒤 바로 비워서 다음 로그아웃 때 다시 뜨지 않게 한다.
   useEffect(() => {
@@ -61,6 +70,7 @@ export default function LoginPage() {
     setPending(true)
     try {
       const result = await requestLogin(loginId.trim(), password)
+      hideAll()
       if (result.twoFactorRequired) {
         setChallenge({ challengeToken: result.challengeToken, maskedEmail: result.maskedEmail })
         setPending(false)
@@ -141,20 +151,35 @@ export default function LoginPage() {
         </p>
       )}
       <form className="auth-form login-form" onSubmit={handleSubmit} noValidate>
-        <TextInput label="아이디" value={loginId} onChange={setLoginId} error={fieldErrors.loginId} placeholder="아이디 입력" autoComplete="username" />
-        <TextInput
+        <div {...loginIdInput.compositionProps}>
+          <TextInput
+            label="아이디"
+            value={loginId}
+            onChange={loginIdInput.onChange}
+            error={fieldErrors.loginId}
+            placeholder="아이디 입력"
+            autoComplete="username"
+          />
+        </div>
+        <PasswordField
           label="비밀번호"
-          type="password"
           value={password}
           onChange={setPassword}
           error={fieldErrors.password}
           placeholder="비밀번호 입력"
           autoComplete="current-password"
+          {...reveal('password')}
         />
         {formError && (
           <p className="auth-form__error" role="alert">
             {formError}
           </p>
+        )}
+        {/* FP-258 잠금 안내 아래에 비밀번호 찾기 링크를 둔다(재설정하면 풀린다). */}
+        {formError === ACCOUNT_LOCKED_MESSAGE && (
+          <Link to={AUTH_PATHS.FIND_PASSWORD} className="text-link">
+            비밀번호 찾기
+          </Link>
         )}
         {/* 회원가입 전환은 분할 틀(AuthSplitLayout) 위쪽 탭이 맡는다. 여기는 [로그인] 하나만 강조한다. */}
         <div className="login-form__actions">

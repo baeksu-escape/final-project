@@ -18,7 +18,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 // FP-87 JWT 인증 필터 — Authorization: Bearer 토큰이 유효하고 계정이 사용 중(탈퇴·잠금이 아님)이면 로그인한 사용자로 표시한다.
 // 토큰이 없거나 틀려도 여기서 막지 않는다. 로그인이 필요한 경로라면 뒤에서 401이 된다.
-// FP-80 잠긴 계정(LOCKED)도 탈퇴 계정처럼 기존 토큰을 쓰지 못한다(일반 회원·관리자 같음). 이때 401 code는 ACCOUNT_LOCKED다.
+// FP-80 잠긴 계정(LOCKED)도 탈퇴 계정처럼 기존 토큰을 쓰지 못한다(일반 회원·관리자 같음). 이때 401 code는 ACCOUNT_LOCKED다(FP-258 관리자는 ADMIN_ACCOUNT_LOCKED).
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER = "Bearer ";
@@ -26,6 +26,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     static final String LOCKED = "LOCKED";
     // 잠긴 계정의 토큰이었음을 남기는 요청 속성. JsonErrorWriter가 읽어 401 code를 ACCOUNT_LOCKED로 바꾼다.
     static final String ACCOUNT_LOCKED_ATTRIBUTE = JwtAuthenticationFilter.class.getName() + ".ACCOUNT_LOCKED";
+    // FP-258 잠긴 토큰 주인의 역할(ROLE_USER·ROLE_ADMIN). JsonErrorWriter가 관리자면 관리자 안내를 보낸다.
+    static final String LOCKED_ROLE_ATTRIBUTE = JwtAuthenticationFilter.class.getName() + ".LOCKED_ROLE";
 
     private final JwtTokenProvider tokenProvider;
     private final UserAccountMapper userAccountMapper;
@@ -54,6 +56,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String status = userAccountMapper.selectAccountStatus(user.userId());
         if (LOCKED.equals(status)) {
             request.setAttribute(ACCOUNT_LOCKED_ATTRIBUTE, Boolean.TRUE);
+            request.setAttribute(LOCKED_ROLE_ATTRIBUTE, user.role());
             return false;
         }
         return status != null && !WITHDRAWN.equals(status);

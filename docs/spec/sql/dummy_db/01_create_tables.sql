@@ -92,6 +92,12 @@
 --  C16 [2026-11-27 · B팀 재욱] 서비스 등급 구간을 CUT-0.4(0~644 / 645~711 / 712~1000)로 전환 (FP-285, 구조 변경 없음). 모델 0.3(LGBM-BASE-0.3) 점수 분포의 25/50/25 경계.
 --     기준 데이터만 바뀐다: CUT-0.4 추가(ACTIVE), CUT-0.3 ACTIVE→RETIRED. 점수대별 금리·한도와 대출 상품 최소 점수(727→712, 654→645)도 새 경계에 맞춘다(더미 시드 21·22).
 --     기존 DB는 add_cutoff_cut_0_4.sql → activate_cutoff_cut_0_4.sql, 되돌리기는 rollback_cutoff_cut_0_4_to_0_3.sql.
+--  C17 [2026-11-26 · A팀 우찬] VERIFICATION_CODE.CK_VCD_PURPOSE에 'FIND_ID' 추가(N-03-1 아이디 찾기 휴대폰·이메일 인증, FP-258). 열·표 수(48)는 그대로다.
+--     기존 DB는 alter_verification_code_find_id.sql(제약만 다시 만든다, 인증 기록은 그대로).
+--  C18 [2026-11-27 · A팀 우찬] APP_USER에 마지막 로그인 실패 시각 LAST_LOGIN_FAIL_AT 추가(N-01-3 로그인 5분 제한, FP-258). 표 수(48)는 그대로다.
+--     5분 제한을 UPDATED_AT 대신 이 시각으로 잰다. 기존 DB는 alter_app_user_last_login_fail_at.sql(이미 있는 행은 NULL).
+--     LOGIN_FAIL_COUNT 열 주석도 지금 동작(5회째 5분 제한, 누적 10회 잠금)으로 고쳤다(기존 DB는 같은 alter 끝의 COMMENT ON COLUMN).
+--     ACCOUNT_STATUS_CODE 열 주석의 자동 잠금 횟수도 5회 → 10회로 바로잡았다(PR #173 검수, 주석만, 기존 DB는 같은 alter 끝의 COMMENT ON COLUMN).
 -- ====================================================================
 
 
@@ -169,6 +175,8 @@ CREATE TABLE APP_USER (
     LOGIN_FAIL_COUNT       NUMBER(2)            DEFAULT 0 NOT NULL,
     PASSWORD_CHANGE_REQUIRED_YN CHAR(1)         DEFAULT 'N' NOT NULL,
     LAST_LOGIN_AT          TIMESTAMP,
+    -- v0.3.2 (C18) 마지막 로그인 실패 시각(5분 제한 기준)
+    LAST_LOGIN_FAIL_AT     TIMESTAMP,
     WITHDRAWN_AT           TIMESTAMP,
     DUMMY_YN               CHAR(1)              DEFAULT 'N' NOT NULL,
     CREATED_AT             TIMESTAMP            DEFAULT SYSTIMESTAMP NOT NULL,
@@ -212,9 +220,10 @@ COMMENT ON COLUMN APP_USER.EMAIL_HMAC IS 'v0.3 (E1) 이메일 검색용 HMAC. HM
 COMMENT ON COLUMN APP_USER.BIRTH_YEAR IS '출생연도 (1930~2006, 2026년 기준 20세 이상만 가입). 연령대는 이 값으로 계산. 관리자는 NULL 가능. TODO 상한 연도는 해마다 바뀌므로 최종 검사는 Spring에서';
 COMMENT ON COLUMN APP_USER.WORKER_TYPE_CODE IS '직군 (로그인 후 선택, 선택 전 NULL. N-05-1·N-04-8)';
 COMMENT ON COLUMN APP_USER.WORK_PERIOD_MONTHS IS '재직·운영·활동 기간 (개월, 소득 입력에서 받음)';
-COMMENT ON COLUMN APP_USER.ACCOUNT_STATUS_CODE IS 'v0.3.2 (W1) 계정 상태 (ACTIVE, LOCKED=비밀번호 5회 실패 또는 관리자 잠금, WITHDRAWN=탈퇴. 탈퇴해도 행은 지우지 않고 개인정보 칸을 표시값으로 덮어쓴다(CK_APU_PII_BY_STATUS), N-04-7)';
+COMMENT ON COLUMN APP_USER.ACCOUNT_STATUS_CODE IS 'v0.3.2 (W1·C18) 계정 상태 (ACTIVE, LOCKED=비밀번호 10회 실패 또는 관리자 잠금, WITHDRAWN=탈퇴. 탈퇴해도 행은 지우지 않고 개인정보 칸을 표시값으로 덮어쓴다(CK_APU_PII_BY_STATUS), N-04-7)';
 COMMENT ON COLUMN APP_USER.WITHDRAWN_AT IS 'v0.3.2 (W1) 탈퇴 시각 (WITHDRAWN일 때만 값). 탈퇴 때 개인정보 칸은 CK_APU_PII_BY_STATUS의 표시값으로 덮어쓴다';
-COMMENT ON COLUMN APP_USER.LOGIN_FAIL_COUNT IS '연속 로그인 실패 횟수 (5회면 잠금, 재설정으로 해제)';
+COMMENT ON COLUMN APP_USER.LOGIN_FAIL_COUNT IS 'v0.3.2 (C18) 연속 로그인 실패 횟수 (5회째 5분 제한, 누적 10회 잠금, 재설정으로 해제)';
+COMMENT ON COLUMN APP_USER.LAST_LOGIN_FAIL_AT IS 'v0.3.2 (C18) 마지막 로그인 실패 시각 (N-01-3). 실패할 때마다 기록하고, 실패 횟수를 0으로 돌릴 때(로그인 성공·잠금 해제·비밀번호 재설정) 함께 비운다. 5회 실패 뒤 5분 제한은 이 시각부터 잰다';
 COMMENT ON COLUMN APP_USER.PASSWORD_CHANGE_REQUIRED_YN IS '첫 로그인 때 비밀번호 변경 필요 (관리자 임시 비밀번호, N-27-4)';
 COMMENT ON COLUMN APP_USER.DUMMY_YN IS '더미·시연 계정 여부';
 
@@ -278,7 +287,8 @@ CREATE TABLE VERIFICATION_CODE (
     CREATED_AT             TIMESTAMP            DEFAULT SYSTIMESTAMP NOT NULL,
     CONSTRAINT PK_VERIFICATION_CODE PRIMARY KEY (VERIFICATION_ID),
     CONSTRAINT FK_VCD_USER FOREIGN KEY (USER_ID) REFERENCES APP_USER (USER_ID),
-    CONSTRAINT CK_VCD_PURPOSE CHECK (PURPOSE_CODE IN ('SIGNUP', 'FIND_PASSWORD', 'CHANGE_EMAIL', 'ADMIN_LOGIN')),
+    -- v0.3.2 (C17) FIND_ID 추가: 아이디 찾기 휴대폰·이메일 인증(FP-258)
+    CONSTRAINT CK_VCD_PURPOSE CHECK (PURPOSE_CODE IN ('SIGNUP', 'FIND_PASSWORD', 'CHANGE_EMAIL', 'ADMIN_LOGIN', 'FIND_ID')),
     CONSTRAINT CK_VCD_CHANNEL CHECK (CHANNEL_CODE IN ('EMAIL', 'PHONE'))
 );
 COMMENT ON TABLE  VERIFICATION_CODE IS '인증코드 발송·확인 이력 (N-02-3, N-03-2, N-04-3, 관리자 2단계 인증)';

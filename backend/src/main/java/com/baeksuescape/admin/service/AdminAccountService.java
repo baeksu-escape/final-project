@@ -166,7 +166,8 @@ public class AdminAccountService {
         if (name.isEmpty()) errors.add(new FieldErrorItem("name", "이름을 입력해 주세요."));
         else if (name.length() > AccountRules.NAME_MAX) errors.add(new FieldErrorItem("name", "이름은 50자 이하로 입력해 주세요."));
         if (email.isEmpty()) errors.add(new FieldErrorItem("workEmail", "업무 이메일을 입력해 주세요."));
-        else if (!AccountRules.isValidEmail(email)) errors.add(new FieldErrorItem("workEmail", "이메일 형식이 올바르지 않습니다. 예) name@example.com"));
+        // FP-258 업무 이메일은 develop처럼 기본 형식만 본다(새 이메일 규칙은 회원 가입·이메일 변경만).
+        else if (!AccountRules.isBasicEmail(email)) errors.add(new FieldErrorItem("workEmail", "이메일 형식이 올바르지 않습니다. 예) name@example.com"));
         if (!errors.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", errors.get(0).message(), errors);
     }
 

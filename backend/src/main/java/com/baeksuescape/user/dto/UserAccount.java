@@ -34,6 +34,10 @@ public class UserAccount {
     private String passwordChangeRequiredYn;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
+    // FP-258 행을 마지막으로 고친 시각. 닉네임·이메일 변경 등으로도 바뀌므로 로그인 제한에는 쓰지 않는다.
+    private LocalDateTime updatedAt;
+    // FP-258 N-01-3 마지막 로그인 실패 시각(LAST_LOGIN_FAIL_AT). 5회 실패 뒤 5분 제한은 이 시각부터 잰다. 실패 횟수를 0으로 돌릴 때 함께 비운다.
+    private LocalDateTime lastLoginFailAt;
 
     public boolean isAdmin() {
         return ROLE_ADMIN.equals(roleCode);
