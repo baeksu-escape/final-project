@@ -154,10 +154,20 @@
 | `baseFixedExpenseAmount` 🆕 11/19 | 정수 | 저장된 월 고정지출(FIXED 합계). 화면 고정지출 슬라이더의 처음 값. 조건(`fixedExpenseAmount`)을 보내도 저장값 그대로다 | N-21-1·2 |
 | `baseOtherExpenseAmount` 🆕 11/19 | 정수 | 기타 지출 = 월 지출 합계 − 고정지출(할부·정기결제·기타) | N-21-1·2 |
 | `baseMonthlyLoanPayment` 🆕 11/19 | 정수 | 저장된 월 대출 원리금 합계 | N-21-1·2 |
+| `baseOtherExpenseItems[]` 🆕 11/26 | 배열 | 기타 지출(FIXED 제외)의 항목별 내역. 소득 기준월, 금액 큰 순·같으면 저장 순, 0원 항목도 포함. 합 = `baseOtherExpenseAmount`. 항목이 없으면 `[]` | N-21-1·3·5 |
+| `baseOtherExpenseItems[].expenseGroupCode` 🆕 11/26 | 문자열 | 지출 그룹 코드(`INSTALLMENT`·`SUBSCRIPTION`·`OTHER`, `FIXED` 제외) | N-21-3 |
+| `baseOtherExpenseItems[].expenseCategory` 🆕 11/26 | 문자열 | 지출 분류. 저장된 값 그대로라 `OTHER` 그룹은 한글 분류 이름(예: "의료비"), 할부·정기결제는 `null` | N-21-3 |
+| `baseOtherExpenseItems[].description` 🆕 11/26 | 문자열 | 설명 | N-21-3 |
+| `baseOtherExpenseItems[].monthlyAmount` 🆕 11/26 | 정수 | 월 금액(원) | N-21-3 |
+| `baseLoanItems[]` 🆕 11/26 | 배열 | 보유 대출별 월 원리금. 소득 기준월, 대출 번호 순. 합 = `baseMonthlyLoanPayment`. 대출이 없으면 `[]` | N-21-1·3·5 |
+| `baseLoanItems[].loanId` 🆕 11/26 | 정수 | 대출 번호 | N-21-5 |
+| `baseLoanItems[].loanTypeName` 🆕 11/26 | 문자열 | 대출 종류 이름(자산·부채 API와 같은 `DIM_LOAN_TYPE` 이름) | N-21-5 |
+| `baseLoanItems[].monthlyPaymentAmount` 🆕 11/26 | 정수 | 월 원리금(원) | N-21-5 |
 
 - 저장된 소득이 12개월보다 적은 자영업자·프리랜서는 `months`도 그만큼 짧다.
 - 🆕 11/19 **월 지출 합계에는 대출 원리금이 들어 있지 않다.** 지출 항목(`USER_EXPENSE_ITEM`의 고정·할부·정기결제·기타)만 더하고, 원리금은 대출(`USER_LOAN`)에서 따로 읽는다. 그래서 화면이 월 지출을 `forecastExpense + forecastLoanPayment`로 계산해도 중복되지 않는다.
 - 🆕 11/19 기준값 3개는 저장 데이터 조회(GET)에만 있다. POST(DIAG-08)는 저장값이 없어 `null`이다.
+- 🆕 11/26 `baseOtherExpenseItems`·`baseLoanItems`도 GET에만 채우고 POST는 `null`이다(요청 경위: 경환 님 요청, 광희 님 확인).
 - POST `/api/diagnosis/cash-flow/forecast`(DIAG-08)도 요청의 `past12MonthsHistory`를 같은 모양의 `months`로 돌려준다.
 
 예시 (회원 2번으로 로그인, `?incomeChangePercent=-10&forecastMonths=3`):
@@ -194,7 +204,9 @@
   ],
   "baseFixedExpenseAmount": 1315514,
   "baseOtherExpenseAmount": 0,
-  "baseMonthlyLoanPayment": 0
+  "baseMonthlyLoanPayment": 0,
+  "baseOtherExpenseItems": [],
+  "baseLoanItems": []
 }
 ```
 
