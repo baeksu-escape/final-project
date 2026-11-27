@@ -162,8 +162,8 @@ public class BoardService {
         row.setCreatedAt(LocalDateTime.now(clock));
         boardMapper.insertComment(row);
         if (!Objects.equals(post.getUserId(), userId)) {
-            // D-23 글쓴이 본인 댓글은 제외하고 "글 제목 앞부분 + 댓글 앞부분"으로 새 댓글 알림을 보낸다(닉네임은 넣지 않음).
-            String excerpt = "「" + leadingText(post.getTitle(), 20) + "」에 달린 댓글: " + leadingText(row.getContent(), 30);
+            // D-23 글쓴이 본인 댓글은 제외하고 "글 제목 앞부분"만 넣어 새 댓글 알림을 보낸다. 댓글이 나중에 숨김·삭제될 수 있어 댓글 내용·닉네임은 넣지 않는다.
+            String excerpt = "「" + leadingText(post.getTitle(), 20) + "」에 새 댓글이 달렸어요.";
             notificationService.notifyQuietly(post.getUserId(), "COMMENT_NEW", "내 글에 새 댓글이 달렸어요", excerpt,
                     "/lounge?post=" + postId);
         }
