@@ -1,19 +1,11 @@
-/* N-32 용어 도우미(FP-207) 전용 스타일 — 오른쪽 아래에 떠 있는 아이콘 버튼과 그 위 패널(11/06 UI). 클래스 접두어 gh-, tokens.css 변수만 쓴다.
-   11/27 프론트 담당 허락. z-index는 공통 Modal(40)·메가메뉴(39~40)·Toast(50)보다 낮게 두어 다른 창이 열리면 그 아래에 깔린다. */
+/* N-32 용어 도우미(FP-207) 전용 스타일 — 화면 오른쪽 아래 구석에 떠 있는 아이콘 버튼, 그 위 패널, 닫혀 있을 때의 안내 카드·질문 말풍선.
+   클래스 접두어 gh-, tokens.css 변수만 쓴다. 11/27 프론트 담당 허락.
+   z-index는 공통 Modal(40)·메가메뉴(39~40)·Toast(50)보다 낮게 두어 다른 창이 열리면 그 아래에 깔린다. */
 
-/* 버튼·패널의 오른쪽 위치 — 본문 카드의 오른쪽 끝(layout.css --page-max·--page-pad, 가운데 1440px 안)에 맞춘다.
-   fixed 요소의 right %는 스크롤바를 뺀 화면 폭 기준이라 본문 가운데 정렬과 같은 폭으로 계산된다.
-   기본은 카드 오른쪽 끝 안쪽(노트북·휴대폰은 바깥에 자리가 없음), 넓은 화면에서는 카드 바로 바깥(12px 띄움)에 붙인다(11/27 광희 결정). */
-.gh-fab,
-.gh-panel {
-  --gh-card-edge: calc((100% - min(100%, var(--page-max))) / 2 + var(--page-pad));
-  --gh-right: var(--gh-card-edge);
-}
-
-/* 떠 있는 아이콘 버튼 — 스크롤해도 같은 자리(화면 아래, 카드 오른쪽 끝) */
+/* 떠 있는 아이콘 버튼 — 브라우저 창 오른쪽 아래 구석, 스크롤해도 같은 자리(11/27 광희 결정) */
 .gh-fab {
   position: fixed;
-  right: var(--gh-right);
+  right: var(--sp-6);
   bottom: var(--sp-6);
   z-index: 30;
   display: grid;
@@ -40,7 +32,7 @@
 /* 버튼 바로 위 패널 — 내용이 길면 패널 안에서 스크롤 */
 .gh-panel {
   position: fixed;
-  right: var(--gh-right);
+  right: var(--sp-6);
   bottom: calc(var(--sp-6) + 52px + var(--sp-3));
   z-index: 30;
   display: flex;
@@ -98,28 +90,107 @@
   line-height: 1.4;
 }
 
-/* 휴대폰 너비 — 양옆 16px만 남기고 패널을 넓힌다 */
-/* 넓은 화면(본문 1440px 바깥에 버튼 자리가 남음) — 카드 오른쪽 끝 바로 바깥에 붙인다 */
-@media (min-width: 1500px) {
-  .gh-fab,
-  .gh-panel {
-    --gh-right: calc(var(--gh-card-edge) - 52px - var(--sp-3));
-  }
+/* 닫혀 있을 때 버튼 위 안내 — 아래가 안내 카드, 그 위에 질문 말풍선(오른쪽 정렬) */
+.gh-teaser {
+  position: fixed;
+  right: var(--sp-6);
+  bottom: calc(var(--sp-6) + 52px + var(--sp-3));
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  max-width: min(320px, calc(100vw - 32px));
 }
 
-/* 아주 넓은 화면 — 카드 오른쪽 빈칸에 패널이 다 들어가면 그 빈칸에 띄워 본문을 가리지 않는다(11/27 광희 결정).
-   빈칸 = 카드 끝에서 화면 오른쪽 끝까지. 패널은 카드에서 12px, 화면 끝에서 16px 띄우고 너비는 320~380px.
-   빈칸이 그보다 좁은 화면(노트북·휴대폰)은 지금처럼 버튼 위에 겹쳐 뜬다. */
-@media (min-width: 2030px) {
-  .gh-panel {
-    --gh-panel-w: min(380px, calc(var(--gh-card-edge) - var(--sp-3) - 16px));
-    right: calc(var(--gh-card-edge) - var(--sp-3) - var(--gh-panel-w));
-    width: var(--gh-panel-w);
-  }
+/* 질문 말풍선 — 누르면 패널이 열리며 그 답이 보인다 */
+.gh-chip {
+  max-width: 100%;
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  box-shadow: var(--shadow);
+  cursor: pointer;
 }
 
+.gh-chip:hover,
+.gh-chip:focus-visible {
+  border-color: var(--acc);
+  outline: none;
+}
+
+/* 안내 카드 — 카드 전체가 "대화 시작하기" 버튼, 오른쪽 위 ×는 따로 */
+.gh-teaser__card {
+  position: relative;
+  width: 100%;
+}
+
+.gh-teaser__open {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--sp-4) calc(var(--sp-4) + 28px) var(--sp-4) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.gh-teaser__open:hover,
+.gh-teaser__open:focus-visible {
+  border-color: var(--acc);
+  outline: none;
+}
+
+.gh-teaser__title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.gh-teaser__sub {
+  font-size: 13px;
+  color: var(--mut);
+}
+
+.gh-teaser__close {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--mut);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gh-teaser__close:hover,
+.gh-teaser__close:focus-visible {
+  background: var(--panel2);
+  color: var(--fg);
+  outline: none;
+}
+
+/* 휴대폰 너비 — 버튼·안내는 16px 안쪽, 패널은 양옆 16px만 남기고 넓힌다. 말풍선은 한 줄(넘치면 …) */
 @media (max-width: 480px) {
   .gh-fab {
+    right: var(--sp-4);
     bottom: var(--sp-4);
   }
 
@@ -128,5 +199,16 @@
     left: 16px;
     bottom: calc(var(--sp-4) + 52px + var(--sp-3));
     width: auto;
+  }
+
+  .gh-teaser {
+    right: var(--sp-4);
+    bottom: calc(var(--sp-4) + 52px + var(--sp-3));
+  }
+
+  .gh-chip {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 }

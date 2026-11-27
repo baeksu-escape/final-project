@@ -2,18 +2,45 @@ import { useEffect, useId, useRef, useState } from 'react'
 import Button from '../../../common/components/Button.jsx'
 import Notice from '../../../common/components/Notice.jsx'
 import TextInput from '../../../common/components/TextInput.jsx'
+import { useAuth } from '../../../common/auth/useAuth.js'
 import { askChatbotQuestion, getChatbotPresets } from '../api/chatbotApi.js'
 import '../styles/glossaryHelper.css'
 
 const EMPTY_QUESTION_MESSAGE = '질문을 입력해 주세요.'
+// 안내를 숨긴 것을 기억하는 sessionStorage 키 앞부분. 뒤에 회원 번호를 붙인다.
+const TEASER_HIDDEN_KEY = 'avenue.glossaryTeaserHidden'
+// 닫힌 상태에서 말풍선으로 보여 줄 질문 수
+const TEASER_CHIP_COUNT = 2
 
-// N-32 용어 도우미(FP-207) — 화면 오른쪽 아래에 떠 있는 아이콘 버튼(스크롤해도 따라옴)을 누르면 버튼 위에 패널이 열린다(11/06 UI).
+// 저장소를 쓸 수 없는 환경(사생활 보호 모드 등)에서는 숨기지 않은 것으로 본다.
+function readTeaserHidden(key) {
+  try {
+    return window.sessionStorage.getItem(key) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveTeaserHidden(key) {
+  try {
+    window.sessionStorage.setItem(key, '1')
+  } catch {
+    // 저장하지 못해도 지금 화면에서는 숨긴다.
+  }
+}
+
+// N-32 용어 도우미(FP-207) — 화면 오른쪽 아래 구석에 떠 있는 아이콘 버튼(스크롤해도 따라옴)을 누르면 버튼 위에 패널이 열린다(11/06 UI).
 // N-32-1 질문 버튼을 누르면 등록된 답을 보여 주고(횟수 안 줄어듦), N-32-2 직접 쓴 질문은 AI(HELP-03)가 답한다(하루 횟수에서 차감).
-// 질문 목록·남은 횟수는 처음 열 때 한 번만 불러와 기억한다. 닫아도 패널을 숨기기만 해서 고른 답·쓰던 글이 남는다.
+// 닫혀 있을 때는 버튼 위에 안내 카드와 짧은 질문 말풍선 2개를 띄운다. ×로 숨기거나 패널을 한 번 열면 그 로그인(탭) 동안 다시 띄우지 않는다.
+// 질문 목록·남은 횟수는 한 번만 불러와 기억한다. 닫아도 패널을 숨기기만 해서 고른 답·쓰던 글이 남는다.
 // 스타일은 features/ai/styles/glossaryHelper.css(11/27 프론트 담당 허락). 위쪽 바(AppHeader)의 사용자 화면에 한 번 넣는다.
 // 사용 예: <GlossaryHelperDialog />
 export default function GlossaryHelperDialog() {
+  const { user } = useAuth()
+  const teaserKey = `${TEASER_HIDDEN_KEY}.${user?.userId ?? 'guest'}`
   const [open, setOpen] = useState(false)
+  // 안내(카드·말풍선)를 숨겼는지 — 같은 탭에서는 회원별로 sessionStorage에 기억한다(다시 로그인하면 다시 보임).
+  const [teaserHidden, setTeaserHidden] = useState(() => readTeaserHidden(teaserKey))
   const panelId = useId()
   const titleId = useId()
   const fabRef = useRef(null)
@@ -33,9 +60,11 @@ export default function GlossaryHelperDialog() {
   // 몇 번째 시도까지 불렀는지 기억해 같은 시도를 두 번 부르지 않는다(창을 닫았다 열어도 다시 부르지 않음).
   const requestedAttempt = useRef(-1)
 
-  // 창을 처음 열 때(또는 [다시 시도]) 질문 버튼 목록을 불러온다.
+  const showTeaser = !open && !teaserHidden
+
+  // 안내가 보이거나 창을 처음 열 때(또는 [다시 시도]) 질문 버튼 목록을 불러온다 — 말풍선에 질문이 필요해서다.
   useEffect(() => {
-    if (!open || requestedAttempt.current === attempt) return
+    if ((!open && !showTeaser) || requestedAttempt.current === attempt) return
     requestedAttempt.current = attempt
     getChatbotPresets()
       .then((data) => {
@@ -43,7 +72,19 @@ export default function GlossaryHelperDialog() {
         if (Number.isInteger(data?.remainingCount)) setQuota({ remaining: data.remainingCount, limit: data.dailyLimit ?? null })
       })
       .catch((err) => setPresets({ status: 'error', items: [], error: err.message }))
-  }, [open, attempt])
+  }, [open, showTeaser, attempt])
+
+  // 안내를 숨긴다(×를 누르거나 패널을 한 번 열었을 때). 같은 탭·같은 회원이면 화면을 옮겨도 다시 안 뜬다.
+  const hideTeaser = () => {
+    setTeaserHidden(true)
+    saveTeaserHidden(teaserKey)
+  }
+
+  // 패널 열기 — 안내 카드·말풍선·아이콘 어디서 열어도 안내는 그만 띄운다.
+  const openPanel = () => {
+    setOpen(true)
+    hideTeaser()
+  }
 
   // 열면 패널 제목으로 포커스를 옮겨 화면 낭독기가 패널을 읽게 한다.
   useEffect(() => {
@@ -88,6 +129,16 @@ export default function GlossaryHelperDialog() {
   const choosePreset = (presetId) => {
     setSelectedId(presetId)
     setAiAnswer(null)
+  }
+
+  // 닫힌 상태 말풍선 — 질문 버튼 중 글자가 짧은 2개(표시 순서는 그대로). 누르면 패널을 열고 그 답을 바로 보여 준다.
+  const teaserChips = [...presets.items]
+    .sort((a, b) => a.question.length - b.question.length)
+    .slice(0, TEASER_CHIP_COUNT)
+    .sort((a, b) => presets.items.indexOf(a) - presets.items.indexOf(b))
+  const openWithPreset = (presetId) => {
+    choosePreset(presetId)
+    openPanel()
   }
 
   // N-32-2 직접 질문 보내기 — 빈 글은 화면에서 막고, 성공하면 AI 답과 남은 횟수를 바꾼다. 실패해도 쓴 글은 그대로 둔다.
@@ -207,7 +258,24 @@ export default function GlossaryHelperDialog() {
         </form>
         </div>
       </section>
-      {/* 오른쪽 아래에 떠 있는 아이콘 버튼 — 글자 대신 말풍선 안 물음표 선 아이콘, 이름은 aria-label로 알린다. */}
+      {/* 닫혀 있을 때 버튼 위 안내 — 위에 짧은 질문 말풍선, 아래에 안내 카드(×로 숨김) */}
+      {showTeaser && (
+        <aside className="gh-teaser" aria-label="용어 도우미 안내">
+          {teaserChips.map((item) => (
+            <button key={item.presetId} type="button" className="gh-chip" onClick={() => openWithPreset(item.presetId)}>
+              {item.question}
+            </button>
+          ))}
+          <div className="gh-teaser__card">
+            <button type="button" className="gh-teaser__open" onClick={openPanel}>
+              <span className="gh-teaser__title">궁금한 금융 용어를 물어보세요</span>
+              <span className="gh-teaser__sub">대화 시작하기</span>
+            </button>
+            <button type="button" className="gh-teaser__close" aria-label="안내 닫기" onClick={hideTeaser}>×</button>
+          </div>
+        </aside>
+      )}
+      {/* 오른쪽 아래 구석에 떠 있는 아이콘 버튼 — 글자 대신 말풍선 안 물음표 선 아이콘, 이름은 aria-label로 알린다. */}
       <button
         ref={fabRef}
         type="button"
@@ -216,7 +284,7 @@ export default function GlossaryHelperDialog() {
         title="용어 도우미"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => (open ? close() : setOpen(true))}
+        onClick={() => (open ? close() : openPanel())}
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M4 5h16v11H9l-5 4z" />
