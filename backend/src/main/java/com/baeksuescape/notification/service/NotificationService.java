@@ -1,18 +1,19 @@
 package com.baeksuescape.notification.service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.List;
 import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -36,47 +37,49 @@ public class NotificationService {
     private final NotificationMapper notificationMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate notificationTransaction;
-
-    public NotificationService(NotificationMapper notificationMapper, ApplicationEventPublisher eventPublisher) {
-        this(notificationMapper, eventPublisher, (TransactionTemplate) null);
-    }
-
-    @Autowired
-    public NotificationService(NotificationMapper notificationMapper, ApplicationEventPublisher eventPublisher,
-            PlatformTransactionManager transactionManager) {
-        this(notificationMapper, eventPublisher, new TransactionTemplate(transactionManager));
-        this.notificationTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-    }
+    private final Executor notificationExecutor;
+    private final Clock clock;
 
     public NotificationService(NotificationMapper notificationMapper, ApplicationEventPublisher eventPublisher,
-            TransactionTemplate notificationTransaction) {
+            @Qualifier("notificationTransaction") TransactionTemplate notificationTransaction,
+            @Qualifier("notificationExecutor") Executor notificationExecutor, Clock clock) {
         this.notificationMapper = notificationMapper;
         this.eventPublisher = eventPublisher;
         this.notificationTransaction = notificationTransaction;
+        this.notificationExecutor = notificationExecutor;
+        this.clock = clock;
     }
 
-    // FP-301·D-23 원 업무 커밋 뒤 별도 트랜잭션으로 알림을 저장해 FK 의존을 지키고 실패가 원 업무를 되돌리지 않게 한다.
+    // FP-301·D-23 커밋 뒤 실행기에 작업을 넘겨 요청 스레드 트랜잭션과 분리하고, 큐 포화도 원 업무에 전파하지 않는다.
     public void notifyQuietly(long userId, String typeCode, String title, String content, String linkUrl) {
-        Runnable save = () -> {
+        Runnable submit = () -> {
             try {
-                if (notificationTransaction == null) {
-                    create(userId, typeCode, title, content, linkUrl);
-                } else {
-                    notificationTransaction.execute(status -> create(userId, typeCode, title, content, linkUrl));
-                }
+                notificationExecutor.execute(() -> saveQuietly(userId, typeCode, title, content, linkUrl));
+            } catch (RejectedExecutionException e) {
+                log.warn("알림 생성 작업 폐기 typeCode={} userId={} exception={}", typeCode, userId, e.getClass().getSimpleName());
             } catch (RuntimeException e) {
-                log.warn("알림 생성 실패 typeCode={} userId={}", typeCode, userId);
+                log.warn("알림 생성 작업 제출 실패 typeCode={} userId={} exception={}", typeCode, userId,
+                        e.getClass().getSimpleName());
             }
         };
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    save.run();
+                    submit.run();
                 }
             });
         } else {
-            save.run();
+            submit.run();
+        }
+    }
+
+    // FP-301·D-23 저장과 커밋 뒤 알림 생성 이벤트를 실행기 스레드에서 처리해 요청 스레드 커넥션 점유와 분리한다.
+    private void saveQuietly(long userId, String typeCode, String title, String content, String linkUrl) {
+        try {
+            notificationTransaction.execute(status -> create(userId, typeCode, title, content, linkUrl));
+        } catch (RuntimeException e) {
+            log.warn("알림 생성 실패 typeCode={} userId={} exception={}", typeCode, userId, e.getClass().getSimpleName());
         }
     }
     /** FP-284·D-23 최근 20건과 회원의 안 읽은 개수를 조회한다. */
@@ -104,7 +107,7 @@ public class NotificationService {
     /** FP-284·D-23 본인 알림만 읽음 처리하고, 이미 읽었거나 존재하지 않으면 404로 응답한다. */
     @Transactional
     public void markRead(long userId, long notificationId) {
-        if (notificationMapper.markRead(userId, notificationId, LocalDateTime.now()) == 0
+        if (notificationMapper.markRead(userId, notificationId, LocalDateTime.now(clock)) == 0
                 && notificationMapper.selectOwned(userId, notificationId) == null) {
             throw notFound();
         }
@@ -113,7 +116,7 @@ public class NotificationService {
     /** FP-284·D-23 본인 안 읽은 알림을 모두 읽음 처리하고 변경 건수를 반환한다. */
     @Transactional
     public int markAllRead(long userId) {
-        return notificationMapper.markAllRead(userId, LocalDateTime.now());
+        return notificationMapper.markAllRead(userId, LocalDateTime.now(clock));
     }
 
     /** FP-284·D-23 검증한 알림을 저장하고, 후속 SSE 전달기가 구독할 생성 이벤트를 발행한다. */
@@ -126,7 +129,7 @@ public class NotificationService {
         row.setTitle(title);
         row.setContent(content);
         row.setLinkUrl(linkUrl);
-        row.setCreatedAt(LocalDateTime.now());
+        row.setCreatedAt(LocalDateTime.now(clock));
         notificationMapper.insert(row);
         if (row.getNotificationId() == null) {
             throw new IllegalStateException("알림 저장 결과에 생성된 번호가 없습니다.");

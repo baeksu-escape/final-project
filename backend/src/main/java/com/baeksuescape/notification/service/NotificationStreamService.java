@@ -85,6 +85,7 @@ public class NotificationStreamService {
     }
 
     /** FP-284·D-23 알림 저장이 커밋된 뒤, 받는 회원의 모든 연결에 notification 이벤트로 알림 1건을 보낸다. */
+    // FP-301·D-23 커밋 뒤 SSE는 알림 실행기 스레드에서 전송되어 원 요청 스레드 커넥션과 분리된다.
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onNotificationCreated(NotificationCreatedEvent event) {
         List<SseEmitter> targets = emitters.get(event.userId());
