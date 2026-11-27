@@ -37,6 +37,7 @@ import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.log.SystemLogMapper;
 import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.global.security.JwtTokenProvider;
+import com.baeksuescape.notification.service.NotificationService;
 import com.baeksuescape.user.dto.AuthRequests;
 import com.baeksuescape.user.dto.AuthResponses;
 import com.baeksuescape.user.dto.UserAccount;
@@ -64,6 +65,8 @@ class AuthServiceTest {
     private AdminAuthService adminAuth;
     @Mock
     private SystemLogMapper systemLogMapper;
+    @Mock
+    private NotificationService notificationService;
 
     private final JwtTokenProvider tokenProvider = new JwtTokenProvider(TestKeys.properties());
     private final DevSocialStore socialStore = new DevSocialStore(CLOCK);
@@ -73,7 +76,7 @@ class AuthServiceTest {
     void setUp() {
         service = new AuthService(userMapper, consentMapper, socialMapper, emailVerification, phoneVerification, socialStore,
                 new UserViewFactory(userMapper, CRYPTO), tokenProvider, ENCODER, CRYPTO, HMAC, CLOCK, adminAuth,
-                new SystemLogService(systemLogMapper, TransactionOperations.withoutTransaction(), CLOCK));
+                new SystemLogService(systemLogMapper, TransactionOperations.withoutTransaction(), CLOCK), notificationService);
     }
 
     private static String codeOf(Runnable action) {
@@ -214,6 +217,8 @@ class AuthServiceTest {
         AuthResponses.Signup result = service.signup(signup("  새닉네임  ", 1990, PHONE, true, null));
 
         assertThat(result.userId()).isEqualTo(100L);
+        verify(notificationService).notifyQuietly(100L, "WELCOME", "Avenue에 오신 것을 환영해요",
+                "내 정보를 입력하고 재무 진단을 시작해 보세요.", "/data-input");
         ArgumentCaptor<UserAccount> saved = ArgumentCaptor.forClass(UserAccount.class);
         verify(userMapper).insertUser(saved.capture());
         UserAccount account = saved.getValue();
@@ -372,6 +377,8 @@ class AuthServiceTest {
         String key = socialStore.issueLinkKey(new DevSocialStore.PendingLink("GOOGLE", "dev-google-user"));
         service.signup(signup("새닉네임", 1990, PHONE, true, key));
         verify(socialMapper).insertLink(100L, "GOOGLE", "dev-google-user");
+        verify(notificationService).notifyQuietly(100L, "WELCOME", "Avenue에 오신 것을 환영해요",
+                "내 정보를 입력하고 재무 진단을 시작해 보세요.", "/data-input");
         assertThat(socialStore.findLinkKey(key)).isEmpty();
         assertThat(codeOf(() -> service.signup(signup("새닉네임", 1990, PHONE, true, "unknown-key")))).isEqualTo("400 SOCIAL_LINK_EXPIRED");
     }

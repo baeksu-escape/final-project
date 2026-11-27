@@ -24,6 +24,7 @@ import com.baeksuescape.community.dto.CommentRow;
 import com.baeksuescape.community.dto.PostRow;
 import com.baeksuescape.community.mapper.BoardMapper;
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.notification.service.NotificationService;
 
 // FP-192 N-06 신용 라운지 글·댓글 — 목록·상세(N-06-1), 글 작성(N-06-2), 댓글(N-06-3), 내 글 수정·삭제(N-06-5·6, 11/15 추가).
 // 내가 쓴 댓글 목록과 내 댓글 수정·삭제(N-06, FP-279·280). 숨김 글·댓글은 제목·내용을 비워서 보내고, 삭제 글은 목록·상세에서 뺀다.
@@ -39,11 +40,13 @@ public class BoardService {
     private final BoardMapper boardMapper;
     private final ContentStatusService contentStatus;
     private final Clock clock;
+    private final NotificationService notificationService;
 
-    public BoardService(BoardMapper boardMapper, ContentStatusService contentStatus, Clock clock) {
+    public BoardService(BoardMapper boardMapper, ContentStatusService contentStatus, Clock clock, NotificationService notificationService) {
         this.boardMapper = boardMapper;
         this.contentStatus = contentStatus;
         this.clock = clock;
+        this.notificationService = notificationService;
     }
 
     // N-06-1 글 목록 한 쪽(최신순, 기본 10개). 검색어는 보이는 글의 제목·내용에서 찾는다.
@@ -158,6 +161,12 @@ public class BoardService {
         row.setContent(request.content().trim());
         row.setCreatedAt(LocalDateTime.now(clock));
         boardMapper.insertComment(row);
+        if (!Objects.equals(post.getUserId(), userId)) {
+            // D-23 글쓴이 본인 댓글은 제외하고 "글 제목 앞부분 + 댓글 앞부분"으로 새 댓글 알림을 보낸다(닉네임은 넣지 않음).
+            String excerpt = "「" + leadingText(post.getTitle(), 20) + "」에 달린 댓글: " + leadingText(row.getContent(), 30);
+            notificationService.notifyQuietly(post.getUserId(), "COMMENT_NEW", "내 글에 새 댓글이 달렸어요", excerpt,
+                    "/lounge?post=" + postId);
+        }
         return new BoardDtos.CommentCreated(row.getCommentId());
     }
 
@@ -243,5 +252,13 @@ public class BoardService {
 
     private static boolean isMine(Long ownerUserId, long userId) {
         return Objects.equals(ownerUserId, userId);
+    }
+
+    // D-23 알림 미리보기용 — 줄바꿈을 공백으로 바꾸고 앞에서 max 글자(코드 포인트)까지만 남기며, 잘리면 "…"를 붙인다.
+    private static String leadingText(String text, int max) {
+        String oneLine = text == null ? "" : text.replaceAll("\\s+", " ").trim();
+        int count = oneLine.codePointCount(0, oneLine.length());
+        if (count <= max) return oneLine;
+        return oneLine.substring(0, oneLine.offsetByCodePoints(0, max)) + "…";
     }
 }

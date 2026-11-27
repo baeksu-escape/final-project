@@ -40,6 +40,7 @@ import LoungePage from '../../features/community/pages/LoungePage.jsx'
 import ComparisonPage from '../../features/comparison/pages/ComparisonPage.jsx'
 import LoanProductsPage from '../../features/loans/pages/LoanProductsPage.jsx'
 import LoanProductDetailPage from '../../features/loans/pages/LoanProductDetailPage.jsx'
+import NotificationsPage from '../../features/notification/pages/NotificationsPage.jsx'
 
 // 앱 전체 라우트. 다른 팀은 자기 화면의 element 한 줄만 바꾼다(가드·경로 구조는 그대로 둔다).
 export default function AppRoutes() {
@@ -95,6 +96,7 @@ export default function AppRoutes() {
 
           {/* 일반 사용자 전용, 직군 선택 전에도 연다 — N-08-1 직군 선택·데이터 입력 중에도 헤더의 [마이 페이지]로 들어온다(PR #45 검토) */}
           <Route element={<RouteGuard requiredRole={ROLES.USER} />}>
+            <Route path={PATHS.NOTIFICATIONS} element={<NotificationsPage />} />
             {/* 한눈에(홈) — 회원가입 직후 바로 온다. 직군·점수가 없으면 시작 안내를 보여 준다 */}
             <Route path={PATHS.DASHBOARD} element={<HomePage />} />
             <Route path={PATHS.MY_PAGE} element={<MyPage />} />

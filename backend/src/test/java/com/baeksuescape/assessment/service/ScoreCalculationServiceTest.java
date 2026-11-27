@@ -34,6 +34,7 @@ import com.baeksuescape.assessment.dto.AssessmentRows.FactorRow;
 import com.baeksuescape.assessment.dto.ScoreDtos;
 import com.baeksuescape.assessment.mapper.AssessmentMapper;
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.notification.service.NotificationService;
 import com.baeksuescape.user.dto.DataInputDtos;
 import com.baeksuescape.user.dto.UserAccount;
 import com.baeksuescape.user.service.DataInputUsers;
@@ -59,12 +60,14 @@ class ScoreCalculationServiceTest {
     private FinancialInputService financialInput;
     @Mock
     private DataInputUsers users;
+    @Mock
+    private NotificationService notificationService;
 
     private ScoreCalculationService service;
 
     @BeforeEach
     void setUp() {
-        service = new ScoreCalculationService(mapper, assembler, prediction, financialInput, users, new ObjectMapper());
+        service = new ScoreCalculationService(mapper, assembler, prediction, financialInput, users, new ObjectMapper(), notificationService);
         lenient().when(users.now()).thenReturn(NOW);
         lenient().when(users.toOffset(any())).thenAnswer(inv -> inv.getArgument(0) == null ? null
                 : ((LocalDateTime) inv.getArgument(0)).atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime());
@@ -206,6 +209,7 @@ class ScoreCalculationServiceTest {
 
         assertThat(response.gradeStatusCode()).isEqualTo("NOT_SCORABLE");
         assertThat(response.notScorableReasonCode()).isEqualTo("STALE_INPUT");
+        verify(notificationService, never()).notifyQuietly(eq(USER_ID), eq("SCORE_NEW"), anyString(), anyString(), anyString());
         assertThat(response.alternative()).isNull();
         verify(prediction, never()).score(any());
         ArgumentCaptor<AssessmentRow> row = ArgumentCaptor.forClass(AssessmentRow.class);
@@ -334,6 +338,8 @@ class ScoreCalculationServiceTest {
 
         assertThat(response.gradeStatusCode()).isEqualTo("SCORED");
         assertThat(response.alternative().score()).isEqualTo(639);
+        verify(notificationService).notifyQuietly(USER_ID, "SCORE_NEW", "새 신용 점수가 나왔어요",
+                "내 신용에서 새 평가 결과를 확인해 보세요.", "/report");
         assertThat(response.traditional().score()).isEqualTo(602);
         assertThat(response.calculatedAt()).isNotNull();
 

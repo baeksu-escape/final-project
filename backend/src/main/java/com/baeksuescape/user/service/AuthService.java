@@ -18,6 +18,7 @@ import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.global.security.JwtTokenProvider;
 import com.baeksuescape.global.util.PiiCrypto;
 import com.baeksuescape.global.util.PiiHmac;
+import com.baeksuescape.notification.service.NotificationService;
 import com.baeksuescape.user.dto.AuthRequests;
 import com.baeksuescape.user.dto.AuthResponses;
 import com.baeksuescape.user.dto.UserAccount;
@@ -47,11 +48,12 @@ public class AuthService {
     private final Clock clock;
     private final AdminAuthService adminAuth;
     private final SystemLogService systemLog;
+    private final NotificationService notificationService;
 
     public AuthService(UserAccountMapper userMapper, UserConsentMapper consentMapper, UserSocialAccountMapper socialMapper,
             EmailVerificationService emailVerification, PhoneVerificationService phoneVerification, DevSocialStore socialStore,
             UserViewFactory userViews, JwtTokenProvider tokenProvider, PasswordEncoder passwordEncoder, PiiCrypto crypto, PiiHmac hmac, Clock clock,
-            AdminAuthService adminAuth, SystemLogService systemLog) {
+            AdminAuthService adminAuth, SystemLogService systemLog, NotificationService notificationService) {
         this.userMapper = userMapper;
         this.consentMapper = consentMapper;
         this.socialMapper = socialMapper;
@@ -66,6 +68,7 @@ public class AuthService {
         this.clock = clock;
         this.adminAuth = adminAuth;
         this.systemLog = systemLog;
+        this.notificationService = notificationService;
     }
 
     // AUTH-01 로그인. 일반 사용자는 토큰을 준다(응답 그대로).
@@ -177,6 +180,9 @@ public class AuthService {
             socialMapper.insertLink(account.getUserId(), socialLink.providerCode(), socialLink.providerUserId());
             socialStore.removeLinkKey(request.socialLinkKey());
         }
+        // D-23 일반·소셜 가입이 모두 끝난 뒤 환영 알림을 보낸다.
+        notificationService.notifyQuietly(account.getUserId(), "WELCOME", "Avenue에 오신 것을 환영해요",
+                "내 정보를 입력하고 재무 진단을 시작해 보세요.", "/data-input");
         return new AuthResponses.Signup(account.getUserId());
     }
 

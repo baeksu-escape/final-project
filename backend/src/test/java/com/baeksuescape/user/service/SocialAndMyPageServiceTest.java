@@ -32,6 +32,7 @@ import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.global.config.AvenueProperties;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.security.JwtTokenProvider;
+import com.baeksuescape.notification.service.NotificationService;
 import com.baeksuescape.user.dto.AuthRequests;
 import com.baeksuescape.user.dto.AuthResponses;
 import com.baeksuescape.user.dto.MyPageDtos;
@@ -71,7 +72,7 @@ class SocialAndMyPageServiceTest {
         // 휴대폰 인증(PhoneVerificationService)은 가입에서만 쓰므로 간편 로그인·마이 페이지 시험에서는 비워 둔다.
         AuthService auth = new AuthService(userMapper, consentMapper, socialMapper, emailVerification, null, store, views, tokenProvider,
                 ENCODER, CRYPTO, HMAC, CLOCK, null,
-                new SystemLogService(mock(SystemLogMapper.class), TransactionOperations.withoutTransaction(), CLOCK));
+                new SystemLogService(mock(SystemLogMapper.class), TransactionOperations.withoutTransaction(), CLOCK), mock(NotificationService.class));
         social = new SocialLoginService(properties, store, socialMapper, userMapper, auth);
         myPage = new MyPageService(userMapper, financialInputMapper, emailVerification, views, ENCODER, CRYPTO, HMAC, CLOCK);
     }

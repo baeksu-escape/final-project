@@ -23,6 +23,7 @@ import com.baeksuescape.assessment.dto.ScoreDtos;
 import com.baeksuescape.assessment.mapper.AssessmentMapper;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
+import com.baeksuescape.notification.service.NotificationService;
 import com.baeksuescape.user.dto.DataInputDtos;
 import com.baeksuescape.user.dto.UserAccount;
 import com.baeksuescape.user.service.DataInputUsers;
@@ -56,15 +57,17 @@ public class ScoreCalculationService {
     private final FinancialInputService financialInput;
     private final DataInputUsers users;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
 
     public ScoreCalculationService(AssessmentMapper mapper, ScoreInputAssembler assembler, PredictionClient prediction,
-            FinancialInputService financialInput, DataInputUsers users, ObjectMapper objectMapper) {
+            FinancialInputService financialInput, DataInputUsers users, ObjectMapper objectMapper, NotificationService notificationService) {
         this.mapper = mapper;
         this.assembler = assembler;
         this.prediction = prediction;
         this.financialInput = financialInput;
         this.users = users;
         this.objectMapper = objectMapper;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -279,6 +282,9 @@ public class ScoreCalculationService {
         }
         log.info("assessment saved requestId={} status={} reason={}", row.getRequestId(), row.getGradeStatusCode(),
                 row.getNotScorableReasonCode());
+        // D-23 점수 산출 성공(SCORED)을 저장한 뒤 새 결과 알림을 보낸다.
+        if (SCORED.equals(row.getGradeStatusCode())) notificationService.notifyQuietly(row.getUserId(), "SCORE_NEW",
+                "새 신용 점수가 나왔어요", "내 신용에서 새 평가 결과를 확인해 보세요.", "/report");
         return toResponse(row);
     }
 

@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
@@ -33,6 +34,7 @@ import com.baeksuescape.community.dto.ReportRow;
 import com.baeksuescape.community.mapper.BoardMapper;
 import com.baeksuescape.community.mapper.ReportMapper;
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.notification.service.NotificationService;
 
 // FP-193 N-34 관리자 신고 처리 — 대상별로 묶은 목록(N-34-1), 신고자 가림(N-34-2), 숨김 유지·삭제·반려(N-34-3).
 @ExtendWith(MockitoExtension.class)
@@ -47,13 +49,16 @@ class AdminReportServiceTest {
     private ReportMapper reportMapper;
     @Mock
     private AppSettingService settings;
+    @Mock
+    private NotificationService notificationService;
 
     private AdminReportService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminReportService(reportMapper, new ContentStatusService(boardMapper), settings, CLOCK);
+        service = new AdminReportService(reportMapper, new ContentStatusService(boardMapper), settings, CLOCK, notificationService);
         given(settings.intValue("REPORT_AUTO_HIDE_COUNT", 5)).willReturn(5);
+        given(reportMapper.selectReporterUserId(anyLong())).willReturn(9L);
     }
 
     private static ReportRow report(long reportId, String type, long targetId, String reason, String status, String targetStatus,
@@ -133,6 +138,9 @@ class AdminReportServiceTest {
         assertThat(result.targetStatus()).isEqualTo("VISIBLE");
         assertThat(result.handledCount()).isEqualTo(5);
         verify(boardMapper).insertPostLog(1L, "RESTORE", "ADMIN", ADMIN, "HIDDEN_BY_REPORT", "VISIBLE", 12L, NOW);
+        verify(notificationService).notifyQuietly(9L, "REPORT_RESULT", "신고 처리 결과가 있어요",
+                "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=1");
+        verify(notificationService, never()).notifyQuietly(eq(OTHER), eq("REPORT_RESULT"), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -146,6 +154,10 @@ class AdminReportServiceTest {
 
         assertThat(result.targetStatus()).isEqualTo("DELETED");
         verify(boardMapper).insertPostLog(1L, "DELETE", "ADMIN", ADMIN, "HIDDEN_BY_REPORT", "DELETED", 12L, NOW);
+        verify(notificationService).notifyQuietly(9L, "REPORT_RESULT", "신고 처리 결과가 있어요",
+                "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=1");
+        verify(notificationService).notifyQuietly(OTHER, "REPORT_RESULT", "내 글이 운영 정책에 따라 삭제됐어요",
+                "운영 정책에 따라 게시물이 삭제 처리되었어요.", "/lounge?post=1");
         verify(reportMapper).closeOpenReports("POST", 1L, "DONE", "DELETE", ADMIN, null, NOW);
     }
 

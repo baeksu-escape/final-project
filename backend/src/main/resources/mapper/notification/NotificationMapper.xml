@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FP-284·D-23 회원 본인 알림을 USER_NOTIFICATION에서 조회하고 기록한다. -->
+<mapper namespace="com.baeksuescape.notification.mapper.NotificationMapper">
+    <sql id="columns">
+        NOTIFICATION_ID AS notificationId, USER_ID AS userId,
+        NOTIFICATION_TYPE_CODE AS typeCode, TITLE AS title, CONTENT AS content,
+        LINK_URL AS linkUrl, READ_AT AS readAt, CREATED_AT AS createdAt
+    </sql>
+    <select id="selectLatest" resultType="com.baeksuescape.notification.dto.NotificationRow">
+        SELECT <include refid="columns"/> FROM USER_NOTIFICATION
+         WHERE USER_ID = #{userId}
+         ORDER BY CREATED_AT DESC, NOTIFICATION_ID DESC
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
+    <!-- FP-300·D-23 읽음 여부·종류·커서 조건을 적용하고 다음 페이지 확인용으로 요청 수보다 한 건 더 조회한다. 커서(before)가 알림 번호라 정렬도 알림 번호 기준으로 맞춘다. -->
+    <select id="selectFiltered" resultType="com.baeksuescape.notification.dto.NotificationRow">
+        SELECT <include refid="columns"/> FROM USER_NOTIFICATION
+         WHERE USER_ID = #{userId}
+        <if test="unreadOnly">AND READ_AT IS NULL</if>
+        <if test="typeCode != null">AND NOTIFICATION_TYPE_CODE = #{typeCode}</if>
+        <if test="before != null">AND NOTIFICATION_ID &lt; #{before}</if>
+         ORDER BY NOTIFICATION_ID DESC
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
+    <select id="countUnread" resultType="long">
+        SELECT COUNT(*) FROM USER_NOTIFICATION WHERE USER_ID = #{userId} AND READ_AT IS NULL
+    </select>
+    <select id="selectOwned" resultType="com.baeksuescape.notification.dto.NotificationRow">
+        SELECT <include refid="columns"/> FROM USER_NOTIFICATION
+         WHERE USER_ID = #{userId} AND NOTIFICATION_ID = #{notificationId}
+    </select>
+    <update id="markRead">
+        UPDATE USER_NOTIFICATION SET READ_AT = #{now}
+         WHERE USER_ID = #{userId} AND NOTIFICATION_ID = #{notificationId} AND READ_AT IS NULL
+    </update>
+    <update id="markAllRead">
+        UPDATE USER_NOTIFICATION SET READ_AT = #{now}
+         WHERE USER_ID = #{userId} AND READ_AT IS NULL
+    </update>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="notificationId" keyColumn="NOTIFICATION_ID">
+        INSERT INTO USER_NOTIFICATION
+            (USER_ID, NOTIFICATION_TYPE_CODE, TITLE, CONTENT, LINK_URL, CREATED_AT)
+        VALUES
+            (#{userId}, #{typeCode}, #{title}, #{content}, #{linkUrl}, #{createdAt})
+    </insert>
+</mapper>
