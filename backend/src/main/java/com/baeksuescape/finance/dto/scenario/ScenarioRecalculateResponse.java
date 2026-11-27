@@ -25,7 +25,7 @@ public record ScenarioRecalculateResponse(
                 assumptions, List.of());
     }
 
-    /** 한쪽(지금 또는 조건 반영 후)의 월 소득·지출·상환액·잉여(원)와 상환 부담률(%, 소득이 0 이하이면 null) */
+    /** 한쪽(지금 또는 조건 반영 후)의 월 소득·지출·상환액·여유 자금(원)와 상환 부담률(%, 소득이 0 이하이면 null) */
     public record Side(Long monthlyIncomeAmount, Long monthlyExpenseAmount, Long monthlyPaymentAmount,
             Long monthlySurplusAmount, BigDecimal dsrPct) {
     }

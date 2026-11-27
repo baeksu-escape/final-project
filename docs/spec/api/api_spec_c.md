@@ -390,7 +390,7 @@
 
 ## N-17 시나리오 테스트 (FP-167, 담당 광희) 🆕 11/20
 
-로그인 회원의 저장 데이터에 금리·소득·지출 변화를 넣어 **상환 여력**(월 잉여, 상환 부담률, 월 이자 변화, 버틸 수 있는 개월 수)을 다시 계산한다. **점수는 구하지 않고**(점수 예측은 N-21 DIAG-09) **저장하지 않는다**.
+로그인 회원의 저장 데이터에 금리·소득·지출 변화를 넣어 **상환 여력**(월 여유 자금, 상환 부담률, 월 이자 변화, 버틸 수 있는 개월 수)을 다시 계산한다. **점수는 구하지 않고**(점수 예측은 N-21 DIAG-09) **저장하지 않는다**.
 
 - 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(DIAG-04, 프론트 mock만 있음)를 아래 두 경로로 대신한다. 기준값을 서버가 저장 데이터에서 읽으므로 요청에 기준값을 보내지 않는다.
 - 로그인 확인은 보안 설정이 한다: 토큰 없음 `401 UNAUTHORIZED`, 관리자 계정 `403 FORBIDDEN`(`/api/members/me/**`는 `ROLE_USER` 전용).
@@ -429,7 +429,7 @@
     "policyRate": { "baseDate": "2026-10-31", "ratePct": 3.000 },
     "assumptions": ["금리 변화는 변동금리 대출에만 반영하고, …"],
     "loanItems": [
-      { "loanId": 101, "loanTypeName": "신용대출", "annualRatePct": 8.9, "rateTypeCode": "VARIABLE", "monthlyPaymentAmount": 200000, "balanceAmount": 12000000 },
+      { "loanId": 101, "loanTypeName": "신용대출", "annualRatePct": 5, "rateTypeCode": "VARIABLE", "monthlyPaymentAmount": 200000, "balanceAmount": 12000000 },
       { "loanId": 102, "loanTypeName": "주택담보대출", "annualRatePct": 4.2, "rateTypeCode": "FIXED", "monthlyPaymentAmount": 150000, "balanceAmount": 18000000 }
     ] }
   ```
@@ -469,7 +469,7 @@
   { "current": { "monthlyIncomeAmount": 2099498, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 350000, "monthlySurplusAmount": 433984, "dsrPct": 16.67 },
     "changed": { "monthlyIncomeAmount": 1259699, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 370000, "monthlySurplusAmount": -425815, "dsrPct": 29.37 },
     "monthlyInterestChangeAmount": 20000, "surplusDiffAmount": -859799, "survivableMonths": 10, "verdict": "SHORTFALL",
-    "loanItems": [ { "loanId": 101, "loanTypeName": "신용대출", "annualRatePct": 8.9, "rateTypeCode": "VARIABLE", "monthlyPaymentAmount": 200000, "balanceAmount": 12000000 },
+    "loanItems": [ { "loanId": 101, "loanTypeName": "신용대출", "annualRatePct": 5, "rateTypeCode": "VARIABLE", "monthlyPaymentAmount": 200000, "balanceAmount": 12000000 },
                    { "loanId": 102, "loanTypeName": "주택담보대출", "annualRatePct": 4.2, "rateTypeCode": "FIXED", "monthlyPaymentAmount": 150000, "balanceAmount": 18000000 } ],
     "assumptions": ["금리 변화는 변동금리 대출 잔액에만 반영하고, …"] }
   ```
