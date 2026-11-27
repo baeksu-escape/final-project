@@ -98,7 +98,7 @@ a.dash-card:hover {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-around;
-  gap: 28px;
+  gap: 20px;
 }
 
 .dash-score__facts {
@@ -269,3 +269,69 @@ a.dash-card:hover {
   color: var(--bad);
   font-size: 15px;
 }
+
+/* 점수 길 카드 아래 숫자 3칸 */
+.dash-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 18px 0 4px;
+  border-top: 1px solid var(--line);
+}
+
+.dash-facts dt { color: var(--mut2); font-size: 14px; font-weight: 600; }
+.dash-facts dd { margin: 2px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -0.03em; }
+.dash-facts small { margin-left: 2px; color: var(--mut); font-size: 14px; font-weight: 700; }
+.dash-facts .is-up { color: var(--mint); }
+.dash-facts .is-down { color: var(--bad); }
+
+/* 길 카드와 높이가 달라도 추이 그래프를 카드 가운데에 */
+.dash-trend .viz-trend { margin: auto 0; }
+
+/* 가입 직후처럼 점수가 없을 때의 시작 안내 — 세 단계와 시작 버튼 */
+.dash-start {
+  align-items: flex-start;
+}
+
+.dash-start h2 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.dash-start__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-start__steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 10px 10px;
+  border-radius: 999px;
+  background: var(--panel2);
+  color: var(--mut);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dash-start__steps b {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--fg2);
+  font-size: 13px;
+}
+
+.dash-start__steps li.is-on { color: var(--fg); background: var(--sel); }
+.dash-start__steps li.is-on b { background: var(--acc); color: var(--pri-fg); }
+.dash-start__steps li.is-done b { background: var(--mint); color: var(--pri-fg); }

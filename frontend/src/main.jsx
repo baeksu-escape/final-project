@@ -5,6 +5,8 @@ import './common/styles/tokens.css'
 import './common/styles/forms.css'
 import './common/styles/components.css'
 import './common/styles/layout.css'
+// 핀테크형 입력 화면(로그인·가입·찾기·직군 선택·데이터 입력의 .fin-form)
+import './common/styles/finForm.css'
 import App from './App.jsx'
 import { applyTheme, readTheme } from './common/utils/theme.js'
 
