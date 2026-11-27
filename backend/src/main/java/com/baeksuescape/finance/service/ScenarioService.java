@@ -27,7 +27,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * FP-167 N-17 시나리오 테스트 — 로그인 회원의 저장값(N-17-1)에 금리·소득·지출 변화(N-17-2)를 공통 재계산 틀(N-17-3)로 반영해
- * 월 잉여·상환 부담률·월 이자 변화·버틸 수 있는 개월 수(N-17-4)를 구한다. 점수는 구하지 않는다(점수 예측은 N-21).
+ * 월 여유 자금·상환 부담률·월 이자 변화·버틸 수 있는 개월 수(N-17-4)를 구한다. 점수는 구하지 않는다(점수 예측은 N-21).
  * 결과는 저장하지 않는다.
  */
 @Service
@@ -136,7 +136,7 @@ public class ScenarioService {
                 ASSUMPTIONS, loanItems);
     }
 
-    /** 월 잉여 = 소득 − 지출 − 상환액, 상환 부담률은 N-16-1·N-20-4와 같은 함수(연 원리금 ÷ 연소득)로 구한다. */
+    /** 월 여유 자금 = 소득 − 지출 − 상환액, 상환 부담률은 N-16-1·N-20-4와 같은 함수(연 원리금 ÷ 연소득)로 구한다. */
     private static Side side(long income, long expense, long payment) {
         BigDecimal dsr = FinancialHealthCalculator.calculateRepaymentBurdenRatio(
                 BigDecimal.valueOf(payment).multiply(TWELVE), BigDecimal.valueOf(income).multiply(TWELVE));
@@ -152,7 +152,7 @@ public class ScenarioService {
                 .divide(HUNDRED.multiply(BigDecimal.valueOf(-changedSurplus)), 0, RoundingMode.DOWN).longValueExact();
     }
 
-    /** 적자면 SHORTFALL, 지금보다 잉여가 늘면 IMPROVED, 그 밖(흑자 유지)은 STILL_POSITIVE (시나리오 화면과 같은 규칙) */
+    /** 적자면 SHORTFALL, 지금보다 여유 자금이 늘면 IMPROVED, 그 밖(흑자 유지)은 STILL_POSITIVE (시나리오 화면과 같은 규칙) */
     static String verdict(long changedSurplus, long surplusDiff) {
         if (changedSurplus < 0) {
             return SHORTFALL;

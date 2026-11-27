@@ -1,20 +1,6 @@
 // N-17-2 시나리오 입력 설정 — 상황 버튼과 슬라이더·직접 입력 범위는 확정 UI 초안 값이다(시연 설정, 계산 규칙 아님).
 export const BASE_PRESET = { id: 'base', label: '현재 상황으로 되돌리기', ratePctPoint: 0, incomePct: 0, expensePct: 0 }
 
-export const WORSE_PRESETS = [
-  { id: 'rate1', label: '금리 +1%p', ratePctPoint: 1, incomePct: 0, expensePct: 0 },
-  { id: 'rate2', label: '금리 +2%p', ratePctPoint: 2, incomePct: 0, expensePct: 0 },
-  { id: 'income-20', label: '소득 −20%', ratePctPoint: 0, incomePct: -20, expensePct: 0 },
-  { id: 'worse', label: '악화 복합 (금리 +1%p · 소득 −20% · 지출 +10%)', ratePctPoint: 1, incomePct: -20, expensePct: 10 },
-]
-
-export const BETTER_PRESETS = [
-  { id: 'rate-1', label: '금리 −1%p', ratePctPoint: -1, incomePct: 0, expensePct: 0 },
-  { id: 'income10', label: '소득 +10%', ratePctPoint: 0, incomePct: 10, expensePct: 0 },
-  { id: 'expense-10', label: '지출 −10%', ratePctPoint: 0, incomePct: 0, expensePct: -10 },
-  { id: 'better', label: '호전 복합 (금리 −0.5%p · 소득 +10% · 지출 −10%)', ratePctPoint: -0.5, incomePct: 10, expensePct: -10 },
-]
-
 // 슬라이더 범위(slider*)와 직접 입력 범위(input*)는 다르다. 직접 입력은 더 넓게 받는다.
 // N-17-2 항목 이름은 화면에 표시하고 help는 입력 칸 아래에 짧게 설명한다.
 export const SCENARIO_FIELDS = [
