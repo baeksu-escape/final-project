@@ -12,6 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -24,6 +25,7 @@ import org.springframework.web.context.request.async.AsyncRequestNotUsableExcept
 
 import com.baeksuescape.global.exception.GlobalExceptionHandler;
 import com.baeksuescape.global.security.AuthUser;
+import com.baeksuescape.global.security.JwtTokenProvider;
 import com.baeksuescape.notification.controller.NotificationController;
 import com.baeksuescape.notification.service.NotificationService;
 import com.baeksuescape.notification.service.NotificationStreamService;
@@ -46,14 +48,16 @@ class NotificationDisconnectExceptionHandlerTest {
         verifyNoInteractions(globalHandler);
     }
 
+    // D-23 FP-284 연결 중단 응답 처리 중에도 스트림 전용 예외 처리가 적용되는지 확인한다.
     @Test
     @DisplayName("MVC 예외 처리에서도 끊긴 스트림에 본문을 쓰지 않는다")
     void streamDisconnect_throughMvcLeavesResponseEmpty() throws Exception {
         NotificationStreamService streamService = mock(NotificationStreamService.class);
-        org.mockito.BDDMockito.given(streamService.register(7L)).willAnswer(invocation -> {
+        org.mockito.BDDMockito.given(streamService.register(7L, null)).willAnswer(invocation -> {
             throw new AsyncRequestNotUsableException("connection closed");
         });
-        NotificationController controller = new NotificationController(mock(NotificationService.class), streamService);
+        NotificationController controller = new NotificationController(mock(NotificationService.class), streamService,
+                mock(JwtTokenProvider.class));
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(handler)
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override public boolean supportsParameter(MethodParameter parameter) {
@@ -65,7 +69,7 @@ class NotificationDisconnectExceptionHandlerTest {
                     }
                 }).build();
 
-        mockMvc.perform(get("/api/members/me/notifications/stream"))
+        mockMvc.perform(get("/api/members/me/notifications/stream").header(HttpHeaders.AUTHORIZATION, "Bearer token"))
                 .andExpect(content().string(""));
         verifyNoInteractions(globalHandler);
     }

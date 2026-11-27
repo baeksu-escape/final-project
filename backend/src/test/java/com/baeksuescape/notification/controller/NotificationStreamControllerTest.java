@@ -12,6 +12,7 @@ import com.baeksuescape.global.security.JwtTokenProvider;
 import com.baeksuescape.notification.service.NotificationService;
 import com.baeksuescape.notification.service.NotificationStreamService;
 import com.baeksuescape.user.mapper.UserAccountMapper;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,19 +44,23 @@ class NotificationStreamControllerTest {
         given(userAccountMapper.selectAccountStatus(anyLong())).willReturn("ACTIVE");
     }
 
+    // D-23 FP-284 Authorization 토큰의 만료 시각을 스트림 연결 등록에 전달하는지 확인한다.
     @Test
     @DisplayName("로그인 회원 토큰으로 스트림을 열면 text/event-stream으로 응답하고 그 회원의 연결을 등록한다")
     void stream_opensEventStream() throws Exception {
         SseEmitter emitter = new SseEmitter();
         emitter.send(SseEmitter.event().name("connected").data("ok"));
-        given(streamService.register(7L)).willReturn(emitter);
+        String token = tokenProvider.issue(7, "ROLE_USER");
+        Instant expiresAt = tokenProvider.issuedAt(token).orElseThrow()
+                .plusSeconds(tokenProvider.lifetimeSeconds());
+        given(streamService.register(7L, expiresAt)).willReturn(emitter);
 
-        mockMvc.perform(get(PATH).header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.issue(7, "ROLE_USER"))
+        mockMvc.perform(get(PATH).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .accept(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(request().asyncStarted())
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
-        verify(streamService).register(7L);
+        verify(streamService).register(7L, expiresAt);
     }
 
     @Test

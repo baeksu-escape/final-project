@@ -1,5 +1,6 @@
 import { apiGet, apiPatch } from '../../../common/api/client.js'
-import '../mocks/notificationMockHandlers.js'
+import { USE_MOCK } from '../../../common/config/env.js'
+import { registerNotificationReadMock } from '../mocks/notificationMockHandlers.js'
 
 export const NOTIFICATION_API = Object.freeze({
   LIST: '/api/members/me/notifications',
@@ -18,5 +19,9 @@ export function fetchNotifications({ unreadOnly = false, type, before, size } = 
   const queryText = query.toString()
   return apiGet(queryText ? `${NOTIFICATION_API.LIST}?${queryText}` : NOTIFICATION_API.LIST)
 }
-export const markNotificationRead = (id) => apiPatch(NOTIFICATION_API.read(id))
+// D-23 mock 경로는 정확히 매칭되므로 ID별 읽음 핸들러를 요청 전에 등록한다.
+export const markNotificationRead = (id) => {
+  if (USE_MOCK) registerNotificationReadMock(id)
+  return apiPatch(NOTIFICATION_API.read(id))
+}
 export const markAllNotificationsRead = () => apiPatch(NOTIFICATION_API.READ_ALL)

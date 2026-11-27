@@ -27,16 +27,33 @@ export default function NotificationBell({ enabled = true }) {
   const [open, setOpen] = useState(false)
   const [actionError, setActionError] = useState('')
   const rootRef = useRef(null)
+  const triggerRef = useRef(null)
+  const panelRef = useRef(null)
   const navigate = useNavigate()
   const notifications = useNotifications(enabled)
 
   useEffect(() => {
-    const closeOutside = (event) => { if (!rootRef.current?.contains(event.target)) setOpen(false) }
-    const closeEscape = (event) => { if (event.key === 'Escape') setOpen(false) }
+    if (!open) return undefined
+    // D-23 패널 바깥 클릭은 닫고 종 버튼으로 포커스를 돌린다.
+    const closeOutside = (event) => {
+      if (!rootRef.current?.contains(event.target)) {
+        setOpen(false)
+        window.requestAnimationFrame(() => triggerRef.current?.focus())
+      }
+    }
+    // D-23 Esc는 알림 패널을 닫고 다시 연 종 버튼에 포커스를 둔다.
+    const closeEscape = (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
     document.addEventListener('pointerdown', closeOutside)
     document.addEventListener('keydown', closeEscape)
     return () => { document.removeEventListener('pointerdown', closeOutside); document.removeEventListener('keydown', closeEscape) }
-  }, [])
+  }, [open])
+
+  useEffect(() => { if (open) panelRef.current?.focus() }, [open])
 
   const selectItem = async (item) => {
     try {
@@ -57,11 +74,11 @@ export default function NotificationBell({ enabled = true }) {
 
   return (
     <div className="nt-root" ref={rootRef}>
-      <button type="button" className="app-header__text-btn" aria-expanded={open} aria-controls="notification-panel" aria-label={notifications.unreadCount > 0 ? `알림, 안 읽은 알림 ${notifications.unreadCount}개` : '알림'} onClick={() => { setOpen((value) => !value); setActionError('') }}>
+      <button ref={triggerRef} type="button" className="app-header__text-btn" aria-expanded={open} aria-controls={open ? 'notification-panel' : undefined} aria-label={notifications.unreadCount > 0 ? `알림, 안 읽은 알림 ${notifications.unreadCount}개` : '알림'} onClick={() => { setOpen((value) => !value); setActionError('') }}>
         <span className="nt-bell"><BellIcon />{notifications.unreadCount > 0 && <span className="nt-badge">{notifications.unreadCount > 99 ? '99+' : notifications.unreadCount}</span>}</span>
       </button>
-      {open && <section className="nt-panel" id="notification-panel" aria-label="안 읽은 알림 목록">
-        <header className="nt-panel__head"><strong>알림</strong><span className="nt-panel__actions"><button type="button" className="nt-read-all" disabled={notifications.unreadCount === 0} onClick={readAll}>모두 읽음</button><Link className="text-link nt-all-link" to={PATHS.NOTIFICATIONS} onClick={() => setOpen(false)}>전체 보기</Link></span></header>
+      {open && <section ref={panelRef} className="nt-panel" id="notification-panel" role="region" aria-labelledby="notification-panel-title" tabIndex={-1}>
+        <header className="nt-panel__head"><strong id="notification-panel-title">안 읽은 알림</strong><span className="nt-panel__actions"><button type="button" className="nt-read-all" disabled={notifications.unreadCount === 0} onClick={readAll}>모두 읽음</button><Link className="text-link nt-all-link" to={PATHS.NOTIFICATIONS} onClick={() => setOpen(false)}>전체 보기</Link></span></header>
         {notifications.loading ? <p className="hint">알림을 불러오는 중이에요.</p>
           : notifications.error ? <p className="hint" role="status">{notifications.error}</p>
             : notifications.items.length === 0 ? <p className="hint">새 알림이 없어요.</p>

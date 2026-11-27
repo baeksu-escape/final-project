@@ -98,6 +98,7 @@
 --     5분 제한을 UPDATED_AT 대신 이 시각으로 잰다. 기존 DB는 alter_app_user_last_login_fail_at.sql(이미 있는 행은 NULL).
 --     LOGIN_FAIL_COUNT 열 주석도 지금 동작(5회째 5분 제한, 누적 10회 잠금)으로 고쳤다(기존 DB는 같은 alter 끝의 COMMENT ON COLUMN).
 --     ACCOUNT_STATUS_CODE 열 주석의 자동 잠금 횟수도 5회 → 10회로 바로잡았다(PR #173 검수, 주석만, 기존 DB는 같은 alter 끝의 COMMENT ON COLUMN).
+--  C19 [2026-11-27 · FP-300 알림 검수] USER_NOTIFICATION (USER_ID, NOTIFICATION_ID) 인덱스 추가. 기존 DB는 add_index_user_notification_id.sql.
 -- ====================================================================
 
 
@@ -1274,6 +1275,8 @@ COMMENT ON COLUMN USER_NOTIFICATION.READ_AT IS '읽은 시각. NULL이면 안 �
 COMMENT ON COLUMN USER_NOTIFICATION.CREATED_AT IS '알림 생성 시각';
 -- D-23 회원별 최신 알림 목록 조회를 위한 인덱스.
 CREATE INDEX IX_UNT_USER_CREATED ON USER_NOTIFICATION (USER_ID, CREATED_AT);
+-- v0.3.2 (C19) 회원별 알림 번호 커서 페이지 조회용 인덱스
+CREATE INDEX IX_UNT_USER_NOTI_ID ON USER_NOTIFICATION (USER_ID, NOTIFICATION_ID);
 
 -- 설정값 (신고 자동 숨김 기준·하루 신고 횟수·챗봇 하루 질문 횟수 등).
 CREATE TABLE APP_SETTING (

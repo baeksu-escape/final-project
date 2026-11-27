@@ -17,6 +17,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.concurrent.Executor;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +35,7 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.notification.dto.NotificationCreatedEvent;
@@ -105,6 +111,49 @@ class NotificationServiceTest {
         assertThatCode(() -> service.notifyQuietly(7L, "WELCOME", "환영", "시작해 보세요", "/data-input"))
                 .doesNotThrowAnyException();
         verify(mapper, never()).insert(any());
+    }
+
+    // D-23 FP-301 작은 알림 실행기가 막혀 있어도 호출 작업은 빠르게 반환하고 큐 초과는 예외로 번지지 않는지 확인한다.
+    @Test
+    @DisplayName("실행기 큐가 차도 여러 알림 요청을 빠르게 반환한다")
+    void notifyQuietly_실제실행기포화시빠른반환() throws Exception {
+        ThreadPoolTaskExecutor smallExecutor = new ThreadPoolTaskExecutor();
+        smallExecutor.setCorePoolSize(1);
+        smallExecutor.setMaxPoolSize(1);
+        smallExecutor.setQueueCapacity(2);
+        smallExecutor.initialize();
+        CountDownLatch workerStarted = new CountDownLatch(1);
+        CountDownLatch releaseWorker = new CountDownLatch(1);
+        TransactionTemplate blockedTransaction = mock(TransactionTemplate.class);
+        doAnswer(invocation -> {
+            workerStarted.countDown();
+            releaseWorker.await(5, TimeUnit.SECONDS);
+            return null;
+        }).when(blockedTransaction).execute(any(TransactionCallback.class));
+        NotificationService asyncService = new NotificationService(mapper, eventPublisher, blockedTransaction,
+                smallExecutor, clock);
+        ExecutorService callers = Executors.newFixedThreadPool(50);
+
+        try {
+            asyncService.notifyQuietly(7L, "WELCOME", "환영", "시작", "/data-input");
+            assertThat(workerStarted.await(1, TimeUnit.SECONDS)).isTrue();
+            List<Future<Long>> elapsedMillis = new java.util.ArrayList<>();
+            for (int i = 0; i < 50; i++) {
+                elapsedMillis.add(callers.submit(() -> {
+                    long startedAt = System.nanoTime();
+                    asyncService.notifyQuietly(7L, "WELCOME", "환영", "시작", "/data-input");
+                    return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
+                }));
+            }
+            for (Future<Long> result : elapsedMillis) {
+                assertThat(result.get(1, TimeUnit.SECONDS)).isLessThan(100L);
+            }
+        } finally {
+            releaseWorker.countDown();
+            callers.shutdownNow();
+            smallExecutor.getThreadPoolExecutor().shutdown();
+            smallExecutor.getThreadPoolExecutor().awaitTermination(5, TimeUnit.SECONDS);
+        }
     }
     @BeforeEach
     void setUp() {
