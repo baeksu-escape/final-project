@@ -93,6 +93,11 @@
 
 /* 흰 액정 칸 — 문구 크기는 액정 폭(cqw)에 맞춘다 */
 .cinema__screen {
+  /* hand 사진(16:9) 속 흰 액정 칸 — 사진 크기에 대한 %(11/27 landing-bus-hand.webp 측정). 사진을 바꾸면 이 네 값을 다시 잰다 */
+  left: 39.26%;
+  top: 7.22%;
+  width: 21.45%;
+  height: 81.32%;
   position: absolute;
   display: flex;
   flex-direction: column;

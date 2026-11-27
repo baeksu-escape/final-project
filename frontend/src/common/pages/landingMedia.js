@@ -11,5 +11,4 @@ export const HERO_PHOTOS = {
   hand: photoOf('bus-hand'),
 }
 
-// hand 사진(16:9) 속 흰 액정 칸 — 사진 크기에 대한 %. 사진을 바꾸면 이 값만 다시 잰다(11/27 landing-bus-hand.webp 측정).
-export const HAND_HERO_SCREEN = { left: 39.26, top: 7.22, width: 21.45, height: 81.32 }
+// hand 사진 속 흰 액정 칸 위치는 landingCinema.css의 .cinema__screen에 있다(사진을 바꾸면 그 값을 다시 잰다).

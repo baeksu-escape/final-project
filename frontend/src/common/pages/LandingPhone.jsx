@@ -38,7 +38,7 @@ function SimulatorCard() {
     <>
       <p className="app-card__label">신용케어 시뮬레이터</p>
       <div className="app-row"><span>카드 한도 사용률</span><b className="num">90% → 30%</b></div>
-      <div className="app-slider"><i style={{ '--p': '30%' }} /></div>
+      <div className="app-slider"><i /></div>
       <div className="app-row app-row--strong"><span>예상 대안 점수</span><b className="num">701 → 716 <em className="is-up">+15</em></b></div>
     </>
   )
@@ -109,9 +109,9 @@ export function ServiceScreen({ serviceKey, label }) {
 }
 
 // 입체 폰 틀. tilt면 기울일 수 있는 모습(메인 아래 구간이 --t로 기울기를 정한다), 아니면 정면.
-export function Phone3D({ children, tilt = false, className = '', style }) {
+export function Phone3D({ children, tilt = false, className = '' }) {
   return (
-    <div className={`phone3d${tilt ? ' phone3d--tilt' : ''} ${className}`} style={style}>
+    <div className={`phone3d${tilt ? ' phone3d--tilt' : ''} ${className}`}>
       <span className="phone3d__edge phone3d__edge--3" aria-hidden="true" />
       <span className="phone3d__edge phone3d__edge--2" aria-hidden="true" />
       <span className="phone3d__edge phone3d__edge--1" aria-hidden="true" />

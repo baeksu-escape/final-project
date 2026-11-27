@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { PATHS } from '../config/navigation.js'
-import { HERO_PHOTOS, photoOf } from './landingMedia.js'
+import { HERO_PHOTOS } from './landingMedia.js'
 import LandingCinema from './LandingCinema.jsx'
 import LandingStory from './LandingStory.jsx'
 import './landing.css'
@@ -19,14 +19,13 @@ const MISSION = [
 
 // 기울어진 카드 콜라주 — 대안 데이터 5종(광고용 예시 값)
 const RECORDS = [
-  { tag: '통신비', value: '18개월', text: '연속 정시 납부', tone: 'blue', tilt: -6 },
-  { tag: '국민연금', value: '48개월', text: '꾸준히 납부', tone: 'green', tilt: 4 },
-  { tag: '간편결제', value: '월 12회', text: '규칙적인 사용', tone: 'violet', tilt: -3 },
-  { tag: '건강보험', value: '100%', text: '정시 납부율', tone: 'orange', tilt: 5 },
-  { tag: '공과금', value: '0회', text: '최근 1년 미납', tone: 'sky', tilt: -5 },
+  { tag: '통신비', value: '18개월', text: '연속 정시 납부', tone: 'blue' },
+  { tag: '국민연금', value: '48개월', text: '꾸준히 납부', tone: 'green' },
+  { tag: '간편결제', value: '월 12회', text: '규칙적인 사용', tone: 'violet' },
+  { tag: '건강보험', value: '100%', text: '정시 납부율', tone: 'orange' },
+  { tag: '공과금', value: '0회', text: '최근 1년 미납', tone: 'sky' },
 ]
 
-const ARRIVE_PHOTO = photoOf('arrive')
 const HAS_PHOTOS = Boolean(HERO_PHOTOS.back || HERO_PHOTOS.hand)
 
 // 화면에 들어오면 data-reveal 요소에 is-in을 붙인다(한 번만).
@@ -94,7 +93,7 @@ export default function LandingPage() {
         <h2 id="landing-collage-title" data-reveal>매달 낸 기록이<br />점수의 재료가 됩니다</h2>
         <div className="landing-collage__cards">
           {RECORDS.map((record, index) => (
-            <article key={record.tag} className={`record-card record-card--${record.tone}`} style={{ '--tilt': `${record.tilt}deg`, '--delay': `${index * 90}ms` }} data-reveal>
+            <article key={record.tag} className={`record-card record-card--${record.tone}`} style={{ '--delay': `${index * 90}ms` }} data-reveal>
               <span className="record-card__tag">{record.tag}</span>
               <b className="num">{record.value}</b>
               <span>{record.text}</span>
@@ -110,7 +109,7 @@ export default function LandingPage() {
       </section>
 
       {/* 마무리 — 페이지 맨 아래(도착 사진이 있으면 배경으로) */}
-      <section className={`landing-final${ARRIVE_PHOTO ? ' landing-final--photo' : ''}`} style={ARRIVE_PHOTO ? { '--final-photo': `url(${ARRIVE_PHOTO})` } : undefined} data-reveal>
+      <section className="landing-final landing-final--photo" data-reveal>
         <p className="landing-final__eyebrow">Avenue</p>
         <h2>이제, 내 기록으로<br />다시 평가받아 보세요</h2>
         <Link to={PATHS.LOGIN} className="landing-pill landing-final__cta">내 점수 확인하기</Link>

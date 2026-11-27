@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { HAND_HERO_SCREEN, HERO_PHOTOS } from './landingMedia.js'
+import { HERO_PHOTOS } from './landingMedia.js'
 import { easeInOut, ramp, useSectionProgress } from './landingScroll.js'
 import './landingCinema.css'
 
@@ -18,13 +18,6 @@ function sceneValues(p) {
     screenOut: easeInOut(ramp(p, 0.8, 0.88)),
     fade: easeInOut(ramp(p, 0.84, 1)),
   }
-}
-
-const SCREEN_STYLE = {
-  left: `${HAND_HERO_SCREEN.left}%`,
-  top: `${HAND_HERO_SCREEN.top}%`,
-  width: `${HAND_HERO_SCREEN.width}%`,
-  height: `${HAND_HERO_SCREEN.height}%`,
 }
 
 // 사진 한 장(없으면 색 배경)
@@ -59,7 +52,7 @@ export default function LandingCinema() {
           <div className="cinema__plane cinema__plane--hand">
             <Photo src={HERO_PHOTOS.hand} />
             {/* 흰 액정 칸 — 사진 속 액정 위치에 맞춰 문구를 올린다 */}
-            <div className="cinema__screen" style={SCREEN_STYLE}>
+            <div className="cinema__screen">
               <p className="cinema__screen-tag">신용 네비게이션</p>
               <p className="cinema__screen-title">당신의 좋은 길을<br />안내해 드릴까요?</p>
             </div>

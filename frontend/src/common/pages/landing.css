@@ -150,11 +150,11 @@
   font-weight: 600;
 }
 
-.record-card--blue { --tone: var(--c-blue); }
-.record-card--green { --tone: var(--c-green); }
-.record-card--violet { --tone: var(--c-violet); }
-.record-card--orange { --tone: var(--c-orange); }
-.record-card--sky { --tone: var(--c-sky); }
+.record-card--blue { --tone: var(--c-blue); --tilt: -6deg; }
+.record-card--green { --tone: var(--c-green); --tilt: 4deg; }
+.record-card--violet { --tone: var(--c-violet); --tilt: -3deg; }
+.record-card--orange { --tone: var(--c-orange); --tilt: 5deg; }
+.record-card--sky { --tone: var(--c-sky); --tilt: -5deg; }
 
 .landing-collage__note {
   text-align: center;
@@ -330,5 +330,5 @@
 .landing-final--photo {
   justify-content: center;
   min-height: min(78vh, 720px);
-  background: linear-gradient(rgba(10, 24, 64, 0.55), rgba(10, 24, 64, 0.35)), var(--final-photo) center 62% / cover;
+  background: linear-gradient(rgba(10, 24, 64, 0.55), rgba(10, 24, 64, 0.35)), url('../../assets/landing-arrive.webp') center 62% / cover;
 }
