@@ -1,10 +1,12 @@
 import { Button, Card, MoneyInput, NumberInput, Slider } from '../../../common/components/index.js'
-import { BASE_PRESET, EASY_PRESETS, SCENARIO_FIELDS, amountFromPct, amountRange, baseAmountOf, pctFromAmount } from './scenarioConfig.js'
+import { Link } from 'react-router-dom'
+import { PATHS } from '../../../common/config/navigation.js'
+import { EASY_PRESETS, SCENARIO_FIELDS, amountFromPct, amountRange, baseAmountOf, pctFromAmount } from './scenarioConfig.js'
 
 const signed = (value, unit, digits = 0) => `${value > 0 ? '+' : value < 0 ? '−' : '±'}${Math.abs(value).toFixed(digits)}${unit}`
 const won = (value) => `${Math.round(value).toLocaleString('ko-KR')}원`
-// 큰 금액을 읽기 쉽게 '210만 원'처럼 보여 준다(만 원 아래는 반올림). 1만 원보다 작으면 원 단위 그대로.
-const manwon = (value) => (Math.abs(value) >= 10000 ? `${Math.round(value / 10000).toLocaleString('ko-KR')}만 원` : won(value))
+// 큰 금액을 읽기 쉽게 만 원 단위로 보여 준다(소수 첫째 자리까지). 1만 원보다 작으면 원 단위 그대로.
+const manwon = (value) => (Math.abs(value) >= 10000 ? `${(Math.round(value / 1000) / 10).toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}만 원` : won(value))
 // 변화 퍼센트를 말로 — "20% 줄어듦", "10% 늘어남", "그대로"
 const changeText = (pct) => {
   if (!Number.isFinite(pct)) return '미입력'
@@ -13,17 +15,17 @@ const changeText = (pct) => {
   return `${rounded}% ${pct < 0 ? '줄어듦' : '늘어남'}`
 }
 
-// N-17-2 (시안·쉬운 화면 2차) 상황 칩 5개 + 항목마다 한 줄.
+// N-17-2 베스트·워스트 버튼과 금리·소득·지출 입력을 한 카드에 보여 준다.
 // 월 소득·월 지출: 슬라이더 + 금액(원) 직접 입력 — 금액을 넣으면 지금 금액 대비 퍼센트로 바꿔 서버에 보낸다(서버는 퍼센트를 받는다).
 // 대출 금리: 슬라이더 + %p 칸, 아래에 이자가 한 달에 얼마 바뀌는지 미리보기(정확한 값은 결과 카드의 서버 계산).
 // 슬라이더를 움직이면 상황 선택이 풀린다.
-// (시안 5차) 위쪽 상황 칩 대신 제목 줄 오른쪽 [초기화], 계산 버튼 위 [베스트 시나리오]·[워스트 시나리오].
-// (시안 4차) 자동 계산 대신 카드 맨 아래 [예상 시나리오 계산하기]를 눌러 계산한다. 입력칸은 공통 컴포넌트 모양(라벨 위·칸 전체 너비) 그대로 쓴다.
-export default function ScenarioControls({ values, presetId, inputError, calcError, variableLoanBalanceAmount, baseline, stale, calculating, onChange, onSelect, onRetry, onCalculate }) {
+// N-17-2 초기화는 제목 줄에, 베스트·워스트 선택은 계산 버튼 위에 배치한다.
+// N-17-2 조건을 입력한 뒤 계산 버튼을 눌러 서버 재계산을 요청한다.
+export default function ScenarioControls({ values, presetId, inputError, calcError, variableLoanBalanceAmount, baseline, stale, calculating, onChange, onSelect, onReset, onRetry, onCalculate }) {
   return (
     <Card title="예상 시나리오" className="sc-controls">
-      {/* (시안 5차) 카드 제목 줄 오른쪽 — 모든 값을 지금 상태(변화 0)로 되돌린다. */}
-      <button type="button" className="sc-reset" onClick={() => onSelect(BASE_PRESET)}>초기화</button>
+      {/* N-17-2 초기화 버튼은 조건을 기본 상태로 돌린다. */}
+      <button type="button" className="sc-reset" onClick={onReset}>초기화</button>
       {SCENARIO_FIELDS.map((field) => {
         const value = values[field.key]
         const valid = Number.isFinite(value)
@@ -70,26 +72,32 @@ export default function ScenarioControls({ values, presetId, inputError, calcErr
                   : interest === null || interest === 0 ? '이자는 그대로예요.'
                     : <>이자가 한 달에 약 <strong>{manwon(Math.abs(interest))}</strong> {interest > 0 ? '늘어요' : '줄어요'}.</>}
             </span>
+            {field.key === 'ratePctPoint' && <div className="sc-row-field">
+              <Link className="text-link" to={PATHS.ASSET_DEBT}>보유 대출 전체 보기</Link>
+            </div>}
           </div>
         )
       })}
       {/* 입력 안내는 늘 같은 자리·높이에 둔다. */}
       <p className={inputError ? 'sc-status sc-status--warn' : 'sc-status'} role="status" aria-live="polite">
         {inputError || (!Number.isSafeInteger(variableLoanBalanceAmount)
-          ? '변동금리 대출 정보가 없어 대출 갚는 돈과 남는 돈은 계산하지 않아요.'
+          ? '변동금리 대출 정보가 없어 대출 갚는 돈과 여유 자금은 계산하지 않아요.'
           : variableLoanBalanceAmount === 0
             ? '금리는 변동금리 대출에만 적용돼요. 지금 대출은 모두 고정금리라 금리를 바꿔도 결과는 그대로예요.'
             : `금리 변화는 변동금리 대출 ${variableLoanBalanceAmount.toLocaleString('ko-KR')}원에만 적용돼요.`)}
         {calcError && <> <Button size="sm" onClick={onRetry}>다시 시도</Button></>}
       </p>
       <div className="sc-calc">
-        {/* (시안 5차) 베스트·워스트 시나리오 버튼은 계산 버튼 바로 위에 둔다. */}
+        {/* N-17-2 베스트·워스트 버튼은 계산 버튼 바로 위에 둔다. */}
         <div className="sc-chips" role="group" aria-label="상황 고르기">
-          {EASY_PRESETS.map((preset) => (
-            <button key={preset.id} type="button" className="sc-preset" aria-pressed={presetId === preset.id} onClick={() => onSelect(preset)}>
-              {preset.label}
-            </button>
-          ))}
+          {EASY_PRESETS.map((preset) => {
+            const [label, englishLabel] = preset.label.split(' (')
+            return (
+              <button key={preset.id} type="button" className="sc-preset" aria-pressed={presetId === preset.id} onClick={() => onSelect(preset)}>
+                {label}<br />({englishLabel}
+              </button>
+            )
+          })}
         </div>
         <Button variant="primary" onClick={onCalculate} disabled={Boolean(inputError) || calculating}>
           {calculating ? '계산하는 중…' : '예상 시나리오 계산하기'}

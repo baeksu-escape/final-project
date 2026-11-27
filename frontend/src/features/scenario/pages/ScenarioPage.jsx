@@ -5,7 +5,7 @@ import ScenarioResult from '../components/ScenarioResult.jsx'
 import { useScenario } from '../components/useScenario.js'
 import '../styles/scenario.css'
 
-// N-17 시나리오 테스트 — 금리·소득·지출이 나빠지거나 좋아질 때 매달 남는 돈이 어떻게 바뀌는지 미리 본다. 점수는 예측하지 않는다.
+// N-17 시나리오 테스트 — 금리·소득·지출이 나빠지거나 좋아질 때 월 여유 자금이 어떻게 바뀌는지 미리 본다. 점수는 예측하지 않는다.
 export default function ScenarioPage() {
   const { user } = useAuth()
   const sc = useScenario(user?.userId, user?.jobType)
@@ -22,7 +22,7 @@ export default function ScenarioPage() {
       <div className="sc-layout">
         <ScenarioControls values={sc.values} presetId={sc.presetId} inputError={sc.inputError || sc.calcError} calcError={sc.inputError ? '' : sc.calcError} variableLoanBalanceAmount={sc.baseline?.variableLoanBalanceAmount ?? null}
           baseline={sc.baseline} stale={sc.stale} calculating={sc.calculating}
-          onChange={sc.setValue} onSelect={sc.selectPreset} onRetry={sc.retry} onCalculate={sc.calculate} />
+          onChange={sc.setValue} onSelect={sc.selectPreset} onReset={sc.reset} onRetry={sc.retry} onCalculate={sc.calculate} />
         {sc.result ? <ScenarioResult result={sc.result} assumptions={sc.result.assumptions ?? sc.baseline?.assumptions ?? []} stale={sc.stale} calcError={sc.calcError} />
           : <Card title="결과" className="sc-result"><Notice type="warn">{sc.calcError || '시나리오를 계산하고 있습니다.'}</Notice></Card>}
       </div>
