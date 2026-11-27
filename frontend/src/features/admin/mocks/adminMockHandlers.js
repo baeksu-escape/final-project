@@ -2,7 +2,7 @@ import { ApiError } from '../../../common/api/ApiError.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { ROLES } from '../../../common/config/roles.js'
 import { addMockAccount, listMockAccounts } from '../../auth/mocks/authMockHandlers.js'
-import { isValidEmail } from '../../auth/validation.js'
+import { isBasicEmail } from '../../auth/validation.js'
 import { ACCOUNT_STATUS, ADMIN_ERROR_CODES, ADMIN_LOGIN_ID_PATTERN, ADMIN_LOGIN_ID_RULE_TEXT } from '../adminConstants.js'
 import { ADMIN_VIEW_EXTRAS, EMPTY_ALT_DATA_SUMMARY } from './adminMockData.js'
 import { maskEmail, maskLogLoginId, maskLoginId, maskPhone } from './adminMockMasking.js'
@@ -120,7 +120,8 @@ registerMockHandlers({
     const workEmail = String(body?.workEmail ?? '').trim()
     if (!ADMIN_LOGIN_ID_PATTERN.test(loginId)) throw invalidInput('loginId', `아이디는 ${ADMIN_LOGIN_ID_RULE_TEXT}로 넣어 주세요.`)
     if (!name) throw invalidInput('name', '이름을 넣어 주세요.')
-    if (!isValidEmail(workEmail)) throw invalidInput('workEmail', '업무 이메일 형식이 올바르지 않습니다.')
+    // FP-258 업무 이메일은 develop처럼 기본 형식만 본다(새 이메일 규칙은 회원 가입·이메일 변경만, 서버 AdminAccountService와 같음).
+    if (!isBasicEmail(workEmail)) throw invalidInput('workEmail', '업무 이메일 형식이 올바르지 않습니다.')
     if (listMockAccounts().some((account) => account.loginId === loginId)) {
       throw new ApiError(409, '이미 사용 중인 아이디입니다.', { code: 'DUPLICATE_LOGIN_ID' })
     }

@@ -88,7 +88,7 @@ public class AuthService {
 
     // 아이디·비밀번호를 확인한다. 로그인과 간편 로그인 연결(AUTH-05)이 같은 규칙을 쓴다(FP-258 단계적 제한).
     //   없는 계정·탈퇴·비밀번호 없는 계정·틀린 비밀번호 → 401(어느 쪽이 틀렸는지 알리지 않음)
-    //   잠긴 계정은 횟수를 세지 않고, 비밀번호가 맞을 때만 423으로 알린다(프론트 mock과 같은 순서).
+    //   잠긴 계정은 횟수를 세지 않고, 비밀번호가 맞을 때만 423으로 알린다(프론트 mock과 같은 순서). 관리자는 423 ADMIN_ACCOUNT_LOCKED(FP-258).
     //   5회째 실패하면 그때부터 5분 동안 비밀번호와 상관없이 429(제한 중에는 횟수를 올리지 않음). 10회째면 잠그고 423.
     @Transactional(noRollbackFor = ApiException.class)
     public UserAccount authenticate(String loginId, String password) {
@@ -97,7 +97,7 @@ public class AuthService {
         if (account == null || account.isWithdrawn() || account.getPasswordHash() == null) throw AuthErrors.loginFailed();
         boolean passwordMatches = passwordEncoder.matches(password, account.getPasswordHash());
         if (account.isLocked()) {
-            if (passwordMatches) throw AuthErrors.accountLocked();
+            if (passwordMatches) throw account.isAdmin() ? AuthErrors.adminAccountLocked() : AuthErrors.accountLocked();
             throw AuthErrors.loginFailed();
         }
         LocalDateTime now = LocalDateTime.now(clock);

@@ -27,6 +27,11 @@ public enum EmailPurpose {
         return Arrays.stream(values()).filter(purpose -> purpose.name().equals(value)).findFirst();
     }
 
+    // FP-258 새 이메일 규칙(AccountRules.isValidEmail)을 쓰는 목적(가입·이메일 변경). 찾기·재설정은 기존 이메일도 받도록 기본 형식만 본다.
+    public boolean usesNewEmailRule() {
+        return this == SIGNUP || this == CHANGE_EMAIL;
+    }
+
     // 이미 가입된 이메일로는 코드를 보내지 않는 목적(가입·이메일 변경).
     public boolean blocksUsedEmail() {
         return this == SIGNUP || this == CHANGE_EMAIL;

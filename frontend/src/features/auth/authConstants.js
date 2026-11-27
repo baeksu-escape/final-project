@@ -46,6 +46,10 @@ export const AUTH_ERROR_CODES = Object.freeze({
   SAME_NICKNAME: 'SAME_NICKNAME',
   // FP-258 로그인 5회 실패 뒤 5분 제한(429).
   LOGIN_TEMPORARILY_BLOCKED: 'LOGIN_TEMPORARILY_BLOCKED',
+  // FP-258 잠긴 관리자 계정이 맞는 비밀번호로 로그인할 때(423). 관리자는 비밀번호 찾기로 풀 수 없다.
+  ADMIN_ACCOUNT_LOCKED: 'ADMIN_ACCOUNT_LOCKED',
+  // 이메일 인증 토큰이 없거나 맞지 않음(400, 서버 EmailVerificationService.VERIFICATION_REQUIRED).
+  EMAIL_VERIFICATION_REQUIRED: 'EMAIL_VERIFICATION_REQUIRED',
 })
 
 // FP-222 N-04-3 새 닉네임이 지금 닉네임과 같을 때 문구. 서버 MyPageService.SAME_NICKNAME_MESSAGE와 같다.
@@ -58,6 +62,8 @@ export const SAME_PASSWORD_MESSAGE = '지금 쓰는 비밀번호와 같습니다
 export const LOGIN_FAILED_MESSAGE = '아이디 또는 비밀번호가 맞지 않습니다.'
 // FP-258 잠금은 비밀번호 찾기(재설정)로 풀린다. 서버 AuthErrors.ACCOUNT_LOCKED_MESSAGE와 같다.
 export const ACCOUNT_LOCKED_MESSAGE = '잠긴 계정입니다. 비밀번호 찾기에서 이메일 인증 후 비밀번호를 재설정하면 풀립니다.'
+// FP-258 N-01-3 잠긴 관리자 안내. 서버 AuthErrors.ADMIN_ACCOUNT_LOCKED_MESSAGE와 같다.
+export const ADMIN_ACCOUNT_LOCKED_MESSAGE = '잠긴 관리자 계정입니다. 다른 관리자에게 잠금 해제를 요청해 주세요.'
 
 // FP-258 로그인 단계적 제한 — 5회 실패하면 5분 동안 막고(429), 누적 10회면 잠근다(423). 서버 AuthService 상수와 같다(mock이 쓴다).
 export const LOGIN_TEMP_BLOCK_FAILURES = 5

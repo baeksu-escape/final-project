@@ -4,7 +4,8 @@
 --   스키마 소유자로 실행한다. 새로 DDL(avenue_ddl.sql)을 실행하는 DB는 필요 없다.
 -- 회원 행은 지우거나 바꾸지 않는다. 이미 있는 행의 새 열은 NULL(실패 기록 없음)이라, 지금 5회 실패 상태인 계정도 제한 없이 로그인을 다시 시도할 수 있다.
 -- 이 열이 없는 DB에서는 새 코드의 로그인·회원 조회가 ORA-00904 오류를 낸다. 새 코드를 띄우기 전에 실행한다(열만 먼저 추가해도 이전 코드는 그대로 동작한다).
--- 이미 열이 있으면 건너뛰므로 다시 실행해도 된다.
+-- LOGIN_FAIL_COUNT 열 주석도 지금 동작(5회째 5분 제한, 누적 10회 잠금)으로 고친다(주석만 바뀌고 데이터는 그대로다).
+-- 이미 열이 있으면 건너뛰고 주석은 같은 값으로 다시 쓰므로 다시 실행해도 된다.
 -- Oracle DDL은 실행 전후에 자동 커밋되므로, 커밋하지 않은 작업이 없는 세션에서 실행한다.
 -- SQL Developer는 "스크립트 실행"(F5)으로 실행한다.
 SET DEFINE OFF
@@ -29,3 +30,6 @@ COMMENT ON COLUMN APP_USER.LAST_LOGIN_FAIL_AT IS 'v0.3.2 (C17) 마지막 로그�
 SELECT COLUMN_NAME, DATA_TYPE, NULLABLE
   FROM USER_TAB_COLUMNS
  WHERE TABLE_NAME = 'APP_USER' AND COLUMN_NAME = 'LAST_LOGIN_FAIL_AT';
+
+-- C17 LOGIN_FAIL_COUNT 열 주석을 지금 동작으로 맞춘다(주석만 바뀐다).
+COMMENT ON COLUMN APP_USER.LOGIN_FAIL_COUNT IS 'v0.3.2 (C17) 연속 로그인 실패 횟수 (5회째 5분 제한, 누적 10회 잠금, 재설정으로 해제)';

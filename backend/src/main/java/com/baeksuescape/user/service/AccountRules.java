@@ -41,7 +41,16 @@ public final class AccountRules {
         return value != null && LOGIN_ID.matcher(value).matches();
     }
 
+    // FP-258 N-03-1·N-03-2 기존 이메일 기본 형식(새 규칙 전 develop 규칙, 100자 이하). 아이디·비밀번호 찾기와 관리자 업무 이메일이 쓴다.
+    private static final Pattern BASIC_EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
+
+    // + 같은 글자가 든 기존 이메일도 통과한다. 프론트 validation.js isBasicEmail과 같다.
+    public static boolean isBasicEmail(String value) {
+        return value != null && value.length() <= EMAIL_MAX && BASIC_EMAIL.matcher(value).matches();
+    }
+
     // 이메일 형식 — 소문자로 바꾼 값을 '앞부분@도메인'으로 나눠 위 규칙으로 본다(100자 이하). 대소문자 때문에 거절하지는 않는다.
+    // FP-258 새 규칙은 가입(AUTH-06·SIGNUP 인증)과 이메일 변경(MEM-03·CHANGE_EMAIL 인증)에만 쓴다.
     public static boolean isValidEmail(String value) {
         if (value == null) return false;
         String text = value.toLowerCase(Locale.ROOT);

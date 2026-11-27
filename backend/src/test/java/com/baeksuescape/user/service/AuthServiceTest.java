@@ -200,6 +200,21 @@ class AuthServiceTest {
         verify(userMapper, never()).updateLoginSuccess(anyLong(), any());
     }
 
+    // FP-258 PR #164 검수 — 관리자는 비밀번호 찾기로 잠금을 풀 수 없어, 잠긴 관리자가 맞는 비밀번호를 넣으면 다른 code·문구(423 ADMIN_ACCOUNT_LOCKED)다.
+    @Test
+    void 잠긴_관리자는_비밀번호가_맞으면_423_ADMIN_ACCOUNT_LOCKED이고_틀리면_401() {
+        given(userMapper.selectByLoginId("admin")).willReturn(UserFixtures.account(1L, "admin", UserAccount.ROLE_ADMIN, UserAccount.LOCKED));
+        assertThatThrownBy(() -> service.login(new AuthRequests.Login("admin", PASSWORD)))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getStatus().value()).isEqualTo(423);
+                    assertThat(e.getCode()).isEqualTo("ADMIN_ACCOUNT_LOCKED");
+                    assertThat(e.getMessage()).isEqualTo("잠긴 관리자 계정입니다. 다른 관리자에게 잠금 해제를 요청해 주세요.");
+                });
+        assertThat(codeOf(() -> service.login(new AuthRequests.Login("admin", "wrong1234")))).isEqualTo("401 LOGIN_FAILED");
+        verify(adminAuth, never()).startLogin(any());
+        verify(userMapper, never()).updateLoginFailure(anyLong(), anyInt(), anyBoolean(), any());
+    }
+
     // FP-80 관리자는 비밀번호가 맞아도 토큰을 주지 않고 2단계 인증 대기 응답(AdminAuthService.startLogin)으로 넘어간다.
     @Test
     void 관리자는_비밀번호가_맞아도_토큰_없이_2단계_인증으로_넘어간다() {

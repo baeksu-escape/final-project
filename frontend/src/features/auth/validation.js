@@ -27,6 +27,12 @@ export function isValidEmailDomain(domain) {
     /^[a-z]{2,}$/.test(labels[labels.length - 1])
   )
 }
+// FP-258 N-03-1·N-03-2 기존 이메일 기본 형식(새 규칙 전 develop 규칙, 100자 이하) — 아이디·비밀번호 찾기는 + 같은 글자가 든 기존 이메일도 찾도록 이것만 본다.
+// 서버 AccountRules.isBasicEmail과 같다.
+export function isBasicEmail(value) {
+  const text = String(value ?? '')
+  return text.length <= EMAIL_MAX && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(text)
+}
 export function isValidEmail(value) {
   const text = String(value ?? '').toLowerCase()
   const parts = text.split('@')
@@ -89,6 +95,10 @@ export function filterEmailLocal(value) {
 // N-02-1 이메일 도메인(직접 입력): 소문자로 바꾸고 a-z0-9 . - 만.
 export function filterEmailDomain(value) {
   return String(value ?? '').toLowerCase().replace(/[^a-z0-9.-]/g, '')
+}
+// N-03-1·N-03-2 찾기 화면 이메일 칸(기존 이메일): 글자는 지우지 않고 앞뒤 공백만 빼고 소문자로 바꾼다.
+export function filterExistingEmail(value) {
+  return String(value ?? '').trim().toLowerCase()
 }
 // N-04-3 한 칸 이메일(마이페이지 이메일 변경): 첫 @ 앞뒤를 따로 거르고 @는 하나만 남긴다.
 export function filterEmail(value) {
@@ -204,10 +214,12 @@ export function validatePhoneParts(middle, last) {
 export function joinEmail(local, domain) {
   return `${String(local ?? '').trim()}@${String(domain ?? '').trim()}`
 }
-export function validateEmailParts(local, domain) {
+// FP-258 rule이 'existing'(아이디·비밀번호 찾기)이면 기본 형식(isBasicEmail)만 본다.
+export function validateEmailParts(local, domain, rule) {
   if (!String(local ?? '').trim()) return '이메일을 입력해 주세요.'
   if (!String(domain ?? '').trim()) return '이메일 도메인을 선택하거나 입력해 주세요.'
-  if (!isValidEmail(joinEmail(local, domain))) return '이메일 형식이 올바르지 않습니다. 예) name@example.com'
+  const email = joinEmail(local, domain)
+  if (!(rule === 'existing' ? isBasicEmail(email) : isValidEmail(email))) return '이메일 형식이 올바르지 않습니다. 예) name@example.com'
   return ''
 }
 

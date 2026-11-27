@@ -148,6 +148,7 @@ export default function FindPasswordPage() {
           />
         </div>
         <SplitEmailField
+          rule="existing"
           local={emailParts.emailLocal}
           domainChoice={emailParts.emailDomainChoice}
           customDomain={emailParts.emailCustomDomain}

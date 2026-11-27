@@ -128,6 +128,18 @@ class EmailVerificationServiceTest {
         assertThat(sentCodes).isEmpty();
     }
 
+    // FP-258 PR #164 검수 — 새 이메일 규칙은 가입·이메일 변경만. 아이디·비밀번호 찾기는 + 같은 글자가 든 기존 이메일도 보내고, 기본 형식이 틀리면 400.
+    @Test
+    void 찾기와_재설정은_기존_이메일_형식도_보내고_가입과_변경은_새_규칙으로_막는다() {
+        assertThat(codeOf(() -> service.send(new AuthRequests.EmailSend(" A+B@Example.com ", "FIND_ID", null)))).isEqualTo("no error");
+        assertThat(codeOf(() -> service.send(new AuthRequests.EmailSend("a+b@example.com", "RESET_PASSWORD", "newbie01")))).isEqualTo("no error");
+        assertThat(sentCodes).hasSize(2);
+        assertThat(codeOf(() -> service.send(new AuthRequests.EmailSend("a+b@example.com", "SIGNUP", null)))).isEqualTo("400 INVALID_INPUT");
+        assertThat(codeOf(() -> service.send(new AuthRequests.EmailSend("a+b@example.com", "CHANGE_EMAIL", null)))).isEqualTo("400 INVALID_INPUT");
+        assertThat(codeOf(() -> service.send(new AuthRequests.EmailSend("not-an-email", "FIND_ID", null)))).isEqualTo("400 INVALID_INPUT");
+        assertThat(sentCodes).hasSize(2);
+    }
+
     // FP-258 대문자·앞뒤 공백이 있는 이메일은 소문자로 바꿔 판정하고, 그 주소로 보낸다(HMAC도 같은 값).
     @Test
     void 대문자_이메일은_소문자로_바꿔_보낸다() {

@@ -67,7 +67,8 @@ public class EmailVerificationService {
     public AuthResponses.EmailSent send(AuthRequests.EmailSend request) {
         EmailPurpose purpose = purposeOf(request.purpose());
         String email = AccountRules.normalizeEmail(request.email());
-        if (!AccountRules.isValidEmail(email)) throw invalidEmail();
+        boolean validFormat = purpose.usesNewEmailRule() ? AccountRules.isValidEmail(email) : AccountRules.isBasicEmail(email);
+        if (!validFormat) throw invalidEmail();
         String target = hmac.email(email);
         if (purpose.blocksUsedEmail() && userMapper.countByEmailHmac(target) > 0) throw AuthErrors.duplicateEmail();
 

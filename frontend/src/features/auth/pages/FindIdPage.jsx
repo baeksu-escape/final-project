@@ -81,10 +81,14 @@ export default function FindIdPage() {
         verificationToken: verification.verificationToken,
       })
       setLoginId(result.loginId)
+      // FP-258 서버가 인증 토큰을 사용 처리했으므로 인증을 비운다. 결과는 남기고, 다시 찾으려면 [받기]부터 다시 한다.
+      setVerification(null)
     } catch (error) {
       const nameError = error?.data?.fieldErrors?.find((item) => item.field === 'name')
       if (nameError) setFieldErrors({ name: nameError.message })
       else setFormError(error.message)
+      // FP-258 토큰 오류(없음·만료·이미 씀)는 400이다. 다시 인증할 수 있게 비운다(계정 없음 404는 토큰이 남아 그대로 둔다).
+      if (!nameError && error?.status === 400) setVerification(null)
     } finally {
       setPending(false)
     }
@@ -117,6 +121,7 @@ export default function FindIdPage() {
           />
         ) : (
           <SplitEmailField
+            rule="existing"
             local={emailParts.emailLocal}
             domainChoice={emailParts.emailDomainChoice}
             customDomain={emailParts.emailCustomDomain}

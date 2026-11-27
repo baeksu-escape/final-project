@@ -4,6 +4,7 @@ import { MOCK_USERS, toMockToken } from '../../../common/mocks/mockUsers.js'
 import { ROLES } from '../../../common/config/roles.js'
 import {
   ACCOUNT_LOCKED_MESSAGE,
+  ADMIN_ACCOUNT_LOCKED_MESSAGE,
   AUTH_ERROR_CODES,
   EMAIL_PURPOSES,
   FIND_ID_METHODS,
@@ -16,6 +17,7 @@ import {
 } from '../authConstants.js'
 import {
   SIGNUP_PENDING_MESSAGES,
+  isBasicEmail,
   isValidEmail,
   isValidPassword,
   isValidPhone,
@@ -173,6 +175,34 @@ function loginBlockedError(minutes) {
   return new ApiError(429, loginTemporarilyBlockedMessage(minutes), { code: AUTH_ERROR_CODES.LOGIN_TEMPORARILY_BLOCKED })
 }
 
+// N-01 아이디·비밀번호 확인 — 로그인과 소셜 계정 연결(AUTH-05)이 같은 규칙을 쓴다(서버 AuthService.authenticate와 같은 순서). 맞으면 계정을 돌려준다.
+//   잠긴 계정은 비밀번호가 맞을 때만 423(관리자는 ADMIN_ACCOUNT_LOCKED), 5회째 실패부터 5분 동안 429(횟수는 그대로), 누적 10회째면 잠그고 423.
+export function authenticateMockAccount(loginId, password) {
+  const account = findMockAccount(normalizeLoginId(loginId))
+  if (!account) throw new ApiError(401, LOGIN_FAILED_MESSAGE)
+  const passwordMatches = account.password === null || account.password === password
+  if (account.locked) {
+    if (!passwordMatches) throw new ApiError(401, LOGIN_FAILED_MESSAGE)
+    if (account.user.role === ROLES.ADMIN) {
+      throw new ApiError(423, ADMIN_ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ADMIN_ACCOUNT_LOCKED })
+    }
+    throw new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ACCOUNT_LOCKED })
+  }
+  const blockedMinutes = remainingBlockMinutes(account)
+  if (blockedMinutes > 0) throw loginBlockedError(blockedMinutes)
+  if (!passwordMatches) {
+    account.loginFailCount = (account.loginFailCount ?? 0) + 1
+    account.lastLoginFailureAt = Date.now()
+    if (account.loginFailCount >= LOGIN_MAX_FAILURES) {
+      account.locked = true
+      throw new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ACCOUNT_LOCKED })
+    }
+    if (account.loginFailCount === LOGIN_TEMP_BLOCK_FAILURES) throw loginBlockedError(LOGIN_TEMP_BLOCK_MINUTES)
+    throw new ApiError(401, LOGIN_FAILED_MESSAGE)
+  }
+  return account
+}
+
 // FP-258 아이디·비밀번호 찾기 본인 확인 — 입력한 이름(앞뒤 공백 제거)이 가입 이름과 같은지 본다(서버 AccountRules.nameMatches와 같음).
 function nameMatches(account, name) {
   return typeof name === 'string' && name.trim() !== '' && account.user.name === name.trim()
@@ -188,30 +218,11 @@ export function consumeVerification(token, { purpose, email, loginId }) {
 }
 
 registerMockHandlers({
-  // N-01 로그인 — 아이디·비밀번호가 틀리면 같은 문구로 401, 잠긴 계정이면 비밀번호가 맞을 때만 423. 탈퇴한 계정은 없는 계정과 같게 401이다.
-  // FP-258 단계적 제한(서버 AuthService.authenticate와 같은 순서): 5회째 실패부터 5분 동안 429(횟수는 그대로), 누적 10회째면 잠그고 423.
+  // N-01 로그인 — 확인은 authenticateMockAccount(틀리면 같은 문구로 401, 탈퇴한 계정은 없는 계정과 같게 401). 성공하면 실패 횟수를 비운다.
   // FP-80 관리자는 토큰 대신 2단계 인증 시작 응답 { twoFactorRequired, challengeToken, maskedEmail }을 받는다(1분 안에 다시 부르면 429).
   'POST /api/auth/login': ({ body }) => {
     if (!body?.loginId || !body?.password) throw new ApiError(400, '아이디와 비밀번호를 입력해 주세요.')
-    const account = findMockAccount(normalizeLoginId(body.loginId))
-    if (!account) throw new ApiError(401, LOGIN_FAILED_MESSAGE)
-    const passwordMatches = account.password === null || account.password === body.password
-    if (account.locked) {
-      if (passwordMatches) throw new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ACCOUNT_LOCKED })
-      throw new ApiError(401, LOGIN_FAILED_MESSAGE)
-    }
-    const blockedMinutes = remainingBlockMinutes(account)
-    if (blockedMinutes > 0) throw loginBlockedError(blockedMinutes)
-    if (!passwordMatches) {
-      account.loginFailCount = (account.loginFailCount ?? 0) + 1
-      account.lastLoginFailureAt = Date.now()
-      if (account.loginFailCount >= LOGIN_MAX_FAILURES) {
-        account.locked = true
-        throw new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ACCOUNT_LOCKED })
-      }
-      if (account.loginFailCount === LOGIN_TEMP_BLOCK_FAILURES) throw loginBlockedError(LOGIN_TEMP_BLOCK_MINUTES)
-      throw new ApiError(401, LOGIN_FAILED_MESSAGE)
-    }
+    const account = authenticateMockAccount(body.loginId, body.password)
     account.loginFailCount = 0
     account.lastLoginFailureAt = null
     if (account.user.role === ROLES.ADMIN) return startAdminLoginChallenge(account)
@@ -225,8 +236,9 @@ registerMockHandlers({
   // FP-258 이메일은 서버처럼 앞뒤 공백을 빼고 소문자로 바꾼 뒤 판정·저장한다(발송·확인·가입·찾기·재설정 모두 같다).
   'POST /api/auth/email/send': ({ body }) => {
     const email = normalizeEmail(body?.email)
-    if (!isValidEmail(email)) throw new ApiError(400, '이메일 형식이 올바르지 않습니다.')
-    const blocksUsedEmail = body.purpose === EMAIL_PURPOSES.SIGNUP || body.purpose === EMAIL_PURPOSES.CHANGE_EMAIL
+    // FP-258 새 이메일 규칙은 가입·이메일 변경만. 아이디·비밀번호 찾기는 기존 이메일(+ 등)도 찾도록 기본 형식만 본다(서버 EmailPurpose.usesNewEmailRule).
+    const blocksUsedEmail = body?.purpose === EMAIL_PURPOSES.SIGNUP || body?.purpose === EMAIL_PURPOSES.CHANGE_EMAIL
+    if (!(blocksUsedEmail ? isValidEmail(email) : isBasicEmail(email))) throw new ApiError(400, '이메일 형식이 올바르지 않습니다.')
     if (blocksUsedEmail && accounts.some((item) => item.email === email)) {
       throw new ApiError(409, '이미 가입된 이메일입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_EMAIL })
     }
@@ -363,7 +375,7 @@ registerMockHandlers({
       const email = normalizeEmail(body.email)
       const saved = verifications.get(token)
       if (!saved || saved.purpose !== EMAIL_PURPOSES.FIND_ID || saved.email !== email) {
-        throw new ApiError(400, '이메일 인증을 다시 진행해 주세요.')
+        throw new ApiError(400, '이메일 인증을 다시 진행해 주세요.', { code: AUTH_ERROR_CODES.EMAIL_VERIFICATION_REQUIRED })
       }
       account = accounts.find((item) => !isWithdrawn(item) && item.user.role === ROLES.USER && item.email === email && nameMatches(item, body.name))
     }

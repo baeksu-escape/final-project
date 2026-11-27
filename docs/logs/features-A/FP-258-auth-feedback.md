@@ -315,6 +315,80 @@
   - `UserAccountLoginFailIT` 실행(DB 필요).
   - 화면 동작(mock 개발 서버로 직접 확인 필요).
 
+## 9차 — PR #164 2차 검수 반영 (2026-11-27, 기준 fdd9f45) 🆕 11/27
+- **관련 N-ID:** N-01-3, N-01-6, N-02-1, N-03-1, N-03-2
+
+### 무엇을, 왜 바꿨나
+- **커서(검수 1·5, `useImeSafeFilter`):**
+  - 한글 확정 직후 다음 조합 중에 커서가 앞으로 갔다. 이제 걸러낸 값이 같으면 커서를 건드리지 않고, 새 조합이 시작됐으면 커서 옮기기를 건너뛴다.
+  - 조합이 아닌 입력에서 글자가 걸러지면 커서가 끝으로 갔다. 이제 "입력 위치 − 앞쪽에서 빠진 글자 수"로 되돌린다.
+  - 새 비밀번호의 영문 키 변환 결과는 같다.
+- **소셜 계정 연결 5분 제한(검수 2):**
+  - 화면이 429 서버 문구(남은 분)를 그대로 보여 준다.
+  - mock 연결도 로그인과 같은 확인 함수(`authenticateMockAccount`)를 쓴다. 실패 횟수·5분 제한·10회 잠금이 같다.
+- **아이디 찾기 다시 하기(검수 3):** 아이디를 찾은 뒤와 토큰 오류(400) 뒤에는 인증을 비워 [받기]부터 다시 할 수 있다. 찾은 아이디는 그대로 보인다.
+- **잠긴 관리자 안내(검수 4):** 잠긴 관리자가 맞는 비밀번호를 넣으면 423 `ADMIN_ACCOUNT_LOCKED`("잠긴 관리자 계정입니다. 다른 관리자에게 잠금 해제를 요청해 주세요.")다.
+  - 로그인 화면은 [비밀번호 찾기] 링크를 숨긴다. 일반 회원의 `ACCOUNT_LOCKED`는 그대로다.
+- **기존 이메일 허용(검수 6):** 새 이메일 규칙은 가입(AUTH-06·SIGNUP 인증)과 이메일 변경(MEM-03·CHANGE_EMAIL 인증)에만 쓴다.
+  - 아이디·비밀번호 찾기의 인증(FIND_ID·RESET_PASSWORD)은 기본 형식만 본다. 화면 칸은 글자를 지우지 않는다(소문자·앞뒤 공백만, `SplitEmailField rule="existing"`).
+  - 이 브랜치가 새 규칙으로 바꿔 버린 관리자 업무 이메일(ADM-07)도 develop처럼 기본 형식으로 되돌렸다.
+- **옛 설명(검수 7):**
+  - api_spec_a의 휴대폰 인증 목적을 `SIGNUP`·`FIND_ID`로 고쳤다.
+  - `LOGIN_FAIL_COUNT` 열 주석을 "5회째 5분 제한, 누적 10회 잠금"으로 고쳤다(DDL·사본·지문, 기존 DB는 C17 alter 끝 한 줄).
+
+### 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `frontend/src/features/auth/useImeSafeFilter.js` | 커서 복원(값이 같으면 안 옮김, 새 조합 중이면 건너뜀, 일반 입력도 복원) |
+| `frontend/src/features/auth/socialLoginConfig.js` | 429 서버 문구, `ADMIN_ACCOUNT_LOCKED` 문구 |
+| `frontend/src/features/auth/mocks/authMockHandlers.js` | `authenticateMockAccount` 분리·관리자 잠금 code, 목적별 이메일 형식, 찾기 토큰 오류 code |
+| `frontend/src/features/auth/mocks/socialLoginMockHandlers.js` | 연결이 `authenticateMockAccount`를 씀 |
+| `frontend/src/features/auth/pages/FindIdPage.jsx` | 찾은 뒤·토큰 오류 뒤 인증 비우기, 이메일 `rule="existing"` |
+| `frontend/src/features/auth/pages/FindPasswordPage.jsx` | 이메일 `rule="existing"` |
+| `frontend/src/features/auth/components/SplitEmailField.jsx` | `rule="existing"`이면 소문자·앞뒤 공백만, 기본 형식 |
+| `frontend/src/features/auth/validation.js` | `isBasicEmail`, `filterExistingEmail`, `validateEmailParts`의 `rule` |
+| `frontend/src/features/auth/authConstants.js`, `pages/LoginPage.jsx` | `ADMIN_ACCOUNT_LOCKED` code·문구, 로그인 문구 분기 |
+| `frontend/src/features/admin/mocks/adminMockHandlers.js` | 업무 이메일 기본 형식 |
+| `backend/.../user/service/AuthErrors.java`, `AuthService.java` | `adminAccountLocked()`, 잠긴 관리자 분기 |
+| `backend/.../user/service/AccountRules.java`, `EmailPurpose.java`, `EmailVerificationService.java` | `isBasicEmail`, `usesNewEmailRule()`, 목적별 형식 검사 |
+| `backend/.../admin/service/AdminAccountService.java` | 업무 이메일 기본 형식 |
+| `backend/src/test/.../AuthServiceTest.java`, `EmailVerificationServiceTest.java` | 잠긴 관리자 1개, 목적별 이메일 형식 1개 |
+| `docs/spec/sql/avenue_ddl.sql`, 사본, `seed_report.json`, `alter_app_user_last_login_fail_at.sql`, sql `README.md` | `LOGIN_FAIL_COUNT` 주석 |
+| `docs/spec/api/api_spec_a.md` | AUTH-01·07, 휴대폰 목적, 5장 `ADMIN_ACCOUNT_LOCKED` |
+| `docs/ai/features.md`, `docs/ai/decisions.md` | N-01-3·N-02-1·N-03-1·N-03-2, 계정 잠금 줄 |
+
+### DB·API 변경
+- DB: 열·데이터는 그대로이고, `LOGIN_FAIL_COUNT` 열 주석만 바뀐다. 기존 DB는 C17 alter를 다시 실행하면 된다(이미 실행했어도 다시 실행 가능).
+- API
+  - AUTH-01·05: 잠긴 관리자 + 맞는 비밀번호 → 423 `ADMIN_ACCOUNT_LOCKED`(새 code).
+  - AUTH-07: `FIND_ID`·`RESET_PASSWORD`는 기본 이메일 형식만 본다. ADM-07 업무 이메일도 기본 형식이다.
+
+### 확인
+- 확인함
+  - `./mvnw test`(-s) 541개 통과.
+  - DB 도구 unittest는 오류 1건(`bcrypt`, PC 환경)뿐이다. `cmp`로 DDL 사본이 같음을 확인했다.
+  - `npm run lint` 오류 0, `npm run build` 성공.
+  - mock 개발 서버와 헤드리스 Edge로 고치기 전·후를 재현했다(`Input.imeSetComposition`·`insertText`).
+    - 이름 "홍" 확정 직후 "ㄱ" 조합: 커서 1 → 2
+    - 가입 아이디 ab|cd + XY: `abxcdy` → `abxycd`(커서 4)
+    - 로그인 아이디 ab|cd + `#`: 커서 4 → 2
+    - 새 비밀번호 보기 a|b + 가: `arkb`(커서 3), 전·후 같음
+    - 소셜 연결 5회째: 401 문구 → "로그인 시도가 너무 많습니다. 5분 뒤에 다시 시도해 주세요."
+    - 잠긴 관리자: 회원 문구 + 링크 → 관리자 문구, 링크 없음(잠긴 회원은 그대로)
+    - 아이디 찾기를 찾은 뒤: [받기]가 사라지고 다시 찾으면 오류 → [받기]가 다시 보이고 다시 인증해 찾을 수 있다(결과는 남음)
+    - 비밀번호 찾기 이메일 "Ab+C" → `ab+c`, 가입 이메일 "Ab+C" → `abc`
+  - 끝난 뒤 5199 개발 서버·헤드리스 Edge가 남지 않았다.
+- 확인 못 함
+  - 실제 Windows 한글 IME(사용자가 확인)
+  - `+`가 든 기존 이메일을 가진 DB 회원으로 찾기·재설정(로컬 DB)
+
+### 남은 것 (이번에 고치지 않음)
+- 시드·시연 회원 이름(예: 합성회원000001, mock "데모 급여소득자")이 이름 규칙(한글만)에 걸려 아이디·비밀번호 찾기를 할 수 없다. 팀 결정을 기다린다. 이름 규칙·시드·`build_db.py`는 그대로다.
+- 로그인을 동시에 보내면 실패 횟수가 덜 오른다. 기존부터 있던 문제이고 2차 개발로 넘긴다.
+- 관리자가 수동으로 잠근 회원도 비밀번호 재설정으로 풀린다. 기존부터 그렇고, 팀 확인이 필요하다.
+- 관리자 계정의 10회째 실패 자동 잠금 423과 2단계 인증 중 잠금(AdminAuthService)은 아직 회원과 같은 `ACCOUNT_LOCKED` 문구다. 이번 범위(잠긴 상태 + 맞는 비밀번호) 밖이다.
+- DDL `ACCOUNT_STATUS_CODE` 열 주석의 "LOCKED=비밀번호 5회 실패"도 옛 설명이다. 이번 지시 범위 밖이라 그대로 두었다.
+
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
 

@@ -13,6 +13,8 @@ public final class AuthErrors {
     public static final String LOGIN_FAILED_MESSAGE = "아이디 또는 비밀번호가 올바르지 않습니다.";
     // FP-258 잠금은 비밀번호 찾기(AUTH-10 재설정)로 풀린다는 것을 함께 알린다.
     public static final String ACCOUNT_LOCKED_MESSAGE = "잠긴 계정입니다. 비밀번호 찾기에서 이메일 인증 후 비밀번호를 재설정하면 풀립니다.";
+    // FP-258 N-01-3 관리자는 비밀번호 찾기(재설정)를 쓸 수 없어 다른 관리자에게 해제를 요청하게 한다.
+    public static final String ADMIN_ACCOUNT_LOCKED_MESSAGE = "잠긴 관리자 계정입니다. 다른 관리자에게 잠금 해제를 요청해 주세요.";
     public static final String NO_MATCH_MESSAGE = "입력한 정보와 일치하는 계정이 없습니다.";
     // 423 Locked. Spring HttpStatus에도 있지만 숫자를 그대로 두어 프론트 mock과 같은 값임을 보인다.
     public static final HttpStatus LOCKED = HttpStatus.valueOf(423);
@@ -26,6 +28,11 @@ public final class AuthErrors {
 
     public static ApiException accountLocked() {
         return new ApiException(LOCKED, "ACCOUNT_LOCKED", ACCOUNT_LOCKED_MESSAGE);
+    }
+
+    // FP-258 잠긴 관리자 계정이 맞는 비밀번호로 로그인할 때(423). 일반 회원은 accountLocked().
+    public static ApiException adminAccountLocked() {
+        return new ApiException(LOCKED, "ADMIN_ACCOUNT_LOCKED", ADMIN_ACCOUNT_LOCKED_MESSAGE);
     }
 
     // FP-258 로그인 5회 실패 뒤 잠깐 막을 때(429). minutes는 남은 분(올림, 최소 1).
