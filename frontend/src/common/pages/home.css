@@ -333,5 +333,5 @@ a.dash-card:hover {
 }
 
 .dash-start__steps li.is-on { color: var(--fg); background: var(--sel); }
-.dash-start__steps li.is-on b { background: var(--acc); color: #ffffff; }
-.dash-start__steps li.is-done b { background: var(--mint); color: #ffffff; }
+.dash-start__steps li.is-on b { background: var(--acc); color: var(--pri-fg); }
+.dash-start__steps li.is-done b { background: var(--mint); color: var(--pri-fg); }

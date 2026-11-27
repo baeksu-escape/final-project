@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { CountUp } from './viz.jsx'
 import Button from './Button.jsx'
 import { useCountUp, useInView } from './vizHooks.js'
-import { GRADE_BOUNDARIES } from '../config/grades.js'
+import { GRADE_BOUNDARIES, GRADE_LABELS, GRADES, SCORE_RANGE } from '../config/grades.js'
 
-const MAX = 1000
+// 점수 구간 — 이름은 등급 공통 상수(GRADE_LABELS)를 쓴다
 const ZONES = [
-  { key: 'caution', label: '주의', from: 0, to: GRADE_BOUNDARIES.STANDARD },
-  { key: 'standard', label: '보통', from: GRADE_BOUNDARIES.STANDARD, to: GRADE_BOUNDARIES.GOOD },
-  { key: 'good', label: '좋음', from: GRADE_BOUNDARIES.GOOD, to: MAX },
+  { key: 'caution', label: GRADE_LABELS[GRADES.CAUTION], from: SCORE_RANGE.MIN, to: GRADE_BOUNDARIES.STANDARD },
+  { key: 'standard', label: GRADE_LABELS[GRADES.STANDARD], from: GRADE_BOUNDARIES.STANDARD, to: GRADE_BOUNDARIES.GOOD },
+  { key: 'good', label: GRADE_LABELS[GRADES.GOOD], from: GRADE_BOUNDARIES.GOOD, to: SCORE_RANGE.MAX },
 ]
 // 캐릭터 "아비"의 단계 이름 — 점수 구간(ZONES)과 같은 순서
 const STAGES = ['새싹', '무럭무럭', '활짝']
@@ -43,12 +43,8 @@ function DrawnMascot({ stage }) {
   )
 }
 
-// 축하 연출 조각 — 가운데에서 사방으로 퍼진다(좌표는 한 번만 계산)
-const BITS = Array.from({ length: 18 }, (_, i) => {
-  const angle = (i / 18) * Math.PI * 2
-  const dist = 90 + (i % 3) * 34
-  return { x: Math.round(Math.cos(angle) * dist), y: Math.round(Math.sin(angle) * dist * 0.7 - 16), color: ['--acc', '--mint', '--c-gold', '--c-sky', '--c-pink'][i % 5], delay: (i % 6) * 0.04 }
-})
+// 축하 연출 조각 개수 — 조각마다 퍼지는 위치·색·늦춤은 viz.css의 .road-up__bit:nth-of-type 규칙에 있다
+const BIT_COUNT = 18
 
 // 한 번 본 축하는 다시 띄우지 않는다(평가 시각별로 기억). 저장소를 못 쓰면 이번 화면에서만 기억한다.
 const SEEN_KEY = 'avenue.roadSeen'
@@ -58,7 +54,7 @@ const writeSeen = (value) => { try { localStorage.setItem(SEEN_KEY, value) } cat
 function LevelUp({ headline, sub, onClose }) {
   return (
     <div className="road-up" role="status">
-      {BITS.map((bit, i) => <span key={i} className="road-up__bit" style={{ '--x': `${bit.x}px`, '--y': `${bit.y}px`, '--c': `var(${bit.color})`, animationDelay: `${bit.delay}s` }} />)}
+      {Array.from({ length: BIT_COUNT }, (_, i) => <span key={i} className="road-up__bit" />)}
       <div className="road-up__card">
         <b>{headline}</b>
         <p>{sub}</p>

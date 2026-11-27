@@ -8,6 +8,7 @@ export default function JourneySteps({ current }) {
     <div className="journey">
       <div
         className="journey__bar"
+        data-step={current + 1}
         role="progressbar"
         aria-label="가입 진행률"
         aria-valuemin={1}
@@ -15,7 +16,8 @@ export default function JourneySteps({ current }) {
         aria-valuenow={current + 1}
         aria-valuetext={`${current + 1}단계 ${STEPS[current]}`}
       >
-        <span style={{ width: `${((current + 1) / STEPS.length) * 100}%` }} />
+        {/* 막대 길이는 finForm.css가 data-step(1~3)으로 정한다 */}
+        <span />
       </div>
       <ol className="journey__steps">
         {STEPS.map((step, index) => (

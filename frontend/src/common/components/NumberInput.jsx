@@ -67,7 +67,7 @@ export default function NumberInput({ label, value, onChange, min, max, step, un
     else if (!incomplete && text !== '' && Number.isFinite(Number(text))) setText(String(Number(text)))
   }
   return (
-    <div className="form-field number-input" style={unit ? { '--unit-len': unit.length } : undefined}>
+    <div className="form-field number-input" data-unit-len={unit ? unit.length : undefined}>
       <label htmlFor={id} className="form-field__label">
         {label}
       </label>

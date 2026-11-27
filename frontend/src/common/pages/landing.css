@@ -326,7 +326,7 @@
   }
 }
 
-/* 마무리: 도착 사진 */
+/* 마무리: 도착 사진 — 흰 글자가 읽히게 사진 위에 남색 막을 깐다(사진 위 색이라 테마와 상관없이 고정) */
 .landing-final--photo {
   justify-content: center;
   min-height: min(78vh, 720px);

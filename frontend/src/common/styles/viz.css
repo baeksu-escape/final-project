@@ -232,7 +232,7 @@
 .road-mascot { width: 100%; animation: road-bob 1.8s ease-in-out infinite; }
 .road-mascot img { display: block; width: 100%; height: auto; }
 .road-mascot svg { display: block; width: 46%; height: auto; margin: 0 auto; overflow: visible; }
-.road-mascot__body { fill: #fff; stroke: var(--fg); stroke-width: 2; }
+.road-mascot__body { fill: var(--panel); stroke: var(--fg); stroke-width: 2; }
 .road-mascot__eye { fill: var(--fg); }
 .road-mascot__cheek { fill: var(--bad); opacity: .28; }
 .road-mascot__mouth { fill: none; stroke: var(--fg); stroke-width: 1.6; stroke-linecap: round; }
@@ -251,6 +251,25 @@
 .road-up__card b { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 .road-up__card p { max-width: 220px; margin: 0; color: var(--mut); font-size: 14px; }
 .road-up__bit { position: absolute; top: 46%; left: 50%; width: 8px; height: 12px; border-radius: 2px; background: var(--c); opacity: 0; animation: road-pop 1.3s ease-out both; }
+/* 조각 18개가 가운데에서 사방으로 퍼지는 도착 위치(--x·--y)·색·늦춤 — 원 둘레 18등분, 거리 90·124·158px, 세로는 0.7배 */
+.road-up__bit:nth-of-type(1) { --x: 90px; --y: -16px; --c: var(--acc); animation-delay: 0s; }
+.road-up__bit:nth-of-type(2) { --x: 117px; --y: 14px; --c: var(--mint); animation-delay: 0.04s; }
+.road-up__bit:nth-of-type(3) { --x: 121px; --y: 55px; --c: var(--c-gold); animation-delay: 0.08s; }
+.road-up__bit:nth-of-type(4) { --x: 45px; --y: 39px; --c: var(--c-sky); animation-delay: 0.12s; }
+.road-up__bit:nth-of-type(5) { --x: 22px; --y: 69px; --c: var(--c-pink); animation-delay: 0.16s; }
+.road-up__bit:nth-of-type(6) { --x: -27px; --y: 93px; --c: var(--acc); animation-delay: 0.2s; }
+.road-up__bit:nth-of-type(7) { --x: -45px; --y: 39px; --c: var(--mint); animation-delay: 0s; }
+.road-up__bit:nth-of-type(8) { --x: -95px; --y: 40px; --c: var(--c-gold); animation-delay: 0.04s; }
+.road-up__bit:nth-of-type(9) { --x: -148px; --y: 22px; --c: var(--c-sky); animation-delay: 0.08s; }
+.road-up__bit:nth-of-type(10) { --x: -90px; --y: -16px; --c: var(--c-pink); animation-delay: 0.12s; }
+.road-up__bit:nth-of-type(11) { --x: -117px; --y: -46px; --c: var(--acc); animation-delay: 0.16s; }
+.road-up__bit:nth-of-type(12) { --x: -121px; --y: -87px; --c: var(--mint); animation-delay: 0.2s; }
+.road-up__bit:nth-of-type(13) { --x: -45px; --y: -71px; --c: var(--c-gold); animation-delay: 0s; }
+.road-up__bit:nth-of-type(14) { --x: -22px; --y: -101px; --c: var(--c-sky); animation-delay: 0.04s; }
+.road-up__bit:nth-of-type(15) { --x: 27px; --y: -125px; --c: var(--c-pink); animation-delay: 0.08s; }
+.road-up__bit:nth-of-type(16) { --x: 45px; --y: -71px; --c: var(--acc); animation-delay: 0.12s; }
+.road-up__bit:nth-of-type(17) { --x: 95px; --y: -72px; --c: var(--mint); animation-delay: 0.16s; }
+.road-up__bit:nth-of-type(18) { --x: 148px; --y: -54px; --c: var(--c-gold); animation-delay: 0.2s; }
 @keyframes road-up-in { from { opacity: 0; transform: scale(.9); } }
 @keyframes road-pop { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.4); } 100% { opacity: 0; transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y) + 36px)) rotate(420deg); } }
 

@@ -406,7 +406,7 @@
 .input-status__item--done .input-status__marker {
   border-color: var(--st-emerald);
   background: var(--st-emerald);
-  color: #ffffff;
+  color: var(--pri-fg);
 }
 
 /* 지금 단계 — 연한 바탕 하이라이트 + 딥 네이비 번호 뱃지 */

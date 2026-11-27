@@ -68,15 +68,11 @@
   transition: background 0.3s, border-radius 0.3s;
 }
 
-/* 펼쳐진 항목 — 연한 파랑 카드(#E8F1FE) + 파랑 제목(#3478F6) */
+/* 펼쳐진 항목 — 연한 파랑 카드(--sel) + 파랑 제목(--pri). 블랙 테마 색은 토큰이 바꾼다 */
 .svc-acc li.is-on {
   border-bottom-color: transparent;
   border-radius: 16px;
-  background: #e8f1fe;
-}
-
-:root[data-theme='dark'] .svc-acc li.is-on {
-  background: color-mix(in srgb, #3478f6 18%, var(--panel));
+  background: var(--sel);
 }
 
 .svc-acc__head {
@@ -101,7 +97,7 @@
 
 .svc-acc li.is-on .svc-acc__head {
   padding-bottom: 6px;
-  color: #3478f6;
+  color: var(--pri);
   font-size: 19px;
 }
 
@@ -147,8 +143,8 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #3478f6;
-  color: #ffffff;
+  background: var(--pri);
+  color: var(--pri-fg);
   font-size: 12px;
 }
 

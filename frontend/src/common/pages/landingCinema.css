@@ -1,6 +1,8 @@
 /* N-10 메인 ① 히어로(LandingCinema) — 스크롤 축소 + 뒷모습 사진 → 손에 든 폰 사진 + 흰 액정 위 문구.
    진행률 값(--shrink·--title·--swap·--screen)은 LandingCinema가 매 프레임 넘긴다.
-   화면 변화는 clip-path·transform·opacity로만 그려 리플로우가 없다. 높이는 100dvh(없으면 100vh). */
+   화면 변화는 clip-path·transform·opacity로만 그려 리플로우가 없다. 높이는 100dvh(없으면 100vh).
+   색 예외: 이 구간의 색 코드는 사진 위 글자·그림자와 사진 속 흰 액정 위 문구에만 쓴다. 블랙 테마에서도 사진은 그대로라
+   테마 토큰을 쓰면 글자가 사진과 안 맞으므로, 화이트 테마 토큰과 같은 값(#191f28 = --fg, #3478f6 = --pri, #e8f1fe = --sel)을 고정해 둔다. */
 
 .cinema {
   --shrink: 0;
