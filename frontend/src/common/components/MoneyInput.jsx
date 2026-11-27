@@ -136,12 +136,12 @@ export default function MoneyInput({ label, value, onChange, error, name, placeh
   )
 }
 
-// 입력 위치 앞에 있던 숫자 수를 쉼표가 포함된 문자열의 커서 위치로 바꾼다.
 // 입력 중에는 숫자로 바꾸지 않고 자릿수 문자열 그대로 묶어 선행 0을 보존한다.
 function formatDigitText(text) {
   return String(text ?? '').replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
+// 입력 위치 앞에 있던 숫자 수를 쉼표가 포함된 문자열의 커서 위치로 바꾼다.
 function restoreCursor(input, digitCount) {
   let position = 0
   let digits = 0

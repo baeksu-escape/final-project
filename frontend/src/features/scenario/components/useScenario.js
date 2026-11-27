@@ -65,13 +65,16 @@ export function useScenario(userId, workerTypeCode) {
   const calculating = ready && !inputError && (calculation.key !== key || calculation.version !== requested.version)
   // N-17-2 입력이 올바를 때만 현재 조건으로 계산을 요청한다.
   const calculate = () => { if (!inputError) setRequest({ key, values: current.values, version: requested.version + 1 }) }
-  // N-17-2 초기화는 입력을 항상 기본 조건으로 되돌리고, 이미 해당 결과가 있을 때만 중복 계산을 생략한다.
+  // N-17-2 초기화는 입력을 기본 조건으로 되돌린다. 진행 중이거나 실패한 요청은 다시 보내 이전 응답을 무효화한다.
   const reset = () => {
     const values = INITIAL
     setDraft({ key, values, presetId: BASE_PRESET.id, lastValid: values })
-    if (calculation.key === key && sameValues(calculation.applied, values)) return
+    if (calculation.key === key && sameValues(calculation.applied, values) && !calculating && !calcError && !resetPending && !retryPending) return
     // N-17-2 초기화 재계산 중에는 stale 안내 대신 계산 중 상태를 유지한다.
+    seq.current += 1
     setResetPending(true)
+    setRetryPending(false)
+    setCalculation((previous) => ({ ...previous, error: '' }))
     setRequest({ key, values, version: requested.version + 1 })
   }
 
