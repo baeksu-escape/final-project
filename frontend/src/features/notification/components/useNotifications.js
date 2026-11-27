@@ -10,8 +10,8 @@ import { fetchNotifications, markAllNotificationsRead, markNotificationRead } fr
 export const NOTIFICATIONS_CHANGED_EVENT = 'avenue:notifications-changed'
 
 // D-23 변경 주체를 이벤트에 넣어 헤더와 기록 페이지 사이의 상호 갱신 반복을 막는다.
-export function emitNotificationsChanged(source) {
-  window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, { detail: { source } }))
+export function emitNotificationsChanged(source, change = {}) {
+  window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, { detail: { source, ...change } }))
 }
 
 // D-23 재연결 대기 중 화면이 닫히면 타이머와 취소 리스너를 함께 정리한다.
@@ -21,26 +21,32 @@ const waitForReconnect = (signal, delay) => new Promise((resolve) => {
   signal.addEventListener('abort', finish, { once: true })
 })
 
+// D-23 서버 목록과 조회 도중 도착한 SSE를 ID로 합치고 새 항목 수를 전체 배지에 더한다.
+function mergePendingNotifications(response, pendingItems, pendingAtStart) {
+  const items = [...response.items]
+  let arrivedDuringRequest = 0
+  pendingItems.forEach((item, id) => {
+    if (items.some((row) => row.notificationId === id)) return
+    items.push(item)
+    if (!pendingAtStart.has(id)) arrivedDuringRequest += 1
+  })
+  items.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+  return { ...response, items, unreadCount: response.unreadCount + arrivedDuringRequest }
+}
+
 // D-23 알림 목록·읽음 상태를 관리하고 SSE 연결 시 새 항목을 추가할 수 있는 함수를 제공한다.
 export function useNotifications(enabled = true) {
   const [state, setState] = useState({ items: [], unreadCount: 0, loading: true, error: '' })
   const pendingSse = useRef(new Map())
   const seenIds = useRef(new Set())
-  const refresh = useCallback(async ({ preserveSse = false } = {}) => {
-    setState((current) => ({ ...current, error: '', loading: true }))
+  const refresh = useCallback(async () => {
+    const pendingAtStart = new Set(pendingSse.current.keys())
+    setState((current) => ({ ...current, error: '', loading: current.items.length === 0 ? true : current.loading }))
     try {
-      const response = adaptNotifications(await fetchNotifications({ unreadOnly: true }))
-      const items = [...response.items]
-      if (preserveSse) {
-        pendingSse.current.forEach((item, id) => {
-          if (!items.some((row) => row.notificationId === id)) items.push(item)
-        })
-      }
-      items.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-      const ids = new Set(items.map((item) => item.notificationId))
-      ids.forEach((id) => seenIds.current.add(id))
+      const response = mergePendingNotifications(adaptNotifications(await fetchNotifications({ unreadOnly: true })), pendingSse.current, pendingAtStart)
+      response.items.forEach((item) => seenIds.current.add(item.notificationId))
       response.items.forEach((item) => pendingSse.current.delete(item.notificationId))
-      setState({ ...response, items, unreadCount: Math.max(response.unreadCount, items.length), loading: false, error: '' })
+      setState({ ...response, loading: false, error: '' })
     }
     catch { setState((current) => ({ ...current, loading: false, error: '알림을 불러오지 못했어요.' })) }
   }, [])
@@ -48,17 +54,13 @@ export function useNotifications(enabled = true) {
   useEffect(() => {
     if (!enabled) return undefined
     let active = true
+    const pendingAtStart = new Set(pendingSse.current.keys())
     fetchNotifications({ unreadOnly: true }).then((data) => {
       if (active) {
-        const response = adaptNotifications(data)
-        const items = [...response.items]
-        pendingSse.current.forEach((item, id) => {
-          if (!items.some((row) => row.notificationId === id)) items.push(item)
-        })
-        items.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-        items.forEach((item) => seenIds.current.add(item.notificationId))
+        const response = mergePendingNotifications(adaptNotifications(data), pendingSse.current, pendingAtStart)
+        response.items.forEach((item) => seenIds.current.add(item.notificationId))
         response.items.forEach((item) => pendingSse.current.delete(item.notificationId))
-        setState({ ...response, items, unreadCount: Math.max(response.unreadCount, items.length), loading: false, error: '' })
+        setState({ ...response, loading: false, error: '' })
       }
     })
       .catch(() => { if (active) setState((current) => ({ ...current, loading: false, error: '알림을 불러오지 못했어요.' })) })
@@ -119,7 +121,7 @@ export function useNotifications(enabled = true) {
           }
           if (!response.ok) throw new Error('알림 스트림 연결 실패')
           retryDelay = 1000
-          await refresh({ preserveSse: true })
+          await refresh()
           await readNotificationEvents(response, addNotification, controller.signal)
         } catch {
           if (stopped || controller.signal.aborted) break
@@ -149,13 +151,13 @@ export function useNotifications(enabled = true) {
       const items = current.items.filter((item) => item.notificationId !== id)
       return { ...current, items, unreadCount: Math.max(0, current.unreadCount - Number(wasUnread)) }
     })
-    emitNotificationsChanged('bell')
+    emitNotificationsChanged('bell', { notificationId: id })
   }, [])
   const markAllRead = useCallback(async () => {
     await markAllNotificationsRead()
     pendingSse.current.clear()
     setState((current) => ({ ...current, items: [], unreadCount: 0 }))
-    emitNotificationsChanged('bell')
+    emitNotificationsChanged('bell', { readAll: true })
   }, [])
 
   return { ...state, refresh, addNotification, markRead, markAllRead }

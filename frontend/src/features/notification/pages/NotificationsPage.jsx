@@ -39,7 +39,21 @@ export default function NotificationsPage() {
   useEffect(() => {
     const requestId = ++sequence.current
     fetchNotifications({ type: type === 'ALL' ? undefined : type, size: PAGE_SIZE }).then((data) => {
-      if (sequence.current === requestId) setHistory({ type, ...adaptNotifications(data), loading: false, error: '' })
+      if (sequence.current === requestId) {
+        const firstPage = adaptNotifications(data)
+        setHistory((current) => {
+          if (current.type !== type || current.items.length === 0) return { type, ...firstPage, loading: false, error: '' }
+          const firstIds = new Set(firstPage.items.map((item) => item.notificationId))
+          return {
+            ...current,
+            items: [...firstPage.items, ...current.items.filter((item) => !firstIds.has(item.notificationId))],
+            unreadCount: firstPage.unreadCount,
+            hasMore: current.hasMore || firstPage.hasMore,
+            loading: false,
+            error: '',
+          }
+        })
+      }
     }).catch(() => {
       if (sequence.current === requestId) setHistory({ type, items: [], unreadCount: 0, hasMore: false, loading: false, error: '알림을 불러오지 못했어요.' })
     })
@@ -49,6 +63,18 @@ export default function NotificationsPage() {
   useEffect(() => {
     const refreshFromBell = (event) => {
       if (event.detail?.source === 'page') return
+      if (event.detail?.readAll) {
+        setHistory((current) => ({ ...current, items: current.items.map((item) => ({ ...item, read: true })), unreadCount: 0 }))
+      } else if (event.detail?.notificationId != null) {
+        setHistory((current) => {
+          const wasUnread = current.items.some((item) => item.notificationId === event.detail.notificationId && !item.read)
+          return {
+            ...current,
+            items: current.items.map((item) => item.notificationId === event.detail.notificationId ? { ...item, read: true } : item),
+            unreadCount: Math.max(0, current.unreadCount - Number(wasUnread)),
+          }
+        })
+      }
       setRefreshVersion((version) => version + 1)
     }
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshFromBell)

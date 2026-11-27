@@ -58,7 +58,7 @@ class AdminReportServiceTest {
     void setUp() {
         service = new AdminReportService(reportMapper, new ContentStatusService(boardMapper), settings, CLOCK, notificationService);
         given(settings.intValue("REPORT_AUTO_HIDE_COUNT", 5)).willReturn(5);
-        given(reportMapper.selectReporterUserId(anyLong())).willReturn(9L);
+        given(reportMapper.selectOpenReporterUserIds(anyString(), anyLong())).willReturn(List.of(9L));
     }
 
     private static ReportRow report(long reportId, String type, long targetId, String reason, String status, String targetStatus,
@@ -128,6 +128,7 @@ class AdminReportServiceTest {
     @Test
     void 반려하면_숨김을_풀고_미처리_신고를_모두_반려로_닫는다() {
         given(reportMapper.selectReport(12L)).willReturn(report(12, "POST", 1, "SPAM", "RECEIVED", "HIDDEN_BY_REPORT", NOW));
+        given(reportMapper.selectOpenReporterUserIds("POST", 1L)).willReturn(List.of(9L, 10L));
         given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "HIDDEN_BY_REPORT"));
         given(reportMapper.countOpenByTarget("POST", 1L)).willReturn(5);
         given(boardMapper.updatePostStatus(1L, "HIDDEN_BY_REPORT", "VISIBLE", NOW)).willReturn(1);
@@ -140,6 +141,8 @@ class AdminReportServiceTest {
         verify(boardMapper).insertPostLog(1L, "RESTORE", "ADMIN", ADMIN, "HIDDEN_BY_REPORT", "VISIBLE", 12L, NOW);
         verify(notificationService).notifyQuietly(9L, "REPORT_RESULT", "신고 처리 결과가 있어요",
                 "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=1");
+        verify(notificationService).notifyQuietly(10L, "REPORT_RESULT", "신고 처리 결과가 있어요",
+                "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=1");
         verify(notificationService, never()).notifyQuietly(eq(OTHER), eq("REPORT_RESULT"), anyString(), anyString(), anyString());
     }
 
@@ -147,6 +150,7 @@ class AdminReportServiceTest {
     void 삭제하면_글을_지우고_처리_완료로_닫는다() {
         given(reportMapper.selectReport(12L)).willReturn(report(12, "POST", 1, "SPAM", "RECEIVED", "HIDDEN_BY_REPORT", NOW));
         given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "HIDDEN_BY_REPORT"));
+        given(reportMapper.selectOpenReporterUserIds("POST", 1L)).willReturn(List.of(9L, 9L));
         given(reportMapper.countOpenByTarget("POST", 1L)).willReturn(5);
         given(boardMapper.updatePostStatus(1L, "HIDDEN_BY_REPORT", "DELETED", NOW)).willReturn(1);
 
@@ -156,8 +160,11 @@ class AdminReportServiceTest {
         verify(boardMapper).insertPostLog(1L, "DELETE", "ADMIN", ADMIN, "HIDDEN_BY_REPORT", "DELETED", 12L, NOW);
         verify(notificationService).notifyQuietly(9L, "REPORT_RESULT", "신고 처리 결과가 있어요",
                 "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=1");
+
         verify(notificationService).notifyQuietly(OTHER, "REPORT_RESULT", "내 글이 운영 정책에 따라 삭제됐어요",
                 "운영 정책에 따라 글이 삭제 처리되었어요.", "/lounge?post=1");
+        verify(reportMapper).selectOpenReporterUserIds("POST", 1L);
+        verify(reportMapper, never()).selectReporterUserId(anyLong());
         verify(reportMapper).closeOpenReports("POST", 1L, "DONE", "DELETE", ADMIN, null, NOW);
     }
 
