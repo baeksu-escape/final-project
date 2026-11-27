@@ -87,7 +87,7 @@ def build(source, cfg, prior):
         if not ((age>=minimum_age)&(age<=69)).all():
             raise ValueError('explicit age incompatible with account history')
     if cfg.get('statistical_priors_enabled', False):
-        stats = json.loads((ROOT/'reference/statistical_priors.json').read_text())
+        stats = json.loads((ROOT/'reference/statistical_priors.json').read_text(encoding='utf-8'))
         # Reuse the copula latent value; only the wage age-conditional marginal changes.
         sc = prior['segments']['wage']
         old_sigma = sigma if sc['income_sigma'] is None else sc['income_sigma']
