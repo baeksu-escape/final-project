@@ -1,5 +1,5 @@
-// D-23 SSE 응답의 event·data 줄을 빈 줄 단위로 모아 notification 이벤트만 JSON으로 전달한다.
-export async function readNotificationEvents(response, onNotification, signal) {
+// D-23 SSE event·data 줄을 빈 줄 단위로 파싱해 알림과 연결 제어 이벤트를 전달한다.
+export async function readNotificationEvents(response, onNotification, signal, onControlEvent = () => {}) {
   const reader = response.body?.getReader()
   if (!reader) throw new Error('SSE 스트림을 읽을 수 없습니다.')
   const decoder = new TextDecoder()
@@ -11,7 +11,7 @@ export async function readNotificationEvents(response, onNotification, signal) {
     if (line === '') {
       if (eventName === 'notification' && dataLines.length) {
         try { onNotification(JSON.parse(dataLines.join('\n'))) } catch { /* 잘못된 이벤트는 건너뛴다. */ }
-      }
+      } else if (eventName === 'replaced' || eventName === 'expired') onControlEvent(eventName)
       eventName = ''
       dataLines = []
       return

@@ -21,6 +21,26 @@ const waitForReconnect = (signal, delay) => new Promise((resolve) => {
   signal.addEventListener('abort', finish, { once: true })
 })
 
+// D-23 replaced 연결은 탭이 숨겨졌다가 다시 보일 때까지 재연결을 미룬다.
+function waitUntilVisible(signal) {
+  return new Promise((resolve) => {
+    let hiddenBefore = document.visibilityState !== 'visible'
+    const finish = (visible) => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      signal.removeEventListener('abort', handleAbort)
+      resolve(visible)
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') hiddenBefore = true
+      else if (hiddenBefore) finish(true)
+    }
+    const handleAbort = () => finish(false)
+    if (signal.aborted) { finish(false); return }
+    document.addEventListener('visibilitychange', handleVisibility)
+    signal.addEventListener('abort', handleAbort, { once: true })
+  })
+}
+
 // D-23 서버 목록과 조회 도중 도착한 SSE를 ID로 합치고 새 항목 수를 전체 배지에 더한다.
 function mergePendingNotifications(response, pendingItems, pendingAtStart) {
   const items = [...response.items]
@@ -39,6 +59,8 @@ export function useNotifications(enabled = true) {
   const [state, setState] = useState({ items: [], unreadCount: 0, loading: true, error: '' })
   const pendingSse = useRef(new Map())
   const seenIds = useRef(new Set())
+  const firstListRequest = useRef(null)
+  // D-23 최초 목록 요청을 SSE 연결에서도 기다려 중복 조회를 막는다.
   const refresh = useCallback(async () => {
     const pendingAtStart = new Set(pendingSse.current.keys())
     setState((current) => ({ ...current, error: '', loading: current.items.length === 0 ? true : current.loading }))
@@ -55,7 +77,9 @@ export function useNotifications(enabled = true) {
     if (!enabled) return undefined
     let active = true
     const pendingAtStart = new Set(pendingSse.current.keys())
-    fetchNotifications({ unreadOnly: true }).then((data) => {
+    const request = fetchNotifications({ unreadOnly: true })
+    firstListRequest.current = request
+    request.then((data) => {
       if (active) {
         const response = mergePendingNotifications(adaptNotifications(data), pendingSse.current, pendingAtStart)
         response.items.forEach((item) => seenIds.current.add(item.notificationId))
@@ -102,6 +126,8 @@ export function useNotifications(enabled = true) {
     const controller = new AbortController()
     let stopped = false
     let retryDelay = 1000
+    let firstConnection = true
+    let waitingForVisible = false
     const stopForUnauthorized = () => { stopped = true; controller.abort() }
     window.addEventListener(UNAUTHORIZED_EVENT, stopForUnauthorized)
 
@@ -121,8 +147,24 @@ export function useNotifications(enabled = true) {
           }
           if (!response.ok) throw new Error('알림 스트림 연결 실패')
           retryDelay = 1000
-          await refresh()
-          await readNotificationEvents(response, addNotification, controller.signal)
+          if (firstConnection) {
+            firstConnection = false
+            if (firstListRequest.current) await firstListRequest.current
+            else await refresh()
+          } else await refresh()
+          let replaced = false
+          await readNotificationEvents(response, addNotification, controller.signal, (eventName) => {
+            if (eventName === 'replaced') replaced = true
+            // expired 이벤트 뒤에는 서버가 스트림을 닫고 다음 요청에서 401을 돌려 로그아웃 흐름을 탄다.
+          })
+          if (replaced) {
+            waitingForVisible = true
+            const visible = await waitUntilVisible(controller.signal)
+            waitingForVisible = false
+            if (!visible) break
+            retryDelay = 1000
+            await refresh()
+          }
         } catch {
           if (stopped || controller.signal.aborted) break
         }
@@ -133,7 +175,7 @@ export function useNotifications(enabled = true) {
     }
 
     connect()
-    const refreshOnVisible = () => { if (document.visibilityState === 'visible' && !stopped) refresh() }
+    const refreshOnVisible = () => { if (document.visibilityState === 'visible' && !stopped && !waitingForVisible) refresh() }
     document.addEventListener('visibilitychange', refreshOnVisible)
     return () => {
       stopped = true

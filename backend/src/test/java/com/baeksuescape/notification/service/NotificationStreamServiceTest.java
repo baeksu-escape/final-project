@@ -5,11 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -33,6 +35,12 @@ class NotificationStreamServiceTest {
                 return emitter;
             }
         };
+    }
+
+    // D-23 FP-284 만료 예약을 사용한 시험의 백그라운드 실행기를 정리한다.
+    @AfterEach
+    void stopExecutors() {
+        service.stop();
     }
 
     @Test
@@ -65,7 +73,25 @@ class NotificationStreamServiceTest {
 
         assertEquals(NotificationStreamService.MAX_CONNECTIONS_PER_USER, service.connectionCount(7L));
         assertTrue(created.get(0).completed, "가장 먼저 연 연결이 닫혀야 한다.");
+        String replacementEvent = String.join("", created.get(0).sent);
+        assertTrue(replacementEvent.contains("event:replaced") && replacementEvent.contains("limit"), replacementEvent);
         assertFalse(created.get(1).completed);
+    }
+
+    // D-23 FP-284 토큰 만료 시 제한 시간 안에 expired 이벤트를 보내고 연결이 제거되는지 확인한다.
+    @Test
+    @DisplayName("토큰 만료 시 expired 이벤트를 보내고 연결을 닫는다")
+    void tokenExpiry_sendsExpiredAndCloses() {
+        Instant expiresAt = Instant.now().plusSeconds(60);
+        service.register(7L, expiresAt);
+
+        service.expire(7L, created.get(0));
+
+        assertTrue(created.get(0).timeoutMillis <= 61_000);
+        String expiredEvent = String.join("", created.get(0).sent);
+        assertTrue(expiredEvent.contains("event:expired") && expiredEvent.contains("token"), expiredEvent);
+        assertTrue(created.get(0).completed);
+        assertEquals(0, service.connectionCount(7L));
     }
 
     @Test
@@ -108,14 +134,16 @@ class NotificationStreamServiceTest {
         return new NotificationItemResponse(id, "WELCOME", "환영", "시작해 보세요", "/home", false, LocalDateTime.of(2026, 11, 27, 10, 0));
     }
 
-    /** 보낸 내용을 기록하고, 필요하면 보내기 실패를 흉내 내는 가짜 연결이다. */
+    /** D-23 FP-284 SSE 이벤트 형식과 종료를 기록하는 테스트용 가짜 연결이다. */
     private static class RecordingEmitter extends SseEmitter {
         final List<String> sent = new ArrayList<>();
+        final long timeoutMillis;
         boolean failSend;
         boolean completed;
 
         RecordingEmitter(long timeout) {
             super(timeout);
+            timeoutMillis = timeout;
         }
 
         @Override
