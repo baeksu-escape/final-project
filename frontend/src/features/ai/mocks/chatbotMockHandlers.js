@@ -33,34 +33,37 @@ const SAMPLE_CHATBOT_PRESETS = Object.freeze([
 
 // N-32-2 하루 자유 질문 횟수(APP_SETTING CHATBOT_DAILY_LIMIT 기본값). mock은 새로고침하면 다시 10회가 된다.
 const MOCK_DAILY_LIMIT = 10
-let mockUsedCount = 0
+// 회원 번호 → 오늘 쓴 질문 수. 실제 서버처럼 회원마다 따로 센다(다른 회원으로 로그인하면 10회부터 다시).
+const mockUsedCounts = new Map()
+const usedCountOf = (userId) => mockUsedCounts.get(userId) ?? 0
 
-// N-32-1 HELP-02 mock — 실제 API처럼 로그인하지 않았으면 401이다. 버튼을 눌러도 횟수는 줄지 않고, 남은 자유 질문 횟수를 함께 준다.
+// N-32-1 HELP-02 mock — 실제 API처럼 로그인하지 않았으면 401이다. 버튼을 눌러도 횟수는 줄지 않고, 그 회원의 남은 자유 질문 횟수를 함께 준다.
 function handleChatbotPresets({ token }) {
-  requireMockUser(token)
+  const { userId } = requireMockUser(token)
   return {
     presets: SAMPLE_CHATBOT_PRESETS.map((item) => ({ ...item })),
-    remainingCount: Math.max(0, MOCK_DAILY_LIMIT - mockUsedCount),
+    remainingCount: Math.max(0, MOCK_DAILY_LIMIT - usedCountOf(userId)),
     dailyLimit: MOCK_DAILY_LIMIT,
   }
 }
 
 // N-32-2 HELP-03 mock — 실제 API와 같은 입력 검사·하루 횟수(429)를 흉내 낸다. 답은 AI가 아니라 고정 예시 문장이다.
 function handleChatbotQuestion({ body, token }) {
-  requireMockUser(token)
+  const { userId } = requireMockUser(token)
   const question = typeof body?.question === 'string' ? body.question.trim() : ''
   if (!question || question.length > 200) {
     const message = question ? '질문은 200자까지 쓸 수 있습니다.' : '질문을 입력해 주세요.'
     throw new ApiError(400, message, { code: 'INVALID_INPUT', message, fieldErrors: [{ field: 'question', message }] })
   }
-  if (mockUsedCount >= MOCK_DAILY_LIMIT) {
+  const used = usedCountOf(userId)
+  if (used >= MOCK_DAILY_LIMIT) {
     const message = `자유 질문은 하루 ${MOCK_DAILY_LIMIT}번까지 할 수 있습니다. 내일 다시 이용해 주세요.`
     throw new ApiError(429, message, { code: 'DAILY_LIMIT_EXCEEDED', message, fieldErrors: [] })
   }
-  mockUsedCount += 1
+  mockUsedCounts.set(userId, used + 1)
   return {
     answer: `(예시 답) "${question}"에 대한 설명입니다. 실제 서버에서는 AI가 쉬운 말로 3~5문장 안에서 답합니다. 이 답은 교육용 예시이며 개인 재무 상담이 아닙니다.`,
-    remainingCount: MOCK_DAILY_LIMIT - mockUsedCount,
+    remainingCount: MOCK_DAILY_LIMIT - (used + 1),
     dailyLimit: MOCK_DAILY_LIMIT,
   }
 }
