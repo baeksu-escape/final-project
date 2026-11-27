@@ -89,21 +89,23 @@ export const SAMPLE_MEMBER_FINANCIAL_HEALTH = Object.freeze({
   ]),
 })
 
-// N-17-1 DIAG-04 시나리오 기준값 mock. 소득·지출은 위 현금흐름 예시(시드 회원 2번)와 같고,
-// 상환액·변동금리 대출·총자산은 금리 변화를 화면에서 볼 수 있게 넣은 예시값이다(실제 저장 데이터 아님).
-// 정책금리는 develop의 한국은행 기준금리 적재 SQL의 가장 최근 값이다. 버틸 개월 수는 D-33에 따라 총자산 15%를 쓴다.
+// N-17-1 DIAG-04 시나리오 기준값 mock. 소득·지출은 위 현금흐름 예시를 사용한다.
+// 월 상환액과 변동금리 잔액은 자산·부채 mock의 대출 목록에서 계산하며, 실제 저장 데이터는 아니다.
+// 정책금리는 최근 적재값 예시이고, 버틸 개월 수는 D-33에 따라 총자산 15%를 사용한다.
 export const SAMPLE_SCENARIO_BASE = Object.freeze({
   monthlyIncomeAmount: 2099498,
   monthlyExpenseAmount: 1315514,
-  monthlyPaymentAmount: 350000,
-  variableLoanBalanceAmount: 12000000,
+  monthlyPaymentAmount: SAMPLE_MEMBER_FINANCIAL_HEALTH.loans.reduce((sum, loan) => sum + loan.monthlyPaymentAmount, 0),
+  variableLoanBalanceAmount: SAMPLE_MEMBER_FINANCIAL_HEALTH.loans.filter((loan) => loan.rateTypeCode === 'VARIABLE').reduce((sum, loan) => sum + loan.balanceAmount, 0),
   totalAssetAmount: 30000000,
   policyRate: Object.freeze({ baseDate: '2026-10-31', ratePct: 3 }),
   survivableAssetRatioPct: 15,
-  // mock 계산용 변동금리 대출 행(응답에는 넣지 않음). 전체 상환액 35만 중 변동 20만, 나머지 15만은 고정금리로 본다.
-  variableLoans: Object.freeze([
-    Object.freeze({ balanceAmount: 12000000, annualRatePct: 5, monthlyPaymentAmount: 200000 }),
-  ]),
+  // mock 계산용 variableLoans에는 변동금리 대출만 담고, 응답 loanItems에는 모든 대출을 담는다.
+  // N-17-1 대출 상세와 계산용 변동금리 목록은 자산·부채 mock의 동일 대출 자료에서 만든다.
+  loanItems: Object.freeze(SAMPLE_MEMBER_FINANCIAL_HEALTH.loans.map(({ loanId, loanTypeName, balanceAmount, annualRatePct, rateTypeCode, monthlyPaymentAmount }) =>
+    Object.freeze({ loanId, loanTypeName, balanceAmount, annualRatePct, rateTypeCode, monthlyPaymentAmount }))),
+  variableLoans: Object.freeze(SAMPLE_MEMBER_FINANCIAL_HEALTH.loans.filter((loan) => loan.rateTypeCode === 'VARIABLE').map(({ balanceAmount, annualRatePct, monthlyPaymentAmount }) =>
+    Object.freeze({ balanceAmount, annualRatePct, monthlyPaymentAmount }))),
   assumptions: Object.freeze([
     '금리 변화는 변동금리 대출에만 반영하고, 고정금리·금리 방식을 모르는 대출의 상환액은 바꾸지 않습니다.',
     '월 이자 변화는 변동금리 대출 잔액 × 금리 변화 ÷ 12로 간단히 어림한 값이며, 대출마다 금리는 0% 아래로 내려가지 않는 것으로 봅니다.',

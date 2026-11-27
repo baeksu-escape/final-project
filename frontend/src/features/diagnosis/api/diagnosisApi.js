@@ -53,7 +53,7 @@ export function calculateFinancialHealth(payload) {
   return apiPost(DIAGNOSIS_API.CALCULATE_FINANCIAL_HEALTH, payload)
 }
 
-// N-17-4 금리·소득·지출 변화에 따른 월 잉여금 및 상환 여력 재계산 (N-17-3, N-21-4 공통)
+// N-17-4 금리·소득·지출 변화에 따른 월 여유 자금 및 상환 여력 재계산 (N-17-3, N-21-4 공통)
 // 옛 mock 전용 함수다(서버에는 이 경로가 없다). 저장 데이터로 계산하는 실제 API는 아래 recalculateMemberScenario를 쓴다.
 export function recalculateScenario(payload) {
   return apiPost(DIAGNOSIS_API.RECALCULATE_SCENARIO, payload)
