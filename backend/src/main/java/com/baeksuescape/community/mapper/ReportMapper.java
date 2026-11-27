@@ -40,10 +40,13 @@ public interface ReportMapper {
     List<ReportRow> selectReportsByTarget(@Param("targetType") String targetType, @Param("targetId") long targetId);
 
     // N-34-3 한 대상의 미처리 신고를 모두 처리 완료·반려로 닫는다. 닫은 건수를 돌려준다.
-    // D-23 FP-301 신고 처리 결과 알림의 수신 회원 ID를 조회한다.
-    long selectReporterUserId(@Param("reportId") long reportId);
-
     int closeOpenReports(@Param("targetType") String targetType, @Param("targetId") long targetId, @Param("statusCode") String statusCode,
             @Param("resultCode") String resultCode, @Param("handlerUserId") long handlerUserId, @Param("memo") String memo,
             @Param("now") LocalDateTime now);
+
+    // D-23 FP-301 사용 안 함(2차 개발 뒤 정리). 단일 신고 조회 메서드 이름은 유지한다.
+    long selectReporterUserId(@Param("reportId") long reportId);
+
+    // D-23 FP-301 처리 대상의 미처리 신고자 회원 ID를 중복 없이 조회한다.
+    List<Long> selectOpenReporterUserIds(@Param("targetType") String targetType, @Param("targetId") long targetId);
 }

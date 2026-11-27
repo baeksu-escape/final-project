@@ -97,4 +97,11 @@
          WHERE <include refid="targetWhere"/>
            AND R.STATUS_CODE IN ('RECEIVED', 'IN_REVIEW')
     </update>
+    <!-- D-23 FP-301 닫기 전 같은 대상의 미처리 신고자 ID를 중복 없이 조회한다. -->
+    <select id="selectOpenReporterUserIds" resultType="long">
+        SELECT DISTINCT R.REPORTER_USER_ID
+          FROM CONTENT_REPORT R
+         WHERE <include refid="targetWhere"/>
+           AND R.STATUS_CODE IN ('RECEIVED', 'IN_REVIEW')
+    </select>
 </mapper>

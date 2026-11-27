@@ -113,12 +113,14 @@ public class AdminReportService {
             changeOrFail(type, id, before, after, ACTION_RESTORE, adminUserId, reportId, now);
         }
 
+        List<Long> reporterUserIds = reportMapper.selectOpenReporterUserIds(type, id).stream().distinct().toList();
         String reportStatus = RESULT_REJECT.equals(result) ? REPORT_REJECTED : REPORT_DONE;
         int handled = reportMapper.closeOpenReports(type, id, reportStatus, result, adminUserId, blankToNull(request.memo()), now);
         long postId = target.parentPostId() == null ? target.targetId() : target.parentPostId();
-        // D-23 처리 결과는 신고자에게 알리고, 실제 숨김·삭제된 대상의 작성자에게도 별도 안내한다.
-        notificationService.notifyQuietly(reportMapper.selectReporterUserId(reportId), "REPORT_RESULT",
-                "신고 처리 결과가 있어요", "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=" + postId);
+        // D-23 FP-301 닫히는 신고자 모두에게 결과를 알리고 작성자 알림은 아래에서 별도로 보낸다.
+        reporterUserIds.forEach(reporterUserId ->
+                notificationService.notifyQuietly(reporterUserId, "REPORT_RESULT",
+                "신고 처리 결과가 있어요", "접수한 신고의 처리 결과를 확인해 주세요.", "/lounge?post=" + postId));
         if (!VISIBLE.equals(after) && !after.equals(before) && target.ownerUserId() != null) {
             // D-23 대상이 댓글이면(부모 글이 있으면) '댓글', 아니면 '글'로 안내한다.
             String noun = target.parentPostId() == null ? "글" : "댓글";
