@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { getScenarioBase, recalculateMemberScenario } from '../../diagnosis/api/diagnosisApi.js'
 import { adaptBaseline, adaptResponse } from '../adapters/scenarioAdapter.js'
-import { BASE_PRESET, presetValues, scenarioInputError } from './scenarioConfig.js'
+import { BASE_PRESET, SCENARIO_FIELDS, presetValues, scenarioInputError } from './scenarioConfig.js'
+
+// N-17-2 두 조건이 같은 값인지 항목별로 비교한다(슬라이더를 움직였다 같은 값으로 돌아오면 바뀌지 않은 것으로 본다).
+const sameValues = (a, b) => Boolean(a && b) && SCENARIO_FIELDS.every((field) => a[field.key] === b[field.key])
 
 const INITIAL = presetValues(BASE_PRESET)
 
@@ -66,7 +69,7 @@ export function useScenario(userId, workerTypeCode) {
   const reset = () => {
     const values = INITIAL
     setDraft({ key, values, presetId: BASE_PRESET.id, lastValid: values })
-    if (calculation.key === key && calculation.applied === values) return
+    if (calculation.key === key && sameValues(calculation.applied, values)) return
     // N-17-2 초기화 재계산 중에는 stale 안내 대신 계산 중 상태를 유지한다.
     setResetPending(true)
     setRequest({ key, values, version: requested.version + 1 })
@@ -88,7 +91,7 @@ export function useScenario(userId, workerTypeCode) {
     result,
     calcError,
     // 결과가 지금 입력과 다른 조건으로 계산된 것인지(버튼을 아직 안 누름)
-    stale: Boolean(result) && calculation.applied !== current.values && !resetPending,
+    stale: Boolean(result) && !sameValues(calculation.applied, current.values) && !resetPending,
     calculating: calculating || resetPending || retryPending,
     setValue,
     selectPreset,
