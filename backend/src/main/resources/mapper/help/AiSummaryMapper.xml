@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- N-31-2 AI 요약 저장 — ASSESSMENT.AI_SUMMARY (FP-181). 본인 평가(USER_ID)만 다룬다 -->
+<mapper namespace="com.baeksuescape.help.mapper.AiSummaryMapper">
+
+    <!-- 요약이 비어 있을 때만 저장한다. 두 요청이 동시에 와도 먼저 저장된 요약이 남는다 -->
+    <update id="updateAiSummaryIfEmpty">
+        UPDATE ASSESSMENT
+           SET AI_SUMMARY = #{aiSummary}
+         WHERE REQUEST_ID = #{requestId}
+           AND USER_ID = #{userId}
+           AND AI_SUMMARY IS NULL
+    </update>
+
+    <select id="selectAiSummary" resultType="string">
+        SELECT AI_SUMMARY
+          FROM ASSESSMENT
+         WHERE REQUEST_ID = #{requestId}
+           AND USER_ID = #{userId}
+    </select>
+</mapper>

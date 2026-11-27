@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!-- FP-142 N-12-2 점수 산출 저장, N-14 SHAP 요인, N-04-6 진단 내역 (DDL avenue_ddl.sql ASSESSMENT·ASSESSMENT_FACTOR).
-     평가는 추가만 하고 고치거나 지우지 않는다(탈퇴해도 보존, DDL W1). 서비스 회원 평가라 DATASET_CODE = 'SERVICE'. -->
+     평가는 추가만 하고 고치거나 지우지 않는다(탈퇴해도 보존, DDL W1). 서비스 회원 평가라 DATASET_CODE = 'SERVICE'.
+     단, ASSESSMENT.AI_SUMMARY는 RPT-04(FP-181 help/AiSummaryMapper)가 비어 있을 때만 한 번 저장한다(11/27 PR #170 리뷰). -->
 <mapper namespace="com.baeksuescape.assessment.mapper.AssessmentMapper">
 
     <sql id="assessmentColumns">

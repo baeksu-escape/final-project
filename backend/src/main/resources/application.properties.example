@@ -41,6 +41,11 @@ avenue.altdata.missing-member-mode=EMPTY
 # ---- FP-142 점수 계산 서버(FastAPI) — 비워 두면 http://localhost:8000 (1차·시연: 한 PC). Docker(http://fastapi:8000)는 2차 개발 후보 ----
 avenue.prediction.base-url=
 
+# ---- FP-181 OpenAI (N-31-2 AI 요약 RPT-04, N-32-2 용어 도우미 자유 질문 HELP-03) — 강사 제공 키 ----
+# 키 값은 이 파일에 쓰지 않는다. 환경변수 OPENAI_API_KEY에만 넣는다(강사 안내: .env 또는 환경변수만). 이 줄은 그대로 복사한다
+# 환경변수가 없으면 빈 값이 되어 백엔드는 그대로 켜지고 두 API만 503 AI_UNAVAILABLE로 답한다. 모델·주소·시간 제한(연결 2초/응답 15초, D-18)은 기본값을 쓴다
+avenue.ai.openai.api-key=${OPENAI_API_KEY:}
+
 # ---- 개인정보 암호화 키 (N-02-4) — Base64. AES는 정확히 32바이트, HMAC은 32바이트 이상, 둘은 서로 달라야 한다 ----
 avenue.pii.aes-key=${AVENUE_DEV_AES_KEY}
 avenue.pii.hmac-key=${AVENUE_DEV_HMAC_KEY}
