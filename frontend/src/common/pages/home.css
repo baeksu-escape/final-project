@@ -200,6 +200,7 @@ a.dash-card:hover {
 
 .dash-group--finance { --tone: var(--mint); }
 .dash-group--loans { --tone: var(--c-violet); }
+.dash-group--market { --tone: var(--c-pink); }
 .dash-group--lounge { --tone: var(--c-orange); }
 
 .dash-group__label {
