@@ -1,5 +1,5 @@
 {
-  "ddl_sha256": "83db8815dace247316091e2bca67f466271e56990ed395bede49743c0ddb0fbe",
+  "ddl_sha256": "1ae328acb0787687dc30519a70b4670f05316e3e0f820f7422bcaba0ccaee033",
   "table_count": 48,
   "rows": {
     "DIM_WORKER_TYPE": 3,
@@ -21,8 +21,8 @@
     "USER_CREDIT_PROFILE": 318,
     "FEATURE_SET_VERSION": 2,
     "DIM_FEATURE": 77,
-    "SCORE_CUTOFF_VERSION": 3,
-    "SCORE_GRADE_BAND": 9,
+    "SCORE_CUTOFF_VERSION": 4,
+    "SCORE_GRADE_BAND": 12,
     "DATASET_VERSION": 0,
     "DATASET_CLEANING_LOG": 0,
     "MODEL_REGISTRY": 2,
