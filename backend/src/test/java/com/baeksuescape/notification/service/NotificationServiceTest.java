@@ -219,6 +219,38 @@ class NotificationServiceTest {
         verify(mapper).selectFiltered(7L, true, "COMMENT_NEW", 50L, 3);
     }
 
+    // FP-300·D-23 헤더 드롭다운 조회는 목록과 같은 문장에서 센 안 읽은 개수를 쓰고 countUnread를 따로 부르지 않는다.
+    @Test
+    @DisplayName("안 읽은 것만 조건 없이 조회하면 같은 시점의 안 읽은 개수를 쓴다")
+    void 안읽은목록_같은시점_개수() {
+        LocalDateTime now = LocalDateTime.now();
+        NotificationRow first = row(40L, 7L, null, now);
+        first.setUnreadTotal(25L);
+        NotificationRow second = row(39L, 7L, null, now.minusMinutes(1));
+        second.setUnreadTotal(25L);
+        given(mapper.selectUnreadWithTotal(7L, 2)).willReturn(List.of(first, second));
+
+        var result = service.list(7L, true, null, null, 1);
+
+        assertThat(result.unreadCount()).isEqualTo(25);
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.hasMore()).isTrue();
+        verify(mapper, never()).countUnread(7L);
+    }
+
+    // FP-300·D-23 안 읽은 알림이 없으면 개수 0, 빈 목록을 돌려준다.
+    @Test
+    @DisplayName("안 읽은 알림이 없으면 개수 0을 돌려준다")
+    void 안읽은목록_없음() {
+        given(mapper.selectUnreadWithTotal(7L, 21)).willReturn(List.of());
+
+        var result = service.list(7L, true, null, null, 20);
+
+        assertThat(result.unreadCount()).isZero();
+        assertThat(result.items()).isEmpty();
+        assertThat(result.hasMore()).isFalse();
+    }
+
     // FP-300·D-23 허용되지 않은 알림 종류의 400 검증을 확인한다.
     @Test
     @DisplayName("지원하지 않는 알림 종류는 400으로 거부한다")

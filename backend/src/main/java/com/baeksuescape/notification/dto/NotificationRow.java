@@ -17,4 +17,6 @@ public class NotificationRow {
     private String linkUrl;
     private LocalDateTime readAt;
     private LocalDateTime createdAt;
+    // FP-300·D-23 안 읽은 목록 조회에서만 채우는, 같은 조회 시점의 전체 안 읽은 개수.
+    private Long unreadTotal;
 }

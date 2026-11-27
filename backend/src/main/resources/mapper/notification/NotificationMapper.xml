@@ -23,6 +23,13 @@
          ORDER BY NOTIFICATION_ID DESC
          FETCH FIRST #{limit} ROWS ONLY
     </select>
+    <!-- FP-300·D-23 안 읽은 목록과 전체 안 읽은 개수를 한 문장으로 조회해, 목록과 개수가 같은 시점 기준이 되게 한다. -->
+    <select id="selectUnreadWithTotal" resultType="com.baeksuescape.notification.dto.NotificationRow">
+        SELECT <include refid="columns"/>, COUNT(*) OVER () AS unreadTotal FROM USER_NOTIFICATION
+         WHERE USER_ID = #{userId} AND READ_AT IS NULL
+         ORDER BY NOTIFICATION_ID DESC
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
     <select id="countUnread" resultType="long">
         SELECT COUNT(*) FROM USER_NOTIFICATION WHERE USER_ID = #{userId} AND READ_AT IS NULL
     </select>

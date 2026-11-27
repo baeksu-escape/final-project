@@ -15,6 +15,8 @@ public interface NotificationMapper {
     // FP-300·D-23 조건별 최신 목록을 조회하며 limit에는 hasMore 확인을 위한 추가 한 건이 포함된다.
     List<NotificationRow> selectFiltered(@Param("userId") long userId, @Param("unreadOnly") boolean unreadOnly,
             @Param("typeCode") String typeCode, @Param("before") Long before, @Param("limit") int limit);
+    // FP-300·D-23 안 읽은 목록(최신순)과 같은 시점의 전체 안 읽은 개수(unreadTotal)를 함께 조회한다.
+    List<NotificationRow> selectUnreadWithTotal(@Param("userId") long userId, @Param("limit") int limit);
     long countUnread(@Param("userId") long userId);
     NotificationRow selectOwned(@Param("userId") long userId, @Param("notificationId") long notificationId);
     int markRead(@Param("userId") long userId, @Param("notificationId") long notificationId,

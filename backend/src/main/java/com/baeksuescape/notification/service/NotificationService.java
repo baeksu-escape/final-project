@@ -97,11 +97,18 @@ public class NotificationService {
                 || (before != null && before <= 0)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "알림 목록 조건을 확인해 주세요.");
         }
-        List<NotificationItemResponse> fetched = notificationMapper.selectFiltered(userId, unreadOnly, typeCode, before,
-                size + 1).stream().map(NotificationService::toResponse).toList();
+        // 헤더 드롭다운 조회(안 읽은 것만·조건 없음)는 목록과 개수를 한 문장으로 받아 같은 시점 기준으로 맞춘다.
+        boolean unreadSnapshot = unreadOnly && typeCode == null && before == null;
+        List<NotificationRow> rows = unreadSnapshot
+                ? notificationMapper.selectUnreadWithTotal(userId, size + 1)
+                : notificationMapper.selectFiltered(userId, unreadOnly, typeCode, before, size + 1);
+        List<NotificationItemResponse> fetched = rows.stream().map(NotificationService::toResponse).toList();
         boolean hasMore = fetched.size() > size;
         List<NotificationItemResponse> items = hasMore ? fetched.subList(0, size) : fetched;
-        return new NotificationListResponse(notificationMapper.countUnread(userId), items, hasMore);
+        long unreadCount = unreadSnapshot
+                ? (rows.isEmpty() || rows.get(0).getUnreadTotal() == null ? 0 : rows.get(0).getUnreadTotal())
+                : notificationMapper.countUnread(userId);
+        return new NotificationListResponse(unreadCount, items, hasMore);
     }
 
     /** FP-284·D-23 본인 알림만 읽음 처리하고, 이미 읽었거나 존재하지 않으면 404로 응답한다. */
