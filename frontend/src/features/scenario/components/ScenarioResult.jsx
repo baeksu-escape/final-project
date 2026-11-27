@@ -5,7 +5,7 @@ const signedWon = (value) => (Number.isFinite(value)
   ? `${value > 0 ? '+' : value < 0 ? '−' : '±'}${Math.abs(Math.round(value)).toLocaleString('ko-KR')}원` : '—')
 const pct = (value) => (Number.isFinite(value) ? `${value.toFixed(1)}%` : '—')
 const tone = (value) => (!Number.isFinite(value) || value === 0 ? '' : value < 0 ? 'sc-neg' : 'sc-pos')
-// (시안) 빚 갚는 비율은 색을 '변화 방향'으로 보여 주고, 단계(N-16-2·N-20-4와 같은 30·40 기준)는 글자로 덧붙인다.
+// N-17-5 DSR 변화 방향은 색으로, 위험 단계는 기준값을 문자로 함께 나타낸다.
 const dsrStep = (value) => (!Number.isFinite(value) ? '' : value >= 40 ? ' · 위험' : value >= 30 ? ' · 주의' : '')
 const dsrTone = (before, after) => (!Number.isFinite(before) || !Number.isFinite(after) || before === after ? '' : after > before ? 'sc-neg' : 'sc-pos')
 
@@ -13,10 +13,10 @@ const ROWS = [
   { key: 'monthlyIncomeAmount', label: '월 소득' },
   { key: 'monthlyExpenseAmount', label: '월 지출 (할부·정기결제 포함)' },
   { key: 'monthlyPaymentAmount', label: '대출 갚는 돈' },
-  { key: 'monthlySurplusAmount', label: '한 달에 남는 돈', surplus: true },
+  { key: 'monthlySurplusAmount', label: '월 여유 자금', surplus: true },
 ]
 
-// N-17-5 (시안·쉬운 화면) 답 한 문장 → 큰 숫자 2개 → 작은 줄 2개 → 지금과 이 상황 비교(막대)·계산 가정 순서로 모두 펼쳐 보여 준다.
+// N-17-5 결과는 답변, 핵심 수치, 현재와 시나리오 비교, 계산 가정 순서로 보여 준다.
 // 숫자와 계산은 바꾸지 않고 보여 주는 순서와 말만 바꾼다.
 export default function ScenarioResult({ result, assumptions, stale, calcError }) {
   const { current, changed } = result
@@ -30,7 +30,7 @@ export default function ScenarioResult({ result, assumptions, stale, calcError }
       <Answer result={result} />
       <div className="sc-pair">
         <div className="sc-kpi">
-          <span className="sc-hint">한 달에 남는 돈</span>
+          <span className="sc-hint">월 여유 자금</span>
           <strong className={`sc-big sc-big--xl ${tone(changed.monthlySurplusAmount)}`}>{signedWon(changed.monthlySurplusAmount)}</strong>
           <span className="sc-hint">지금 {signedWon(current.monthlySurplusAmount)}</span>
         </div>
@@ -72,7 +72,7 @@ export default function ScenarioResult({ result, assumptions, stale, calcError }
   )
 }
 
-// N-17-4 (시안) 답 한 문장 — 모자라면 버틸 수 있는 개월 수, 좋아지면 늘어나는 돈을 맨 위에 크게 보여 준다.
+// N-17-4 판정 문구는 부족할 때 버틸 기간을, 개선 시에는 늘어난 여유 자금을 보여 준다.
 function Answer({ result }) {
   const { changed } = result
   if (result.verdict === 'SHORTFALL') {

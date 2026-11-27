@@ -5,14 +5,14 @@ import { BASE_PRESET, presetValues, scenarioInputError } from './scenarioConfig.
 
 const INITIAL = presetValues(BASE_PRESET)
 
-// N-17-1·N-17-3 저장값을 조회하고, [예상 시나리오 계산하기]를 누르면 바꾼 조건을 서버에서 재계산한다(시안 4차, 자동 계산 없음).
+// N-17-1·N-17-3 기준값을 조회하고, 사용자가 계산 버튼을 누른 조건으로 서버에서 재계산한다.
 // 회원·직군 전환 시 이전 응답을 버리고, 입력을 바꿔도 기존 결과는 버튼을 누를 때까지 유지한다.
 export function useScenario(userId, workerTypeCode) {
   const [revision, setRevision] = useState(0)
   const [load, setLoad] = useState({ key: null, baseline: null, error: '' })
   const [draft, setDraft] = useState({ key: null, values: INITIAL, lastValid: INITIAL, presetId: BASE_PRESET.id })
   const [calculation, setCalculation] = useState({ key: null, result: null, applied: null, version: -1, error: '' })
-  // (시안 4차) 계산은 버튼으로만 요청한다. request는 '계산하기'를 누른 순간의 값과 횟수이고, 처음에는 지금 상태(변화 0)를 한 번 계산한다.
+  // N-17-3 요청 버전으로 계산·초기화를 구분하고, 처음에는 현재 조건을 한 번 계산한다.
   const [request, setRequest] = useState({ key: null, values: INITIAL, version: 0 })
   const [retryVersion, setRetryVersion] = useState(0)
   const seq = useRef(0)
@@ -30,12 +30,12 @@ export function useScenario(userId, workerTypeCode) {
 
   const ready = load.key === key
   const current = draft.key === key ? draft : { key, values: INITIAL, lastValid: INITIAL, presetId: BASE_PRESET.id }
-  // (시안 2차) 저장값을 넘겨 금액 칸 항목은 범위를 원으로 안내한다.
+  // N-17-2 기준값으로 원 단위 입력 범위를 안내한다.
   const inputError = scenarioInputError(current.values, ready ? load.baseline : null)
 
   const requested = request.key === key ? request : { key, values: INITIAL, version: 0 }
 
-  // N-17-3 (시안 4차) 자동 계산 대신 처음 한 번(지금 상태)과 [예상 시나리오 계산하기]·[다시 시도]를 눌렀을 때만 요청한다.
+  // N-17-3 최초 현재 조건과 사용자가 계산 또는 다시 시도를 눌렀을 때만 서버에 요청한다.
   // 늦게 온 이전 응답은 버리고, 실패하면 이전 결과를 그대로 둔다.
   useEffect(() => {
     const requestId = ++seq.current
@@ -58,8 +58,16 @@ export function useScenario(userId, workerTypeCode) {
   const calcError = calculation.key === key ? calculation.error : ''
   // 계산 중: 누른 횟수(requested.version)의 응답이 아직 오지 않았을 때
   const calculating = ready && !inputError && (calculation.key !== key || calculation.version !== requested.version)
-  // (시안 4차) 버튼 — 입력이 올바를 때만 지금 값으로 계산을 요청한다.
+  // N-17-2 입력이 올바를 때만 현재 조건으로 계산을 요청한다.
   const calculate = () => { if (!inputError) setRequest({ key, values: current.values, version: requested.version + 1 }) }
+  // N-17-2 초기화는 기본 조건으로 되돌린 뒤 같은 요청 경로로 재계산한다. 이미 그 조건의 결과가 있으면 중복 요청하지 않는다.
+  const reset = () => {
+    const values = INITIAL
+    setDraft({ key, values, presetId: BASE_PRESET.id, lastValid: values })
+    if (calculation.key !== key || calculation.applied !== values) {
+      setRequest({ key, values, version: requested.version + 1 })
+    }
+  }
 
   return {
     loading: !ready,
@@ -77,6 +85,7 @@ export function useScenario(userId, workerTypeCode) {
     setValue,
     selectPreset,
     calculate,
+    reset,
     retry: () => { if (!inputError) setRetryVersion((value) => value + 1) },
     reload: () => setRevision((value) => value + 1),
   }
