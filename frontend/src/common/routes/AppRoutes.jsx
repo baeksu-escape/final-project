@@ -72,7 +72,7 @@ export default function AppRoutes() {
           {/* 직군 선택 (FP-85 N-05-1) — 직군이 없는 사용자만 머문다 */}
           <Route path={PATHS.SELECT_JOB} element={<JobSelectPage />} />
 
-          {/* 일반 사용자 전용 + 직군 선택 완료 — N-08-1 기능 9개(위쪽 메뉴는 큰 분류 5개로 묶음) */}
+          {/* 일반 사용자 전용 + 직군 선택 완료 — N-08-1 기능 9개(위쪽 메뉴는 큰 분류 6개로 묶음) */}
           <Route element={<RouteGuard requiredRole={ROLES.USER} requireJobType />}>
             {/* 점수가 있어야 보는 화면 — 점수가 없으면 데이터 입력으로 보낸다(11/06 확정 UI) */}
             <Route element={<RouteGuard requireScore />}>
