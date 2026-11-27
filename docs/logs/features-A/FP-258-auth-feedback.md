@@ -557,7 +557,49 @@
 - 프록시 뒤 배포라면 `server.forward-headers-strategy` 같은 설정이 있어야 IP 제한이 접속지별로 동작한다(설정 파일은 열지 않음).
 - 약관 전문·버전(`TERMS_VERSION`)은 팀 확인이 필요하다.
 - 일반 인증코드의 같은 대상 1분 1회 제한은 아직 없다.
-- 실제 DB에서 동시 로그인을 보내는 통합 시험은 만들지 않았다.
+- 실제 DB에서 동시 로그인을 보내는 통합 시험은 만들지 않았다. → 13-1차 보완에서 만들었다.
+
+## 13-1차 보완 — FP-290 동시 로그인 실패 횟수 (2026-11-27, 기준 9e0b5f6) 🆕 11/27
+- **관련 N-ID:** N-01-3 (Jira FP-290)
+- 로컬 Oracle(C##AVENUE_LOCAL) 모의 시험 D-2에서 문제가 나와 고쳤다.
+  - 실패 0회 계정에 틀린 비밀번호 5회를 동시에 보내면 다섯 요청 모두 401이었고, `LOGIN_FAIL_COUNT`는 5가 아니라 1만 올랐다.
+  - 그 뒤 4번을 더 틀려서야 5분 제한(429)이 나왔다.
+
+### 원인
+- `authenticate`는 `selectByLoginId` → `lockUser`(SELECT … FOR UPDATE) → `selectByLoginId`(같은 값) 순서로 읽는다.
+- MyBatis 1차 캐시(local cache, 기본 SESSION)는 한 트랜잭션 안의 같은 조회를 캐시한다. 그래서 두 번째 조회가 DB 대신 잠그기 전 결과를 돌려줬다.
+- 행 잠금으로 줄은 섰지만(동시 5회가 약 480ms), 모두 옛 값 0을 읽어 `updateLoginFailure`로 0+1=1을 덮어썼다.
+- 13차-1 단위 시험은 매퍼를 가짜로 바꿔 써서 이 캐시를 거치지 않아 잡지 못했다.
+
+### 수정
+- `UserAccountMapper.xml` `lockUser`에 `flushCache="true"`를 붙이고 이유를 주석으로 남겼다. 잠근 뒤 다시 읽는 조회는 DB에서 최신 값을 읽는다.
+- `AuthService.authenticate` 위 주석에 근거를 한 줄 더했다.
+- `lockUser`를 부르는 다른 곳도 점검했다. 모두 잠근 뒤에 처음 읽으므로, 잠그기 전에 읽은 값을 잠근 뒤에 쓰는 곳은 없다.
+  - `MyPageService.selectJobType`, `WithdrawalService.withdraw`
+  - `DataInputUsers.lock`을 쓰는 `ConsentService.agree·withdraw`, `FinancialInputService.save`, `AltDataImportService.importData`, `ScoreCalculationService.calculate`
+
+### 시험
+- **새 통합 시험 `UserAccountLoginFailConcurrencyIT`**(-Ddb.it=true)
+  - 시험 안에서 qa1127it 계정을 만들고, 스레드 5개가 각자 트랜잭션으로 틀린 비밀번호를 동시에 보낸다.
+  - 기대: 횟수 5, 응답 중 429 하나, 다음 시도 429.
+  - 시험 메서드에는 `@Transactional`을 붙이지 않았다. 만든 계정은 앞뒤로 지운다.
+  - 로그인 실패 기록(SYSTEM_LOG, 수정·삭제 금지)은 가짜로 바꿔 행이 남지 않는다.
+  - 수정 전에는 실패했고(횟수 1, 응답 모두 401), 수정 후에는 통과했다.
+- `./mvnw test`(-s, 시험 힙 512MB) 553개 통과.
+- `-Ddb.it=true` 통합 시험 10개 클래스 22개: 21개 통과, 1개 건너뜀(`AdminStatsMapperIT.withdrawnExcluded`, 로컬 DB에 탈퇴 회원 없음).
+- **모의 시험 D-2 재확인(HTTP):** 새 계정 qa1127e로 동시 5회 틀렸다.
+  - 동시 5회 응답은 401 넷과 429 `LOGIN_TEMPORARILY_BLOCKED` 하나였다.
+  - 다음 시도는 틀린 비밀번호·맞는 비밀번호 모두 429였다.
+
+### 바뀐 파일
+| 파일 | 변경 내용 (1줄) |
+|------|-----------------|
+| `backend/src/main/resources/mapper/user/UserAccountMapper.xml` | `lockUser` `flushCache="true"`와 이유 주석 |
+| `backend/.../user/service/AuthService.java` | `authenticate` 주석 한 줄 |
+| `backend/src/test/.../user/mapper/UserAccountLoginFailConcurrencyIT.java` (새 파일) | 동시 로그인 실패 횟수 통합 시험 |
+
+### DB·API 변경
+- 없음(DDL·API 그대로).
 
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)

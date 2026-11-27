@@ -93,6 +93,7 @@ public class AuthService {
     //   잠긴 계정은 횟수를 세지 않고, 비밀번호가 맞을 때만 423으로 알린다(프론트 mock과 같은 순서). 관리자는 423 ADMIN_ACCOUNT_LOCKED(FP-258).
     //   5회째 실패하면 그때부터 5분 동안 비밀번호와 상관없이 429(제한 중에는 횟수를 올리지 않음). 10회째면 잠그고 423.
     //   FP-258 13차 같은 계정 행을 잠근(lockUser) 뒤 다시 읽은 횟수로 판단한다. 동시에 보낸 로그인은 커밋까지 줄을 서므로 실패 횟수가 덜 오르지 않는다(FP-290).
+    //   lockUser가 MyBatis 1차 캐시를 비우므로(flushCache) 잠근 뒤 다시 읽은 값이 최신이다(13-1차 보완, 비우지 않으면 잠그기 전 값이 돌아왔다).
     @Transactional(noRollbackFor = ApiException.class)
     public UserAccount authenticate(String loginId, String password) {
         // FP-258 가입 아이디는 소문자만 받으므로 소문자로 바꿔 조회한다.
