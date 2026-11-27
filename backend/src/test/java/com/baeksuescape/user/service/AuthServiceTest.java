@@ -13,6 +13,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
@@ -356,13 +358,13 @@ class AuthServiceTest {
         verify(phoneVerification).consume(PHONE_TOKEN, PhonePurpose.SIGNUP, "01012345678");
         verify(consentMapper).insertSignupConsent(eq(100L), eq("TERMS_OF_SERVICE"), eq("Y"), eq("Y"), any(), any());
         verify(consentMapper).insertSignupConsent(eq(100L), eq("PRIVACY_COLLECTION"), eq("Y"), eq("Y"), any(), any());
-        // FP-258 13차 선택 동의는 체크했을 때만 기록한다.
-        verify(consentMapper, never()).insertSignupConsent(eq(100L), eq("NOTIFICATION_MARKETING"), any(), any(), any(), any());
+        // 선택 동의는 체크하지 않아도 N·동의 시각 없음으로 한 행을 남긴다(시드 3행 모양).
+        verify(consentMapper).insertSignupConsent(eq(100L), eq("NOTIFICATION_MARKETING"), eq("N"), eq("N"), isNull(), any());
     }
 
-    // FP-258 13차 N-02-2 필수 동의 2개·선택 1개를 따로 받는다 — 필수가 빠지면 그 칸 400, 모두 체크하면 3행(선택은 Y).
+    // FP-258 13차 N-02-2 필수 동의 2개·선택 1개를 따로 받는다 — 필수가 빠지면 그 칸 400, 모두 체크하면 3행(선택은 Y·동의 시각 있음).
     @Test
-    void 필수_동의를_따로_받아_빠진_칸을_알리고_체크한_것만_기록한다() {
+    void 필수_동의를_따로_받아_빠진_칸을_알리고_선택_동의를_기록한다() {
         AuthRequests.Signup noPrivacy = consentSignup(true, false, false);
         assertThat(fieldOf(() -> service.signup(noPrivacy))).isEqualTo("agreePrivacy");
         AuthRequests.Signup noTerms = consentSignup(false, true, true);
@@ -373,7 +375,7 @@ class AuthServiceTest {
         service.signup(consentSignup(true, true, true));
         verify(consentMapper).insertSignupConsent(eq(100L), eq("TERMS_OF_SERVICE"), eq("Y"), eq("Y"), any(), any());
         verify(consentMapper).insertSignupConsent(eq(100L), eq("PRIVACY_COLLECTION"), eq("Y"), eq("Y"), any(), any());
-        verify(consentMapper).insertSignupConsent(eq(100L), eq("NOTIFICATION_MARKETING"), eq("N"), eq("Y"), any(), any());
+        verify(consentMapper).insertSignupConsent(eq(100L), eq("NOTIFICATION_MARKETING"), eq("N"), eq("Y"), notNull(), any());
     }
 
     private static AuthRequests.Signup consentSignup(boolean terms, boolean privacy, boolean marketing) {

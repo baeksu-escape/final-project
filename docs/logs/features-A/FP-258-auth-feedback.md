@@ -516,7 +516,8 @@
   - 새 비밀번호(가입·재설정·변경·관리자 비밀번호 설정)에만 쓰고, 로그인·현재 비밀번호 확인·탈퇴는 검사하지 않는다.
   - 화면은 64자에서 자르고 같은 규칙으로 본다.
 - **5. 가입 동의(FP-294):** 1단계를 [전체 동의] + 필수 2(이용약관, 개인정보 수집·이용) + 선택 1(점수 변동 알림·혜택 안내)로 나눴다.
-  - 서버는 `agreeTerms`·`agreePrivacy`·`agreeMarketing`을 따로 받는다. 필수 2개와, 체크했을 때만 선택 동의를 `USER_CONSENT`에 남긴다.
+  - 서버는 `agreeTerms`·`agreePrivacy`·`agreeMarketing`을 따로 받는다. `USER_CONSENT`에는 develop과 같게 늘 3행을 남긴다. 필수 2개는 Y이고, 선택(`NOTIFICATION_MARKETING`)은 체크하면 Y, 안 하면 `AGREED_YN='N'`·`AGREED_AT` 없음이다(시드 3행 모양).
+    - 처음 커밋(b228974)은 체크한 선택 동의만 남겼는데, 시드·develop 모양과 맞추려고 되돌렸다(11/27).
   - 예전 요청(`agreeCreditInfo` 하나)도 받는다.
   - `USER_CONSENT`의 `CK_UCS_TYPE`이 세 종류를 이미 받아서 DDL 변경은 없다.
   - 약관 전문·링크는 저장소에 없어 [보기]는 "약관 전문은 준비 중입니다."만 보인다.
@@ -526,7 +527,7 @@
 |------|-----------------|
 | `backend/.../user/service/ClientRateLimiter.java` (새 파일) | 같은 IP 반복 시도 제한(규칙 3개) |
 | `backend/.../user/controller/AuthController.java`, `SocialLoginController.java` | 로그인·연결 실패, 확인, 발송에 제한 적용 |
-| `backend/.../user/service/AuthService.java` | 행 잠금 뒤 다시 읽기, 필수 동의 따로 검사, 선택 동의는 체크했을 때만 기록 |
+| `backend/.../user/service/AuthService.java` | 행 잠금 뒤 다시 읽기, 필수 동의 따로 검사, 동의 3행 기록(선택 미동의는 N) |
 | `backend/.../user/dto/AuthRequests.java` | 가입 요청 `agreeTerms`·`agreePrivacy`(예전 `agreeCreditInfo` 호환) |
 | `backend/.../user/service/AuthErrors.java`, `EmailVerificationService.java`, `PhoneVerificationService.java` | 하루 발송 상한 |
 | `backend/.../user/mapper/VerificationCodeMapper.java`, `resources/mapper/user/VerificationCodeMapper.xml` | `countSentSince` |

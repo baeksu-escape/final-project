@@ -228,11 +228,11 @@ public class AuthService {
     }
 
     // N-02-2 가입 동의 기록(USER_CONSENT). FP-258 13차 가입 화면이 필수 2개(이용약관·개인정보 수집·이용)와 선택 1개(점수 변동 알림·혜택 안내)를 따로 받는다.
-    //   필수 2개는 검사(validateSignup)를 통과해야 여기까지 오므로 동의(Y)로 남기고, 선택 동의는 체크했을 때만 남긴다(체크한 것만 기록).
+    //   필수 2개는 검사(validateSignup)를 통과해야 여기까지 오므로 동의(Y)로 남긴다. 선택 동의는 체크하지 않아도 N·동의 시각 없음으로 한 행을 남겨 늘 3행이다(더미 시드와 같은 모양).
     private void saveSignupConsents(long userId, boolean agreeMarketing, LocalDateTime now) {
         consentMapper.insertSignupConsent(userId, "TERMS_OF_SERVICE", "Y", "Y", now, now);
         consentMapper.insertSignupConsent(userId, "PRIVACY_COLLECTION", "Y", "Y", now, now);
-        if (agreeMarketing) consentMapper.insertSignupConsent(userId, "NOTIFICATION_MARKETING", "N", "Y", now, now);
+        consentMapper.insertSignupConsent(userId, "NOTIFICATION_MARKETING", "N", agreeMarketing ? "Y" : "N", agreeMarketing ? now : null, now);
     }
 
     // 가입 칸 검사 — 프론트 validateSignup과 같은 규칙·문구. 틀린 칸을 모두 모아 400 INVALID_INPUT으로 돌려준다.
