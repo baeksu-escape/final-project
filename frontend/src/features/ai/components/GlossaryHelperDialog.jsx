@@ -1,18 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import Button from '../../../common/components/Button.jsx'
-import Modal from '../../../common/components/Modal.jsx'
 import Notice from '../../../common/components/Notice.jsx'
 import TextInput from '../../../common/components/TextInput.jsx'
 import { askChatbotQuestion, getChatbotPresets } from '../api/chatbotApi.js'
+import '../styles/glossaryHelper.css'
 
 const EMPTY_QUESTION_MESSAGE = '질문을 입력해 주세요.'
 
-// N-32 용어 도우미 창(FP-207) — 위쪽 바 [용어 도우미]로 연다.
+// N-32 용어 도우미(FP-207) — 화면 오른쪽 아래에 떠 있는 아이콘 버튼(스크롤해도 따라옴)을 누르면 버튼 위에 패널이 열린다(11/06 UI).
 // N-32-1 질문 버튼을 누르면 등록된 답을 보여 주고(횟수 안 줄어듦), N-32-2 직접 쓴 질문은 AI(HELP-03)가 답한다(하루 횟수에서 차감).
-// 질문 목록·남은 횟수는 처음 열 때 한 번만 불러와 기억한다(위쪽 바는 화면을 옮겨도 그대로라 다시 부르지 않는다).
-// 새 CSS 없이 공통 컴포넌트와 기존 클래스만 쓴다.
-// 사용 예: <GlossaryHelperDialog open={open} onClose={() => setOpen(false)} />
-export default function GlossaryHelperDialog({ open, onClose }) {
+// 질문 목록·남은 횟수는 처음 열 때 한 번만 불러와 기억한다. 닫아도 패널을 숨기기만 해서 고른 답·쓰던 글이 남는다.
+// 스타일은 features/ai/styles/glossaryHelper.css(11/27 프론트 담당 허락). 위쪽 바(AppHeader)의 사용자 화면에 한 번 넣는다.
+// 사용 예: <GlossaryHelperDialog />
+export default function GlossaryHelperDialog() {
+  const [open, setOpen] = useState(false)
+  const panelId = useId()
+  const titleId = useId()
+  const fabRef = useRef(null)
+  const titleRef = useRef(null)
+  const panelRef = useRef(null)
   // status: loading(아직 안 부름·부르는 중) · error · ready
   const [presets, setPresets] = useState({ status: 'loading', items: [], error: '' })
   const [selectedId, setSelectedId] = useState(null)
@@ -39,6 +45,30 @@ export default function GlossaryHelperDialog({ open, onClose }) {
       .catch((err) => setPresets({ status: 'error', items: [], error: err.message }))
   }, [open, attempt])
 
+  // 열면 패널 제목으로 포커스를 옮겨 화면 낭독기가 패널을 읽게 한다.
+  useEffect(() => {
+    if (open) titleRef.current?.focus()
+  }, [open])
+
+  // 닫으면 포커스를 아이콘 버튼으로 돌려준다(키보드 사용자가 자리를 잃지 않게).
+  const close = () => {
+    setOpen(false)
+    fabRef.current?.focus()
+  }
+
+  // 열려 있는 동안 Esc는 포커스가 어디 있든 패널을 닫는다(질문을 보내는 동안 입력 칸이 잠겨 포커스가 패널 밖으로 나가도).
+  useEffect(() => {
+    if (!open) return undefined
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        fabRef.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open])
+
   const retry = () => {
     setPresets({ status: 'loading', items: [], error: '' })
     setAttempt((count) => count + 1)
@@ -46,6 +76,13 @@ export default function GlossaryHelperDialog({ open, onClose }) {
   const selected = presets.items.find((item) => item.presetId === selectedId) ?? null
   const sending = ask.status === 'sending'
   const usedUp = quota.remaining === 0
+
+  // 답을 받고 입력 칸 잠금이 풀리면 포커스를 입력 칸으로 돌려 바로 다음 질문을 쓸 수 있게 한다.
+  const wasSending = useRef(false)
+  useEffect(() => {
+    if (wasSending.current && !sending && open && !usedUp) panelRef.current?.querySelector('input')?.focus()
+    wasSending.current = sending
+  }, [sending, open, usedUp])
 
   // N-32-1 질문 버튼 — 등록된 답으로 바꾸고 AI 답은 지운다.
   const choosePreset = (presetId) => {
@@ -86,8 +123,24 @@ export default function GlossaryHelperDialog({ open, onClose }) {
     : `오늘 남은 질문 ${quota.remaining}/${quota.limit ?? quota.remaining}회 · 질문 버튼은 횟수가 줄지 않아요.`
 
   return (
-    <Modal open={open} title="용어 도우미" onClose={onClose}>
-      <div className="l-stack">
+    <>
+      {/* 버튼 위 패널 — 닫혀도 hidden으로 숨기기만 한다. Esc로 닫는다. */}
+      <section
+        id={panelId}
+        className="gh-panel"
+        role="dialog"
+        aria-labelledby={titleId}
+        hidden={!open}
+        ref={panelRef}
+      >
+        <div className="gh-panel__head">
+          <div>
+            <p className="gh-panel__tag">HELP</p>
+            <h2 id={titleId} ref={titleRef} tabIndex={-1} className="gh-panel__title">금융 용어 도우미</h2>
+          </div>
+          <Button size="sm" onClick={close}>닫기 ×</Button>
+        </div>
+        <div className="gh-panel__body l-stack">
         <p className="hint">궁금한 질문을 누르거나, 아래에 금융 용어를 직접 물어보세요.</p>
         {presets.status === 'loading' && <p className="hint">불러오는 중…</p>}
         {presets.status === 'error' && (
@@ -152,7 +205,24 @@ export default function GlossaryHelperDialog({ open, onClose }) {
             {sending ? '답을 만드는 중…' : '질문하기'}
           </Button>
         </form>
-      </div>
-    </Modal>
+        </div>
+      </section>
+      {/* 오른쪽 아래에 떠 있는 아이콘 버튼 — 글자 대신 말풍선 안 물음표 선 아이콘, 이름은 aria-label로 알린다. */}
+      <button
+        ref={fabRef}
+        type="button"
+        className="gh-fab"
+        aria-label={open ? '용어 도우미 닫기' : '용어 도우미 열기'}
+        title="용어 도우미"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => (open ? close() : setOpen(true))}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 5h16v11H9l-5 4z" />
+          <path d="M10 8.5a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.2v.5M12 13.8h0" />
+        </svg>
+      </button>
+    </>
   )
 }

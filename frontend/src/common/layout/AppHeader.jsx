@@ -19,8 +19,6 @@ export default function AppHeader() {
   const { user, logout } = useAuth()
   const { pathname } = useLocation()
   const [toastMessage, setToastMessage] = useState('')
-  // N-32-1 용어 도우미 창(FP-207) 열림 여부
-  const [helperOpen, setHelperOpen] = useState(false)
   const admin = isAdmin(user)
   const showMenu = canSeeMainMenu(user)
   // 관리자는 분류 없이 메뉴 5개를 그대로 쓴다
@@ -53,8 +51,6 @@ export default function AppHeader() {
               <>
                 {/* TODO(D-23) 알림 자리 — 알림 내용과 범위는 팀 결정 전이라 안내만 띄운다. */}
                 <button type="button" className="app-header__text-btn" onClick={() => setToastMessage(NOTIFICATION_PENDING_MESSAGE)}>알림</button>
-                {/* N-32-1 용어 도우미(FP-207) — 명세의 오른쪽 아래 떠 있는 창 대신 알림 옆 버튼 + 공통 Modal(새 CSS 없음, 11/26) */}
-                <button type="button" className="app-header__text-btn" onClick={() => setHelperOpen(true)}>용어 도우미</button>
                 <NavLink to={PATHS.MY_PAGE} className="app-header__text-btn">마이페이지</NavLink>
               </>
             )}
@@ -73,7 +69,8 @@ export default function AppHeader() {
         )}
       </header>
       <Toast message={toastMessage} onClose={() => setToastMessage('')} />
-      {!admin && <GlossaryHelperDialog open={helperOpen} onClose={() => setHelperOpen(false)} />}
+      {/* N-32 용어 도우미(FP-207) — 사용자 화면 오른쪽 아래에 떠 있는 아이콘 버튼과 패널. 관리자 화면에는 없다. */}
+      {!admin && <GlossaryHelperDialog />}
     </>
   )
 }

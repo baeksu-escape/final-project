@@ -1,0 +1,105 @@
+/* N-32 용어 도우미(FP-207) 전용 스타일 — 오른쪽 아래에 떠 있는 아이콘 버튼과 그 위 패널(11/06 UI). 클래스 접두어 gh-, tokens.css 변수만 쓴다.
+   11/27 프론트 담당 허락. z-index는 공통 Modal(40)·메가메뉴(39~40)·Toast(50)보다 낮게 두어 다른 창이 열리면 그 아래에 깔린다. */
+
+/* 떠 있는 아이콘 버튼 — 스크롤해도 화면 오른쪽 아래 같은 자리 */
+.gh-fab {
+  position: fixed;
+  right: var(--sp-6);
+  bottom: var(--sp-6);
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--pri);
+  color: var(--pri-fg);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.gh-fab:hover {
+  background: var(--pri2);
+}
+
+.gh-fab:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 3px;
+}
+
+/* 버튼 바로 위 패널 — 내용이 길면 패널 안에서 스크롤 */
+.gh-panel {
+  position: fixed;
+  right: var(--sp-6);
+  bottom: calc(var(--sp-6) + 52px + var(--sp-3));
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.gh-panel[hidden] {
+  display: none;
+}
+
+.gh-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.gh-panel__tag {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--mut);
+}
+
+.gh-panel__title {
+  margin: 2px 0 0;
+  font-size: 16px;
+}
+
+.gh-panel__title:focus {
+  outline: none;
+}
+
+.gh-panel__body {
+  padding: var(--sp-4);
+  overflow-y: auto;
+}
+
+/* 패널 안 질문 버튼은 긴 질문도 버튼 안에서 줄바꿈 */
+.gh-panel__body [role='group'] .button {
+  height: auto;
+  min-height: 36px;
+  padding-block: var(--sp-2);
+  justify-content: flex-start;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.4;
+}
+
+/* 휴대폰 너비 — 양옆 16px만 남기고 패널을 넓힌다 */
+@media (max-width: 480px) {
+  .gh-fab {
+    right: var(--sp-4);
+    bottom: var(--sp-4);
+  }
+
+  .gh-panel {
+    right: 16px;
+    left: 16px;
+    bottom: calc(var(--sp-4) + 52px + var(--sp-3));
+    width: auto;
+  }
+}
