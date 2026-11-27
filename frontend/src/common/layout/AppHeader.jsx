@@ -7,6 +7,7 @@ import { ROLE_LABELS, isAdmin } from '../config/roles.js'
 import MegaNav from './MegaNav.jsx'
 import { ADMIN_PATHS } from '../../features/admin/adminConstants.js'
 import NotificationBell from '../../features/notification/components/NotificationBell.jsx'
+import GlossaryHelperDialog from '../../features/ai/components/GlossaryHelperDialog.jsx'
 
 // N-08-1 로그인 후 공통 위쪽 바 — 로고(메인 페이지로), 큰 분류 메뉴(마우스를 올리면 세부 메뉴 판), 계정 버튼, 분류 안 세부 기능 줄.
 // 사용자 메뉴는 점수가 나온 뒤에만 보이고(canSeeMainMenu), 관리자 메뉴 5개는 늘 보인다.
@@ -62,6 +63,8 @@ export default function AppHeader() {
           </nav>
         )}
       </header>
+      {/* N-32 용어 도우미(FP-207) — 사용자 화면 오른쪽 아래에 떠 있는 아이콘 버튼과 패널. 관리자 화면에는 없다. */}
+      {!admin && <GlossaryHelperDialog />}
     </>
   )
 }

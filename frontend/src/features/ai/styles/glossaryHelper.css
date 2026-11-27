@@ -1,0 +1,188 @@
+/* N-32 용어 도우미(FP-207) 전용 스타일 — 화면 오른쪽 아래 구석에 떠 있는 아이콘 버튼, 그 위 패널, 닫혀 있을 때의 안내 카드·질문 말풍선.
+   클래스 접두어 gh-, tokens.css 변수만 쓴다. 11/27 프론트 담당 허락.
+   z-index는 공통 Modal(40)·메가메뉴(39~40)·Toast(50)보다 낮게 두어 다른 창이 열리면 그 아래에 깔린다. */
+
+/* 떠 있는 아이콘 버튼 — 브라우저 창 오른쪽 아래 구석, 스크롤해도 같은 자리(11/27 광희 결정) */
+.gh-fab {
+  position: fixed;
+  right: var(--sp-6);
+  bottom: var(--sp-6);
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--pri);
+  color: var(--pri-fg);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.gh-fab:hover {
+  background: var(--pri2);
+}
+
+.gh-fab:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 3px;
+}
+
+/* 버튼 바로 위 패널 — 내용이 길면 패널 안에서 스크롤 */
+.gh-panel {
+  position: fixed;
+  right: var(--sp-6);
+  bottom: calc(var(--sp-6) + 52px + var(--sp-3));
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.gh-panel[hidden] {
+  display: none;
+}
+
+.gh-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.gh-panel__tag {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--mut);
+}
+
+.gh-panel__title {
+  margin: 2px 0 0;
+  font-size: 16px;
+}
+
+.gh-panel__title:focus {
+  outline: none;
+}
+
+.gh-panel__body {
+  padding: var(--sp-4);
+  overflow-y: auto;
+}
+
+/* 패널 안 질문 버튼은 긴 질문도 버튼 안에서 줄바꿈 */
+.gh-panel__body [role='group'] .button {
+  height: auto;
+  min-height: 36px;
+  padding-block: var(--sp-2);
+  justify-content: flex-start;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.4;
+}
+
+/* 닫혀 있을 때 버튼 위 안내 — 아래가 안내 카드, 그 위에 질문 말풍선(오른쪽 정렬) */
+.gh-teaser {
+  position: fixed;
+  right: var(--sp-6);
+  bottom: calc(var(--sp-6) + 52px + var(--sp-3));
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  max-width: min(320px, calc(100vw - 32px));
+}
+
+/* 질문 말풍선 — 누르면 패널이 열리며 그 답이 보인다 */
+.gh-chip {
+  max-width: 100%;
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.gh-chip:hover,
+.gh-chip:focus-visible {
+  border-color: var(--acc);
+  outline: none;
+}
+
+/* 안내 카드 — 카드 전체가 "대화 시작하기" 버튼, 오른쪽 위 ×는 따로 */
+.gh-teaser__card {
+  position: relative;
+  width: 100%;
+}
+
+.gh-teaser__open {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--sp-4) calc(var(--sp-4) + 28px) var(--sp-4) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.gh-teaser__open:hover,
+.gh-teaser__open:focus-visible {
+  border-color: var(--acc);
+  outline: none;
+}
+
+.gh-teaser__title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.gh-teaser__sub {
+  font-size: 13px;
+  color: var(--mut);
+}
+
+.gh-teaser__close {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--mut);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gh-teaser__close:hover,
+.gh-teaser__close:focus-visible {
+  background: var(--panel2);
+  color: var(--fg);
+  outline: none;
+}
