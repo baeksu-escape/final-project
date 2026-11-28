@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button, Card, TextInput, Toast } from '../../../common/components/index.js'
 import PasswordRuleList from '../../auth/components/PasswordRuleList.jsx'
-import { validateNewPassword } from '../../auth/validation.js'
+import { passwordTooLongError, validateNewPassword } from '../../auth/validation.js'
 import { changeAdminPassword } from '../api/adminAuthApi.js'
 import { ADMIN_ERROR_CODES, adminErrorMessage } from '../adminConstants.js'
 import StepUpModal from '../components/StepUpModal.jsx'
@@ -72,7 +72,7 @@ export default function AdminPasswordPage() {
             type="password"
             value={form.password}
             onChange={update('password')}
-            error={errors.password}
+            error={passwordTooLongError(form.password) || errors.password}
             autoComplete="new-password"
           />
           <PasswordRuleList password={form.password} />
@@ -85,7 +85,8 @@ export default function AdminPasswordPage() {
             autoComplete="new-password"
           />
           {formError && <p role="alert">{formError}</p>}
-          <Button type="submit" variant="primary" disabled={pending}>
+          {/* FP-275 새 비밀번호가 64자를 넘으면 칸 아래 길이 오류를 바로 보여 주고 버튼을 끈다(회원 화면과 같음). */}
+          <Button type="submit" variant="primary" disabled={pending || passwordTooLongError(form.password) !== ''}>
             비밀번호 저장
           </Button>
         </form>

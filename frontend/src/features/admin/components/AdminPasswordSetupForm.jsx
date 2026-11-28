@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button, Notice, TextInput } from '../../../common/components/index.js'
 import PasswordRuleList from '../../auth/components/PasswordRuleList.jsx'
-import { validateNewPassword } from '../../auth/validation.js'
+import { passwordTooLongError, validateNewPassword } from '../../auth/validation.js'
 import { setupAdminPassword } from '../api/adminAuthApi.js'
 import { ADMIN_ERROR_CODES, adminErrorMessage } from '../adminConstants.js'
 
@@ -61,7 +61,7 @@ export default function AdminPasswordSetupForm({ passwordSetupToken, onDone, onR
         type="password"
         value={form.password}
         onChange={update('password')}
-        error={errors.password}
+        error={passwordTooLongError(form.password) || errors.password}
         autoComplete="new-password"
       />
       <PasswordRuleList password={form.password} />
@@ -78,7 +78,8 @@ export default function AdminPasswordSetupForm({ passwordSetupToken, onDone, onR
           {formError}
         </p>
       )}
-      <button type="submit" className="auth-form__submit" disabled={pending}>
+      {/* FP-275 새 비밀번호가 64자를 넘으면 칸 아래 길이 오류를 바로 보여 주고 버튼을 끈다(회원 화면과 같음). */}
+      <button type="submit" className="auth-form__submit" disabled={pending || passwordTooLongError(form.password) !== ''}>
         비밀번호 정하고 들어가기
       </button>
       <Button onClick={onRestart}>처음으로</Button>
