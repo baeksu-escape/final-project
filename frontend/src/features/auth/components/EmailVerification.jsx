@@ -23,6 +23,8 @@ export default function EmailVerification({ email, purpose, extraBody, disabled 
   const [code, setCode] = useState('')
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  // FP-259 14차 인증코드 칸 형식 오류(6자리 아님) — 칸에 넘겨 빨간 테두리를 붙인다. 서버 오류는 아래 error 문구에 그대로 둔다.
+  const [codeError, setCodeError] = useState('')
   const [pending, setPending] = useState(false)
 
   if (verified) {
@@ -48,6 +50,7 @@ export default function EmailVerification({ email, purpose, extraBody, disabled 
       const { expiresInSeconds } = await requestEmailCode({ ...extraBody, email, purpose })
       setSentTo(email)
       setCode('')
+      setCodeError('')
       setNotice(`인증코드를 보냈습니다. ${Math.ceil(expiresInSeconds / 60)}분 안에 입력해 주세요.`)
     } catch (sendError) {
       setError(sendError.message)
@@ -58,7 +61,8 @@ export default function EmailVerification({ email, purpose, extraBody, disabled 
 
   const handleVerify = async () => {
     if (!/^\d{6}$/.test(code)) {
-      setError('6자리 인증코드를 입력해 주세요.')
+      setError('')
+      setCodeError('6자리 인증코드를 입력해 주세요.')
       return
     }
     setPending(true)
@@ -97,17 +101,24 @@ export default function EmailVerification({ email, purpose, extraBody, disabled 
             </p>
           )}
           {USE_MOCK && <p className="email-verification__mock-hint">개발용 mock 인증코드: {MOCK_EMAIL_CODE}</p>}
-          <TextInput
-            label="인증코드"
-            value={code}
-            onChange={(value) => setCode(value.replace(/\D/g, ''))}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-          />
-          <button type="button" className="email-verification__verify" onClick={handleVerify} disabled={pending}>
-            인증코드 확인
-          </button>
+          {/* 격자 줄이라 [인증코드 확인]은 칸 아래 오류가 생겨도 입력 칸 옆에 있다. */}
+          <div className="account-form__row account-form__row--grid">
+            <TextInput
+              label="인증코드"
+              value={code}
+              onChange={(value) => {
+                setCode(value.replace(/\D/g, ''))
+                setCodeError('')
+              }}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              error={codeError}
+            />
+            <button type="button" className="email-verification__verify" onClick={handleVerify} disabled={pending}>
+              인증코드 확인
+            </button>
+          </div>
         </>
       )}
       <FieldError message={error} />

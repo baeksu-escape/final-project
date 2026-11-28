@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FieldError, TextInput } from '../../../common/components/index.js'
+import { TextInput } from '../../../common/components/index.js'
 import { checkNicknameAvailability } from '../api/authFeatureApi.js'
 import { requestNicknameChange } from '../api/myPageApi.js'
 import { AUTH_ERROR_CODES, SAME_NICKNAME_MESSAGE } from '../authConstants.js'
@@ -65,9 +65,18 @@ export default function NicknameChangeForm({ currentNickname, onSaved, onCancel 
 
   return (
     <form className="account-form nickname-change-form" onSubmit={handleSubmit} noValidate>
-      <div className="account-form__row">
+      {/* FP-259 14차 안내·오류는 TextInput의 hint·error로 넘겨 칸에 빨간 테두리·aria-invalid를 붙인다. 격자 줄이라 버튼은 오류가 있어도 칸 옆에 있다. */}
+      <div className="account-form__row account-form__row--grid">
         <div {...nicknameInput.compositionProps}>
-          <TextInput label="새 닉네임" value={nickname} onChange={nicknameInput.onChange} maxLength={NICKNAME_MAX} autoComplete="nickname" />
+          <TextInput
+            label="새 닉네임"
+            value={nickname}
+            onChange={nicknameInput.onChange}
+            maxLength={NICKNAME_MAX}
+            autoComplete="nickname"
+            hint={checked ? '사용할 수 있는 닉네임입니다.' : `한글·영문·숫자 2~${NICKNAME_MAX}자, 신용 라운지에 작성자로 보입니다`}
+            error={formatError || (sameAsCurrent ? SAME_NICKNAME_MESSAGE : '') || error}
+          />
         </div>
         <button
           type="button"
@@ -78,10 +87,6 @@ export default function NicknameChangeForm({ currentNickname, onSaved, onCancel 
           중복 확인
         </button>
       </div>
-      <p className="form-field__hint">
-        {checked ? '사용할 수 있는 닉네임입니다.' : `한글·영문·숫자 2~${NICKNAME_MAX}자, 신용 라운지에 작성자로 보입니다`}
-      </p>
-      <FieldError message={formatError || (sameAsCurrent ? SAME_NICKNAME_MESSAGE : '') || error} />
       <div className="nickname-change-form__actions">
         <button type="submit" className="account-form__submit" disabled={pending || !checked}>
           닉네임 저장

@@ -632,6 +632,17 @@
     text-align: left;
     white-space: normal;
   }
+
+  /* FP-259 14차 가린 상태(빈칸)에서도 안내 한 줄 자리를 남겨 [표시] 전후 카드 높이를 같게 한다. */
+  .my-profile-card__head .my-profile-card__unmasked {
+    min-height: 1.5em;
+    line-height: 1.5;
+  }
+
+  /* FP-259 14차 이메일(5번째 항목)은 한 줄 전체를 써서 가린 값·원래 값 모두 단어 중간에서 끊기지 않게 한다. */
+  .my-profile-card__item:nth-child(5) {
+    grid-column: 1 / -1;
+  }
 }
 
 .my-profile-card__unmask-form {
@@ -838,6 +849,36 @@
 /* 칸 옆 버튼은 입력 칸(forms.css 48px)과 같은 높이 */
 .account-form__row > button {
   min-height: 48px;
+}
+
+/* FP-259 14차 칸 오류를 TextInput error로 넘기는 줄(닉네임·인증코드) — 칸 묶음을 풀어(display: contents) 격자에 놓는다.
+   이름 1행, 입력 칸·버튼 2행(같은 높이), 안내·오류는 그 아래 한 줄씩. 오류가 생겨도 버튼은 입력 칸 옆에 있다. */
+.account-form__row--grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.account-form__row--grid > :not(button),
+.account-form__row--grid .form-field {
+  display: contents;
+}
+
+.account-form__row--grid .form-field__label,
+.account-form__row--grid .form-field__hint,
+.account-form__row--grid .field-error {
+  grid-column: 1 / -1;
+}
+
+.account-form__row--grid .text-input__control {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.account-form__row--grid > button {
+  grid-column: 2;
+  grid-row: 2;
 }
 
 /* 이메일 인증 묶음(줄바꿈 flex) 안에서는 칸 + 버튼 줄이 한 줄 전체를 쓴다 */
