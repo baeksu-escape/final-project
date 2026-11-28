@@ -1,0 +1,142 @@
+/* FP-275 관리자 화면 전용 스타일 — admin- 접두어, 색·간격은 tokens.css 변수만 쓴다(밝은·어두운 테마 모두 변수로 바뀐다).
+   지금은 접근·감사 로그 표(N-28-2)와 회원 상세 패널(N-35-1)만 쓴다. 다른 관리자 화면(모형 성능·통계·신고·계정 목록 표)은 건드리지 않는다. */
+
+/* ===== 접근·감사 로그 표 — 높이를 한 쪽 줄 수(--admin-log-rows, ADMIN_PAGE_SIZE)로 고정 ===== */
+.admin-log {
+  --admin-log-head: 41px; /* 머리 줄 높이(아래 테두리 포함) */
+  --admin-log-row: 45px; /* 데이터 줄 높이(아래 테두리 포함) */
+  position: relative;
+  box-sizing: content-box;
+  height: calc(var(--admin-log-head) + var(--admin-log-row) * var(--admin-log-rows, 10));
+  overflow-y: hidden;
+}
+
+/* 열 너비 고정 — 좁은 화면에서는 표 상자 안에서 가로로 넘긴다(페이지는 넘치지 않는다). */
+.admin-log__table {
+  min-width: 680px;
+  table-layout: fixed;
+}
+
+.admin-log__table th {
+  box-sizing: border-box;
+  height: var(--admin-log-head);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* 긴 칸(내용·사유 등)은 한 줄로 말줄임하고, 전체 글은 칸의 title로 보인다. */
+.admin-log__table td {
+  box-sizing: border-box;
+  height: var(--admin-log-row);
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 마지막 줄도 아래 테두리를 그려 줄 높이가 쪽마다 같게 한다(공통 data-table은 마지막 줄 테두리를 지운다). */
+.admin-log__table tbody tr:last-child td {
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-log__col--time {
+  width: 150px;
+}
+
+.admin-log__col--id {
+  width: 110px;
+}
+
+.admin-log__col--target {
+  width: 150px;
+}
+
+.admin-log__col--resource {
+  width: 140px;
+}
+
+.admin-log__col--type {
+  width: 84px;
+}
+
+.admin-log__col--source {
+  width: 130px;
+}
+
+/* 남은 너비 전부(사유·내용) */
+.admin-log__col--rest {
+  width: auto;
+}
+
+/* 불러오는 중·오류·기록 없음 — 머리 줄 아래 빈 자리 가운데에 글자만 둔다(빈 줄을 그리지 않는다). */
+.admin-log__message {
+  position: absolute;
+  inset: var(--admin-log-head) 0 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--mut);
+  font-size: 13.5px;
+}
+
+/* 새 쪽을 불러오는 동안 지난 쪽을 흐리게 둔다(표가 사라졌다 나타나지 않게). */
+.admin-log[aria-busy='true'] .admin-log__table tbody {
+  opacity: 0.55;
+}
+
+/* ===== 회원 상세 패널 — 네 묶음을 넓은 화면 2×2, 좁은 화면 한 줄에 하나 ===== */
+.admin-member-detail__groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-4);
+}
+
+@media (max-width: 899px) {
+  .admin-member-detail__groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.admin-member-detail__group {
+  min-width: 0;
+  padding: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--panel2);
+}
+
+.admin-member-detail__title {
+  margin: 0 0 var(--sp-2);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* 이름·값 2열 목록 */
+.admin-dl {
+  margin: 0;
+}
+
+.admin-dl__row {
+  display: grid;
+  grid-template-columns: minmax(0, 12em) minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+}
+
+.admin-dl__row:last-child {
+  border-bottom: 0;
+}
+
+.admin-dl__row dt {
+  color: var(--mut);
+}
+
+.admin-dl__row dd {
+  margin: 0;
+  color: var(--fg);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
