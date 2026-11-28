@@ -48,6 +48,7 @@ function toComparable(values) {
 // 기준월과 함께 저장한 뒤 입력 완료 현황을 보여 준다. 대안 데이터는 모의 연동으로 따로 불러온다.
 // FP-227 카드를 7단계(config/inputSteps.js)로 나눠 [이전]/[다음]으로 넘기고, 입력값은 브라우저에 임시저장한다(utils/inputDraft.js).
 // 5단계의 [저장하기]에서 서버에 저장하고, 6단계에서 대안 데이터를 불러오고, 7단계에서 점수를 산출한다.
+// FP-260 10차 7단계 [이 단계로]로 들어온 입력 단계는 [저장하고 7단계로]로, 7단계는 "저장하지 않은 변경" 안내의 [저장하기]로 그 자리에서 저장한다.
 // 입력 완료 현황은 develop 화면처럼 모든 단계에서 오른쪽 열 같은 자리에 둔다(왼쪽 열 내용만 단계마다 바뀐다).
 // FP-86: 잘못된 값은 입력 즉시, 빈 필수 칸은 그 단계에서 [다음]을 시도한 뒤부터 칸 옆에 오류를 보여 주고, 오류가 있으면 [다음] 버튼을 막는다.
 export default function DataInputPage() {
@@ -89,6 +90,10 @@ export default function DataInputPage() {
   const requestIdRef = useRef(null)
   // 요청 중에 버튼을 빠르게 두 번 눌러도 한 번만 보내도록 막는 표시.
   const calculatingRef = useRef(false)
+  // FP-260 10차 마지막으로 서버에 저장한(또는 불러온) 입력값의 비교용 문자열 — 지금 값과 다르면 7단계에 "저장하지 않은 변경"을 알린다. 저장한 적이 없으면 null.
+  const [savedComparable, setSavedComparable] = useState(null)
+  // FP-260 10차 7단계 [이 단계로]로 입력 단계에 들어왔는지 — 그동안 주 버튼이 [저장하고 7단계로]가 된다. 7단계에 다시 오거나 저장하면 끈다.
+  const [returnToScore, setReturnToScore] = useState(false)
   // 단계를 사용자가 바꿨을 때만 새 단계 제목으로 포커스를 옮기려는 표시(처음 불러올 때는 옮기지 않는다).
   const focusStepRef = useRef(false)
 
@@ -108,6 +113,7 @@ export default function DataInputPage() {
           storedDraft && toComparable(withMinimumRows(storedDraft.values, sections)) !== toComparable(serverValues) ? storedDraft : null
         if (storedDraft && !draft) clearDraft(user.userId, user.jobType)
         setServerInput(result.input ?? null)
+        setSavedComparable(result.input ? toComparable(serverValues) : null)
         if (draft) {
           setValues(draft.values)
           setStep(draft.step)
@@ -198,8 +204,9 @@ export default function DataInputPage() {
       : index === ALT_DATA_STEP && !altDataItem.done
         ? altDataItem.hint
         : ''
+    // FP-260 10차 산출을 막는 단계는 노란 표시(색·테두리)만 하고 글자는 붙이지 않는다(개수 안내 등 baseHint는 그대로).
     const warn = blockingSteps.has(index)
-    let hint = warn ? ['점수 산출에 필요', baseHint].filter(Boolean).join(' · ') : baseHint
+    let hint = baseHint
     // 7단계 줄은 완료로 세지 않고, 산출 준비 상태를 보여 준다.
     if (index === SCORE_STEP) hint = missingItems.length === 0 ? '점수 산출 가능' : `남은 항목 ${missingItems.length}개`
     return {
@@ -218,6 +225,8 @@ export default function DataInputPage() {
     !saved && passedSteps.length > 0
       ? `임시 저장됨: ${Math.max(...passedSteps) + 1}단계까지 (${LAST_INPUT_STEP + 1}단계 [저장하기] 전)`
       : ''
+  // FP-260 10차 서버에 저장한 뒤 화면에서 값을 고쳤는지 — 고친 값은 저장해야 완료 현황·점수 산출에 반영된다.
+  const hasUnsavedChanges = savedComparable !== null && toComparable(values) !== savedComparable
 
   // 고친 칸의 서버 오류만 지운다 — key가 errorKey와 같거나 'errorKey.'로 시작하는 오류(줄 섹션이면 그 섹션 전체)를 뺀다.
   const clearServerErrors = (errorKey) =>
@@ -254,6 +263,7 @@ export default function DataInputPage() {
 
   // 단계를 바꾸고 화면 맨 위로 올린다. 포커스는 위 effect가 새 단계 제목으로 옮긴다.
   const goToStep = (nextStep) => {
+    if (nextStep === SCORE_STEP) setReturnToScore(false)
     focusStepRef.current = true
     setStepDir(nextStep >= step ? 'next' : 'prev')
     setStep(nextStep)
@@ -289,48 +299,90 @@ export default function DataInputPage() {
   // FP-227 1단계 [이전] — 서버에 저장한 입력이 없을 때만 보이고, 직군 선택 화면으로 가서 직군을 다시 고르게 한다(MEM-05 저장 전 변경).
   const handleBackToJobSelect = () => navigate(PATHS.SELECT_JOB, { state: { from: FROM_DATA_INPUT } })
 
-  // 1~4단계 [다음]·5단계 [저장하기] — 지금 단계의 오류가 없으면 다음 단계로 넘긴다. 임시저장은 값이 바뀔 때마다 이미 되어 있다.
-  // 5단계에서는 1~5단계를 모두 검사해 오류가 있는 가장 앞 단계로 돌아가고, 통과하면 요청 본문(모든 섹션에 기준월)을 서버에 저장한 뒤 6단계(대안 데이터)로 간다.
-  // 서버가 400과 칸별 오류(fieldErrors)를 주면 해당 칸이 있는 단계로 돌아가 칸 옆에 보여 주고, 칸을 찾지 못한 오류는 폼 아래 문구에 붙인다.
-  // { code, message, fieldErrors }는 팀 공통 오류 형식이다(D-20 확정, FP-87).
-  const handleNext = async (event) => {
-    event.preventDefault()
+  // FP-260 10차 저장한 뒤 서버 완료 현황을 다시 받는다 — [점수 산출하기](RPT-01)와 같은 기준(가장 최근 기준월)으로 보여 주려고 GET을 한 번 더 부른다.
+  // 실패하면 저장 응답의 status를 그대로 둔다.
+  const refreshStatus = async () => {
+    try {
+      const latest = await fetchFinancialInput()
+      setStatus(latest.status)
+      setSavedBaseMonths(latest.savedBaseMonths ?? [])
+      setServerInput(latest.input ?? null)
+    } catch {
+      // 저장 응답의 status로 계속 보여 준다.
+    }
+  }
+
+  // 1~5단계를 모두 검사하고 서버에 저장한 뒤 nextStep으로 간다 — 5단계 [다음](→ 6단계), [저장하고 7단계로]·7단계 [저장하기](→ 7단계)가 함께 쓴다.
+  // 오류가 있으면 오류가 있는 가장 앞 단계로 돌아간다. 서버가 400과 칸별 오류(fieldErrors)를 주면 해당 칸이 있는 단계로 돌아가 칸 옆에 보여 주고,
+  // 칸을 찾지 못한 오류는 폼 아래 문구에 붙인다. { code, message, fieldErrors }는 팀 공통 오류 형식이다(D-20 확정, FP-87).
+  const saveInput = async (nextStep) => {
     setFormError('')
-    const checkedSteps = step < LAST_INPUT_STEP ? [step] : Array.from({ length: LAST_INPUT_STEP + 1 }, (_, index) => index)
+    const checkedSteps = Array.from({ length: LAST_INPUT_STEP + 1 }, (_, index) => index)
     setAttemptedSteps((prev) => [...new Set([...prev, ...checkedSteps])])
-    const errorSteps = Object.keys({ ...fullErrors, ...serverErrors })
+    const invalidSteps = Object.keys({ ...fullErrors, ...serverErrors })
       .map(getStepIndexOfErrorKey)
       .filter((index) => checkedSteps.includes(index))
-    if (errorSteps.length > 0) {
-      goToStep(Math.min(...errorSteps))
+    // 7단계로 돌아가려던 저장이 막히면, 고칠 단계에서도 [저장하고 7단계로]를 그대로 보여 준다.
+    const keepReturn = nextStep === SCORE_STEP
+    if (invalidSteps.length > 0) {
+      goToStep(Math.min(...invalidSteps))
+      setReturnToScore(keepReturn)
       return
     }
-    if (step < LAST_INPUT_STEP) {
-      setPassedSteps((prev) => (prev.includes(step) ? prev : [...prev, step]))
-      goToStep(step + 1)
-      return
-    }
-
     setPending(true)
     try {
       const result = await saveFinancialInput(buildPayload(values, sections, user.jobType))
       setStatus(result.status)
       setSavedAt(result.savedAt)
       setSavedBaseMonths(result.savedBaseMonths ?? [])
+      setSavedComparable(toComparable(values))
       setServerErrors({})
       setJustSaved(true)
       clearDraft(user.userId, user.jobType)
       setDraftRestored(false)
-      goToStep(ALT_DATA_STEP)
+      setReturnToScore(false)
+      goToStep(nextStep)
+      await refreshStatus()
     } catch (error) {
       const { errors: fieldErrors, unmatched } = fromServerFieldErrors(error.data?.fieldErrors, values)
       setServerErrors(fieldErrors)
       setFormError([error.message, ...unmatched].join(' '))
       const errorKeys = Object.keys(fieldErrors)
-      if (errorKeys.length > 0) goToStep(Math.min(...errorKeys.map(getStepIndexOfErrorKey)))
+      if (errorKeys.length > 0) {
+        goToStep(Math.min(...errorKeys.map(getStepIndexOfErrorKey)))
+        setReturnToScore(keepReturn)
+      }
     } finally {
       setPending(false)
     }
+  }
+
+  // 1~4단계 [다음]·5단계 [저장하기] — 지금 단계의 오류가 없으면 다음 단계로 넘긴다. 임시저장은 값이 바뀔 때마다 이미 되어 있다.
+  // 5단계에서는 saveInput으로 1~5단계를 모두 검사·저장한 뒤 6단계(대안 데이터)로 간다.
+  const handleNext = async (event) => {
+    event.preventDefault()
+    if (step === LAST_INPUT_STEP) {
+      await saveInput(ALT_DATA_STEP)
+      return
+    }
+    setFormError('')
+    setAttemptedSteps((prev) => (prev.includes(step) ? prev : [...prev, step]))
+    const hasStepError = Object.keys({ ...fullErrors, ...serverErrors }).some((key) => getStepIndexOfErrorKey(key) === step)
+    if (hasStepError) {
+      goToStep(step)
+      return
+    }
+    setPassedSteps((prev) => (prev.includes(step) ? prev : [...prev, step]))
+    goToStep(step + 1)
+  }
+
+  // FP-260 10차 [저장하고 7단계로]·7단계 [저장하기] — 그 자리에서 저장하고 7단계로 간다(5단계 [저장하기]와 같은 검사·저장·임시저장 정리).
+  const handleSaveAndReturn = () => saveInput(SCORE_STEP)
+
+  // FP-260 10차 7단계 [이 단계로] — 그 단계로 가고, 입력 단계(1~5단계)면 주 버튼을 [저장하고 7단계로]로 바꾼다.
+  const handleGoToMissing = (targetStep) => {
+    goToStep(targetStep)
+    setReturnToScore(targetStep <= LAST_INPUT_STEP)
   }
 
   // 6단계 [다음] — 대안 데이터를 다 불러오지 않아도 7단계로 간다. [점수 산출하기]는 입력 완료 현황이 모두 완료일 때만 켜진다.
@@ -499,9 +551,21 @@ export default function DataInputPage() {
           {/* 버튼 줄 — 왼쪽 [이전], 오른쪽 주 버튼. 지금 단계를 다 채우기 전에는 주 버튼이 꺼져 있다 */}
           <div className="fin-actions">
             {backButton}
-            <button type="submit" className="fin-submit" disabled={pending || stepIncomplete}>
-              {step === LAST_INPUT_STEP && pending ? '저장 중…' : '다음'}
-            </button>
+            {/* FP-260 10차 [이 단계로]로 들어왔으면 주 버튼은 [저장하고 7단계로](다른 단계는 오른쪽 단계 줄로 옮긴다) */}
+            {returnToScore ? (
+              <button
+                type="button"
+                className="fin-submit data-input-page__save-return"
+                onClick={handleSaveAndReturn}
+                disabled={pending || stepIncomplete}
+              >
+                {pending ? '저장 중…' : '저장하고 7단계로'}
+              </button>
+            ) : (
+              <button type="submit" className="fin-submit" disabled={pending || stepIncomplete}>
+                {step === LAST_INPUT_STEP && pending ? '저장 중…' : '다음'}
+              </button>
+            )}
           </div>
         </form>
       )}
@@ -537,6 +601,26 @@ export default function DataInputPage() {
         <div className="data-input-form" style={progressStyle}>
           <div key={step} className={`step-slide step-slide--${stepDir}`}>
             {stepHead}
+          {/* FP-260 10차 저장한 뒤 값을 고쳤으면 먼저 알리고 그 자리에서 저장하게 한다(완료 현황·점수는 저장한 입력 기준). */}
+          {hasUnsavedChanges ? (
+            <div className="score-unsaved" role="status">
+              <p className="score-unsaved__text">저장하지 않은 변경이 있습니다. 저장해야 완료 현황과 점수 산출에 반영됩니다.</p>
+              <Button size="sm" onClick={handleSaveAndReturn} disabled={pending}>
+                {pending ? '저장 중…' : '저장하기'}
+              </Button>
+            </div>
+          ) : (
+            justSaved && (
+              <p className="data-input-form__saved" role="status">
+                저장되었습니다.
+              </p>
+            )
+          )}
+          {formError && (
+            <p className="data-input-form__error" role="alert">
+              {formError}
+            </p>
+          )}
           {/* FP-260 9차 산출이 막혀 있으면 안내 한 줄 대신 남은 항목(이름·이유·[이 단계로])을 보여 준다. 모두 완료면 안내 한 줄만. */}
           {missingItems.length === 0 ? (
             <p className="hint data-input-page__score-hint">마지막으로 저장한 입력으로 점수를 계산합니다.</p>
@@ -551,7 +635,7 @@ export default function DataInputPage() {
                       <span>{item.reason}</span>
                     </div>
                     {/* 보조 이동 버튼 — 7단계 주 버튼은 [점수 산출하기] 하나라 흰 바탕 기본 버튼(finForm 규칙)으로 둔다 */}
-                    <Button size="sm" onClick={() => goToStep(item.step)}>
+                    <Button size="sm" onClick={() => handleGoToMissing(item.step)}>
                       이 단계로
                     </Button>
                   </li>

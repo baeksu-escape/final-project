@@ -506,6 +506,35 @@
   flex: none;
 }
 
+/* FP-260 10차 7단계 — 저장하지 않은 변경 안내 + [저장하기]. 남은 항목(노랑)과 구분해 카드 안 낮은 상자(파랑 왼쪽 선)로 둔다. */
+.score-unsaved {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--acc);
+  border-radius: 12px;
+  background: var(--panel2);
+  color: var(--fg2);
+}
+
+.score-unsaved__text {
+  margin: 0;
+  font-size: 13px;
+}
+
+.score-unsaved > .button {
+  flex: none;
+}
+
+/* FP-260 10차 [저장하고 7단계로]는 [다음]보다 글자가 길어 [점수 산출하기]와 같은 폭으로 둔다(390 폭에서도 [이전]과 한 줄). */
+.data-input-page .fin-actions .data-input-page__save-return {
+  flex-basis: 180px;
+}
+
 /* 완료 애니메이션 — 단계가 완료되면 초록 동그라미가 톡 튀어나오고, 체크가 그려지고, 아래 세로선이 위에서부터 초록으로 찬다.
    처음 화면에 들어올 때는 완료된 단계가 위에서부터 차례로(--i) 나타난다. 움직임 줄이기 설정이면 멈춘다. */
 .input-status__item--done .input-status__marker {

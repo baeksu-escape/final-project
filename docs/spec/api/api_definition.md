@@ -158,7 +158,7 @@
 | MEM-02 | `POST /api/members/me/profile/unmask` | N-04-2 마스킹 해제 | `APP_USER` | USER | ✅ |
 | MEM-03 | `PUT /api/members/me/email` | N-04-3 계정 관리 (이메일 변경, N-02-3 재인증) | `APP_USER`, `VERIFICATION_CODE` | USER | ✅ |
 | MEM-04 | `PUT /api/members/me/password` | N-04-3 계정 관리 (비밀번호 변경) | `APP_USER` | USER 전용 | ✅ |
-| MEM-05 | `PATCH /api/members/me/job-type` | N-05-1 직군 선택 (입력 저장 전에는 다시 고를 수 있음. 같은 직군이면 200, 저장한 입력이나 평가가 있으면 409 `JOB_TYPE_LOCKED`, 그사이 다른 요청이 먼저 바꿨으면 409 `JOB_TYPE_ALREADY_SELECTED`) 🆕 11/20 | `APP_USER`, `USER_ASSET_SNAPSHOT`·`ASSESSMENT`(잠금 판단에 읽기만) | USER | ✅ |
+| MEM-05 | `PATCH /api/members/me/job-type` | N-05-1 직군 선택·N-04-8 직군 변경 (저장한 입력·평가가 있어도 바꿀 수 있고, 입력·평가 행은 그대로 둔다. 같은 직군이면 400 `SAME_JOB_TYPE`, 틀린 값이면 400 `INVALID_INPUT`, 그사이 다른 요청이 먼저 바꿨으면 409 `JOB_TYPE_ALREADY_SELECTED`. 바꾸면 `SYSTEM_LOG` INFO에 가린 아이디·직군 코드만 남긴다) 🆕 11/28 FP-298 | `APP_USER`, `SYSTEM_LOG` | USER | ✅ |
 | MEM-06 | `GET /api/members/me/diagnoses` | N-04-6 진단 내역 조회 | `ASSESSMENT` | USER | ✅ **구현됨 (FP-142, 실제 연결 확인 11/16)** (응답 상세: B팀 명세서 3-4) |
 | MEM-07 | `DELETE /api/members/me` | N-04-7 회원 탈퇴 `{ password }` — 상태 `WITHDRAWN`·개인정보 덮어쓰기, 소셜 연결·인증 기록·동의로 불러온 데이터 삭제, 직접 입력·평가는 보관. 간편 로그인 전용 계정은 토큰 발급 10분 이내로 확인(넘으면 403 `RECENT_LOGIN_REQUIRED`) | `APP_USER`, `USER_*`, `SYSTEM_LOG` | USER | ✅ |
 | MEM-08 | `PATCH /api/members/me/nickname` 🆕 11/23 | N-04-3 계정 관리 (닉네임 변경 `{ nickname }`, 규칙은 가입과 같음. 중복 확인은 AUTH-13. 같은 닉네임이면 400 `SAME_NICKNAME`, 다른 회원이 쓰면 409 `DUPLICATE_NICKNAME`) | `APP_USER` | USER | ✅ (FP-222) |

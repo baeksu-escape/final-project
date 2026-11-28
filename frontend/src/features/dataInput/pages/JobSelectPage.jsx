@@ -12,7 +12,7 @@ import '../dataInput.css'
 
 // N-05-1 직군 선택 화면 — 일반 사용자가 세 직군 중 하나를 골라 저장하면 데이터 입력 화면으로 보낸다.
 // FP-227 데이터 입력 1단계 [이전]으로 넘어온 경우(state.from === FROM_DATA_INPUT)에만 직군이 있는 사용자도 머물며 다시 고른다(MEM-05 저장 전 변경).
-// 그 밖에 직군이 이미 있거나 관리자면 첫 화면으로 보낸다. 입력을 저장한 뒤에는 서버가 409 JOB_TYPE_LOCKED로 막는다.
+// 그 밖에 직군이 이미 있거나 관리자면 첫 화면으로 보낸다. 입력을 저장한 뒤의 직군 변경은 마이페이지 [직군 변경하기](N-04-8, FP-298)에서 한다.
 // 직군 카드 한 줄 설명 — 어느 직군을 골라야 할지 헷갈리지 않게 소득을 얻는 방식으로 적는다.
 const JOB_DESCRIPTIONS = {
   [JOB_TYPES.EMPLOYEE]: '회사에 다니며 매달 월급을 받아요',
@@ -63,7 +63,7 @@ export default function JobSelectPage() {
       setSaved(true)
       updateUser({ jobType: updated.jobType })
     } catch (saveError) {
-      // 409 JOB_TYPE_LOCKED(입력을 저장한 뒤)도 서버 문구를 칸 아래에 그대로 보여 준다.
+      // 서버 오류(409 JOB_TYPE_ALREADY_SELECTED 등)도 서버 문구를 칸 아래에 그대로 보여 준다.
       setError(saveError.message)
       setPending(false)
     }

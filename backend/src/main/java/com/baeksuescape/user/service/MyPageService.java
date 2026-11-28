@@ -13,13 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
+import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.global.util.PiiCrypto;
 import com.baeksuescape.global.util.PiiHmac;
 import com.baeksuescape.global.util.PiiMasking;
 import com.baeksuescape.user.dto.AuthResponses;
 import com.baeksuescape.user.dto.MyPageDtos;
 import com.baeksuescape.user.dto.UserAccount;
-import com.baeksuescape.user.mapper.FinancialInputMapper;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 
 // FP-87 N-04 마이페이지(MEM-01~04)와 N-05-1 직군 선택(MEM-05). 로그인한 본인(USER_ID는 토큰에서)만 다룬다.
@@ -32,9 +32,11 @@ public class MyPageService {
     static final String SAME_PASSWORD_MESSAGE = "지금 쓰는 비밀번호와 같습니다. 다른 비밀번호를 입력해 주세요.";
     // FP-222 MEM-08 새 닉네임이 지금 닉네임과 같을 때 문구(프론트 authConstants.js SAME_NICKNAME_MESSAGE와 같음).
     static final String SAME_NICKNAME_MESSAGE = "지금 쓰는 닉네임과 같습니다.";
+    // FP-298 N-04-8 지금 직군과 같은 직군으로 바꾸려 할 때 문구.
+    static final String SAME_JOB_TYPE_MESSAGE = "지금 직군과 같습니다. 다른 직군을 골라 주세요.";
 
     private final UserAccountMapper userMapper;
-    private final FinancialInputMapper financialInputMapper;
+    private final SystemLogService systemLog;
     private final EmailVerificationService emailVerification;
     private final UserViewFactory userViews;
     private final PasswordEncoder passwordEncoder;
@@ -42,10 +44,10 @@ public class MyPageService {
     private final PiiHmac hmac;
     private final Clock clock;
 
-    public MyPageService(UserAccountMapper userMapper, FinancialInputMapper financialInputMapper, EmailVerificationService emailVerification,
+    public MyPageService(UserAccountMapper userMapper, SystemLogService systemLog, EmailVerificationService emailVerification,
             UserViewFactory userViews, PasswordEncoder passwordEncoder, PiiCrypto crypto, PiiHmac hmac, Clock clock) {
         this.userMapper = userMapper;
-        this.financialInputMapper = financialInputMapper;
+        this.systemLog = systemLog;
         this.emailVerification = emailVerification;
         this.userViews = userViews;
         this.passwordEncoder = passwordEncoder;
@@ -135,21 +137,23 @@ public class MyPageService {
         userMapper.updatePassword(userId, passwordEncoder.encode(request.newPassword()), LocalDateTime.now(clock));
     }
 
-    // MEM-05 직군 선택·저장 전 변경(FP-227) — 비어 있으면 저장, 같은 직군이면 그대로 200, 다른 직군이면 저장한 입력도 평가도 없을 때만 바꾼다.
-    // 저장한 입력 = 데이터 입력 저장 기록(USER_ASSET_SNAPSHOT, FinancialInputMapper.selectSavedBaseMonths, 기준월 무관), 평가 = ASSESSMENT 행.
-    // 관리자는 /api/members/me/**에서 이미 403이다.
-    // TODO(N-04-8) 저장 전 변경만 허용(11/19 결정). 저장 후 변경은 미정(D-27).
+    // MEM-05 직군 선택(N-05-1)·변경(N-04-8, FP-298) — 비어 있으면 저장하고, 다른 직군이면 저장한 입력·평가가 있어도 바꾼다(11/28 조장 확인).
+    // 같은 직군이면 400 SAME_JOB_TYPE, 틀린 값이면 400 INVALID_INPUT. 저장된 입력·평가 행은 지우거나 바꾸지 않는다(소득·기간은 새 직군 기준으로 다시 입력).
+    // 바꾼 경우 시스템 로그(INFO)에 가린 아이디와 직군 코드만 남긴다. 탈퇴·잠긴 계정은 JWT 필터가 먼저 401로 막고, 관리자는 /api/members/me/**에서 403이다.
     @Transactional
     public AuthResponses.Me selectJobType(long userId, MyPageDtos.JobType request) {
         if (request.jobType() == null || !JOB_TYPES.contains(request.jobType())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "직군을 선택해 주세요.",
                     List.of(new FieldErrorItem("jobType", "직군을 선택해 주세요.")));
         }
-        // 같은 회원의 입력 저장(INP-02)도 회원 행을 먼저 잠그므로, 확인과 변경 사이에 입력이 저장되지 않는다.
+        // 같은 회원의 입력 저장(INP-02)도 회원 행을 먼저 잠그므로, 직군 확인과 변경 사이에 다른 직군 기준의 입력이 저장되지 않는다.
         userMapper.lockUser(userId);
         UserAccount account = require(userId);
         String current = account.getWorkerTypeCode();
-        if (request.jobType().equals(current)) return new AuthResponses.Me(userViews.of(account));
+        if (request.jobType().equals(current)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "SAME_JOB_TYPE", SAME_JOB_TYPE_MESSAGE,
+                    List.of(new FieldErrorItem("jobType", SAME_JOB_TYPE_MESSAGE)));
+        }
 
         LocalDateTime now = LocalDateTime.now(clock);
         if (current == null) {
@@ -157,12 +161,11 @@ public class MyPageService {
                 throw new ApiException(HttpStatus.CONFLICT, "JOB_TYPE_ALREADY_SELECTED", "이미 직군이 선택되어 있습니다.");
             }
         } else {
-            if (!financialInputMapper.selectSavedBaseMonths(userId).isEmpty() || userMapper.countAssessments(userId) > 0) {
-                throw new ApiException(HttpStatus.CONFLICT, "JOB_TYPE_LOCKED", "입력을 저장한 뒤에는 직군을 바꿀 수 없습니다.");
-            }
             if (userMapper.updateWorkerTypeFrom(userId, current, request.jobType(), now) == 0) {
                 throw new ApiException(HttpStatus.CONFLICT, "JOB_TYPE_ALREADY_SELECTED", "이미 직군이 바뀌었습니다. 새로고침해 주세요.");
             }
+            systemLog.record(SystemLogService.Type.INFO, "member-service",
+                    "직군 변경 " + current + " → " + request.jobType() + " (" + SystemLogService.maskLoginId(account.getLoginId()) + ")", userId);
         }
         return new AuthResponses.Me(userViews.of(require(userId)));
     }

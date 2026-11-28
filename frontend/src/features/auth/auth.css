@@ -652,6 +652,7 @@
 .account-manage-card__email,
 .account-manage-card__password,
 .account-manage-card__data-input,
+.account-manage-card__job-type,
 .account-form__submit,
 .account-form__cancel,
 .withdrawal-card__open {
@@ -677,6 +678,7 @@
 .account-manage-card__email:hover,
 .account-manage-card__password:hover,
 .account-manage-card__data-input:hover,
+.account-manage-card__job-type:hover,
 .account-form__cancel:hover {
   border-color: var(--acc);
   color: var(--fg);
@@ -766,12 +768,58 @@
   color: var(--bad);
 }
 
-/* FP-259 3차 [회원 탈퇴]는 위 2×2 버튼(.account-manage-card__actions, 간격 8px)의 왼쪽 칸과 같은 너비. */
-.account-manage-card .withdrawal-card__open {
-  width: calc((100% - 8px) / 2);
+/* FP-298 맨 아래 줄 [직군 변경하기]·[회원 탈퇴]도 위 2×2와 같은 격자(.account-manage-card__actions)라 칸 너비를 그대로 채운다. */
+.account-manage-card__actions .withdrawal-card__open {
+  align-self: stretch;
 }
 
-/* [탈퇴하기]·[취소]도 위 버튼과 같은 2칸 격자·8px 간격. 상자 안쪽 여백만큼 칸이 조금 좁다. */
+/* 두 격자가 바로 붙어 있으면(사이에 폼·안내가 없으면) 카드 안 간격(12px)에서 4px 줄여 위 격자의 줄 간격(8px)과 같게 둔다. */
+.account-manage-card__actions + .account-manage-card__actions {
+  margin-top: -4px;
+}
+
+/* FP-298 N-04-8 직군 변경 폼 — 지금 직군, 새 직군 라디오(지금 직군은 고를 수 없음), 안내문 */
+.job-type-form__current {
+  font-size: 13px;
+}
+
+.job-type-form__options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.job-type-form__legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: var(--fg2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.job-type-form__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.job-type-form__option.is-current {
+  color: var(--mut);
+  cursor: not-allowed;
+}
+
+.job-type-form__notice {
+  color: var(--fg2);
+  font-size: 12.5px;
+}
+
+/* [탈퇴하기]·[취소]도 위 버튼과 같은 2칸 격자·8px 간격. 상자 안쪽 여백만큼 칸이 조금 좁다. FP-298 [변경하기]·[취소]도 같다. */
+.job-type-form__actions,
 .withdrawal-form__actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
