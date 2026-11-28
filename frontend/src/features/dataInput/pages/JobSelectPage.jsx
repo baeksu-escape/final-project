@@ -76,7 +76,7 @@ export default function JobSelectPage() {
       <p className="job-select-page__message">
         직군에 따라 소득 입력 항목이 달라집니다. 지금 소득을 얻는 방식에 가장 가까운 직군을 골라 주세요.
       </p>
-      <p className="job-select-page__message">입력을 저장하기 전까지만 직군을 바꿀 수 있습니다.</p>
+      <p className="job-select-page__message">입력을 저장한 뒤에는 마이 페이지 [직군 변경하기]에서 바꿀 수 있습니다.</p>
       <form className="job-select-form" onSubmit={handleSubmit}>
         <fieldset className="job-select-form__options">
           <legend className="job-select-form__legend">직군</legend>

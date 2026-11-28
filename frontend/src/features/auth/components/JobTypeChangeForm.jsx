@@ -1,14 +1,24 @@
 import { useState } from 'react'
 import { useAuth } from '../../../common/auth/useAuth.js'
-import { JOB_TYPE_LABELS, JOB_TYPE_OPTIONS } from '../../../common/config/jobTypes.js'
+import { JOB_TYPES, JOB_TYPE_LABELS, JOB_TYPE_OPTIONS } from '../../../common/config/jobTypes.js'
 import { saveJobType } from '../../dataInput/api/dataInputApi.js'
 import { clearDraft } from '../../dataInput/utils/inputDraft.js'
 
 // N-04-8 직군 변경 안내문(11/28 조장 확인) — 기존 입력은 그대로 두고 직군만 바꾼다.
+// 기간은 직군과 상관없이 하나이고, 소득은 급여소득자만 기준월 한 달이라 급여소득자에서 바꿀 때만 12개월 소득이 더 필요하다.
 const JOB_TYPE_NOTICE_LINES = Object.freeze([
-  '직군을 바꾸면 소득·기간을 새 직군 기준으로 다시 입력해야 점수를 낼 수 있습니다.',
+  '급여소득자에서 다른 직군으로 바꾸면 최근 12개월 소득을 입력해야 점수를 낼 수 있습니다.',
   '지금까지 입력한 값과 진단 기록은 그대로 남습니다.',
 ])
+
+// 바꾼 뒤 안내 — 급여소득자에서 다른 직군으로 바꾼 경우만 12개월 소득 입력을 안내한다.
+function savedMessage(fromJobType, toJobType) {
+  const head = `직군을 ${JOB_TYPE_LABELS[toJobType]}(으)로 바꿨습니다.`
+  if (fromJobType === JOB_TYPES.EMPLOYEE && toJobType !== JOB_TYPES.EMPLOYEE) {
+    return `${head} 데이터 입력에서 최근 12개월 소득을 입력해 주세요.`
+  }
+  return `${head} 입력한 값은 그대로이니 데이터 입력에서 소득을 확인한 뒤 점수를 내 주세요.`
+}
 
 // FP-298 N-04-8 직군 변경 폼 — 계정 관리 카드의 [직군 변경하기]를 누르면 펼쳐진다(탈퇴 폼과 같은 "한 번에 하나").
 // 지금 직군을 보여 주고 다른 직군 하나를 고르게 한다(지금 직군은 고를 수 없음). 서버(MEM-05)는 같은 직군·틀린 값이면 400이다.
@@ -33,7 +43,7 @@ export default function JobTypeChangeForm({ onSaved, onCancel }) {
       const { user: updated } = await saveJobType(jobType)
       if (currentJobType) clearDraft(user.userId, currentJobType)
       updateUser({ jobType: updated.jobType })
-      onSaved(`직군을 ${JOB_TYPE_LABELS[updated.jobType]}(으)로 바꿨습니다. 데이터 입력에서 소득·기간을 새 직군 기준으로 다시 입력해 주세요.`)
+      onSaved(savedMessage(currentJobType, updated.jobType))
     } catch (saveError) {
       setError(saveError.data?.fieldErrors?.[0]?.message ?? saveError.message)
       setPending(false)

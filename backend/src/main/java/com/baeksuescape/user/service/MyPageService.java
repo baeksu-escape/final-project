@@ -138,7 +138,7 @@ public class MyPageService {
     }
 
     // MEM-05 직군 선택(N-05-1)·변경(N-04-8, FP-298) — 비어 있으면 저장하고, 다른 직군이면 저장한 입력·평가가 있어도 바꾼다(11/28 조장 확인).
-    // 같은 직군이면 400 SAME_JOB_TYPE, 틀린 값이면 400 INVALID_INPUT. 저장된 입력·평가 행은 지우거나 바꾸지 않는다(소득·기간은 새 직군 기준으로 다시 입력).
+    // 같은 직군이면 400 SAME_JOB_TYPE, 틀린 값이면 400 INVALID_INPUT. 저장된 입력·평가 행은 지우거나 바꾸지 않는다(기간은 그대로 쓰고, 급여소득자 → 다른 직군일 때만 12개월 소득을 더 입력).
     // 바꾼 경우 시스템 로그(INFO)에 가린 아이디와 직군 코드만 남긴다. 탈퇴·잠긴 계정은 JWT 필터가 먼저 401로 막고, 관리자는 /api/members/me/**에서 403이다.
     @Transactional
     public AuthResponses.Me selectJobType(long userId, MyPageDtos.JobType request) {
