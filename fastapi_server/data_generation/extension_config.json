@@ -1,6 +1,17 @@
 {
   "seed": 20261029,
-  "rows": 12000,
+  "rows": 0,
+  "input_rules": {
+    "enabled": true,
+    "income_floor_dsr_range": [
+      0.4,
+      0.8
+    ],
+    "expense_cap_enabled": false,
+    "expense_ratio_scale": 0.85,
+    "expense_ratio_max": 0.9,
+    "basis": "assumption (v3.7.0, 정의서 C32): 소득 하한·지출 비율 조정은 통계값이 아니다. 서비스 시연 회원 생성에는 적용하지 않는다"
+  },
   "occupation_map": {
     "1": "wage",
     "2": "selfemp",

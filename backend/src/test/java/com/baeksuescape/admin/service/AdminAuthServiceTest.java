@@ -1,6 +1,7 @@
 package com.baeksuescape.admin.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -8,6 +9,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -47,6 +50,7 @@ import com.baeksuescape.user.dto.UserAccount;
 import com.baeksuescape.user.dto.VerificationCode;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 import com.baeksuescape.user.mapper.VerificationCodeMapper;
+import com.baeksuescape.user.service.LoginAttemptService;
 import com.baeksuescape.user.service.UserViewFactory;
 import com.baeksuescape.user.service.email.EmailCodeSender;
 
@@ -130,7 +134,7 @@ class AdminAuthServiceTest {
         store = new OneTimeTokenStore(clock);
         service = new AdminAuthService(codeMapper, userMapper, adminMapper, tokens, store, sender, ENCODER, CRYPTO,
                 new UserViewFactory(userMapper, CRYPTO), new SystemLogService(systemLogMapper, TransactionOperations.withoutTransaction(), clock),
-                properties, clock);
+                properties, clock, new LoginAttemptService(userMapper, ENCODER, clock));
         admin = admin(1L, "admin01");
         given(userMapper.selectById(1L)).willAnswer(invocation -> admin);
         fakeCodeTable();
@@ -221,6 +225,25 @@ class AdminAuthServiceTest {
         assertThat(result.user().role()).isEqualTo("ROLE_ADMIN");
         verify(userMapper).updateLoginSuccess(eq(1L), any());
         verify(systemLogMapper).insertLog(eq("AUTH"), eq("auth-service"), eq("관리자 2단계 인증 통과 (ad***)"), eq(1L), any());
+        // FP-258 성공 처리는 계정 행을 잠근 뒤 한다.
+        InOrder order = inOrder(userMapper);
+        order.verify(userMapper).lockUser(1L);
+        order.verify(userMapper).updateLoginSuccess(eq(1L), any());
+    }
+
+    // FP-258 번호를 확인하는 사이 다른 요청이 10회째 실패로 잠그면, 잠근 뒤 다시 읽은 값으로 423 ADMIN_ACCOUNT_LOCKED이고 실패 횟수를 지우지 않는다.
+    @Test
+    void lockedWhileVerifyingIs423AndKeepsFailureCount() {
+        String challenge = challenge();
+        given(userMapper.lockUser(1L)).willAnswer(invocation -> {
+            admin.setAccountStatusCode(UserAccount.LOCKED);
+            return 1L;
+        });
+
+        assertThatThrownBy(() -> service.verifyLogin(new AdminDtos.VerifyCode(challenge, CODE)))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("ADMIN_ACCOUNT_LOCKED"));
+        verify(userMapper, never()).updateLoginSuccess(anyLong(), any());
+        verify(systemLogMapper, never()).insertLog(eq("AUTH"), eq("auth-service"), eq("로그인 성공 (ad***)"), eq(1L), any());
     }
 
     @Test

@@ -1,4 +1,4 @@
-import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES } from './authConstants.js'
+import { ACCOUNT_LOCKED_MESSAGE, ADMIN_ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES } from './authConstants.js'
 
 // N-01-6 소셜 로그인 설정 — 제공자를 빼거나 더할 때, 백엔드 경로가 정해질 때 이 파일만 고친다.
 
@@ -49,6 +49,9 @@ export function toSocialErrorMessage(error, fallback) {
   const code = error?.data?.code
   if (code === SOCIAL_ERROR_CODES.ADMIN_NOT_ALLOWED) return SOCIAL_ADMIN_BLOCKED_MESSAGE
   if (code === AUTH_ERROR_CODES.ACCOUNT_LOCKED) return ACCOUNT_LOCKED_MESSAGE
+  if (code === AUTH_ERROR_CODES.ADMIN_ACCOUNT_LOCKED) return ADMIN_ACCOUNT_LOCKED_MESSAGE
+  // FP-258 계정 연결도 로그인처럼 5회째 실패부터 5분 제한(429) — 남은 분이 담긴 서버 문구를 그대로 보여 준다.
+  if (error?.status === 429) return error.message
   if (code === SOCIAL_ERROR_CODES.LINK_EXPIRED) return SOCIAL_FAILED_MESSAGE
   if (error?.status === 0) return error.message
   return fallback

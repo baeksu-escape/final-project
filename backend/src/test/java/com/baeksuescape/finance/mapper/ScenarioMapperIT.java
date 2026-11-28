@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.baeksuescape.finance.dto.scenario.PolicyRateRow;
+import com.baeksuescape.finance.dto.scenario.ScenarioBaseResponse.ScenarioLoanItem;
 import com.baeksuescape.finance.dto.scenario.VariableLoanRow;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -81,6 +82,35 @@ class ScenarioMapperIT {
         assertEquals(30_000_000L, first.getBalanceAmount());
         assertEquals(0, new BigDecimal("4.5").compareTo(first.getAnnualRatePct()));
         assertEquals(300_000L, first.getMonthlyPaymentAmount());
+    }
+
+    @Test
+    @DisplayName("기준월 전체 대출 목록은 LOAN_ID 순으로 잔액·상환액·금리 정보를 매핑하고 UNKNOWN 방식을 유지한다")
+    // N-17-1 기준 대출 상세 조회의 정렬·합계·필드 매핑을 롤백 트랜잭션 안에서 확인한다.
+    void selectLatestLoanItems() {
+        assertTrue(mapper.selectLatestLoanItems(userId).isEmpty());
+
+        loan(30_000_000L, "4.5", "VARIABLE", 300_000L);
+        loan(5_000_000L, "6.25", "VARIABLE", 80_000L);
+        loan(20_000_000L, "5", "FIXED", 100_000L);
+        loan(10_000_000L, "5", "UNKNOWN", 100_000L);
+        clearMyBatisCache();
+
+        List<ScenarioLoanItem> rows = mapper.selectLatestLoanItems(userId);
+        List<Long> expectedIds = jdbc.queryForList(
+                "SELECT LOAN_ID FROM USER_LOAN WHERE USER_ID = ? AND BASE_MONTH = ? ORDER BY LOAN_ID",
+                Long.class, userId, MONTH);
+        assertEquals(4, rows.size());
+        assertEquals(expectedIds, rows.stream().map(ScenarioLoanItem::loanId).toList());
+        assertEquals(65_000_000L, rows.stream().mapToLong(ScenarioLoanItem::balanceAmount).sum());
+        assertEquals(580_000L, rows.stream().mapToLong(ScenarioLoanItem::monthlyPaymentAmount).sum());
+        String expectedLoanTypeName = jdbc.queryForObject(
+                "SELECT LOAN_TYPE_NAME FROM DIM_LOAN_TYPE WHERE LOAN_TYPE_CODE = ?", String.class, loanType);
+        assertEquals(expectedLoanTypeName, rows.get(0).loanTypeName());
+        assertEquals(0, new BigDecimal("4.5").compareTo(rows.get(0).annualRatePct()));
+        assertEquals("VARIABLE", rows.get(0).rateTypeCode());
+        assertEquals(30_000_000L, rows.get(0).balanceAmount());
+        assertEquals("UNKNOWN", rows.get(3).rateTypeCode());
     }
 
     @Test

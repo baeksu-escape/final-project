@@ -98,7 +98,7 @@ a.dash-card:hover {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-around;
-  gap: 28px;
+  gap: 20px;
 }
 
 .dash-score__facts {
@@ -170,11 +170,11 @@ a.dash-card:hover {
   font-size: 14px;
 }
 
-/* 분류 바로가기 — 큰 글자 타일 */
+/* 분류 바로가기 — 큰 글자 타일. FP-307 분류가 5개가 되어 한 줄 5칸에 맞게 타일을 줄였다(11/27) */
 .dash-groups {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
   margin-top: 16px;
 }
 
@@ -183,10 +183,10 @@ a.dash-card:hover {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-height: 230px;
-  padding: 28px;
-  border-radius: 28px;
+  gap: 8px;
+  min-height: 180px;
+  padding: 22px;
+  border-radius: 22px;
   background: color-mix(in srgb, var(--tone) 9%, var(--panel));
   color: var(--fg);
   text-decoration: none;
@@ -200,6 +200,7 @@ a.dash-card:hover {
 
 .dash-group--finance { --tone: var(--mint); }
 .dash-group--loans { --tone: var(--c-violet); }
+.dash-group--market { --tone: var(--c-pink); }
 .dash-group--lounge { --tone: var(--c-orange); }
 
 .dash-group__label {
@@ -209,7 +210,7 @@ a.dash-card:hover {
 }
 
 .dash-group b {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 800;
   line-height: 1.4;
   letter-spacing: -0.03em;
@@ -223,10 +224,10 @@ a.dash-card:hover {
 
 .dash-group__arrow {
   position: absolute;
-  top: 26px;
-  right: 28px;
+  top: 20px;
+  right: 22px;
   color: var(--tone);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   transition: transform 0.2s;
 }
@@ -269,3 +270,69 @@ a.dash-card:hover {
   color: var(--bad);
   font-size: 15px;
 }
+
+/* 점수 길 카드 아래 숫자 3칸 */
+.dash-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 18px 0 4px;
+  border-top: 1px solid var(--line);
+}
+
+.dash-facts dt { color: var(--mut2); font-size: 14px; font-weight: 600; }
+.dash-facts dd { margin: 2px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -0.03em; }
+.dash-facts small { margin-left: 2px; color: var(--mut); font-size: 14px; font-weight: 700; }
+.dash-facts .is-up { color: var(--mint); }
+.dash-facts .is-down { color: var(--bad); }
+
+/* 길 카드와 높이가 달라도 추이 그래프를 카드 가운데에 */
+.dash-trend .viz-trend { margin: auto 0; }
+
+/* 가입 직후처럼 점수가 없을 때의 시작 안내 — 세 단계와 시작 버튼 */
+.dash-start {
+  align-items: flex-start;
+}
+
+.dash-start h2 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.dash-start__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-start__steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 10px 10px;
+  border-radius: 999px;
+  background: var(--panel2);
+  color: var(--mut);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dash-start__steps b {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--fg2);
+  font-size: 13px;
+}
+
+.dash-start__steps li.is-on { color: var(--fg); background: var(--sel); }
+.dash-start__steps li.is-on b { background: var(--acc); color: var(--pri-fg); }
+.dash-start__steps li.is-done b { background: var(--mint); color: var(--pri-fg); }

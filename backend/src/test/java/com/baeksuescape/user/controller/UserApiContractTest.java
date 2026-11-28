@@ -108,7 +108,7 @@ class UserApiContractTest {
         mvc.perform(json(post("/api/auth/login"), "{\"loginId\":\"a\",\"password\":\"b\"}"))
                 .andExpect(status().is(423))
                 .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"))
-                .andExpect(jsonPath("$.message").value("잠긴 계정입니다. 관리자에게 문의해 주세요."));
+                .andExpect(jsonPath("$.message").value("잠긴 계정입니다. 비밀번호 찾기에서 이메일 인증 후 비밀번호를 재설정하면 풀립니다."));
 
         mvc.perform(json(post("/api/auth/login"), "{\"loginId\":\"employee\"}"))
                 .andExpect(status().isBadRequest())
@@ -166,6 +166,38 @@ class UserApiContractTest {
                 .andExpect(jsonPath("$.available").value(true));
     }
 
+    // FP-258 AUTH-16 아이디 중복 확인도 로그인 없이 부르고, 응답 모양은 닉네임 확인과 같다.
+    @Test
+    void 아이디_중복_확인은_토큰_없이_available을_준다() throws Exception {
+        given(authService.checkLoginId(any())).willReturn(new AuthResponses.LoginIdAvailability(false));
+        mvc.perform(json(post("/api/auth/login-id/check"), "{\"loginId\":\"employee\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(false));
+    }
+
+    // FP-258 같은 IP가 중복 확인을 1분에 30회 넘게 부르면 31회째는 429 TOO_MANY_REQUESTS이고 문구를 그대로 준다(다른 시험과 섞이지 않게 IP를 따로 쓴다).
+    @Test
+    void 같은_IP의_중복_확인이_1분에_30회를_넘으면_429() throws Exception {
+        given(authService.checkLoginId(any())).willReturn(new AuthResponses.LoginIdAvailability(true));
+        for (int i = 0; i < 30; i++) {
+            mvc.perform(json(post("/api/auth/login-id/check"), "{\"loginId\":\"newbie01\"}").with(remoteAddr("10.13.0.1")))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(json(post("/api/auth/login-id/check"), "{\"loginId\":\"newbie01\"}").with(remoteAddr("10.13.0.1")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("TOO_MANY_REQUESTS"))
+                .andExpect(jsonPath("$.message").value("확인 요청이 너무 많습니다. 1분 뒤에 다시 시도해 주세요."));
+        mvc.perform(json(post("/api/auth/nickname/check"), "{\"nickname\":\"테스트닉\"}").with(remoteAddr("10.13.0.2")))
+                .andExpect(status().isOk());
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor remoteAddr(String ip) {
+        return request -> {
+            request.setRemoteAddr(ip);
+            return request;
+        };
+    }
+
     @Test
     void 휴대폰_인증_발송과_확인은_토큰_없이_부르고_이메일과_같은_모양이다() throws Exception {
         given(phoneVerification.send(any())).willReturn(new AuthResponses.PhoneSent(300));
@@ -185,10 +217,12 @@ class UserApiContractTest {
 
     @Test
     void 아이디_찾기와_비밀번호_재설정() throws Exception {
-        given(authService.findId(any())).willReturn(new AuthResponses.FoundId("jwc****"));
-        mvc.perform(json(post("/api/auth/find-id"), "{\"name\":\"홍길동\",\"phone\":\"01012345678\"}"))
+        // FP-258 요청에 방법·인증 토큰이 붙고, 응답에 가리지 않은 loginId가 더해진다(maskedLoginId는 그대로).
+        given(authService.findId(any())).willReturn(new AuthResponses.FoundId("jwc****", "jwc1226"));
+        mvc.perform(json(post("/api/auth/find-id"), "{\"name\":\"홍길동\",\"method\":\"PHONE\",\"phone\":\"01012345678\",\"verificationToken\":\"t\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.maskedLoginId").value("jwc****"));
+                .andExpect(jsonPath("$.maskedLoginId").value("jwc****"))
+                .andExpect(jsonPath("$.loginId").value("jwc1226"));
 
         willThrow(AuthErrors.accountNotFound()).given(authService).findId(any());
         mvc.perform(json(post("/api/auth/find-id"), "{\"name\":\"홍길동\",\"phone\":\"01012345678\"}"))

@@ -59,7 +59,7 @@
 
     <update id="updateUnlocked">
         UPDATE APP_USER
-           SET ACCOUNT_STATUS_CODE = 'ACTIVE', LOGIN_FAIL_COUNT = 0, LOCK_REASON = NULL, LOCKED_AT = NULL, UPDATED_AT = #{now}
+           SET ACCOUNT_STATUS_CODE = 'ACTIVE', LOGIN_FAIL_COUNT = 0, LAST_LOGIN_FAIL_AT = NULL, LOCK_REASON = NULL, LOCKED_AT = NULL, UPDATED_AT = #{now}
          WHERE USER_ID = #{userId}
            AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'
     </update>
@@ -79,7 +79,7 @@
     <update id="updateTemporaryPassword">
         UPDATE APP_USER
            SET PASSWORD_HASH = #{passwordHash}, PASSWORD_CHANGE_REQUIRED_YN = 'Y', ACCOUNT_STATUS_CODE = 'ACTIVE',
-               LOGIN_FAIL_COUNT = 0, LOCK_REASON = NULL, LOCKED_AT = NULL, UPDATED_AT = #{now}
+               LOGIN_FAIL_COUNT = 0, LAST_LOGIN_FAIL_AT = NULL, LOCK_REASON = NULL, LOCKED_AT = NULL, UPDATED_AT = #{now}
          WHERE USER_ID = #{userId}
            AND ROLE_CODE = 'ROLE_ADMIN'
            AND ACCOUNT_STATUS_CODE &lt;&gt; 'WITHDRAWN'

@@ -33,6 +33,24 @@ GRADE_BANDS = [
     {"gradeBandCode": "GOOD", "minScore": 727, "maxScore": 1000},
 ]
 
+# FP-285 등급 구간은 불러온 모델 묶음의 버전에 따라 고른다(11/27). 그래서 코드를 먼저 병합해도 0.2 묶음의 서버는 CUT-0.3 그대로이고,
+# 0.3 묶음으로 바꾸면 CUT-0.4가 된다. Mock과 표에 없는 버전은 CUT-0.3(위 CUTOFF_VERSION·GRADE_BANDS)이다.
+# CUT-0.4 = 모델 0.3 대안 점수 VALID 25·75%(정의서 C37): 0~644 / 645~711 / 712~1000. DB의 ACTIVE 구간 버전과 같아야 한다.
+GRADE_BANDS_BY_CUTOFF = {
+    CUTOFF_VERSION: GRADE_BANDS,
+    "CUT-0.4": [
+        {"gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 644},
+        {"gradeBandCode": "STANDARD", "minScore": 645, "maxScore": 711},
+        {"gradeBandCode": "GOOD", "minScore": 712, "maxScore": 1000},
+    ],
+}
+CUTOFF_BY_MODEL_VERSION = {"LGBM-BASE-0.3": "CUT-0.4"}
+
+
+def cutoff_for(model_version: str | None) -> str:
+    """모델 버전에 맞는 등급 구간 버전. 표에 없으면(Mock·0.1·0.2) CUT-0.3이다."""
+    return CUTOFF_BY_MODEL_VERSION.get(model_version, CUTOFF_VERSION)
+
 
 @dataclass(frozen=True)
 class Feature:
@@ -94,9 +112,9 @@ TRADITIONAL_CODES = [f.code for f in FEATURES if f.alternative_yn == "N"]
 ALTERNATIVE_CODES = [f.code for f in FEATURES]
 
 
-def grade_band(score: int) -> str:
-    """점수를 CUT-0.3 등급 코드로 바꾼다."""
-    for band in GRADE_BANDS:
+def grade_band(score: int, cutoff_version: str = CUTOFF_VERSION) -> str:
+    """점수를 지정한 등급 구간(기본 CUT-0.3)의 등급 코드로 바꾼다."""
+    for band in GRADE_BANDS_BY_CUTOFF[cutoff_version]:
         if band["minScore"] <= score <= band["maxScore"]:
             return band["gradeBandCode"]
     raise ValueError(f"점수 범위 밖: {score}")

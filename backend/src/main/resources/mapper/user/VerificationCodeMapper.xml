@@ -24,6 +24,16 @@
          FETCH FIRST 1 ROWS ONLY
     </select>
 
+    <!-- FP-258 N-02-3 하루 발송 상한: since 뒤로 같은 채널·대상에 보낸 횟수(목적은 가리지 않고, 관리자 로그인 번호는 뺀다) -->
+    <select id="countSentSince" resultType="int">
+        SELECT COUNT(*)
+          FROM VERIFICATION_CODE
+         WHERE CHANNEL_CODE = #{channelCode}
+           AND TARGET_HMAC = #{targetHmac}
+           AND PURPOSE_CODE &lt;&gt; 'ADMIN_LOGIN'
+           AND CREATED_AT &gt;= #{since}
+    </select>
+
     <select id="selectById" resultType="com.baeksuescape.user.dto.VerificationCode">
         SELECT <include refid="codeColumns"/>
           FROM VERIFICATION_CODE

@@ -1,18 +1,19 @@
 {
- "package_version": "3.6.1-light",
+ "package_version": "3.7.0-light",
  "package_contents": "generation code, configuration, statistical sources and documentation; generated datasets are not included",
  "packaged_input": {
-  "file": "data/base_207.csv",
-  "rows": 12000,
-  "description": "original academy-generator 207 columns and labels, unchanged since v2.4",
-  "sha256": "85fc74118f5385e5646b9719f0067e02e4e557f41be7cd6e130d4886dfd0ffaa"
+  "file": "financial_credit_synthetic_155746x207.csv (not in the repository)",
+  "rows": 155746,
+  "rows_used": 139347,
+  "description": "educational synthetic source; same values as the default output of reference/academy/generate_dataset_original.py; shared outside Git",
+  "sha256": "bb556c3a89cf50e672daad17235b6161766baa934e7819170865efd5883df2a0"
  },
  "data_version": "not assigned to bundled files (datasets are not bundled). Full-size generation from this code was validated on 2026-11-01; assign a data_version when datasets are published",
  "original_generator_sha256": "1cecf0cae289af64762abdc60225709b81fbb6f7d64c742599bb85416b47544d",
  "source_statistics": "reference/statistical_priors.json",
  "label_origin": {
-  "legacy": "academy_original",
-  "thinfile": "thinfile_scenario_v25",
+  "legacy": "build_delinquency_label.py (original academy logit + assumed effects, reference/delinquency_label.json)",
+  "thinfile": "thinfile_scenario_v25 probability + assumed effects (build_delinquency_label.py)",
   "nonfinancial_effect_label": "build_nonfinancial_labels.py (docs/NONFINANCIAL_LABEL.md); v3.5.0 adds social insurance arrears and payment regularity terms",
   "nonfinancial_sources": "build_nonfinancial_sources.py (docs/NONFINANCIAL_SOURCES.md); original labels are not read"
  },
@@ -23,7 +24,8 @@
   "loan_products": 20261102,
   "external_api": 20261103,
   "nonfinancial_label": 20261104,
-  "nonfinancial_sources": 20261105
+  "nonfinancial_sources": 20261105,
+  "delinquency_label": 20261126
  },
  "official_thinfile_thresholds_used": false,
  "training_data_policy": "models are trained on synthetic data only; service_dummy/ (members) is never used for training",
@@ -755,5 +757,49 @@
   ],
   "git": "branch KGH_Work; no commit, push, stash, reset or merge by the tool",
   "final_review_note": "2026-11-10 최종 검수 반영: handoff 피처 안내와 모델 역할 일치, 기관 응답 전원 OK·시작 동의 분리 문서 통일, DB 99_check USER_LOAN 203 및 생성본 동등성 테스트 보완. 데이터 값 재생성 없이 문서·마커·manifest·v3.6.0 ZIP만 갱신."
+ },
+ "v3_7_0_regeneration": {
+  "date": "2026-11-26",
+  "release": "v3.7.0",
+  "decision": "team meeting 2026-11-26; docs/spec/feature_definition.md C32",
+  "rows": {
+   "legacy": 139347,
+   "thinfile": 2400,
+   "legacy_split": {
+    "TRAIN": 97543,
+    "VALID": 20903,
+    "TEST": 20901
+   }
+  },
+  "environment": {
+   "python": "3.11.9",
+   "numpy": "2.3.5",
+   "pandas": "2.2.3",
+   "scipy": "1.17.0",
+   "scikit-learn": "1.8.0"
+  },
+  "run": "clean copy outside the repository, README order without build_loan_extension and three experiments",
+  "verifiers": {
+   "passed": [
+    "verify",
+    "verify_thinfile",
+    "verify_thinfile_general",
+    "verify_nonfinancial_sources",
+    "verify_input_features_6m",
+    "verify_input_features_12m",
+    "verify_data_split",
+    "verify_delinquency_label"
+   ],
+   "failed": {
+    "verify_statistics": "source CSV hashes differ only because of CRLF line endings in this Windows checkout; values equal"
+   },
+   "not_run": [
+    "verify_loan_extension",
+    "verify_assumption_sensitivity",
+    "verify_nonfinancial_experiment"
+   ]
+  },
+  "tests": "112 run, 110 passed, 2 errors (Windows symlink privilege, same before this change)",
+  "unchanged": "service dummy outputs (18 files, byte identical), base_207 values vs source, thinfile split, rules-off extend output vs v3.6.1 code"
  }
 }

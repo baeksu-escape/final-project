@@ -41,10 +41,12 @@ public class PhoneVerificationService {
     private final PiiHmac hmac;
     private final AvenueProperties properties;
     private final Clock clock;
+    private final CodeSendGuard sendGuard;
     private final SecureRandom random = new SecureRandom();
 
     public PhoneVerificationService(VerificationCodeMapper codeMapper, VerificationTokenService tokenService, PhoneCodeSender sender,
-            PasswordEncoder passwordEncoder, PiiHmac hmac, AvenueProperties properties, Clock clock) {
+            PasswordEncoder passwordEncoder, PiiHmac hmac, AvenueProperties properties, Clock clock, CodeSendGuard sendGuard) {
+        this.sendGuard = sendGuard;
         this.codeMapper = codeMapper;
         this.tokenService = tokenService;
         this.sender = sender;
@@ -55,24 +57,31 @@ public class PhoneVerificationService {
     }
 
     // 인증번호 발송 — { phone, purpose } → { expiresInSeconds }. 번호 형식이 틀리면 400(phone 칸 오류).
-    @Transactional
+    // FP-258 같은 번호의 발송은 sendGuard 잠금 안에서 한 트랜잭션으로 한다(이메일 발송과 같은 방식).
     public AuthResponses.PhoneSent send(AuthRequests.PhoneSend request) {
         PhonePurpose purpose = purposeOf(request.purpose());
         String phone = AccountRules.normalizePhone(request.phone());
         if (!AccountRules.isValidPhone(phone)) throw invalidPhone();
 
-        LocalDateTime now = LocalDateTime.now(clock);
-        String code = newCode();
-        VerificationCode row = new VerificationCode();
-        row.setPurposeCode(purpose.dbCode());
-        row.setChannelCode(CHANNEL_PHONE);
-        row.setTargetHmac(hmac.phone(phone));
-        row.setCodeHash(passwordEncoder.encode(code));
-        row.setExpiresAt(now.plusSeconds(CODE_TTL_SECONDS));
-        row.setCreatedAt(now);
-        codeMapper.insertCode(row);
-        sender.send(phone, code, purpose.name());
-        return new AuthResponses.PhoneSent(CODE_TTL_SECONDS);
+        String target = hmac.phone(phone);
+        return sendGuard.run(CHANNEL_PHONE, target, () -> {
+            LocalDateTime now = LocalDateTime.now(clock);
+            // FP-258 같은 번호로 오늘(0시부터) 보낸 횟수가 상한이면 429(가입·아이디 찾기 목적을 함께 센다).
+            if (codeMapper.countSentSince(CHANNEL_PHONE, target, now.toLocalDate().atStartOfDay()) >= AuthErrors.DAILY_CODE_SEND_LIMIT) {
+                throw AuthErrors.codeSendDailyLimit("번호");
+            }
+            String code = newCode();
+            VerificationCode row = new VerificationCode();
+            row.setPurposeCode(purpose.dbCode());
+            row.setChannelCode(CHANNEL_PHONE);
+            row.setTargetHmac(target);
+            row.setCodeHash(passwordEncoder.encode(code));
+            row.setExpiresAt(now.plusSeconds(CODE_TTL_SECONDS));
+            row.setCreatedAt(now);
+            codeMapper.insertCode(row);
+            sender.send(phone, code, purpose.name());
+            return new AuthResponses.PhoneSent(CODE_TTL_SECONDS);
+        });
     }
 
     // 인증번호 확인 — 같은 목적·번호의 최근 발송 1건만 본다. 틀리면 시도 횟수를 올리고, 5회가 되면 그 번호는 쓸 수 없다.

@@ -1,21 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
 import { getScenarioBase, recalculateMemberScenario } from '../../diagnosis/api/diagnosisApi.js'
 import { adaptBaseline, adaptResponse } from '../adapters/scenarioAdapter.js'
-import { BASE_PRESET, presetValues, scenarioInputError } from './scenarioConfig.js'
+import { BASE_PRESET, SCENARIO_FIELDS, presetValues, scenarioInputError } from './scenarioConfig.js'
+
+// N-17-2 두 조건이 같은 값인지 항목별로 비교한다(슬라이더를 움직였다 같은 값으로 돌아오면 바뀌지 않은 것으로 본다).
+const sameValues = (a, b) => Boolean(a && b) && SCENARIO_FIELDS.every((field) => a[field.key] === b[field.key])
 
 const INITIAL = presetValues(BASE_PRESET)
 
-// N-17-1·N-17-3 저장값을 조회하고 변경된 조건을 서버에서 재계산한다.
-// 회원·직군 전환이나 입력 변경 시 이전 응답을 버리고 기존 결과는 유지한다.
+// N-17-1·N-17-3 기준값을 조회하고, 사용자가 계산 버튼을 누른 조건으로 서버에서 재계산한다.
+// 회원·직군 전환 시 이전 응답을 버리고, 입력을 바꿔도 기존 결과는 버튼을 누를 때까지 유지한다.
 export function useScenario(userId, workerTypeCode) {
   const [revision, setRevision] = useState(0)
   const [load, setLoad] = useState({ key: null, baseline: null, error: '' })
   const [draft, setDraft] = useState({ key: null, values: INITIAL, lastValid: INITIAL, presetId: BASE_PRESET.id })
-  const [calculation, setCalculation] = useState({ key: null, result: null, applied: null, error: '' })
+  const [calculation, setCalculation] = useState({ key: null, result: null, applied: null, version: -1, error: '' })
+  // N-17-3 요청 버전으로 계산·초기화를 구분하고, 처음에는 현재 조건을 한 번 계산한다.
+  const [request, setRequest] = useState({ key: null, values: INITIAL, version: 0 })
+  const [resetPending, setResetPending] = useState(false)
   const [retryVersion, setRetryVersion] = useState(0)
+  const [retryPending, setRetryPending] = useState(false)
   const seq = useRef(0)
-  const startedKey = useRef(null)
-  const startedRetry = useRef(0)
   const key = `${userId}:${workerTypeCode}:${revision}`
 
   // N-17-1 저장값 조회. 화면을 떠나거나 범위가 바뀌면 늦은 응답을 버린다.
@@ -30,26 +35,23 @@ export function useScenario(userId, workerTypeCode) {
 
   const ready = load.key === key
   const current = draft.key === key ? draft : { key, values: INITIAL, lastValid: INITIAL, presetId: BASE_PRESET.id }
-  const inputError = scenarioInputError(current.values)
+  // N-17-2 기준값으로 원 단위 입력 범위를 안내한다.
+  const inputError = scenarioInputError(current.values, ready ? load.baseline : null)
 
-  // N-17-3 첫 계산과 재시도는 즉시 요청하고 이후 입력은 300ms 모아서 요청한다.
+  const requested = request.key === key ? request : { key, values: INITIAL, version: 0 }
+
+  // N-17-3 최초 현재 조건과 사용자가 계산 또는 다시 시도를 눌렀을 때만 서버에 요청한다.
+  // 늦게 온 이전 응답은 버리고, 실패하면 이전 결과를 그대로 둔다.
   useEffect(() => {
     const requestId = ++seq.current
-    if (!ready || !load.baseline || inputError) return
-    const first = startedKey.current !== key
-    const retrying = startedRetry.current !== retryVersion
-    startedKey.current = key
-    startedRetry.current = retryVersion
-    const run = () => {
-      recalculateMemberScenario(current.values).then(adaptResponse).then(
-        (result) => { if (seq.current === requestId) setCalculation({ key, result, applied: current.values, retryVersion, error: '' }) },
-        (error) => { if (seq.current === requestId) setCalculation((prev) => ({ key, result: prev.key === key ? prev.result : null, applied: prev.key === key ? prev.applied : null, error: error.data?.fieldErrors?.[0]?.message || error.message })) },
-      )
-    }
-    if (first || retrying) run()
-    const timer = first || retrying ? null : setTimeout(run, 300)
-    return () => { clearTimeout(timer); seq.current += 1 }
-  }, [key, ready, load.baseline, current.values, inputError, retryVersion])
+    if (!ready || !load.baseline || scenarioInputError(requested.values, load.baseline)) return undefined
+    const { values, version } = requested
+    recalculateMemberScenario(values).then(adaptResponse).then(
+      (result) => { if (seq.current === requestId) { setCalculation({ key, result, applied: values, version, error: '' }); setResetPending(false); setRetryPending(false) } },
+      (error) => { if (seq.current === requestId) { setCalculation((prev) => ({ key, result: prev.key === key ? prev.result : null, applied: prev.key === key ? prev.applied : null, version, error: error.data?.fieldErrors?.[0]?.message || error.message })); setResetPending(false); setRetryPending(false) } },
+    )
+    return () => { seq.current += 1 }
+  }, [key, ready, load.baseline, requested.values, requested.version, retryVersion]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // N-17-2 값 바꾸기. 올바른 값이면 그 값을 계산 기준으로 삼고, 아니면 마지막 올바른 값의 결과를 그대로 둔다.
   // 상황 버튼을 누르면 그 버튼을 선택 상태로 두고, 슬라이더·직접 입력으로 바꾸면 값이 우연히 같아도 선택을 푼다.
@@ -59,6 +61,27 @@ export function useScenario(userId, workerTypeCode) {
 
   const result = calculation.key === key ? calculation.result : null
   const calcError = calculation.key === key ? calculation.error : ''
+  // 계산 중: 누른 횟수(requested.version)의 응답이 아직 오지 않았을 때
+  const calculating = ready && !inputError && (calculation.key !== key || calculation.version !== requested.version)
+  // N-17-2 입력이 올바를 때만 현재 조건으로 계산을 요청한다.
+  const calculate = () => { if (!inputError) setRequest({ key, values: current.values, version: requested.version + 1 }) }
+  // N-17-2 초기화는 입력을 기본 조건으로 되돌린다. 진행 중이거나 실패한 요청은 다시 보내 이전 응답을 무효화한다.
+  const reset = () => {
+    const values = INITIAL
+    setDraft({ key, values, presetId: BASE_PRESET.id, lastValid: values })
+    if (calculation.key === key && sameValues(calculation.applied, values) && !calculating && !calcError && !resetPending && !retryPending) return
+    // N-17-2 초기화 재계산 중에는 stale 안내 대신 계산 중 상태를 유지한다.
+    seq.current += 1
+    setResetPending(true)
+    setRetryPending(false)
+    setCalculation((previous) => ({ ...previous, error: '' }))
+    setRequest({ key, values, version: requested.version + 1 })
+  }
+
+  // N-17-2 실패한 계산의 재시도도 요청이 끝날 때까지 계산 중으로 표시한다.
+  const retry = () => {
+    if (!inputError) { setRetryPending(true); setRetryVersion((value) => value + 1) }
+  }
 
   return {
     loading: !ready,
@@ -70,10 +93,14 @@ export function useScenario(userId, workerTypeCode) {
     inputError,
     result,
     calcError,
-    stale: Boolean(result) && (calculation.applied !== current.values || calculation.retryVersion !== retryVersion),
+    // 결과가 지금 입력과 다른 조건으로 계산된 것인지(버튼을 아직 안 누름)
+    stale: Boolean(result) && !sameValues(calculation.applied, current.values) && !resetPending,
+    calculating: calculating || resetPending || retryPending,
     setValue,
     selectPreset,
-    retry: () => { if (!inputError) setRetryVersion((value) => value + 1) },
+    calculate,
+    reset,
+    retry,
     reload: () => setRevision((value) => value + 1),
   }
 }

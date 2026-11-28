@@ -4,7 +4,8 @@ import { USE_MOCK } from '../../../common/config/env.js'
 import { requestEmailCode, verifyEmailCode } from '../api/authFeatureApi.js'
 import { CUSTOM_EMAIL_DOMAIN, EMAIL_DOMAIN_OPTIONS, resolveEmailDomain } from '../emailParts.js'
 import { MOCK_EMAIL_CODE } from '../mocks/authMockData.js'
-import { joinEmail, validateEmailParts } from '../validation.js'
+import useImeSafeFilter from '../useImeSafeFilter.js'
+import { filterEmailDomain, filterEmailLocal, filterExistingEmailLocal, joinEmail, validateEmailParts } from '../validation.js'
 
 // 발송·확인 흐름의 처음 상태. target은 이 상태가 가리키는 이메일이고, status는 'idle'(발송 전)·'sent'(코드 보냄)·'error'(실패) 중 하나다.
 // codeOpen은 코드를 한 번 보내서 코드 칸이 열려 있는지다(실패해도 다시 입력할 수 있게 남긴다).
@@ -23,7 +24,11 @@ const IDLE_FLOW = { target: null, status: 'idle', message: '', codeOpen: false }
 //     onVerified={setVerification}                                // { email, verificationToken }
 //     error={errors.email}
 //   />
+//   FP-258 앞부분·직접 입력 도메인은 filterEmailLocal·filterEmailDomain으로 거른다(한글 조합은 끝날 때, useImeSafeFilter).
+//   FP-258 rule="existing"(아이디·비밀번호 찾기): 이미 가입한 이메일(+ ' 등)을 찾는 칸이라 앞부분은 filterExistingEmailLocal(공백·@만 지움)로,
+//   직접 입력 도메인은 가입과 같은 filterEmailDomain으로 거르고, 판정은 기본 형식(isBasicEmail)만 본다.
 //   문구는 한 번에 하나만 보인다: 완료 / (실패 > 부모 오류 > 발송 안내). 이메일을 고치면 발송·코드·오류·안내를 모두 비운다.
+//   FP-258 beforeRequest: [받기]·[확인] 요청 전에 부른다. false를 돌려주면 보내지 않는다(아이디·비밀번호 찾기의 이름 검사). 없으면 그대로 보낸다.
 export default function SplitEmailField({
   local,
   domainChoice,
@@ -35,17 +40,23 @@ export default function SplitEmailField({
   verified = false,
   onVerified,
   error,
+  beforeRequest,
+  rule,
 }) {
   const id = useId()
   const [flow, setFlow] = useState(IDLE_FLOW)
   const [code, setCode] = useState('')
   const [pending, setPending] = useState(false)
+  const bindFilter = useImeSafeFilter()
+  const existing = rule === 'existing'
+  const localInput = bindFilter((value) => handleEmailChange({ emailLocal: value }), existing ? filterExistingEmailLocal : filterEmailLocal)
+  const domainInput = bindFilter((value) => handleEmailChange({ emailCustomDomain: value }), filterEmailDomain)
 
   const domain = resolveEmailDomain(domainChoice, customDomain)
   const email = joinEmail(local, domain)
   // 지금 이메일에 대한 상태만 쓴다. 다른 이메일에서 남은 안내·오류는 보이지 않는다.
   const current = flow.target === email ? flow : IDLE_FLOW
-  const canSend = !verified && !disabled && !pending && validateEmailParts(local, domain) === ''
+  const canSend = !verified && !disabled && !pending && validateEmailParts(local, domain, rule) === ''
 
   // 이메일 칸(앞부분·도메인)을 고치면 발송·코드·오류·안내를 모두 비운다.
   const handleEmailChange = (patch) => {
@@ -55,6 +66,7 @@ export default function SplitEmailField({
   }
 
   const handleSend = async () => {
+    if (beforeRequest && !beforeRequest()) return
     setPending(true)
     try {
       const { expiresInSeconds } = await requestEmailCode({ ...extraBody, email, purpose })
@@ -73,6 +85,7 @@ export default function SplitEmailField({
   }
 
   const handleVerify = async () => {
+    if (beforeRequest && !beforeRequest()) return
     if (!/^\d{6}$/.test(code)) {
       setFlow({ ...current, status: 'error', message: '6자리 인증코드를 입력해 주세요.' })
       return
@@ -115,18 +128,26 @@ export default function SplitEmailField({
           id={`${id}-local`}
           className="text-input__control signup-form__grow"
           value={local}
-          onChange={(event) => handleEmailChange({ emailLocal: event.target.value })}
+          onChange={(event) => localInput.onChange(event.target.value)}
+          {...localInput.compositionProps}
           placeholder="이메일"
           autoComplete="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          inputMode="email"
           aria-invalid={invalid}
         />
         <span className="signup-form__fixed">@</span>
         {domainChoice === CUSTOM_EMAIL_DOMAIN && (
           <input
-            className="text-input__control signup-form__grow"
+            className="text-input__control signup-form__grow signup-email__custom-domain"
             value={customDomain}
-            onChange={(event) => handleEmailChange({ emailCustomDomain: event.target.value })}
+            onChange={(event) => domainInput.onChange(event.target.value)}
+            {...domainInput.compositionProps}
             placeholder="example.com"
+            autoCapitalize="none"
+            spellCheck={false}
+            inputMode="email"
             aria-label="이메일 도메인 직접 입력"
             aria-invalid={invalid}
           />

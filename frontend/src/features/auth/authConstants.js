@@ -22,11 +22,14 @@ export const EMAIL_PURPOSES = Object.freeze({
   SIGNUP: 'SIGNUP',
   RESET_PASSWORD: 'RESET_PASSWORD',
   CHANGE_EMAIL: 'CHANGE_EMAIL',
+  // FP-258 아이디 찾기(이메일 인증). 가입 여부와 상관없이 코드를 보낸다.
+  FIND_ID: 'FIND_ID',
 })
 
-// 휴대폰 인증을 어디에 쓰는지 서버에 알려 주는 값. 지금은 회원가입만 쓴다(11/18 1차 시연 후속).
+// 휴대폰 인증을 어디에 쓰는지 서버에 알려 주는 값. 회원가입(11/18 1차 시연 후속)과 아이디 찾기(FP-258)가 쓴다.
 export const PHONE_PURPOSES = Object.freeze({
   SIGNUP: 'SIGNUP',
+  FIND_ID: 'FIND_ID',
 })
 
 // 서버가 오류 종류를 알려 줄 때 쓰는 코드(error.data.code).
@@ -41,6 +44,12 @@ export const AUTH_ERROR_CODES = Object.freeze({
   SAME_PASSWORD: 'SAME_PASSWORD',
   // FP-222 MEM-08 새 닉네임이 지금 닉네임과 같음(400).
   SAME_NICKNAME: 'SAME_NICKNAME',
+  // FP-258 로그인 5회 실패 뒤 5분 제한(429).
+  LOGIN_TEMPORARILY_BLOCKED: 'LOGIN_TEMPORARILY_BLOCKED',
+  // FP-258 잠긴 관리자 계정이 맞는 비밀번호로 로그인할 때(423). 관리자는 비밀번호 찾기로 풀 수 없다.
+  ADMIN_ACCOUNT_LOCKED: 'ADMIN_ACCOUNT_LOCKED',
+  // 이메일 인증 토큰이 없거나 맞지 않음(400, 서버 EmailVerificationService.VERIFICATION_REQUIRED).
+  EMAIL_VERIFICATION_REQUIRED: 'EMAIL_VERIFICATION_REQUIRED',
 })
 
 // FP-222 N-04-3 새 닉네임이 지금 닉네임과 같을 때 문구. 서버 MyPageService.SAME_NICKNAME_MESSAGE와 같다.
@@ -51,7 +60,33 @@ export const SAME_PASSWORD_MESSAGE = '지금 쓰는 비밀번호와 같습니다
 
 // N-01 로그인 실패 문구. 아이디와 비밀번호 중 무엇이 틀렸는지 알려 주지 않는다. 탈퇴한 옛 아이디로 로그인할 때도 이 문구를 쓴다(FP-93 작업 지시서 문구).
 export const LOGIN_FAILED_MESSAGE = '아이디 또는 비밀번호가 맞지 않습니다.'
-export const ACCOUNT_LOCKED_MESSAGE = '잠긴 계정입니다. 관리자에게 문의해 주세요.'
+// FP-258 잠금은 비밀번호 찾기(재설정)로 풀린다. 서버 AuthErrors.ACCOUNT_LOCKED_MESSAGE와 같다.
+export const ACCOUNT_LOCKED_MESSAGE = '잠긴 계정입니다. 비밀번호 찾기에서 이메일 인증 후 비밀번호를 재설정하면 풀립니다.'
+// FP-258 N-01-3 잠긴 관리자 안내. 서버 AuthErrors.ADMIN_ACCOUNT_LOCKED_MESSAGE와 같다.
+export const ADMIN_ACCOUNT_LOCKED_MESSAGE = '잠긴 관리자 계정입니다. 다른 관리자에게 잠금 해제를 요청해 주세요.'
+
+// FP-258 로그인 단계적 제한 — 5회 실패하면 5분 동안 막고(429), 누적 10회면 잠근다(423). 서버 AuthService 상수와 같다(mock이 쓴다).
+export const LOGIN_TEMP_BLOCK_FAILURES = 5
+export const LOGIN_TEMP_BLOCK_MINUTES = 5
+export const LOGIN_MAX_FAILURES = 10
+
+// FP-258 5분 제한 문구. 서버 AuthErrors.loginTemporarilyBlocked와 같다.
+export function loginTemporarilyBlockedMessage(minutes) {
+  return `로그인 시도가 너무 많습니다. ${minutes}분 뒤에 다시 시도해 주세요.`
+}
+
+// FP-258 N-03-1 아이디 찾기 방법. 서버 AuthService.FIND_ID_PHONE·FIND_ID_EMAIL과 같다.
+export const FIND_ID_METHODS = Object.freeze({
+  PHONE: 'PHONE',
+  EMAIL: 'EMAIL',
+})
 
 // N-02 필수 동의 문구.
 export const CREDIT_INFO_AGREEMENT_LABEL = '(필수) 개인신용정보 수집·이용에 동의합니다.'
+
+// FP-258 N-02-2 가입 동의 항목(decisions.md 1-2 '가입 동의': 필수 2 + 선택 1). key는 가입 요청(AUTH-06) 필드 이름과 같다.
+export const SIGNUP_CONSENT_ITEMS = Object.freeze([
+  { key: 'agreeTerms', label: '(필수) 서비스 이용약관에 동의합니다.', required: true },
+  { key: 'agreePrivacy', label: '(필수) 개인정보 수집·이용에 동의합니다.', required: true },
+  { key: 'agreeMarketing', label: '(선택) 점수 변동 알림·혜택 안내를 받습니다.', required: false },
+])

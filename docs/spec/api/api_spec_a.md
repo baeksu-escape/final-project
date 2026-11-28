@@ -3,7 +3,12 @@
 > A팀(우찬·경환) API의 요청·응답 상세다. 관리: A팀. 작성 규칙은 [README](README.md) 3장, 전체 목록과 ID는 [API 정의서](api_definition.md)에 있다.
 >
 > - **원본:** 우찬 님 「A팀 API 명세 — 반영 요청(11/16)」. develop `bfe6b94`(PR #50·#52·#53 병합 후)의 실제 Spring Controller·DTO에서 뽑은 내용이다. 🆕 11/18 이 파일로 옮겼다(그 전에는 정의서에 요약만 있었다). 그 뒤 코드가 바뀌면 A팀이 이 파일을 고친다.
-> - 🆕 최근 변경 (11/23, FP-222): MEM-08 닉네임 변경 추가(`SAME_NICKNAME` 추가), MEM-04가 400 `SAME_PASSWORD`를 실제로 돌려줌
+> - 🆕 최근 변경 (11/27, FP-258 PR #173 검수): AUTH-06 필수 동의 `agreeTerms`·`agreePrivacy` 각각 검사(`agreeCreditInfo` 삭제), AUTH-06·10, MEM-04 64자 초과 문구, AUTH-01·05 10회째 잠기는 관리자·AUTH-11 잠긴 관리자 423 `ADMIN_ACCOUNT_LOCKED`, AUTH-01·05 IP 실패 제한을 요청 전에 셈, AUTH-07·14 하루 상한을 동시 요청에도 지킴
+> - 🆕 최근 변경 (11/27, FP-258 13차-1): 같은 IP 반복 시도 제한 429 `TOO_MANY_REQUESTS`(AUTH-01·05·07·13·14·16), 인증코드 하루 10회 상한 429 `CODE_SEND_DAILY_LIMIT`(AUTH-07·14), AUTH-06 필수 동의 2개 따로 받기(`agreeTerms`·`agreePrivacy`), 새 비밀번호 ASCII 출력 문자만(AUTH-06·10, MEM-04), AUTH-01·05 실패 횟수를 계정 행 잠금으로 셈
+> - 🆕 최근 변경 (11/27, FP-258 12차): AUTH-16 아이디 중복 확인 추가(가입 4단계 [중복 확인], AUTH-13과 같은 모양)
+> - 🆕 최근 변경 (11/27, FP-258 PR #164 검수): AUTH-01·05 잠긴 관리자 423 `ADMIN_ACCOUNT_LOCKED`, AUTH-07 목적별 이메일 형식(가입·이메일 변경만 새 규칙), AUTH-14·15 `purpose` 설명 정정
+> - 🆕 최근 변경 (11/26, FP-258): AUTH-01 단계적 로그인 제한(429 `LOGIN_TEMPORARILY_BLOCKED`, 10회 잠금), AUTH-09 휴대폰·이메일 인증 필수와 `loginId` 응답, AUTH-08·10 `name` 추가, 인증 목적 `FIND_ID`(DDL C17). 2차: 이메일 규칙 통일·소문자 저장(AUTH-06·07·08·09·10, MEM-03), AUTH-08(재설정)·09·10 이름 형식 400 `name` 칸, AUTH-01 아이디 소문자 조회
+> - 최근 변경 (11/23, FP-222): MEM-08 닉네임 변경 추가(`SAME_NICKNAME` 추가), MEM-04가 400 `SAME_PASSWORD`를 실제로 돌려줌
 > - 최근 변경 (11/19, FP-227): 자산 4종 저장(DDL C13). INP-02 요청 본문 모양은 바뀌지 않고, INP-01이 저장된 4종을 그대로 돌려준다
 > - 최근 변경 (11/19, FP-227): MEM-05 저장 전 직군 변경 허용(`JOB_TYPE_LOCKED` 추가)
 > - 🆕 최근 변경 (11/19, FP-90): 7장 대출 상품 LOAN-01~05 추가(경환), 5장 오류 code에 `PRODUCT_NOT_FOUND`
@@ -34,21 +39,22 @@
 
 | ID | 메서드 · 경로 | 요청 | 응답 | 인증 | 상태 |
 |---|---|---|---|---|---|
-| AUTH-01 | `POST /api/auth/login` | `{ loginId, password }` | 일반: `{ accessToken, user }`<br>관리자: `{ twoFactorRequired: true, challengeToken, maskedEmail }` | 없음 | ✅ (관리자 응답 추가) |
+| AUTH-01 | `POST /api/auth/login` | `{ loginId, password }` | 일반: `{ accessToken, user }`<br>관리자: `{ twoFactorRequired: true, challengeToken, maskedEmail }` | 없음 | ✅ (관리자 응답 추가) 🆕 11/26 FP-258 틀리면 401, 5회째 실패하면 5분 동안 비밀번호와 상관없이 429 `LOGIN_TEMPORARILY_BLOCKED`(남은 분 문구, 제한 중 횟수 그대로), 누적 10회째 잠금 423. 잠긴 계정은 틀리면 401·맞으면 423 그대로. 🆕 11/27 잠긴 관리자가 맞으면 423 `ADMIN_ACCOUNT_LOCKED`(비밀번호 찾기 안내 없음) |
 | AUTH-02 | `POST /api/auth/logout` | — | `{}` | ACCESS | ✅ |
 | AUTH-03 | `GET /api/auth/me` | — | `{ user }` | ACCESS | ✅ |
 | AUTH-04 | `POST /api/auth/social/exchange` | `{ code }` | `{ result: LINKED \| LINK_REQUIRED, accessToken, user, linkKey, provider, profile, devMode }` | 없음 | ✅ |
 | AUTH-05 | `POST /api/auth/social/link` | `{ linkKey, loginId, password }` | `{ accessToken, user }` | 없음 | ✅ |
-| AUTH-06 | `POST /api/auth/signup` | `{ loginId, name, nickname, phone, email, password, birthYear, ageGroup, agreeCreditInfo, agreeMarketing, emailVerificationToken, socialLinkKey, phoneVerificationToken }` 🆕 11/18 | `{ userId }` | 없음 | ✅ (🆕 11/18 `phoneVerificationToken` 필수, 아래 설명) |
-| AUTH-07 | `POST /api/auth/email/send` | `{ email, purpose, loginId }` | `{ expiresInSeconds }` | 없음 | ✅ |
-| AUTH-08 | `POST /api/auth/email/verify` | `{ email, code, purpose, loginId }` | `{ verificationToken }` | 없음 | ✅ |
-| AUTH-09 | `POST /api/auth/find-id` | `{ name, phone }` | `{ maskedLoginId }` | 없음 | ✅ (관리자 계정은 찾지 않음) |
-| AUTH-10 | `POST /api/auth/password/reset` | `{ loginId, email, emailVerificationToken, newPassword }` | `{}` | 없음 | ✅ (관리자 아이디는 "없는 계정"과 같은 404) |
+| AUTH-06 | `POST /api/auth/signup` | `{ loginId, name, nickname, phone, email, password, birthYear, ageGroup, agreeTerms, agreePrivacy, agreeMarketing, emailVerificationToken, socialLinkKey, phoneVerificationToken }` 🆕 11/27 | `{ userId }` | 없음 | ✅ (🆕 11/18 `phoneVerificationToken` 필수, 아래 설명) |
+| AUTH-07 | `POST /api/auth/email/send` | `{ email, purpose, loginId }` | `{ expiresInSeconds }` | 없음 | ✅ 🆕 11/26 `purpose`에 `FIND_ID`(가입 여부와 상관없이 보냄). 🆕 11/27 이메일 형식은 `SIGNUP`·`CHANGE_EMAIL`만 새 규칙, `FIND_ID`·`RESET_PASSWORD`는 기본 형식(@·점·100자)만 본다(기존 이메일 허용) |
+| AUTH-08 | `POST /api/auth/email/verify` | `{ email, code, purpose, loginId, name }` 🆕 11/26 | `{ verificationToken }` | 없음 | ✅ 🆕 11/26 `RESET_PASSWORD`는 아이디·이메일·이름이 같은 계정만(아니면 404), `FIND_ID`는 계정을 보지 않음. 🆕 11/26 2차 `RESET_PASSWORD`는 이름 형식(가입과 같은 규칙)을 코드보다 먼저 보고 틀리면 400 `INVALID_INPUT`(`name` 칸) |
+| AUTH-09 | `POST /api/auth/find-id` | `{ method, name, phone, email, verificationToken }` 🆕 11/26 | `{ maskedLoginId, loginId }` 🆕 11/26 | 없음 | ✅ (관리자 계정은 찾지 않음) 🆕 11/26 FP-258 `method` `PHONE`이면 `phone` + AUTH-15 토큰, `EMAIL`이면 `email` + AUTH-08 토큰(둘 다 목적 `FIND_ID`). 방법이 틀리면 400 `INVALID_INPUT`(`method` 칸), 토큰이 없으면 가입과 같은 400(휴대폰 `phone` 칸·이메일 `EMAIL_VERIFICATION_REQUIRED`). 이름이 같은 일반 회원이 없으면 404(토큰은 쓰지 않은 채 남음). 🆕 11/26 2차 이름 형식이 틀리면 맨 먼저 400 `INVALID_INPUT`(`name` 칸) |
+| AUTH-10 | `POST /api/auth/password/reset` | `{ loginId, name, email, emailVerificationToken, newPassword }` 🆕 11/26 | `{}` | 없음 | ✅ (관리자 아이디는 "없는 계정"과 같은 404) 🆕 11/26 아이디·이메일·이름이 같은 계정만, 아니면 같은 404. 2차 이름 형식이 틀리면 맨 먼저 400 `INVALID_INPUT`(`name` 칸) |
 | AUTH-11 | `POST /api/auth/admin/verify-code` | `{ challengeToken, code }` | 통과: `{ token, user, passwordChangeRequired: false }`<br>임시 비밀번호: `{ passwordChangeRequired: true, passwordSetupToken }` | 없음(challengeToken) | ✅ |
 | AUTH-12 🟡 | `POST /api/auth/admin/password-setup` | `{ passwordSetupToken, newPassword }` | `{ token, user }` | 없음(setup 토큰) | ✅ |
 | AUTH-13 | `POST /api/auth/nickname/check` | `{ nickname }` | `{ available }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) |
-| AUTH-14 | `POST /api/auth/phone/send` | `{ phone, purpose }` | `{ expiresInSeconds }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) |
-| AUTH-15 | `POST /api/auth/phone/verify` | `{ phone, code, purpose }` | `{ verificationToken }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) |
+| AUTH-14 | `POST /api/auth/phone/send` | `{ phone, purpose }` | `{ expiresInSeconds }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) 🆕 11/26 `purpose`는 `SIGNUP`·`FIND_ID` |
+| AUTH-15 | `POST /api/auth/phone/verify` | `{ phone, code, purpose }` | `{ verificationToken }` | 없음 | ✅ (FP-219, PR #89 · ID는 정의서에서 확정 🆕 11/19) 🆕 11/26 `FIND_ID` 토큰은 AUTH-09에 넣음 |
+| AUTH-16 🆕 11/27 | `POST /api/auth/login-id/check` | `{ loginId }` | `{ available }` | 없음 | ✅ (FP-258 12차, 🆕 11/27 13차-1 정의서 행 추가) |
 
 - `user` = `{ userId, name, role, jobType, hasScore }`
 - AUTH-11·12의 토큰 필드 이름은 `token`이다(AUTH-01은 `accessToken`). 화면은 둘 다 받는다.
@@ -59,8 +65,23 @@
   - `phone`: 필수. 비면 `휴대폰 번호를 입력해 주세요.`, 형식이 틀리면 형식 오류 문구가 온다. `phoneVerificationToken`이 없거나 다른 번호·다른 목적·이메일용 토큰이거나 이미 쓴 토큰이면 `phone` 칸 `휴대폰 인증을 완료해 주세요.`
   - `birthYear`: 화면에서 고른 생일의 연도다. 생일(월·일)은 보내지도 저장하지도 않는다.
 - 🆕 11/18 **AUTH-13 닉네임 중복 확인**: 닉네임을 주소에 남기지 않으려고 POST로 받는다. 형식이 틀리면 400 `INVALID_INPUT`(`nickname` 칸). 결과는 안내용이고, 가입 때 서버가 다시 막는다(409 `DUPLICATE_NICKNAME`).
+- 🆕 11/27 **AUTH-16 아이디 중복 확인**(FP-258): AUTH-13과 같은 모양이고, 아이디를 주소에 남기지 않으려고 POST로 받는다.
+  - 형식은 AUTH-06과 같다(영문 소문자로 시작하는 4~20자 영문 소문자·숫자). 비거나 틀리면 400 `INVALID_INPUT`(`loginId` 칸, 가입과 같은 문구)이고 DB는 보지 않는다.
+  - 중복 기준은 가입 중복 검사와 같다(`countByLoginId`, 받은 값 그대로 비교). 탈퇴 회원 아이디는 표시값으로 덮여 있어 잡히지 않는다.
+  - 결과는 안내용이고, 가입 때 서버가 다시 막는다(409 `DUPLICATE_LOGIN_ID`). 🆕 11/27 13차-1 같은 IP는 AUTH-13과 합쳐 1분 30회까지(넘으면 429 `TOO_MANY_REQUESTS`).
+- 🆕 11/27 **FP-258 13차-1 인증 보안**(멘토링 반영, DB 변경 없음)
+  - **같은 IP 반복 시도 제한**(서버 메모리 `ClientRateLimiter`, 서버를 다시 켜면 초기화, 서버가 여러 대면 대마다 따로 셈): AUTH-01·05 실패(401)는 10분 20회, AUTH-13·16은 1분 30회, AUTH-07·14는 1시간 20회. 넘으면 429 `TOO_MANY_REQUESTS`, 문구는 "로그인 시도가 너무 많습니다. / 확인 요청이 너무 많습니다. / 인증코드 요청이 너무 많습니다." + " N분 뒤에 다시 시도해 주세요."(N은 남은 분 올림). IP는 `getRemoteAddr()`로 읽으므로 프록시 뒤에서는 서버의 forward-headers 설정이 필요하다.
+  - **인증코드 하루 상한**(AUTH-07·14): 같은 이메일·휴대폰으로 오늘 0시부터 10회 보냈으면 429 `CODE_SEND_DAILY_LIMIT`("오늘 이 이메일(번호)로 받을 수 있는 인증코드 10회를 모두 받았습니다. 내일 다시 시도해 주세요."). `VERIFICATION_CODE`의 발송 기록으로 세고, 목적(가입·찾기·재설정·이메일 변경)을 가리지 않는다. 관리자 로그인 번호는 세지 않는다.
+  - **AUTH-06 동의**: `agreeTerms`(서비스 이용약관)·`agreePrivacy`(개인정보 수집·이용)는 필수, `agreeMarketing`(점수 변동 알림·혜택 안내)은 선택이다. 필수가 빠지면 400 `INVALID_INPUT`(그 칸). `USER_CONSENT`에는 늘 3행을 남긴다(필수 2개는 Y, 선택은 체크하면 Y, 안 하면 `AGREED_YN='N'`·`AGREED_AT` 없음 — develop·시드와 같은 모양). 🆕 11/27 PR #173 필수 2개는 각각 검사한다(빠진 칸마다 오류). 예전 `agreeCreditInfo`는 읽지 않으므로 그것만 보내면 `agreeTerms`·`agreePrivacy` 두 칸 모두 400이다.
+  - **새 비밀번호**(AUTH-06·10, AUTH-12, MEM-04): 영문·숫자를 섞은 8~64자이고 ASCII 출력 문자(영문·숫자·키보드 기호·공백)만 쓸 수 있다. 틀리면 지금처럼 400(`password` 또는 `newPassword` 칸). 🆕 11/27 PR #173 64자를 넘으면 AUTH-06·10, MEM-04는 "비밀번호는 64자 이하로 입력해 주세요."(그 밖의 위반은 지금 문구). 로그인·현재 비밀번호 확인·탈퇴는 검사하지 않는다.
+  - **AUTH-01·05 실패 횟수**: 같은 계정의 로그인은 계정 행을 잠근(`SELECT … FOR UPDATE`) 뒤 다시 읽은 횟수로 판단해, 동시에 보내도 덜 오르지 않는다(5회째 5분 제한·10회 잠금 규칙은 그대로).
+- 🆕 11/26 **FP-258 2차 이메일 규칙**(AUTH-06·07·08·09·10, MEM-03 공통): 앞뒤 공백을 빼고 소문자로 바꾼 뒤 판정·저장한다(`EMAIL_ENC`도 소문자).
+  - 앞부분은 영문 소문자·숫자·`.`·`_`·`-`(64자)이고, 처음·끝은 영문·숫자, 점 연속은 안 된다.
+  - 도메인은 점으로 나눈 덩어리마다 영문·숫자로 시작·끝(가운데 `-` 가능)하고, 마지막은 영문 2자 이상이다. 전체는 100자 이하.
+  - 틀리면 지금처럼 400이다.
+  - AUTH-01·08·10의 `loginId`는 앞뒤 공백을 빼고 소문자로 바꿔 조회한다.
 - 🆕 11/18 **AUTH-14·15 휴대폰 인증번호**: 이메일 인증(AUTH-07·08)과 같은 모양이다.
-  - `purpose`는 `SIGNUP`만 받는다(다르면 400 `INVALID_INPUT`, `purpose` 칸). 번호 형식이 틀리면 400 `INVALID_INPUT`(`phone` 칸).
+  - `purpose`는 `SIGNUP`·`FIND_ID`를 받는다(🆕 11/27 정정, 다르면 400 `INVALID_INPUT`, `purpose` 칸). 번호 형식이 틀리면 400 `INVALID_INPUT`(`phone` 칸).
   - 6자리 번호, 유효 300초, 5회 틀리면 그 번호는 쓸 수 없다. 틀림·만료·5회 초과는 모두 400 `INVALID_VERIFICATION_CODE`(`인증번호가 올바르지 않거나 만료되었습니다.`).
   - 받은 `verificationToken`(10분)을 AUTH-06의 `phoneVerificationToken`에 넣는다. 번호는 HMAC과 코드 해시만 저장한다(`VERIFICATION_CODE.CHANNEL_CODE = 'PHONE'`).
   - 발송 구현은 설정 `avenue.auth.phone.mode`로 바뀐다. 기본 `LOG`는 서버 로그에 개발용 번호를 남기고(번호는 `010-****-5678`처럼 가림), `FIXED`는 `avenue.auth.phone.fixed-code`를 쓴다. 실제 문자 발송은 아직 없다.
@@ -71,7 +92,7 @@
 |---|---|---|---|---|
 | MEM-01 | `GET /api/members/me/profile` | — | `{ profile: { loginId, nickname, name, phone, email, joinedAt, jobType } }` (마스킹) | ✅ |
 | MEM-02 | `POST /api/members/me/profile/unmask` | `{ password }` | `{ profile: { name, phone, email } }` | ✅ |
-| MEM-03 | `PUT /api/members/me/email` | `{ email, emailVerificationToken }` | `{}` | ✅ |
+| MEM-03 | `PUT /api/members/me/email` | `{ email, emailVerificationToken }` | `{}` | ✅ 🆕 11/26 FP-258 2차 이메일은 앞뒤 공백을 빼고 소문자로 바꿔 판정·저장(규칙은 AUTH-06과 같음) |
 | MEM-04 | `PUT /api/members/me/password` | `{ currentPassword, newPassword }` | `{}` | ✅ (ROLE_USER 전용) |
 | MEM-05 | `PATCH /api/members/me/job-type` | `{ jobType }` | `{ user }` | ✅ 🆕 11/19 FP-227 입력 저장 전에는 다시 고를 수 있다. 비어 있으면 저장 · 같은 직군이면 바꾸지 않고 200 · 다른 직군이면 저장한 데이터 입력(`USER_ASSET_SNAPSHOT`, 기준월 무관)도 평가(`ASSESSMENT`)도 없을 때만 바꾼다. 하나라도 있으면 409 `JOB_TYPE_LOCKED`. 동시에 바뀌어 반영하지 못하면 409 `JOB_TYPE_ALREADY_SELECTED` |
 | MEM-06 | `GET /api/members/me/diagnoses` | — | [B팀 명세서](api_spec_b.md) 3-4 | ↗ B팀(범영) 구현 완료(FP-142), A팀 화면 연결됨 🆕 11/18 |
@@ -172,8 +193,12 @@
 | 409 | `CREDIT_PROFILE_IMPORTED` | 같은 기준일에 불러온 신용 정보가 있어 직접 입력 저장 불가 |
 | 409 | `SOCIAL_ALREADY_LINKED` | 이미 연결된 간편 로그인 |
 | 409 | `CANNOT_CHANGE_SELF`, `ACCOUNT_WITHDRAWN`, `ADMIN_EMAIL_UNAVAILABLE` | 본인 잠금, 탈퇴 계정 잠금, 관리자 업무 이메일 복호화 불가 |
-| 423 | `ACCOUNT_LOCKED` | 잠긴 계정 로그인 시도 |
+| 423 | `ACCOUNT_LOCKED` | 잠긴 계정 로그인 시도(누적 10회 실패 자동 잠금 포함) 🆕 11/26 — "잠긴 계정입니다. 비밀번호 찾기에서 이메일 인증 후 비밀번호를 재설정하면 풀립니다." |
+| 423 | `ADMIN_ACCOUNT_LOCKED` 🆕 11/27 | 잠긴 관리자 계정이 맞는 비밀번호로 로그인(AUTH-01·05), 🆕 PR #173 10회째 실패로 잠기는 관리자(AUTH-01·05)·2단계 인증 중 잠긴 관리자(AUTH-11) — "잠긴 관리자 계정입니다. 다른 관리자에게 잠금 해제를 요청해 주세요." |
 | 429 | `CODE_RESEND_TOO_SOON` | 인증번호 1분 안에 재요청 |
+| 429 | `LOGIN_TEMPORARILY_BLOCKED` 🆕 11/26 | 로그인 5회 실패 뒤 5분 제한(AUTH-01·05) — "로그인 시도가 너무 많습니다. N분 뒤에 다시 시도해 주세요." |
+| 429 | `TOO_MANY_REQUESTS` 🆕 11/27 | 같은 IP 반복 시도 제한(AUTH-01·05 실패, AUTH-13·16, AUTH-07·14) — "… 요청이 너무 많습니다. N분 뒤에 다시 시도해 주세요." |
+| 429 | `CODE_SEND_DAILY_LIMIT` 🆕 11/27 | 같은 이메일·휴대폰 인증코드 하루 10회 초과(AUTH-07·14) |
 | 503 | `ALT_DATA_SOURCE_UNAVAILABLE` | 기관 응답 파일 폴더 없음 |
 
 ## 6. 2차로 넘긴 것

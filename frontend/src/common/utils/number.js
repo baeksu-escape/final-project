@@ -12,3 +12,15 @@ export function parseDigits(text) {
   const digits = String(text ?? '').replace(/\D/g, '').slice(0, 15)
   return digits === '' ? null : Number(digits)
 }
+
+// 금액(원)을 한글 단위로 읽기 쉽게 바꾼다. 예) 12000000 → '1,200만 원', 150000000 → '1억 5,000만 원', 12345 → '1만 2,345원'. 0·빈 값이면 ''.
+export function toKoreanWon(value) {
+  const number = Math.floor(Number(value))
+  if (!Number.isFinite(number) || number <= 0) return ''
+  const eok = Math.floor(number / 1e8)
+  const man = Math.floor((number % 1e8) / 1e4)
+  const won = number % 1e4
+  const parts = [eok && `${eok.toLocaleString('ko-KR')}억`, man && `${man.toLocaleString('ko-KR')}만`].filter(Boolean)
+  if (won) return `${[...parts, won.toLocaleString('ko-KR')].join(' ')}원`
+  return `${parts.join(' ')} 원`
+}

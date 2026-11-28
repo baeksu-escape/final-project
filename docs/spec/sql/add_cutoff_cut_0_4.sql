@@ -1,0 +1,70 @@
+-- 등급 구간 버전 CUT-0.4(DRAFT)와 구간 3행을 이미 만들어진 DB에 추가한다 (FP-285, 피처 정의서 10장 C37·C40, decisions.md D-01).
+-- 모델 0.3(LGBM-BASE-0.3)의 점수 분포로 다시 계산한 25/50/25 경계다: CAUTION 0부터 644, STANDARD 645부터 711, GOOD 712부터 1000
+-- (데이터 v3.7.0 기존 집단 VALID 20,903행의 대안 모델 점수 p25/p75 = 645/712). CUT-0.1~0.3은 고치지 않는다.
+-- 새로 DDL을 실행하는 DB는 avenue_ddl.sql 기준 데이터에 이미 들어 있으므로 이 파일이 필요 없다.
+-- DRAFT라서 서비스는 바뀌지 않는다: ACTIVE는 계속 CUT-0.3이고, CUT-0.4를 ACTIVE로 옮기는 일은 activate_cutoff_cut_0_4.sql이 따로 한다.
+-- ⚠️ FastAPI가 모델 0.3 묶음을 불러오면 CUT-0.4로 저장하므로, 서버 PC의 모델 파일을 0.3으로 바꾸기 전에 이 파일을 먼저 실행한다(없으면 점수 저장이 FK 오류).
+-- 이미 같은 버전·구간이 있고 값이 같으면 넣지 않으므로 다시 실행해도 된다. 상태가 DRAFT가 아니거나 경계·표시 순서가 다르면 아무것도 바꾸지 않고 오류(-20171~-20173)로 멈춘다. 일부 구간만 있으면 있는 구간이 같은 값일 때만 빠진 구간을 채운다. 오류가 나면 두 단계가 함께 취소된다.
+-- SQL*Plus/SQLcl/SQL Developer에서 대상 스키마 소유자로 실행한다. 공용 DB는 PR 작성자가 병합 후 실행하고 DB 변경 채널에 남긴다(sql README 「공용 DB 적용 규칙」).
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
+WHENEVER OSERROR EXIT FAILURE ROLLBACK
+
+-- 이미 있는 CUT-0.4 행이 이 파일의 값과 다르면 아무것도 바꾸기 전에 멈춘다.
+-- -20171 상태가 DRAFT가 아님 / -20172 경계·표시 순서가 다름 / -20173 CAUTION·STANDARD·GOOD 외의 등급 코드가 있음. 없는 행은 아래 MERGE가 채운다.
+DECLARE
+  v_status SCORE_CUTOFF_VERSION.STATUS_CODE%TYPE;
+  v_extra  NUMBER;
+BEGIN
+  BEGIN
+    SELECT STATUS_CODE INTO v_status FROM SCORE_CUTOFF_VERSION WHERE CUTOFF_VERSION = 'CUT-0.4';
+    IF v_status <> 'DRAFT' THEN
+      RAISE_APPLICATION_ERROR(-20171, 'CUT-0.4의 상태가 DRAFT가 아닙니다(' || v_status || '). 값을 확인한 뒤 팀과 정하세요.');
+    END IF;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN NULL;
+  END;
+  FOR r IN (SELECT b.GRADE_BAND_CODE, b.MIN_SCORE, b.MAX_SCORE, b.DISPLAY_ORDER
+              FROM SCORE_GRADE_BAND b
+              JOIN (
+            SELECT 'CUT-0.4' AS CUTOFF_VERSION, 'CAUTION' AS GRADE_BAND_CODE, 0 AS MIN_SCORE, 644 AS MAX_SCORE, 1 AS DISPLAY_ORDER FROM DUAL
+            UNION ALL SELECT 'CUT-0.4', 'STANDARD', 645, 711, 2 FROM DUAL
+            UNION ALL SELECT 'CUT-0.4', 'GOOD', 712, 1000, 3 FROM DUAL
+                   ) e ON e.CUTOFF_VERSION = b.CUTOFF_VERSION AND e.GRADE_BAND_CODE = b.GRADE_BAND_CODE
+             WHERE b.MIN_SCORE <> e.MIN_SCORE OR b.MAX_SCORE <> e.MAX_SCORE OR b.DISPLAY_ORDER <> e.DISPLAY_ORDER
+             ORDER BY b.DISPLAY_ORDER) LOOP
+    RAISE_APPLICATION_ERROR(-20172, 'CUT-0.4 ' || r.GRADE_BAND_CODE || ' 구간이 다릅니다(DB: ' || r.MIN_SCORE || '~' || r.MAX_SCORE || ', 순서 ' || r.DISPLAY_ORDER || ').');
+  END LOOP;
+  SELECT COUNT(*) INTO v_extra FROM SCORE_GRADE_BAND
+   WHERE CUTOFF_VERSION = 'CUT-0.4' AND GRADE_BAND_CODE NOT IN ('CAUTION', 'STANDARD', 'GOOD');
+  IF v_extra > 0 THEN
+    RAISE_APPLICATION_ERROR(-20173, 'CUT-0.4에 CAUTION·STANDARD·GOOD 외의 등급 코드가 ' || v_extra || '개 있습니다.');
+  END IF;
+END;
+/
+
+MERGE INTO SCORE_CUTOFF_VERSION t
+USING (SELECT 'CUT-0.4' AS CUTOFF_VERSION,
+              'DRAFT' AS STATUS_CODE,
+              '25/50/25 임시 결정 (D-01, 11/27). 모델 0.3 대안 모델 VALID 점수 p25/p75=645/712. 모델 0.3 전환과 함께 ACTIVE' AS NOTE
+         FROM DUAL) s
+   ON (t.CUTOFF_VERSION = s.CUTOFF_VERSION)
+ WHEN NOT MATCHED THEN
+      INSERT (CUTOFF_VERSION, STATUS_CODE, NOTE, ACTIVATED_AT)
+      VALUES (s.CUTOFF_VERSION, s.STATUS_CODE, s.NOTE, NULL);
+
+MERGE INTO SCORE_GRADE_BAND t
+USING (SELECT 'CUT-0.4' AS CUTOFF_VERSION, 'CAUTION' AS GRADE_BAND_CODE, 0 AS MIN_SCORE, 644 AS MAX_SCORE, 1 AS DISPLAY_ORDER FROM DUAL
+        UNION ALL
+       SELECT 'CUT-0.4', 'STANDARD', 645, 711, 2 FROM DUAL
+        UNION ALL
+       SELECT 'CUT-0.4', 'GOOD', 712, 1000, 3 FROM DUAL) s
+   ON (t.CUTOFF_VERSION = s.CUTOFF_VERSION AND t.GRADE_BAND_CODE = s.GRADE_BAND_CODE)
+ WHEN NOT MATCHED THEN
+      INSERT (CUTOFF_VERSION, GRADE_BAND_CODE, MIN_SCORE, MAX_SCORE, DISPLAY_ORDER)
+      VALUES (s.CUTOFF_VERSION, s.GRADE_BAND_CODE, s.MIN_SCORE, s.MAX_SCORE, s.DISPLAY_ORDER);
+
+COMMIT;
+
+-- 확인: CUT-0.3 ACTIVE 1행(그대로), CUT-0.4 DRAFT 1행, CUT-0.4 구간 3행(644/645, 711/712 경계)이 나와야 한다.
+SELECT CUTOFF_VERSION, STATUS_CODE FROM SCORE_CUTOFF_VERSION ORDER BY CUTOFF_VERSION;
+SELECT CUTOFF_VERSION, GRADE_BAND_CODE, MIN_SCORE, MAX_SCORE FROM SCORE_GRADE_BAND ORDER BY CUTOFF_VERSION, DISPLAY_ORDER;

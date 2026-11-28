@@ -390,7 +390,7 @@
 
 ## N-17 시나리오 테스트 (FP-167, 담당 광희) 🆕 11/20
 
-로그인 회원의 저장 데이터에 금리·소득·지출 변화를 넣어 **상환 여력**(월 잉여, 상환 부담률, 월 이자 변화, 버틸 수 있는 개월 수)을 다시 계산한다. **점수는 구하지 않고**(점수 예측은 N-21 DIAG-09) **저장하지 않는다**.
+로그인 회원의 저장 데이터에 금리·소득·지출 변화를 넣어 **상환 여력**(월 여유 자금, 상환 부담률, 월 이자 변화, 버틸 수 있는 개월 수)을 다시 계산한다. **점수는 구하지 않고**(점수 예측은 N-21 DIAG-09) **저장하지 않는다**.
 
 - 정의서의 옛 경로 `POST /api/diagnosis/scenario/recalculate`(DIAG-04, 프론트 mock만 있음)를 아래 두 경로로 대신한다. 기준값을 서버가 저장 데이터에서 읽으므로 요청에 기준값을 보내지 않는다.
 - 로그인 확인은 보안 설정이 한다: 토큰 없음 `401 UNAUTHORIZED`, 관리자 계정 `403 FORBIDDEN`(`/api/members/me/**`는 `ROLE_USER` 전용).
@@ -402,7 +402,8 @@
 | 월 소득 | `USER_INCOME_MONTH` 최근 12개월 평균(급여소득자는 월급 그대로). DIAG-08-1과 같은 함수 | 소득이 하나도 없으면 404 |
 | 월 지출 | `USER_EXPENSE_ITEM` 기준월 합계 | 0 |
 | 월 상환액 | `USER_LOAN` 기준월 월 원리금 합계 | 0 |
-| 변동금리 대출 | `USER_LOAN` 기준월 `RATE_TYPE_CODE = 'VARIABLE'` 행의 잔액·연 금리·월 원리금(고정·`UNKNOWN` 제외). 기준값 응답에는 잔액 합계만 준다 | 잔액 0(행 없음) |
+| 기준 응답의 월 상환액 | `loanItems[].monthlyPaymentAmount` 합계와 같다. 재계산 응답의 현재 월 상환액도 같은 목록의 합계다 | 대출이 없으면 0 |
+| 변동금리 대출 | `loanItems` 중 `rateTypeCode = 'VARIABLE'`인 항목의 잔액·연 금리·월 원리금만 계산에 사용한다(고정·`UNKNOWN` 제외). 기준값 응답에는 잔액 합계를 준다 | 잔액 0(행 없음) |
 | 총자산 | `USER_ASSET_SNAPSHOT.TOTAL_ASSET_AMT` 기준월 | `null`(미입력, 0으로 바꾸지 않음) |
 | 현재 정책금리 | `FACT_POLICY_RATE`의 '한국은행 기준금리' 중 기준일이 가장 늦은 행(FP-153 적재 SQL) | `null` |
 
@@ -417,6 +418,21 @@
   | `totalAssetAmount` | 정수(원) 또는 `null` | 총자산. 미입력이면 `null`(버틸 개월 수를 구하지 않음) |
   | `policyRate` | 객체 또는 `null` | `{ baseDate: "2026-10-31", ratePct: 3.000 }` 출발 금리(연 %) |
   | `assumptions` | 문자열 배열 | 화면에 그대로 보여 줄 계산 가정 4개 |
+  | `loanItems` | 배열 | 기준월 `LOAN_ID` 순 대출 항목: `loanId`, `loanTypeName`, `annualRatePct`(연 %, 예: 8.9), `rateTypeCode`(`FIXED`·`VARIABLE`·`UNKNOWN`), `monthlyPaymentAmount`(원), `balanceAmount`(잔액 원). 대출이 없으면 빈 배열 |
+
+  `monthlyPaymentAmount`는 `loanItems[].monthlyPaymentAmount`의 합이다.
+  변동금리 대출은 `loanItems` 중 `rateTypeCode = 'VARIABLE'`인 항목만 계산에 사용한다.
+
+  ```json
+  { "monthlyIncomeAmount": 2099498, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 350000,
+    "variableLoanBalanceAmount": 12000000, "totalAssetAmount": 30000000,
+    "policyRate": { "baseDate": "2026-10-31", "ratePct": 3.000 },
+    "assumptions": ["금리 변화는 변동금리 대출에만 반영하고, …"],
+    "loanItems": [
+      { "loanId": 101, "loanTypeName": "신용대출", "annualRatePct": 5, "rateTypeCode": "VARIABLE", "monthlyPaymentAmount": 200000, "balanceAmount": 12000000 },
+      { "loanId": 102, "loanTypeName": "주택담보대출", "annualRatePct": 4.2, "rateTypeCode": "FIXED", "monthlyPaymentAmount": 150000, "balanceAmount": 18000000 }
+    ] }
+  ```
 
 - 오류: `404 NOT_FOUND` "저장된 소득 데이터가 없습니다."(현금흐름 전망과 같음)
 
@@ -434,7 +450,7 @@
   - 바뀐 소득·지출 = 기준값 × (1 + % ÷ 100)
   - 월 이자 변화 = Σ 변동금리 잔액 × (max(금리 + 변화, 0) − 금리) ÷ 100 ÷ 12. **대출마다 금리는 0% 아래로 내려가지 않는다.** 합계를 낸 뒤 한 번만 반올림한다(HALF_UP, −0.5원 → −1원. 프론트 mock도 같음)
   - 바뀐 상환액 = 고정 상환액 + max(0, 변동 상환액 + 월 이자 변화). 변동 상환액은 변동금리 대출 월 원리금 합계, 고정 상환액은 전체 월 상환액에서 그것을 뺀 값(고정·`UNKNOWN`)이다. **금리가 내려가도 고정 상환액은 줄지 않는다**
-  - 월 잉여 = 소득 − 지출 − 상환액. 상환 부담률 = 연 원리금 ÷ 연소득 × 100(소수 둘째 자리, N-16-1·N-20-4와 같은 함수). 소득이 0 이하면 `null`
+  - 월 여유 자금 = 소득 − 지출 − 상환액. 상환 부담률 = 연 원리금 ÷ 연소득 × 100(소수 둘째 자리, N-16-1·N-20-4와 같은 함수). 소득이 0 이하면 `null`
   - 버틸 수 있는 개월 수 = ⌊총자산 × **15%** ÷ 월 부족액⌋. 조건 반영 후 **적자일 때만** 값이 있고, 흑자이거나 총자산 미입력이면 `null`
     - 15%는 D-33 11/20 합의다(`ScenarioService.SURVIVABLE_ASSET_RATIO_PCT`).
 - 응답 `200`:
@@ -443,15 +459,18 @@
   |---|---|---|
   | `current`, `changed` | 객체 | 지금·조건 반영 후. 각각 `monthlyIncomeAmount`, `monthlyExpenseAmount`, `monthlyPaymentAmount`, `monthlySurplusAmount`(원), `dsrPct`(%, 또는 `null`) |
   | `monthlyInterestChangeAmount` | 정수(원) | 월 이자 변화(±, 대출마다 금리 하한 0% 적용) |
-  | `surplusDiffAmount` | 정수(원) | 조건 반영 후 월 잉여 − 지금 월 잉여 |
+  | `surplusDiffAmount` | 정수(원) | 조건 반영 후 월 여유 자금 − 지금 월 여유 자금 |
   | `survivableMonths` | 정수 또는 `null` | 버틸 수 있는 개월 수(위 규칙) |
-  | `verdict` | 문자열 | `SHORTFALL`(조건 반영 후 적자), `IMPROVED`(지금보다 잉여 증가), `STILL_POSITIVE`(그 밖, 흑자 유지) |
+  | `verdict` | 문자열 | `SHORTFALL`(조건 반영 후 적자), `IMPROVED`(지금보다 여유 자금 증가), `STILL_POSITIVE`(그 밖, 흑자 유지) |
   | `assumptions` | 문자열 배열 | 기준값 응답과 같은 계산 가정 |
+  | `loanItems` | 배열 | 현재 기준월 대출 항목. `scenario-base`와 같은 형식이며 `current.monthlyPaymentAmount`는 이 목록의 월 원리금 합계 |
 
   ```json
   { "current": { "monthlyIncomeAmount": 2099498, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 350000, "monthlySurplusAmount": 433984, "dsrPct": 16.67 },
     "changed": { "monthlyIncomeAmount": 1259699, "monthlyExpenseAmount": 1315514, "monthlyPaymentAmount": 370000, "monthlySurplusAmount": -425815, "dsrPct": 29.37 },
     "monthlyInterestChangeAmount": 20000, "surplusDiffAmount": -859799, "survivableMonths": 10, "verdict": "SHORTFALL",
+    "loanItems": [ { "loanId": 101, "loanTypeName": "신용대출", "annualRatePct": 5, "rateTypeCode": "VARIABLE", "monthlyPaymentAmount": 200000, "balanceAmount": 12000000 },
+                   { "loanId": 102, "loanTypeName": "주택담보대출", "annualRatePct": 4.2, "rateTypeCode": "FIXED", "monthlyPaymentAmount": 150000, "balanceAmount": 18000000 } ],
     "assumptions": ["금리 변화는 변동금리 대출 잔액에만 반영하고, …"] }
   ```
   (예: 변동금리 대출 1,200만 원·연 5%·월 원리금 20만 원(전체 상환액 35만 원 중), 총자산 3,000만 원, `{ "ratePctPoint": 2, "incomePct": -40 }`. 같은 기준값에 `-5`%p면 금리가 0%까지만 내려가 월 이자 −50,000원, 상환액은 고정 15만 원이 남아 30만 원)
@@ -967,3 +986,126 @@ ML-04의 그 밖의 오류를 화면에 전달하는 규칙(FP-170 구현). 시�
 - `GLOSSARY_TERM.TERM_ID`는 화면이 쓰지 않아 보내지 않는다.
 - SHAP 용어 풀이는 "점수에 어떻게 반영됐는지"만 설명하고 원인처럼 쓰지 않는다(AGENTS.md 5장).
 - 프론트: `features/ai/api/glossaryApi.js`의 `getGlossary()`. mock은 시드 문구 5개를 같은 모양으로 돌려준다(로그인하지 않았으면 401).
+
+## N-32-1 용어 도우미 질문 버튼 (HELP-02, FP-181, 담당 광희) 🆕 11/19
+
+| 메서드 | 경로 | 설명 | 데이터 출처 |
+|---|---|---|---|
+| GET | `/api/chatbot/presets` | 용어 도우미(오른쪽 아래 [? 용어 도우미])의 질문 버튼 4개와 등록된 답 | DB `CHATBOT_PRESET_QUESTION` |
+
+- 인증: 로그인 필요(보안 설정 "그 밖의 `/api/**`"). 토큰이 없으면 `401 UNAUTHORIZED`다.
+- 요청 값은 없다. 질문 버튼 전체를 **표시 순서**(`ORDER BY DISPLAY_ORDER, PRESET_ID`)로 돌려준다.
+- **AI를 부르지 않고 질문 횟수도 줄지 않는다**(N-32-1). 호출 기록(`CHATBOT_QUESTION_LOG`)을 남기지 않는다. 화면은 한 번 받아 두고 버튼을 누를 때 받아 둔 `answer`를 보여 주면 된다.
+- 🆕 11/26 창을 처음 열 때 남은 자유 질문 횟수를 보여 주도록 `remainingCount`·`dailyLimit`을 함께 준다(값은 HELP-03과 같은 기준, 기록을 읽기만 함).
+- 등록된 버튼이 없으면 오류가 아니라 `{ "presets": [], ... }`다.
+- 기준 데이터: [`docs/spec/sql/add_chatbot_preset_question.sql`](../sql/add_chatbot_preset_question.sql)(합성 교육용 문구 4개, 표시 순서 1~4 기준으로 다시 실행해도 됨). dummy_db 생성기에는 들어 있지 않아 DDL·시드 다음에 따로 실행한다. 공용 DB 실행은 병합 후 PR 작성자(광희)가 한다(🆕 11/23 규칙).
+- 자유 질문은 아래 「N-32-2 용어 도우미 자유 질문 (HELP-03)」 절에 있다 🆕 11/26.
+
+응답 `200`:
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `presets[]` | 배열 | 질문 버튼 목록 (표시 순서대로) |
+| `presets[].presetId` | 정수 | 버튼 번호. 화면 목록의 key로 쓴다 |
+| `presets[].question` | 문자열 | 버튼에 보일 질문(최대 200자) |
+| `presets[].answer` | 문자열 | 버튼을 누르면 보일 답(최대 2000자) |
+| `remainingCount` | 정수 | 오늘 남은 자유 질문 횟수(0 아래로 내려가지 않음) 🆕 11/26 |
+| `dailyLimit` | 정수 | 하루 자유 질문 횟수(`APP_SETTING.CHATBOT_DAILY_LIMIT`, 없으면 10) 🆕 11/26 |
+
+```json
+{
+  "presets": [
+    { "presetId": 1, "question": "대안 신용 점수는 기존 신용 점수와 무엇이 다른가요?", "answer": "기존 신용 점수는 대출·카드 같은 금융 거래 기록만 봅니다. …" },
+    { "presetId": 2, "question": "점수 영향도(SHAP)는 어떻게 읽나요?", "answer": "점수 영향도는 … 원인·결과를 뜻하지는 않습니다. …" }
+  ],
+  "remainingCount": 10,
+  "dailyLimit": 10
+}
+```
+
+- DB 열 이름(`QUESTION_TEXT`·`ANSWER_TEXT`·`DISPLAY_ORDER`)은 그대로 내보내지 않는다.
+- 프론트: `features/ai/api/chatbotApi.js`의 `getChatbotPresets()`. mock은 시드와 같은 4개와 남은 횟수를 돌려준다(로그인하지 않았으면 401).
+
+## N-32-2 용어 도우미 자유 질문 (HELP-03, FP-181, 담당 광희) 🆕 11/26
+
+| 메서드 | 경로 | 설명 | 데이터 출처 |
+|---|---|---|---|
+| POST | `/api/chatbot/questions` | 사용자가 직접 쓴 금융 용어·질문에 AI(OpenAI)가 쉬운 말로 답한다. 하루 10회 | OpenAI, DB `CHATBOT_QUESTION_LOG`·`APP_SETTING` |
+
+- 인증: 로그인 필요(보안 설정 "그 밖의 `/api/**`"). 토큰이 없으면 `401 UNAUTHORIZED`다.
+- 요청 본문: `{ "question": "DSR이 뭐예요?" }` — 1~200자, 앞뒤 공백은 뗀다.
+- **AI에는 질문 글만 넘긴다**(D-21, AGENTS.md 5장). 회원 번호·점수·개인정보를 붙이지 않는다. 질문 글은 DB와 서버 로그 어디에도 저장하지 않는다.
+- 지시 문장(서버에 고정): 금융 용어·개념을 쉬운 한국어 3~5문장으로 설명, 개인 재무 상담·상품 추천·투자 권유 안 함, 금융과 관계없는 질문은 범위를 안내, 모르면 지어내지 않음. 답 길이 상한 400토큰.
+- **하루 횟수**: `APP_SETTING.CHATBOT_DAILY_LIMIT`(행이 없거나 숫자가 아니면 10). 오늘 0시(서버 시각 Asia/Seoul)부터 **성공한 호출(`SUCCESS_YN = 'Y'`)만** 센다. 질문 버튼(HELP-02)은 세지 않는다.
+- 기록: 성공하면 `Y`, AI가 실패하면 `N`으로 한 줄 남긴다(시각·성공 여부만). 키가 없어서(503) 부르지 못한 경우는 남기지 않는다.
+- 🆕 11/27 같은 사용자는 **한 번에 질문 1개만** 처리한다. 앞 질문이 AI 답을 기다리는 동안 들어온 요청은 409 `QUESTION_IN_PROGRESS`로 거절한다(세기 → AI 호출 → 기록 사이에 끼어들어 하루 횟수를 넘기지 않게 함, PR #170 리뷰). 서버 1대 기준이며 여러 대로 늘리면 공용 잠금이 필요하다.
+- 🆕 11/27 AI 답이 길이 상한에서 잘리면(`finish_reason = length`) 502 `AI_FAILED`로 본다(실패로 기록, 횟수 안 줄어듦).
+- 호출 설정: `avenue.ai.openai.api-key=${OPENAI_API_KEY:}`(강사 제공 키 값은 환경변수 `OPENAI_API_KEY`에만, properties·코드에 쓰지 않음), 모델 기본 `gpt-5.6-luna`(`avenue.ai.openai.model`로 바꿀 수 있음), 시간 제한 연결 2초·응답 15초(D-18).
+
+응답 `200`:
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `answer` | 문자열 | AI 답(앞뒤 공백 뗌) |
+| `remainingCount` | 정수 | 이번 질문까지 뺀 오늘 남은 횟수 |
+| `dailyLimit` | 정수 | 하루 횟수 |
+
+```json
+{ "answer": "DSR은 1년 동안 갚는 대출 원금과 이자를 1년 소득으로 나눈 비율이에요. …", "remainingCount": 9, "dailyLimit": 10 }
+```
+
+오류(공통 형식 `{ code, message, fieldErrors }`):
+
+| HTTP | code | 언제 |
+|---|---|---|
+| 400 | `INVALID_INPUT` | `question`이 없음·공백만·200자 초과(`fieldErrors[0].field = "question"`) |
+| 401 | `UNAUTHORIZED` | 토큰 없음·만료 |
+| 409 | `QUESTION_IN_PROGRESS` | 같은 사용자의 앞 질문이 아직 처리 중 → "이전 질문에 답하고 있습니다. 잠시 후 다시 시도해 주세요." 🆕 11/27 |
+| 429 | `DAILY_LIMIT_EXCEEDED` | 오늘 성공한 질문이 하루 횟수에 이름 → "자유 질문은 하루 10번까지 할 수 있습니다. 내일 다시 이용해 주세요." |
+| 502 | `AI_FAILED` | OpenAI 연결 실패·시간 초과·4xx(키 오류·한도)·5xx·빈 답·길이 상한에서 잘린 답(🆕 11/27). 횟수는 줄지 않는다 |
+| 503 | `AI_UNAVAILABLE` | 서버에 OpenAI 키가 없음 |
+
+- 프론트: `features/ai/api/chatbotApi.js`의 `askChatbotQuestion(question)`. mock은 고정 예시 답을 주고 같은 입력 검사·10회 초과 429를 흉내 낸다(새로고침하면 다시 10회).
+
+## N-31-2 AI 요약 생성·저장 (RPT-04, FP-181, 담당 광희) 🆕 11/26
+
+| 메서드 | 경로 | 설명 | 데이터 출처 |
+|---|---|---|---|
+| POST | `/api/report/{requestId}/ai-summary` | 내 평가 한 건을 AI(OpenAI)로 3문장 이내 요약해 저장하고 돌려준다. 저장돼 있으면 AI를 부르지 않는다 | RPT-03과 같은 평가 조회, DB `ASSESSMENT.AI_SUMMARY`, OpenAI |
+
+- 인증: `ROLE_USER`(보안 설정 `/api/report/**`). 토큰 없음 401, 관리자 토큰 403.
+- 요청 본문은 없다. `requestId`는 RPT-03과 같다(소문자 UUID, 형식이 틀리면 400, 남의 평가·없는 평가는 404 `ASSESSMENT_NOT_FOUND` — 범영 님 `ReportService.byRequestId`를 그대로 쓴다).
+- 처리 순서:
+  1. 그 평가에 `AI_SUMMARY`가 있으면 그대로 돌려준다(`generated: false`). AI를 부르지 않는다.
+  2. 산출되지 않은 평가(`gradeStatusCode`가 `SCORED`가 아님)면 409 `NOT_SCORED`.
+  3. 아래 값만 AI에 넘겨 요약을 받는다. 결과는 1000자(열 크기)로 자르고, **요약이 비어 있을 때만** 저장한다.
+  4. 동시에 두 요청이 와서 다른 요청이 먼저 저장했으면 저장된 요약을 돌려준다(`generated: false`).
+- **AI에 넘기는 값**(N-31-2 "계산된 숫자만", AGENTS.md 5장): 기존·대안 점수와 한글 등급(좋음·보통·주의, 산정 불가면 "산정 불가"), 대안 − 기존 점수 차이와 등급 변화 여부, SHAP 상위 3개 요인의 이름과 작용 점수(`shapScore`, 부호 포함). **넘기지 않는 값**: 피처 원래 값(`featureValue`), 회원 번호·`requestId`, 직군 코드, 개인정보.
+- 지시 문장(서버에 고정): 받은 숫자만 써서 3문장 이내, 영향 요인은 "작용한 정도"로만 쓰고 원인처럼 쓰지 않음(AGENTS.md 5장 SHAP), 상품 추천·투자 권유 안 함, 마지막 문장에 시연용 계산이라 실제 대출 심사 결과가 아니라고 밝힘. 답 길이 상한 300토큰.
+- 저장한 요약은 리포트 응답(RPT-02·03)의 `aiSummary`로도 나간다(B팀 명세서 3-2).
+
+응답 `200`:
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| `requestId` | 문자열 | 요청한 평가 번호 |
+| `aiSummary` | 문자열 | 요약 문장(최대 1000자) |
+| `generated` | 불리언 | 이번 요청에서 새로 만들었으면 true, 저장된 요약이면 false |
+
+```json
+{ "requestId": "3f1c2a9e-8b7d-4c1e-9a2b-1d2e3f4a5b6c", "aiSummary": "대안 신용 점수가 기존보다 50점 높게 계산됐어요. …", "generated": true }
+```
+
+오류:
+
+| HTTP | code | 언제 |
+|---|---|---|
+| 400 | `INVALID_INPUT` | `requestId`가 소문자 UUID가 아님 |
+| 401 / 403 | `UNAUTHORIZED` / `FORBIDDEN` | 토큰 없음 / 관리자 계정 |
+| 404 | `ASSESSMENT_NOT_FOUND` | 없는 평가·남의 평가 |
+| 409 | `NOT_SCORED` | 점수가 산출되지 않은 평가 |
+| 502 | `AI_FAILED` | OpenAI 실패, 또는 요약이 길이 상한에서 잘림(🆕 11/27, 끊긴 문장이 저장돼 계속 보이지 않게). 저장하지 않으므로 다시 요청하면 다시 만든다 |
+| 503 | `AI_UNAVAILABLE` | 서버에 OpenAI 키가 없음 |
+
+- 구현 위치: 범영 님 `ReportController`·`AssessmentMapper`를 고치지 않으려고 `help` 패키지의 `AiSummaryController`·`AiSummaryService`·`AiSummaryMapper`에 둔다.
+- 프론트: `features/ai/api/aiSummaryApi.js`의 `requestAiSummary(requestId)`. mock은 mock 리포트(`creditMockData.js`의 `scoredReport`) 한 건에만 고정 예시 요약을 준다(처음 `generated: true`, 그다음 false).

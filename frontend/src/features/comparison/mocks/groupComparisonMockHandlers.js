@@ -7,8 +7,8 @@ import { ROLES } from '../../../common/config/roles.js'
 import { registerMockHandlers, requireMockUser } from '../../../common/mocks/mockHandlers.js'
 import { GROUP_CODES, MIN_GROUP_SIZE, SAMPLE_MODEL_VERSION, aggregate } from '../../admin/mocks/adminStatsMockHandlers.js'
 
-// 등급은 점수로 정한다(CUT-0.3 경계 654·727, 관리자 통계 mock과 같음). 기존 점수가 없으면 null
-const gradeOfScore = (score) => (score === null ? null : score >= 727 ? 'GOOD' : score >= 654 ? 'STANDARD' : 'CAUTION')
+// 등급은 점수로 정한다(CUT-0.4 경계 645·712, 관리자 통계 mock과 같음). 기존 점수가 없으면 null
+const gradeOfScore = (score) => (score === null ? null : score >= 712 ? 'GOOD' : score >= 645 ? 'STANDARD' : 'CAUTION')
 // 칸 평균을 정하는 직군·연령대 가감(점)과 칸 안에서 회원마다 더할 차이 — 칸마다 진하기가 달라 보이게 한 예시값
 const WORKER_TYPE_BASE = Object.freeze({ EMPLOYEE: 705, SELF_EMPLOYED: 685, FREELANCER: 675 })
 const AGE_BAND_SHIFT = Object.freeze({ '20S': -15, '30S': 5, '40S': 12, '50_PLUS': -2 })
