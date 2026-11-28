@@ -7,10 +7,40 @@
   justify-self: start;
 }
 
-/* 로그 카드 안의 Chip·구분 탭도 카드 폭으로 늘어나지 않게 왼쪽에 둔다(카드 본문은 세로 flex라 기본이 늘이기). */
-.admin-log-card > .card__body > .chip,
-.admin-log-card > .card__body > .segmented {
-  align-self: flex-start;
+/* FP-273 5차 탭 줄 오른쪽 칸 — 시스템 로그 구분 탭 자리. 열람 감사 탭에서는 비어 있어도 탭 묶음과 같은 높이(버튼 36px + 안쪽 4px×2)를 차지한다. */
+.admin-log-tabs__filter {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 44px;
+}
+
+/* 좁은 화면(한 칸)에서는 구분 탭도 왼쪽에 두고, 버튼 4개가 두 줄로 접혀 탭 줄 높이가 바뀌지 않게 버튼 좌우 여백만 줄여 한 줄로 둔다. */
+@media (max-width: 599px) {
+  .admin-log-tabs__filter {
+    justify-content: flex-start;
+  }
+
+  .admin-log-tabs__filter .segmented {
+    flex-wrap: nowrap;
+  }
+
+  .admin-log-tabs__filter .segmented__button {
+    padding-inline: var(--sp-3);
+  }
+}
+
+/* FP-273 5차 로그 카드 틀 — Chip 줄·쪽 넘기기 자리·안내 줄이 두 탭에서 같은 높이를 차지한다. */
+.admin-log-card__meta {
+  display: flex;
+}
+
+.admin-log-card__pager {
+  min-height: 36px;
+}
+
+/* 시스템 로그 카드의 빈 자리 — 열람 감사 카드와 같은 글을 보이지 않게 두어 높이만 맞춘다(aria-hidden). */
+.admin-log-card__ghost {
+  visibility: hidden;
 }
 
 /* 계정 검색 칸과 [검색] 버튼을 한 줄에 — 공통 form 격자(칸 최소 200px)로는 검색 카드 줄 안에서 버튼이 칸 아래로 내려간다. */
@@ -34,6 +64,175 @@
   display: flex;
   align-items: center;
   min-height: 48px;
+}
+
+/* ===== FP-273 5차 계정 목록 표 — 열 너비·줄 높이 고정, 표 상자는 한 쪽(--admin-accounts-rows) 높이를 늘 차지 ===== */
+/* 열람 사유 줄이 열리면 그만큼만 늘어난다(min-height). container는 사유 줄 폼을 보이는 폭에 맞추는 데 쓴다. */
+.admin-accounts {
+  --admin-accounts-head: 41px; /* 머리 줄 높이(아래 테두리 포함) */
+  --admin-accounts-row: 61px; /* 데이터 줄 높이 — [상세 보기]·[잠금] 두 버튼 줄 기준(아래 테두리 포함) */
+  position: relative;
+  box-sizing: content-box;
+  /* + 1px: 접힌 테두리 모델에서 표 맨 아래 테두리 반쪽이 더해져, 10줄을 다 채운 표와 높이가 같다. */
+  min-height: calc(var(--admin-accounts-head) + 1px + var(--admin-accounts-row) * var(--admin-accounts-rows, 10));
+  container-type: inline-size;
+}
+
+/* 좁은 화면에서는 표 상자 안에서 가로로 넘긴다(페이지는 넘치지 않는다). */
+.admin-accounts__table {
+  min-width: 1080px;
+  table-layout: fixed;
+}
+
+.admin-accounts__table th {
+  box-sizing: border-box;
+  height: var(--admin-accounts-head);
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 모든 줄이 같은 높이 — 긴 값은 한 줄 말줄임(전체 글은 title), "본인" 줄도 버튼 줄과 같은 높이. */
+.admin-accounts__table td {
+  box-sizing: border-box;
+  height: var(--admin-accounts-row);
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 마지막 줄도 아래 테두리를 그려 줄 높이가 쪽마다 같게 한다(공통 data-table은 마지막 줄 테두리를 지운다). */
+.admin-accounts__table tbody tr:last-child td {
+  border-bottom: 1px solid var(--line);
+}
+
+/* 상세 패널을 연 회원 줄 — 패널이 어느 줄의 것인지 보이게 바탕을 칠한다. */
+.admin-accounts__row--open td {
+  background: var(--panel2);
+}
+
+.admin-accounts__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.admin-accounts__col--auto {
+  width: auto;
+}
+
+.admin-accounts__col--name {
+  width: 104px;
+}
+
+.admin-accounts__col--role {
+  width: 84px;
+}
+
+.admin-accounts__col--job {
+  width: 92px;
+}
+
+.admin-accounts__col--score {
+  width: 112px;
+}
+
+.admin-accounts__col--status {
+  width: 80px;
+}
+
+.admin-accounts__col--reports {
+  width: 100px;
+}
+
+.admin-accounts__col--date {
+  width: 108px;
+}
+
+.admin-accounts__col--actions {
+  width: 200px;
+}
+
+/* 열람 사유 줄 — 고정 줄 높이·말줄임을 풀고, 폼은 표 상자에서 보이는 폭만큼만 차지해 가로로 넘겨도 왼쪽에 붙어 있다. */
+.admin-accounts__table .admin-accounts__reason-row td {
+  height: auto;
+  padding: var(--sp-3);
+  overflow: visible;
+  white-space: normal;
+  background: var(--panel2);
+}
+
+.admin-accounts__reason-row .admin-reason {
+  position: sticky;
+  left: var(--sp-3);
+  box-sizing: border-box;
+  width: calc(100cqw - var(--sp-3) * 2 - 2px);
+}
+
+/* 불러오는 중·오류·계정 없음 — 머리 줄 아래 빈 자리 가운데에 글자만 둔다(빈 줄을 그리지 않는다). */
+.admin-accounts__message {
+  position: absolute;
+  inset: var(--admin-accounts-head) 0 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--mut);
+  font-size: 13.5px;
+}
+
+/* 새 쪽을 불러오는 동안 지난 쪽을 흐리게 둔다. */
+.admin-accounts[aria-busy='true'] .admin-accounts__table tbody {
+  opacity: 0.55;
+}
+
+/* ===== FP-273 5차 열람 사유 폼 — [사유] → [사유 남기고 열기] → [취소]를 한 줄에 48px 높이·8px 간격, 안내는 아래 한 줄 ===== */
+.admin-reason {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.admin-reason__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+
+.admin-reason__row > .form-field {
+  flex: 0 1 280px;
+  min-width: 0;
+}
+
+/* 좁으면 두 버튼이 함께 다음 줄로 내려간다. */
+.admin-reason__actions {
+  display: flex;
+  flex: none;
+  gap: var(--sp-2);
+}
+
+/* ===== FP-273 5차 잠금 창 — body 바로 아래에 그린 창을 메뉴 줄 아래에 두고, 사유 칸 한 줄 + [잠그기]·[취소] 2칸 ===== */
+.admin-modal-layer > .modal__backdrop {
+  padding-top: max(10vh, calc(var(--admin-header-bottom, 0px) + var(--sp-4)));
+}
+
+.admin-lock-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3) var(--sp-2);
+}
+
+.admin-lock-form > p,
+.admin-lock-form > .form-field {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.admin-lock-form > button {
+  width: 100%;
 }
 
 /* ===== 접근·감사 로그 표 — 높이를 한 쪽 줄 수(--admin-log-rows, ADMIN_PAGE_SIZE)로 고정 ===== */

@@ -23,20 +23,24 @@ export default function AccessReasonForm({ viewerLoginId, pending, error, onSubm
     onSubmit(reason)
   }
 
+  // FP-273 5차 [열람 사유](직접 입력이면 사유 칸) → [사유 남기고 열기] → [취소]를 한 줄에 같은 높이로 붙이고, 안내는 그 아래 한 줄.
+  // 좁은 화면에서는 버튼 두 개가 함께 아래 줄로 내려간다(admin.css admin-reason).
   return (
-    <form onSubmit={handleSubmit} noValidate>
-      <Select label="열람 사유" options={REASON_OPTIONS} value={choice} onChange={(value) => setChoice(value ?? AUDIT_REASONS[0])} />
-      {choice === CUSTOM_REASON && (
-        <TextInput label="사유 직접 입력" value={customReason} onChange={setCustomReason} error={reasonError} maxLength={REASON_MAX_LENGTH} />
-      )}
+    <form className="admin-reason" onSubmit={handleSubmit} noValidate>
+      <div className="admin-reason__row">
+        <Select label="열람 사유" options={REASON_OPTIONS} value={choice} onChange={(value) => setChoice(value ?? AUDIT_REASONS[0])} />
+        {choice === CUSTOM_REASON && (
+          <TextInput label="사유 직접 입력" value={customReason} onChange={setCustomReason} error={reasonError} maxLength={REASON_MAX_LENGTH} />
+        )}
+        <div className="admin-reason__actions">
+          <Button type="submit" variant="primary" disabled={pending}>
+            사유 남기고 열기
+          </Button>
+          <Button onClick={onCancel}>취소</Button>
+        </div>
+      </div>
       {error && <p role="alert">{error}</p>}
-      <Button type="submit" variant="primary" size="sm" disabled={pending}>
-        사유 남기고 열기
-      </Button>
-      <Button size="sm" onClick={onCancel}>
-        취소
-      </Button>
-      <p>이 열람은 {viewerLoginId ? `${viewerLoginId} 이름으로 ` : ''}감사 로그에 남습니다.</p>
+      <p className="hint">이 열람은 {viewerLoginId ? `${viewerLoginId} 이름으로 ` : ''}감사 로그에 남습니다.</p>
     </form>
   )
 }

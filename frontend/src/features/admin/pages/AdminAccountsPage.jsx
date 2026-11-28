@@ -22,8 +22,37 @@ import MemberDetailPanel from '../components/MemberDetailPanel.jsx'
 import { useAdminErrorHandler } from '../useAdminErrorHandler.js'
 import '../admin.css'
 
+// FP-273 5차 계정 목록 열 — className은 admin.css의 고정 열 너비(아이디·닉네임은 남은 너비를 나눠 쓴다).
+const ACCOUNT_COLUMNS = Object.freeze([
+  { key: 'loginId', label: '아이디', className: 'admin-accounts__col--auto' },
+  { key: 'name', label: '이름', className: 'admin-accounts__col--name' },
+  { key: 'nickname', label: '닉네임', className: 'admin-accounts__col--auto' },
+  { key: 'role', label: '권한', className: 'admin-accounts__col--role' },
+  { key: 'job', label: '직군', className: 'admin-accounts__col--job' },
+  { key: 'score', label: '최근 대안 점수', className: 'admin-accounts__col--score' },
+  { key: 'status', label: '상태', className: 'admin-accounts__col--status' },
+  { key: 'reports', label: '작성 글 신고', className: 'admin-accounts__col--reports' },
+  { key: 'joined', label: '가입일', className: 'admin-accounts__col--date' },
+  { key: 'actions', label: '관리', className: 'admin-accounts__col--actions' },
+])
 // 표의 열 수 — 열람 사유 줄이 표 전체 너비를 차지하게 할 때 쓴다.
-const COLUMN_COUNT = 10
+const COLUMN_COUNT = ACCOUNT_COLUMNS.length
+
+// 표 상자 안에 보여 줄 안내 — 오류, 처음 불러오는 중, 조건에 맞는 계정 없음. 줄이 있으면 null.
+function listMessage(data, error) {
+  if (error && !data) return { text: error, alert: true }
+  if (!data) return { text: '회원 목록을 불러오는 중입니다.' }
+  if (data.items.length === 0) return { text: '조건에 맞는 계정이 없습니다.' }
+  return null
+}
+
+// 고정 메뉴 줄(.app-header) 아래 16px에 요소 맨 위가 오도록 스크롤한다(움직임 줄이기 설정이면 바로 옮긴다).
+function scrollBelowHeader(element) {
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const headerHeight = document.querySelector('.app-header')?.getBoundingClientRect().height ?? 0
+  const top = element.getBoundingClientRect().top + window.scrollY - headerHeight - 16
+  window.scrollTo({ top: Math.max(0, top), behavior: reduce ? 'auto' : 'smooth' })
+}
 
 // N-27·N-35-1 계정·권한 관리(/admin/accounts) — 회원 목록 검색·필터(권한·상태·직군)·쪽 넘기기, 사유를 남기고 회원 상세 열람, 계정 잠금·해제.
 // 회원 정보는 서버가 가린 값만 보여 준다. 회원을 관리자로 바꾸는 기능은 두지 않는다(N-27-2).
@@ -35,6 +64,8 @@ export default function AdminAccountsPage() {
   // 서버에 보낼 조건.
   const [query, setQuery] = useState({ q: '', role: '', status: '', workerType: '', page: ADMIN_FIRST_PAGE })
   const [data, setData] = useState(null)
+  // 마지막으로 받은 응답의 조건 — 지금 조건과 다르면 새 쪽을 불러오는 중이다(지난 쪽을 흐리게 둔다).
+  const [loadedQuery, setLoadedQuery] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [reasonFor, setReasonFor] = useState(null) // 열람 사유를 고르는 중인 회원 userId
   const [opening, setOpening] = useState(false)
@@ -59,6 +90,7 @@ export default function AdminAccountsPage() {
       .then((result) => {
         if (cancelled) return
         setData(result)
+        setLoadedQuery(query)
         setLoadError('')
       })
       .catch(async (error) => {
@@ -88,7 +120,7 @@ export default function AdminAccountsPage() {
     setOpenError('')
     try {
       const result = await openMemberCreditData(userId, reason)
-      setDetail({ reason, data: result })
+      setDetail({ userId, reason, data: result })
       setReasonFor(null)
       setToastMessage('열람 기록을 감사 로그에 남겼습니다.')
     } catch (error) {
@@ -122,6 +154,18 @@ export default function AdminAccountsPage() {
     setReasonFor(userId)
   }
 
+  // FP-273 5차 상세 패널을 닫으면 보던 줄로 돌아가 그 줄의 [상세 보기]에 포커스를 둔다(쪽을 넘겨 줄이 없으면 그대로 둔다).
+  const closeDetail = () => {
+    const userId = detail?.userId
+    setDetail(null)
+    requestAnimationFrame(() => {
+      const row = document.querySelector(`tr[data-user-id="${CSS.escape(String(userId))}"]`)
+      if (!row) return
+      scrollBelowHeader(row)
+      row.querySelector('button')?.focus({ preventScroll: true })
+    })
+  }
+
   const openLockModal = (row) => {
     setLockError('')
     setLockTarget(row)
@@ -133,7 +177,7 @@ export default function AdminAccountsPage() {
     const withdrawn = row.status === ACCOUNT_STATUS.WITHDRAWN
     const locked = row.status === ACCOUNT_STATUS.LOCKED
     return (
-      <>
+      <div className="admin-accounts__actions">
         {row.role === ROLES.USER && (
           <Button size="sm" onClick={() => openReasonForm(row.userId)}>
             상세 보기
@@ -150,9 +194,12 @@ export default function AdminAccountsPage() {
             잠금
           </Button>
         )}
-      </>
+      </div>
     )
   }
+
+  const message = listMessage(data, loadError)
+  const busy = data !== null && loadedQuery !== query && !loadError
 
   return (
     <>
@@ -187,34 +234,44 @@ export default function AdminAccountsPage() {
         )}
       </Card>
 
+      {/* FP-273 5차 회원 목록 — 접근·감사 로그 표(FP-275)처럼 열 너비·줄 높이를 고정하고, 표 상자는 한 쪽(ADMIN_PAGE_SIZE) 높이를 늘 차지한다.
+          안내 문구는 상자 안에 두고, 새 쪽을 불러오는 동안 지난 쪽을 흐리게 둔다(쪽·검색 결과가 달라도 [이전]/[다음] 위치가 같다). */}
       <Card title="회원 목록">
-        {loadError && <p role="alert">{loadError}</p>}
-        {!data && !loadError && <p>회원 목록을 불러오는 중입니다.</p>}
-        {data && data.items.length === 0 && <p>조건에 맞는 계정이 없습니다.</p>}
-        {data && data.items.length > 0 && (
-          <>
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">아이디</th>
-                  <th scope="col">이름</th>
-                  <th scope="col">닉네임</th>
-                  <th scope="col">권한</th>
-                  <th scope="col">직군</th>
-                  <th scope="col">최근 대안 점수</th>
-                  <th scope="col">상태</th>
-                  <th scope="col">작성 글 신고</th>
-                  <th scope="col">가입일</th>
-                  <th scope="col">관리</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((row) => (
+        {loadError && data && <p role="alert">{loadError}</p>}
+        <div
+          className="data-table-wrap admin-accounts"
+          style={{ '--admin-accounts-rows': ADMIN_PAGE_SIZE }}
+          aria-busy={busy || undefined}
+        >
+          <table className="data-table admin-accounts__table">
+            <caption className="sr-only">회원 목록</caption>
+            <colgroup>
+              {ACCOUNT_COLUMNS.map((column) => (
+                <col key={column.key} className={column.className} />
+              ))}
+            </colgroup>
+            <thead>
+              <tr>
+                {ACCOUNT_COLUMNS.map((column) => (
+                  <th key={column.key} scope="col">
+                    {column.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.items ?? []).map((row) => {
+                const name = row.maskedName
+                const nickname = row.nickname ?? EMPTY_TEXT
+                return (
                   <Fragment key={row.userId}>
-                    <tr>
-                      <td>{row.loginId}</td>
-                      <td>{row.maskedName}</td>
-                      <td>{row.nickname ?? EMPTY_TEXT}</td>
+                    <tr
+                      data-user-id={row.userId}
+                      className={detail?.userId === row.userId ? 'admin-accounts__row--open' : undefined}
+                    >
+                      <td title={row.loginId}>{row.loginId}</td>
+                      <td title={name}>{name}</td>
+                      <td title={nickname}>{nickname}</td>
                       <td>{row.role === ROLES.ADMIN ? <Chip accent>관리자</Chip> : '일반'}</td>
                       <td>{JOB_TYPE_LABELS[row.workerTypeCode] ?? EMPTY_TEXT}</td>
                       <td>{row.latestAltScore ?? EMPTY_TEXT}</td>
@@ -226,7 +283,7 @@ export default function AdminAccountsPage() {
                       <td>{renderActions(row)}</td>
                     </tr>
                     {reasonFor === row.userId && (
-                      <tr>
+                      <tr className="admin-accounts__reason-row">
                         <td colSpan={COLUMN_COUNT}>
                           <AccessReasonForm
                             viewerLoginId={user?.loginId}
@@ -239,20 +296,27 @@ export default function AdminAccountsPage() {
                       </tr>
                     )}
                   </Fragment>
-                ))}
-              </tbody>
-            </table>
-            <AdminPagination
-              page={data.page}
-              size={data.size}
-              totalCount={data.totalCount}
-              onChange={(page) => setQuery((prev) => ({ ...prev, page }))}
-            />
-          </>
+                )
+              })}
+            </tbody>
+          </table>
+          {message && (
+            <p className="admin-accounts__message" role={message.alert ? 'alert' : 'status'}>
+              {message.text}
+            </p>
+          )}
+        </div>
+        {data && (
+          <AdminPagination
+            page={data.page}
+            size={data.size}
+            totalCount={data.totalCount}
+            onChange={(page) => setQuery((prev) => ({ ...prev, page }))}
+          />
         )}
       </Card>
 
-      {detail && <MemberDetailPanel detail={detail} onClose={() => setDetail(null)} />}
+      {detail && <MemberDetailPanel detail={detail} onClose={closeDetail} />}
 
       <LockReasonModal
         target={lockTarget}
