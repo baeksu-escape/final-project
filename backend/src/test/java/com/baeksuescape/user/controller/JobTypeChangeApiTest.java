@@ -57,7 +57,7 @@ class JobTypeChangeApiTest {
     @MockBean
     private PhoneVerificationService phoneVerification;
 
-    // DB의 APP_USER 한 줄 대신 — 입력을 저장하고 평가도 받은 급여소득자(평가 수는 서비스가 더 이상 보지 않는다).
+    // DB의 APP_USER 한 줄 대신 — 입력을 저장하고 평가도 받은 급여소득자.
     private UserAccount account;
 
     @BeforeEach
@@ -76,7 +76,6 @@ class JobTypeChangeApiTest {
 
         given(userAccountMapper.selectById(7L)).willAnswer(invocation -> account);
         given(userAccountMapper.selectAccountStatus(anyLong())).willAnswer(invocation -> account.getAccountStatusCode());
-        given(userAccountMapper.countAssessments(7L)).willReturn(2);
         given(userAccountMapper.updateWorkerTypeFrom(eq(7L), anyString(), anyString(), any())).willAnswer(invocation -> {
             if (!invocation.getArgument(1).equals(account.getWorkerTypeCode())) return 0;
             account.setWorkerTypeCode(invocation.getArgument(2));
