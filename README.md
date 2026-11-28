@@ -25,6 +25,7 @@
 서버별 실행·테스트 방법은 각 README([backend](backend/README.md) · [fastapi_server](fastapi_server/README.md) · [frontend](frontend/README.md))를 본다. 여기에는 여러 서버나 팀 전체가 같이 알아야 하는 것만 적는다.
 
 **실행 순서:** DB 준비([docs/spec/sql/README.md](docs/spec/sql/README.md), 개인 개발은 로컬 DB·통합 테스트 때만 공용 DB) → backend(8080) → fastapi_server(8000, 가상환경) → frontend(5173)
+- 선택: 라운지 검색을 Elasticsearch로 볼 때만 backend보다 먼저 [elasticsearch](elasticsearch/README.md)(9200)를 띄운다(2차 FP-304). 띄우지 않으면 기존 검색 그대로다.
 
 | 설정 | 쓰는 곳 | 값 | 공유 |
 |---|---|---|---|
@@ -33,6 +34,7 @@
 | `AVENUE_DEV_AES_KEY`, `AVENUE_DEV_HMAC_KEY` | backend, 시드 생성기 | 개인정보 암호화 키. 설명은 [backend/README.md](backend/README.md), [dummy_db/README.md](docs/spec/sql/dummy_db/README.md) | **팀 공통** (env 파일로 별도 전달, 새로 만들지 않는다) |
 | `AVENUE_JWT_SECRET` | backend | Base64, 32바이트 이상 — 아래 명령으로 만든다 | 각자 생성 |
 | FastAPI 주소 `avenue.prediction.base-url` | backend → fastapi_server | 비우면 `http://localhost:8000`. 실행은 [fastapi_server/README.md](fastapi_server/README.md) | — |
+| `avenue.search.enabled`, `avenue.search.url` | backend → elasticsearch | 기본 `false`(라운지 검색은 Oracle). `true`로 바꾸면 Elasticsearch(기본 `http://localhost:9200`)로 검색한다. 띄우는 법은 [elasticsearch/README.md](elasticsearch/README.md) | 각자 (검색 담당·시연 PC만 켬) |
 | `VITE_USE_MOCK`, `VITE_API_BASE_URL` | frontend | [frontend/README.md](frontend/README.md) | 각자 |
 
 **JWT 키 만들기** (PowerShell, 폴더 상관없음) — 나온 문자열을 STS 실행 설정 Environment 탭에 `AVENUE_JWT_SECRET`으로 넣는다(Common 탭은 Local file 유지). 한 번 만든 값을 계속 쓴다.

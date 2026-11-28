@@ -26,6 +26,8 @@
 - 응답에는 `devMode: true`가 붙는다.
 - `REAL`은 아직 지원하지 않는다.
 
+검색 서버(Elasticsearch, 2차 FP-304)는 기본으로 쓰지 않는다(`avenue.search.enabled=false`). 쓰려면 [elasticsearch/README.md](../elasticsearch/README.md)대로 8.10.4를 띄우고 `true`로 바꾼다. 켜면 서버가 시작할 때 연결을 확인하고 라운지 색인 `lounge_posts`가 없으면 만든다(`global/search`). 서버가 없어도 백엔드는 켜지고 경고만 남는다.
+
 프론트를 실제 서버에 붙일 때는 프론트 `.env`에 `VITE_USE_MOCK=false`, `VITE_API_BASE_URL=http://localhost:8080`을 넣는다. Vite 프록시는 없다.
 
 3. 테스트: `./mvnw test`. test 프로필(`src/test/resources/application-test.properties`)이 메모리 DB(H2)와 **공개 테스트 키**를 쓰므로 실제 DB·키 없이 돈다.

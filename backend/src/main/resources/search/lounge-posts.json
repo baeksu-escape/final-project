@@ -1,0 +1,33 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "tokenizer": {
+        "lounge_nori_tokenizer": {
+          "type": "nori_tokenizer",
+          "decompound_mode": "mixed"
+        }
+      },
+      "analyzer": {
+        "lounge_korean": {
+          "type": "custom",
+          "tokenizer": "lounge_nori_tokenizer",
+          "filter": ["lowercase", "nori_part_of_speech", "nori_readingform"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "postId": { "type": "long" },
+      "title": { "type": "text", "analyzer": "lounge_korean" },
+      "content": { "type": "text", "analyzer": "lounge_korean" },
+      "categoryCode": { "type": "keyword" },
+      "statusCode": { "type": "keyword" },
+      "userId": { "type": "long" },
+      "createdAt": { "type": "date" }
+    }
+  }
+}

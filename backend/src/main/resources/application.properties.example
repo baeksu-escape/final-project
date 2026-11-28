@@ -46,6 +46,11 @@ avenue.prediction.base-url=
 # 환경변수가 없으면 빈 값이 되어 백엔드는 그대로 켜지고 두 API만 503 AI_UNAVAILABLE로 답한다. 모델·주소·시간 제한(연결 2초/응답 15초, D-18)은 기본값을 쓴다
 avenue.ai.openai.api-key=${OPENAI_API_KEY:}
 
+# ---- FP-305 Elasticsearch (2차 FP-304 신용 라운지 글 검색) — 기본 꺼짐. 꺼져 있으면 기존 Oracle 검색 그대로다 ----
+# 쓰려면 elasticsearch/README.md대로 8.10.4를 띄운 뒤 true로 바꾼다. 개발·시연용 서버는 보안을 끄고 띄워 비밀번호가 없다
+avenue.search.enabled=false
+avenue.search.url=http://localhost:9200
+
 # ---- 개인정보 암호화 키 (N-02-4) — Base64. AES는 정확히 32바이트, HMAC은 32바이트 이상, 둘은 서로 달라야 한다 ----
 avenue.pii.aes-key=${AVENUE_DEV_AES_KEY}
 avenue.pii.hmac-key=${AVENUE_DEV_HMAC_KEY}
