@@ -535,6 +535,14 @@
   }
 }
 
+/* FP-259 15차 넓은 화면은 계정 관리 열을 넓혀(3:2) 새 이메일 칸이 주소를 더 보이게 한다.
+   1200부터 넣으면 가린 이메일이 줄바꿈되어 내 정보 높이가 출렁이므로 1280부터 적용한다. */
+@media (min-width: 1280px) {
+  .my-profile-tab {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
 .my-page__title {
   font-size: 28px;
   font-weight: 700;
@@ -884,6 +892,11 @@
 /* 이메일 인증 묶음(줄바꿈 flex) 안에서는 칸 + 버튼 줄이 한 줄 전체를 쓴다 */
 .email-verification > .account-form__row {
   flex-basis: 100%;
+}
+
+/* FP-259 15차 이메일 칸은 220px보다 좁아지지 않게 한다 — 그보다 좁으면 [인증코드 받기]만 같은 상자 안 아래 줄로 내려간다. */
+.email-verification > .account-form__row > :not(button) {
+  flex-basis: 220px;
 }
 
 /* 좁은 화면에서는 이메일 주소가 잘리지 않게 이메일 칸이 한 줄을 다 쓰고 [인증코드 받기]만 같은 상자 안 아래 줄로 내려간다. */
