@@ -54,9 +54,14 @@ export default function AdminPasswordPage() {
   }
 
   return (
-    <section>
-      <h1>비밀번호 변경</h1>
-      <p>관리자 비밀번호를 바꾸려면 저장 전에 업무 이메일로 받은 번호로 본인을 한 번 더 확인합니다.</p>
+    <>
+      {/* FP-273 4차 UI v2 공통 머리(.page-head) */}
+      <div className="page-head">
+        <div>
+          <h1 className="page-head__title">비밀번호 변경</h1>
+          <p className="page-head__lead">관리자 비밀번호를 바꾸려면 저장 전에 업무 이메일로 받은 번호로 본인을 한 번 더 확인합니다.</p>
+        </div>
+      </div>
       <Card>
         <form onSubmit={handleSubmit} noValidate>
           <TextInput
@@ -93,6 +98,6 @@ export default function AdminPasswordPage() {
       </Card>
       <StepUpModal open={stepUpOpen} purpose="비밀번호를 바꾸기 전에" onVerified={handleVerified} onClose={() => setStepUpOpen(false)} />
       <Toast message={toastMessage} onClose={() => setToastMessage('')} />
-    </section>
+    </>
   )
 }

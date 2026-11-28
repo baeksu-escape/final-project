@@ -1,4 +1,40 @@
-/* FP-275 관리자 화면 전용 스타일(admin- 접두어, 색·간격은 tokens.css 변수만) — 접근·감사 로그 표(N-28-2)와 회원 상세 패널(N-35-1)만 쓴다. */
+/* FP-275 관리자 화면 전용 스타일(admin- 접두어, 색·간격은 tokens.css 변수만) — 접근·감사 로그 표(N-28-2)·회원 상세 패널(N-35-1)과 FP-273 4차 UI v2 틀 정렬에 쓴다. */
+
+/* ===== FP-273 4차 UI v2 틀 — 공통 클래스로 모자란 정렬만 더한다 ===== */
+
+/* 접근·감사 로그 탭 줄(section.card.l-g2) — 탭 묶음을 칸 폭만큼 늘이지 않고 왼쪽에 둔다. */
+.admin-log-tabs > .segmented {
+  justify-self: start;
+}
+
+/* 로그 카드 안의 Chip·구분 탭도 카드 폭으로 늘어나지 않게 왼쪽에 둔다(카드 본문은 세로 flex라 기본이 늘이기). */
+.admin-log-card > .card__body > .chip,
+.admin-log-card > .card__body > .segmented {
+  align-self: flex-start;
+}
+
+/* 계정 검색 칸과 [검색] 버튼을 한 줄에 — 공통 form 격자(칸 최소 200px)로는 검색 카드 줄 안에서 버튼이 칸 아래로 내려간다. */
+.admin-search {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+
+.admin-search > .form-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.admin-search > button {
+  flex: none;
+}
+
+/* 인원 Chip은 입력 칸(48px) 높이의 가운데에 둔다. */
+.admin-search__count {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+}
 
 /* ===== 접근·감사 로그 표 — 높이를 한 쪽 줄 수(--admin-log-rows, ADMIN_PAGE_SIZE)로 고정 ===== */
 .admin-log {

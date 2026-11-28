@@ -20,6 +20,7 @@ import AdminPagination from '../components/AdminPagination.jsx'
 import LockReasonModal from '../components/LockReasonModal.jsx'
 import MemberDetailPanel from '../components/MemberDetailPanel.jsx'
 import { useAdminErrorHandler } from '../useAdminErrorHandler.js'
+import '../admin.css'
 
 // 표의 열 수 — 열람 사유 줄이 표 전체 너비를 차지하게 할 때 쓴다.
 const COLUMN_COUNT = 10
@@ -154,12 +155,20 @@ export default function AdminAccountsPage() {
   }
 
   return (
-    <section>
-      <h1>계정·권한 관리</h1>
-      <p>회원 정보는 가려서 보여 줍니다. 자세히 보려면 사유를 남겨야 하고, 남긴 기록은 열람 감사 로그에 쌓입니다.</p>
+    <>
+      {/* FP-273 4차 UI v2 공통 머리(.page-head) */}
+      <div className="page-head">
+        <div>
+          <h1 className="page-head__title">계정·권한 관리</h1>
+          <p className="page-head__lead">
+            회원 정보는 가려서 보여 줍니다. 자세히 보려면 사유를 남겨야 하고, 남긴 기록은 열람 감사 로그에 쌓입니다.
+          </p>
+        </div>
+      </div>
 
+      {/* 검색·필터 줄 — 공통 규칙(.card__body:has(> form[role='search']))으로 검색 칸·필터를 한 줄에 두고, 검색 칸과 [검색]은 admin-search로 붙인다. */}
       <Card>
-        <form onSubmit={handleSearch} role="search" noValidate>
+        <form className="admin-search" onSubmit={handleSearch} role="search" noValidate>
           <TextInput label="아이디·닉네임 검색" value={searchText} onChange={setSearchText} placeholder="예: spam" />
           <Button type="submit">검색</Button>
         </form>
@@ -171,7 +180,11 @@ export default function AdminAccountsPage() {
           value={query.workerType}
           onChange={(value) => changeQuery({ workerType: value ?? '' })}
         />
-        {data && <Chip>{data.totalCount}명</Chip>}
+        {data && (
+          <div className="admin-search__count">
+            <Chip>{data.totalCount}명</Chip>
+          </div>
+        )}
       </Card>
 
       <Card title="회원 목록">
@@ -249,6 +262,6 @@ export default function AdminAccountsPage() {
         onClose={() => setLockTarget(null)}
       />
       <Toast message={toastMessage} onClose={() => setToastMessage('')} />
-    </section>
+    </>
   )
 }

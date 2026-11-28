@@ -97,7 +97,7 @@ function AccessLogSection() {
   const { data, error, busy } = useAdminLogs(fetchAccessLogs, page, '')
 
   return (
-    <Card title="열람 감사 로그">
+    <Card title="열람 감사 로그" className="admin-log-card">
       <Chip>기록은 고치거나 지울 수 없습니다</Chip>
       {error && data && <p role="alert">{error}</p>}
       <AdminLogTable
@@ -120,7 +120,7 @@ function AccessLogSection() {
         }}
       />
       {data && <AdminPagination page={page} size={data.size} totalCount={data.totalCount} onChange={setPage} />}
-      <p>계정·권한 관리에서 회원 상세를 열면 사유와 함께 자동으로 남습니다.</p>
+      <p className="hint">계정·권한 관리에서 회원 상세를 열면 사유와 함께 자동으로 남습니다.</p>
     </Card>
   )
 }
@@ -138,7 +138,7 @@ function SystemLogSection() {
   }
 
   return (
-    <Card title="시스템 로그">
+    <Card title="시스템 로그" className="admin-log-card">
       <SegmentedControl label="로그 구분" options={SYSTEM_LOG_TYPE_OPTIONS} value={type} onChange={changeType} />
       {error && data && <p role="alert">{error}</p>}
       <AdminLogTable
@@ -166,13 +166,22 @@ function SystemLogSection() {
 // N-28·N-35-2 접근·감사 로그(/admin/audit-logs) — 탭 2개: 열람 감사 로그, 시스템 로그.
 export default function AdminAuditLogsPage() {
   const [tab, setTab] = useState(LOG_TABS.ACCESS)
+  // FP-273 4차 UI v2 공통 틀 — 머리는 .page-head, 탭은 통계 화면의 구분 줄처럼 section.card.l-g2에 둔다.
   return (
-    <section>
-      <h1>접근·감사 로그</h1>
-      <p>열람 감사 로그는 관리자가 회원 정보를 열어 본 기록을, 시스템 로그는 로그인·배치·오류 기록을 보여 줍니다.</p>
-      <SegmentedControl label="로그 종류" options={LOG_TAB_OPTIONS} value={tab} onChange={setTab} />
+    <>
+      <div className="page-head">
+        <div>
+          <h1 className="page-head__title">접근·감사 로그</h1>
+          <p className="page-head__lead">
+            열람 감사 로그는 관리자가 회원 정보를 열어 본 기록을, 시스템 로그는 로그인·배치·오류 기록을 보여 줍니다.
+          </p>
+        </div>
+      </div>
+      <section className="card l-g2 admin-log-tabs" aria-label="로그 종류">
+        <SegmentedControl label="로그 종류" options={LOG_TAB_OPTIONS} value={tab} onChange={setTab} />
+      </section>
       <Notice type="info">최신 기록이 위에 옵니다.</Notice>
       {tab === LOG_TABS.ACCESS ? <AccessLogSection /> : <SystemLogSection />}
-    </section>
+    </>
   )
 }
