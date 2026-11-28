@@ -11,7 +11,7 @@ import FieldControl from '../components/FieldControl.jsx'
 import InputStatus from '../components/InputStatus.jsx'
 import SectionFields from '../components/SectionFields.jsx'
 import SectionList from '../components/SectionList.jsx'
-import { areInputSectionsComplete, getAltDataItem, isInputComplete } from '../config/completionItems.js'
+import { areInputSectionsComplete, getAltDataItem, getMissingItems, isInputComplete } from '../config/completionItems.js'
 import { BASE_MONTH_FIELD, getSectionsForJob } from '../config/inputSections.js'
 import {
   ALT_DATA_STEP,
@@ -177,19 +177,42 @@ export default function DataInputPage() {
   const saved = savedAt !== null
   const errorSteps = [...new Set(Object.keys({ ...fullErrors, ...serverErrors }).map(getStepIndexOfErrorKey))]
   const altDataItem = getAltDataItem(status)
-  const stepDone = getStepDoneList({ passedSteps, saved, errorSteps, altDataDone: altDataItem.done })
-  const statusSteps = INPUT_STEPS.map((inputStep, index) => ({
-    key: inputStep.key,
-    title: getStepTitle(inputStep, sections),
-    done: stepDone[index],
-    canJump: canJumpToStep(index, step, stepDone, saved),
+  // 단계 이동 제한(canJumpToStep)은 지금까지의 기준(통과·저장·오류)을 그대로 쓴다.
+  const jumpDone = getStepDoneList({ passedSteps, saved, errorSteps, altDataDone: altDataItem.done })
+  // FP-260 9차 완료 표시는 [점수 산출하기]와 같은 기준 — 저장한 뒤에는 1·2·4·5단계를 서버 status로 본다(3단계 카드·신용은 산출 조건이 아니라 그대로).
+  const savedSections = status?.sections ?? {}
+  const serverDone = {
+    0: Boolean(savedSections.income && savedSections.workPeriod),
+    1: Boolean(savedSections.loans),
+    3: Boolean(savedSections.assets),
+    4: Boolean(savedSections.fixedExpense),
+  }
+  const stepDone = getStepDoneList({ passedSteps, saved, errorSteps, altDataDone: altDataItem.done, serverDone })
+  // FP-260 9차 점수를 내려면 남은 항목 — 저장한 뒤에는 그 항목이 있는 단계 줄을 노란색(주의)으로 표시한다.
+  const missingItems = getMissingItems(status, user.jobType)
+  const blockingSteps = saved ? new Set(missingItems.map((item) => item.step)) : new Set()
+  const statusSteps = INPUT_STEPS.map((inputStep, index) => {
     // 줄 옆 안내 — 소득 단계는 월별 소득의 남은 달 수(N-05-7), 대안 데이터 단계는 미완료일 때 불러온 종류 수.
-    hint: inputStep.sectionKeys.includes('income')
+    const baseHint = inputStep.sectionKeys.includes('income')
       ? notices.income
       : index === ALT_DATA_STEP && !altDataItem.done
         ? altDataItem.hint
-        : '',
-  }))
+        : ''
+    const warn = blockingSteps.has(index)
+    let hint = warn ? ['점수 산출에 필요', baseHint].filter(Boolean).join(' · ') : baseHint
+    // 7단계 줄은 완료로 세지 않고, 산출 준비 상태를 보여 준다.
+    if (index === SCORE_STEP) hint = missingItems.length === 0 ? '점수 산출 가능' : `남은 항목 ${missingItems.length}개`
+    return {
+      key: inputStep.key,
+      title: getStepTitle(inputStep, sections),
+      done: stepDone[index],
+      canJump: canJumpToStep(index, step, jumpDone, saved),
+      warn,
+      hint,
+    }
+  })
+  // 입력 단계(1~6단계)만 세어 "입력 6단계 중 N단계 완료"로 보여 준다.
+  const progressSummary = `입력 ${SCORE_STEP}단계 중 ${stepDone.slice(0, SCORE_STEP).filter(Boolean).length}단계 완료`
   // 서버 저장 전에 [다음]으로 통과한 단계가 있으면 그 단계까지 임시저장되었다고 알린다(값은 바뀔 때마다 임시저장된다).
   const draftNotice =
     !saved && passedSteps.length > 0
@@ -514,7 +537,28 @@ export default function DataInputPage() {
         <div className="data-input-form" style={progressStyle}>
           <div key={step} className={`step-slide step-slide--${stepDir}`}>
             {stepHead}
-          <p className="hint data-input-page__score-hint">오른쪽 단계가 모두 완료되면 마지막으로 저장한 입력으로 점수를 계산합니다.</p>
+          {/* FP-260 9차 산출이 막혀 있으면 안내 한 줄 대신 남은 항목(이름·이유·[이 단계로])을 보여 준다. 모두 완료면 안내 한 줄만. */}
+          {missingItems.length === 0 ? (
+            <p className="hint data-input-page__score-hint">마지막으로 저장한 입력으로 점수를 계산합니다.</p>
+          ) : (
+            <div className="score-missing" role="status">
+              <p className="score-missing__title">점수를 내려면 남은 항목 {missingItems.length}개</p>
+              <ul className="score-missing__list">
+                {missingItems.map((item) => (
+                  <li key={item.key} className="score-missing__item">
+                    <div className="score-missing__text">
+                      <b>{item.label}</b>
+                      <span>{item.reason}</span>
+                    </div>
+                    {/* 보조 이동 버튼 — 7단계 주 버튼은 [점수 산출하기] 하나라 흰 바탕 기본 버튼(finForm 규칙)으로 둔다 */}
+                    <Button size="sm" onClick={() => goToStep(item.step)}>
+                      이 단계로
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {/* 오류 문구 자리는 늘 남겨 둔다 — 산출을 다시 누를 때 문구가 사라졌다 생기며 페이지 높이가 바뀌어 화면이 튀지 않게 */}
           <p className="data-input-page__calculate-error" aria-live="assertive">
             {calculateError || ' '}
@@ -544,6 +588,7 @@ export default function DataInputPage() {
         onSelect={handleStepJump}
         savedAt={savedAt}
         draftNotice={draftNotice}
+        summary={progressSummary}
       />
     </section>
   )

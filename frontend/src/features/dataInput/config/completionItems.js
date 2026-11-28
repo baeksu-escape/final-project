@@ -46,6 +46,24 @@ export function isInputComplete(status, jobType) {
   return getCompletionItems(status, jobType).every((item) => item.done)
 }
 
+// FP-260 9차 [점수 산출하기]를 막는 항목의 이유 한 줄과 고치러 갈 단계(INPUT_STEPS 번호, 0부터).
+// 기준은 서버 status(ScoreCalculationService.isComplete와 같은 6개)다. 대안 데이터 이유는 '5종 중 N종 불러옴'(hint)을 쓴다.
+const MISSING_GUIDES = Object.freeze({
+  income: { step: 0, reason: '소득을 입력하고 저장해 주세요.' },
+  period: { step: 0, reason: '기간을 입력하고 저장해 주세요.' },
+  loans: { step: 1, reason: '대출을 추가하거나 "보유한 대출이 없습니다."에 체크하고 저장해 주세요.' },
+  assets: { step: 3, reason: '자산을 하나 이상 입력하고 저장해 주세요.' },
+  expenses: { step: 4, reason: '월 고정 지출을 입력하고 저장해 주세요.' },
+  [ALT_DATA_ITEM_KEY]: { step: 5 },
+})
+
+// FP-260 9차 점수를 내려면 남은 항목 [{ key, label, reason, step }] — 모두 완료면 빈 목록이다(이때만 [점수 산출하기]가 켜진다).
+export function getMissingItems(status, jobType) {
+  return getCompletionItems(status, jobType)
+    .filter((item) => !item.done)
+    .map((item) => ({ key: item.key, label: item.label, reason: MISSING_GUIDES[item.key].reason ?? item.hint, step: MISSING_GUIDES[item.key].step }))
+}
+
 // FP-227 대안 데이터 항목({ done, hint })만 돌려준다 — 입력 완료 현황 6단계 줄의 완료 여부와 '5종 중 N종 불러옴' 안내에 쓴다.
 export function getAltDataItem(status) {
   return getCompletionItems(status).find((item) => item.key === ALT_DATA_ITEM_KEY)

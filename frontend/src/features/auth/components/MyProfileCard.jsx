@@ -64,9 +64,10 @@ export default function MyProfileCard({ profile, unmasked, onUnmask }) {
   const head = (
     <div className="my-profile-card__head">
       <h2 className="card__title">내 정보</h2>
-      {unmasked && revealed && (
+      {/* FP-259 9차 안내 자리는 원래 값이 있으면 늘 그려 둔다(가린 상태에서는 빈칸). 좁은 화면에서 안내가 다음 줄로 내려가도 [표시] 전후 높이가 같다. */}
+      {unmasked && (
         <p className="my-profile-card__unmasked" role="status">
-          원래 값 표시 중 · 탭·화면을 옮기면 다시 가려집니다
+          {revealed ? '원래 값 표시 중 · 탭·화면을 옮기면 다시 가려집니다' : ' '}
         </p>
       )}
       {unmasked && (

@@ -35,8 +35,11 @@ export const LOCKED_STEP_MESSAGE = '앞 단계를 먼저 끝내 주세요.'
 //   errorSteps: 지금 값에 오류가 있는 단계 번호들   altDataDone: 대안 데이터 5종을 모두 불러왔는지(서버 status)
 //   1~4단계는 통과했거나 저장본이 있고 지금 오류가 없을 때, 5단계는 저장본이 있고 지금 오류가 없을 때,
 //   6단계는 대안 데이터를 모두 불러왔을 때 완료다. 7단계는 점수를 내면 신용 리포트로 가므로 완료 표시를 하지 않는다.
-export function getStepDoneList({ passedSteps, saved, errorSteps, altDataDone }) {
+//   FP-260 9차 serverDone(선택): 저장한 뒤 서버 status로 본 단계별 완료 { 단계 번호: boolean } — 넘기면 그 단계는 이 값으로 정한다
+//   (지금 오류가 있으면 미완료). [점수 산출하기]와 같은 기준으로 보이게 하려는 것이다. 카드·신용(3단계)은 넘기지 않는다.
+export function getStepDoneList({ passedSteps, saved, errorSteps, altDataDone, serverDone }) {
   return INPUT_STEPS.map((_, index) => {
+    if (saved && serverDone && index in serverDone) return serverDone[index] && !errorSteps.includes(index)
     if (index < LAST_INPUT_STEP) return (saved || passedSteps.includes(index)) && !errorSteps.includes(index)
     if (index === LAST_INPUT_STEP) return saved && !errorSteps.includes(index)
     if (index === ALT_DATA_STEP) return altDataDone
