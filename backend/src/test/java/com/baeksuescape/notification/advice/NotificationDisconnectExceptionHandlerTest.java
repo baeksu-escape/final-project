@@ -2,8 +2,10 @@ package com.baeksuescape.notification.advice;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.io.IOException;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockAsyncContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -22,6 +25,8 @@ import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.method.support.ModelAndViewContainer;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+
+import jakarta.servlet.AsyncEvent;
 
 import com.baeksuescape.global.exception.GlobalExceptionHandler;
 import com.baeksuescape.global.security.AuthUser;
@@ -56,9 +61,35 @@ class NotificationDisconnectExceptionHandlerTest {
         org.mockito.BDDMockito.given(streamService.register(7L, null)).willAnswer(invocation -> {
             throw new AsyncRequestNotUsableException("connection closed");
         });
+        mockMvc(streamService).perform(get("/api/members/me/notifications/stream").header(HttpHeaders.AUTHORIZATION, "Bearer token"))
+                .andExpect(content().string(""));
+        verifyNoInteractions(globalHandler);
+    }
+
+    // D-23 컨테이너의 정상 타임아웃을 실행하면 기존 SSE 응답이 오류 없이 닫혀야 한다.
+    @Test
+    void streamTimeout_throughMvcCompletesNormally() throws Exception {
+        NotificationStreamService streamService = new NotificationStreamService();
+        MockMvc mockMvc = mockMvc(streamService);
+        var opened = mockMvc.perform(get("/api/members/me/notifications/stream")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer token")).andReturn();
+        MockAsyncContext context = (MockAsyncContext) opened.getRequest().getAsyncContext();
+        for (var listener : context.getListeners()) {
+            listener.onTimeout(new AsyncEvent(context, opened.getRequest(), opened.getResponse()));
+        }
+
+        assertThat(opened.getAsyncResult(1000)).isNull();
+        mockMvc.perform(asyncDispatch(opened))
+                .andExpect(status().isOk())
+                .andExpect(content().string("event:connected\ndata:ok\n\n"));
+        verifyNoInteractions(globalHandler);
+    }
+
+    // D-23 스트림 종료 시험에서는 인증 주체만 고정하고 MVC의 비동기 응답 처리를 그대로 사용한다.
+    private MockMvc mockMvc(NotificationStreamService streamService) {
         NotificationController controller = new NotificationController(mock(NotificationService.class), streamService,
                 mock(JwtTokenProvider.class));
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(handler)
+        return MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(handler)
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override public boolean supportsParameter(MethodParameter parameter) {
                         return parameter.hasParameterAnnotation(AuthenticationPrincipal.class);
@@ -69,9 +100,6 @@ class NotificationDisconnectExceptionHandlerTest {
                     }
                 }).build();
 
-        mockMvc.perform(get("/api/members/me/notifications/stream").header(HttpHeaders.AUTHORIZATION, "Bearer token"))
-                .andExpect(content().string(""));
-        verifyNoInteractions(globalHandler);
     }
     @Test
     @DisplayName("스트림 경로의 연결 중단 IOException도 응답을 쓰지 않는다")

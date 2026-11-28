@@ -3,10 +3,12 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { Button, Card } from '../../../common/components/index.js'
 import { PATHS } from '../../../common/config/navigation.js'
 import { adaptNotifications } from '../adapters/notificationAdapter.js'
-import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../api/notificationApi.js'
+import { fetchNotifications, markNotificationRead } from '../api/notificationApi.js'
 import '../styles/notification.css'
 import { emitNotificationsChanged, NOTIFICATIONS_CHANGED_EVENT } from '../components/useNotifications.js'
 import { relativeTime } from '../adapters/notificationTime.js'
+
+import { useReadAllSnapshot, applyReadAll, paginationVersion } from '../components/readAllSnapshot.js'
 
 const PAGE_SIZE = 20
 const TABS = [
@@ -33,97 +35,129 @@ export default function NotificationsPage() {
   const [history, setHistory] = useState({ type: null, items: [], unreadCount: 0, hasMore: false, loading: true, error: '' })
   const [loadingMore, setLoadingMore] = useState(false)
   const [actionError, setActionError] = useState('')
-  const [refreshVersion, setRefreshVersion] = useState(0)
-  const sequence = useRef(0)
+  const [markAll, readingAll] = useReadAllSnapshot(history.items)
+  const view = useRef(null)
+  const actions = useRef(new Set())
 
   useEffect(() => {
-    const requestId = ++sequence.current
-    fetchNotifications({ type: type === 'ALL' ? undefined : type, size: PAGE_SIZE }).then((data) => {
-      if (sequence.current === requestId) {
-        const firstPage = adaptNotifications(data)
-        setHistory((current) => {
-          if (current.type !== type || current.items.length === 0) return { type, ...firstPage, loading: false, error: '' }
-          const firstIds = new Set(firstPage.items.map((item) => item.notificationId))
-          return {
-            ...current,
-            items: [...firstPage.items, ...current.items.filter((item) => !firstIds.has(item.notificationId))],
-            unreadCount: firstPage.unreadCount,
-            hasMore: current.hasMore || firstPage.hasMore,
-            loading: false,
-            error: '',
-          }
-        })
-      }
-    }).catch(() => {
-      // D-23 같은 탭을 다시 불러오다 실패하면 표시 중인 기록은 남기고 오류 안내만, 탭을 바꾸다 실패하면 이전 탭 목록을 보이지 않는다.
-      if (sequence.current === requestId) setHistory((current) => current.type === type
-        ? { ...current, loading: false, error: '알림을 불러오지 못했어요.' }
-        : { type, items: [], unreadCount: 0, hasMore: false, loading: false, error: '알림을 불러오지 못했어요.' })
-    })
-    return () => { sequence.current += 1 }
-  }, [type, refreshVersion])
+    let retryTimer
+    const scope = { sequence: 0, oldest: null, busy: false }
+    view.current = scope
+    const query = { type: type === 'ALL' ? undefined : type, size: PAGE_SIZE }
 
-  useEffect(() => {
-    const refreshFromBell = (event) => {
-      if (event.detail?.source === 'page') return
-      if (event.detail?.readAll) {
-        setHistory((current) => ({ ...current, items: current.items.map((item) => ({ ...item, read: true })), unreadCount: 0 }))
-      } else if (event.detail?.notificationId != null) {
-        setHistory((current) => {
-          const wasUnread = current.items.some((item) => item.notificationId === event.detail.notificationId && !item.read)
-          return {
-            ...current,
-            items: current.items.map((item) => item.notificationId === event.detail.notificationId ? { ...item, read: true } : item),
-            unreadCount: Math.max(0, current.unreadCount - Number(wasUnread)),
-          }
-        })
+    // D-23 기존 마지막 행까지 서버 커서를 따라가 갱신한다. 새 첫 페이지와 겹치지 않아도 중간 기록을 건너뛰지 않는다.
+    const refresh = async (retry = true) => {
+      window.clearTimeout(retryTimer)
+      const request = ++scope.sequence
+      scope.busy = true
+      try {
+        let page = adaptNotifications(await fetchNotifications(query))
+        const unreadCount = page.unreadCount
+        const items = [...page.items]
+        while (request === scope.sequence && scope.oldest != null && page.hasMore && page.items.at(-1)?.notificationId > scope.oldest) {
+          page = adaptNotifications(await fetchNotifications({ ...query, before: page.items.at(-1).notificationId }))
+          items.push(...page.items)
+        }
+        if (request !== scope.sequence) return
+        const retained = scope.oldest == null ? items : items.filter((item) => item.notificationId >= scope.oldest)
+        scope.oldest = retained.at(-1)?.notificationId
+        setHistory({ type, items: retained, unreadCount, hasMore: page.hasMore || retained.length < items.length, loading: false, error: '' })
+      } catch {
+        if (request !== scope.sequence) return
+        if (retry) retryTimer = window.setTimeout(() => refresh(false), 1000)
+        setHistory((current) => current.type === type
+          ? { ...current, loading: false, error: '알림을 불러오지 못했어요.' }
+          : { type, items: [], unreadCount: 0, hasMore: false, loading: false, error: '알림을 불러오지 못했어요.' })
+      } finally {
+        if (request === scope.sequence) {
+          scope.busy = false
+          setLoadingMore(false)
+        }
       }
-      setRefreshVersion((version) => version + 1)
     }
-    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshFromBell)
-    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshFromBell)
-  }, [])
+    const onChange = (event) => {
+      if (view.current !== scope) return
+      const id = event?.detail?.notificationId
+      if (event.detail?.readAll) {
+        setHistory((current) => applyReadAll(current, event.detail, false))
+      } else if (id != null) setHistory((current) => {
+        if (!current.items.some((item) => item.notificationId === id && !item.read)) return current
+        return { ...current, items: current.items.map((item) => item.notificationId === id ? { ...item, read: true } : item), unreadCount: Math.max(0, current.unreadCount - 1) }
+      })
+      setLoadingMore(true)
+      refresh()
+    }
+    scope.refresh = refresh
+    refresh()
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onChange)
+    return () => {
+      scope.sequence += 1
+      window.clearTimeout(retryTimer)
+      view.current = null
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, onChange)
+    }
+  }, [type])
 
   const visible = history.type === type ? history : { items: [], unreadCount: 0, hasMore: false, loading: true, error: '' }
   const selectTab = (code) => {
+    if (code !== type && view.current) {
+      view.current.sequence += 1
+      view.current = null
+    }
     const next = new URLSearchParams(searchParams)
     if (code === 'ALL') next.delete('type')
     else next.set('type', code)
     setSearchParams(next)
     setActionError('')
   }
-  const selectItem = async (item) => {
+  // D-23 같은 동작은 한 번만 보내고, 탭을 떠난 뒤 완료되면 현재 목록에 변경만 알린다.
+  const read = async (item) => {
+    const scope = view.current
+    const id = item?.notificationId
+    if (!scope || actions.current.has(id)) return
+    actions.current.add(id)
     try {
-      if (!item.read) {
-        await markNotificationRead(item.notificationId)
-        emitNotificationsChanged('page')
+      if (!item || !item.read) {
+        if (item) {
+          await markNotificationRead(id)
+          emitNotificationsChanged('page', { notificationId: id })
+        } else {
+          emitNotificationsChanged('page', await markAll())
+        }
       }
-      setHistory((current) => current.type === type
-        ? { ...current, items: current.items.map((row) => row.notificationId === item.notificationId ? { ...row, read: true } : row), unreadCount: Math.max(0, current.unreadCount - Number(!item.read)) }
-        : current)
-      if (item.linkUrl) navigate(item.linkUrl)
-    } catch { setActionError('읽음 처리에 실패했어요.') }
-  }
-  const readAll = async () => {
-    try {
-      await markAllNotificationsRead()
-      emitNotificationsChanged('page')
-      setHistory((current) => ({ ...current, items: current.items.map((item) => ({ ...item, read: true })), unreadCount: 0 }))
+      if (scope !== view.current) return
       setActionError('')
-    } catch { setActionError('읽음 처리에 실패했어요.') }
+      if (item?.linkUrl) navigate(item.linkUrl)
+    } catch {
+      if (scope === view.current) setActionError('읽음 처리에 실패했어요.')
+    } finally { actions.current.delete(id) }
   }
+  const selectItem = (item) => read(item)
+  const readAll = () => read()
+
+  // D-23 더보기 도중 갱신이나 탭 전환이 시작되면 이전 응답과 오류를 버린다.
   const loadMore = async () => {
+    const scope = view.current
+    const version = paginationVersion()
     const before = visible.items.at(-1)?.notificationId
-    if (before == null || !visible.hasMore || loadingMore) return
+    if (version == null || !scope || scope.busy || before == null || !visible.hasMore) return
+    const request = scope.sequence
+    scope.busy = true
     setLoadingMore(true)
     try {
       const page = adaptNotifications(await fetchNotifications({ type: type === 'ALL' ? undefined : type, before, size: PAGE_SIZE }))
-      setHistory((current) => current.type === type
-        ? { ...current, items: [...current.items, ...page.items.filter((item) => !current.items.some((row) => row.notificationId === item.notificationId))], unreadCount: page.unreadCount, hasMore: page.hasMore }
-        : current)
+      if (request !== scope.sequence || version !== paginationVersion()) return
+      scope.oldest = page.items.at(-1)?.notificationId ?? before
+      setHistory((current) => ({ ...current, items: [...current.items, ...page.items], unreadCount: page.unreadCount, hasMore: page.hasMore }))
       setActionError('')
-    } catch { setActionError('알림을 더 불러오지 못했어요.') }
-    finally { setLoadingMore(false) }
+    } catch {
+      if (request === scope.sequence && version === paginationVersion()) setActionError('알림을 더 불러오지 못했어요.')
+    } finally {
+      if (request === scope.sequence) {
+        scope.busy = false
+        setLoadingMore(false)
+      }
+    }
   }
   const selectedTab = TABS.find((tab) => tab.code === type)
 
@@ -135,7 +169,7 @@ export default function NotificationsPage() {
           <h1 className="page-head__title">알림</h1>
           <p className="page-head__lead">새 점수와 댓글, 처리 안내를 모아 봅니다.</p>
         </div>
-        <Button variant="weak" size="sm" disabled={visible.unreadCount === 0} onClick={readAll}>모두 읽음</Button>
+        <Button variant="weak" size="sm" disabled={readingAll || visible.countPending || visible.unreadCount === 0} onClick={readAll}>모두 읽음</Button>
       </div>
       <nav className="sub-tab-menu" aria-label="알림 종류">
         <ul className="sub-tab-menu__list">
@@ -149,7 +183,8 @@ export default function NotificationsPage() {
       </nav>
       <Card title="알림 기록">
         {visible.loading ? <p className="hint" role="status">알림을 불러오는 중이에요.</p> : <>
-          {visible.error && <p className="hint" role="status">{visible.error}</p>}
+          {visible.lastSnapshot && <p className="hint" role="status">마지막 조회 목록입니다. 현재 읽음 상태는 갱신 후 확인할 수 있어요.</p>}
+          {visible.error && <p className="hint" role="status">{visible.error} <Button variant="weak" size="sm" onClick={() => view.current?.refresh()}>다시 조회</Button></p>}
           {visible.items.length === 0 ? (visible.error ? null : <p className="hint">{selectedTab.empty}</p>)
             : <ul className="nt-list">{visible.items.map((item) => <li key={item.notificationId}>
                 <button type="button" className={item.read ? 'nt-item' : 'nt-item nt-item--unread'} onClick={() => selectItem(item)}>
@@ -164,7 +199,7 @@ export default function NotificationsPage() {
               </li>)}</ul>}
         </>}
         {actionError && <p className="hint" role="status">{actionError}</p>}
-        {visible.hasMore && <div className="nt-more"><Button variant="weak" size="sm" disabled={loadingMore} onClick={loadMore}>{loadingMore ? '불러오는 중…' : '더 보기'}</Button></div>}
+        {visible.hasMore && <div className="nt-more"><Button variant="weak" size="sm" disabled={readingAll || loadingMore} onClick={loadMore}>{loadingMore ? '불러오는 중…' : '더 보기'}</Button></div>}
       </Card>
     </div>
   )

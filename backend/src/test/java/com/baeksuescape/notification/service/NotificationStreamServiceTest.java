@@ -3,6 +3,12 @@ package com.baeksuescape.notification.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -10,12 +16,15 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.baeksuescape.notification.dto.NotificationCreatedEvent;
@@ -96,6 +105,41 @@ class NotificationStreamServiceTest {
         assertEquals(0, service.connectionCount(7L));
     }
 
+    // D-23 예약 호출이 반환되기 전에 만료 작업이 끝나는 순서를 재현한다.
+    @Test
+    void expirationRunsBeforeFutureIsRegistered() {
+        ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
+        ScheduledFuture<?> future = mock(ScheduledFuture.class);
+        ReflectionTestUtils.setField(service, "heartbeatExecutor", executor);
+        when(executor.schedule(any(Runnable.class), anyLong(), eq(TimeUnit.MILLISECONDS))).thenAnswer(call -> {
+            call.<Runnable>getArgument(0).run();
+            return future;
+        });
+
+        service.register(7L, Instant.now().minusMillis(1));
+
+        assertEquals(0, service.connectionCount(7L));
+        assertTrue(String.join("", created.get(0).sent).contains("event:expired"));
+        verify(future).cancel(false);
+    }
+
+    // D-23 예약을 등록하기 전에 컨테이너 타임아웃이 연결을 제거하는 순서를 재현한다.
+    @Test
+    void timeoutRunsBeforeFutureIsRegistered() {
+        ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
+        ScheduledFuture<?> future = mock(ScheduledFuture.class);
+        ReflectionTestUtils.setField(service, "heartbeatExecutor", executor);
+        when(executor.schedule(any(Runnable.class), anyLong(), eq(TimeUnit.MILLISECONDS))).thenAnswer(call -> {
+            created.get(0).timeout.run();
+            return future;
+        });
+
+        service.register(7L, Instant.now().plusSeconds(60));
+
+        assertEquals(0, service.connectionCount(7L));
+        verify(future).cancel(false);
+    }
+
     @Test
     @DisplayName("보내기에 실패한 연결은 닫고 목록에서 빼며, 다른 연결은 그대로 둔다")
     void sendFailure_cleansUpOnlyThatConnection() {
@@ -154,10 +198,17 @@ class NotificationStreamServiceTest {
         boolean blockSend;
         boolean failSend;
         boolean completed;
+        Runnable timeout;
 
         RecordingEmitter(long timeout) {
             super(timeout);
             timeoutMillis = timeout;
+        }
+
+        // D-23 컨테이너가 호출하는 타임아웃 콜백을 테스트에서 직접 실행한다.
+        @Override
+        public void onTimeout(Runnable callback) {
+            timeout = callback;
         }
 
         // D-23 FP-284 느린 연결을 막아 두고 다른 emitter의 ping·정리가 진행되는지 가짜 연결에서 확인한다.

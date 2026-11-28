@@ -3,6 +3,7 @@ package com.baeksuescape.community.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.apache.ibatis.session.SqlSession;
@@ -17,7 +18,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
-/** D-23 FP-301 selectOpenReporterUserIds를 실제 Oracle에서 확인한다. -Ddb.it=true일 때만 실행하고 입력 행은 롤백한다. */
+import com.baeksuescape.community.mapper.ReportMapper.PendingReport;
+
+/** N-34-3 신고자 조회와 신고 행 갱신을 Oracle에서 확인한다. -Ddb.it=true일 때만 실행하고 입력 행은 롤백한다. */
 @SpringBootTest
 @Transactional
 @EnabledIfSystemProperty(named = "db.it", matches = "true")
@@ -71,6 +74,25 @@ class ReportMapperIT {
         sqlSession.clearCache();
 
         assertThat(mapper.selectOpenReporterUserIds("POST", postId)).containsExactly(userIds.get(0));
+    }
+
+    // N-34-3 신고자 번호가 NULL인 행을 Oracle에서 읽고 닫으며, 이미 닫은 행은 다시 갱신되지 않는지 확인한다.
+    @Test
+    void closeOpenReport_신고자가_없는_행도_한_번만_닫는다() {
+        List<PendingReport> before = mapper.selectPendingReports("POST", postId);
+        jdbc.update("INSERT INTO CONTENT_REPORT (TARGET_TYPE_CODE, POST_ID, REASON_CODE) VALUES ('POST', ?, 'SPAM')", postId);
+        insertOpen(userIds.get(0), "IN_REVIEW");
+        sqlSession.clearCache();
+
+        List<PendingReport> added = mapper.selectPendingReports("POST", postId).stream()
+                .filter(report -> !before.contains(report)).toList();
+        assertThat(added).extracting(PendingReport::reporterUserId).containsExactlyInAnyOrder(null, userIds.get(0));
+        LocalDateTime now = LocalDateTime.now();
+        for (PendingReport report : added) {
+            assertThat(mapper.closeOpenReport(report.reportId(), "REJECTED", "REJECT", userIds.get(0), null, now)).isEqualTo(1);
+            assertThat(mapper.closeOpenReport(report.reportId(), "DONE", "DELETE", userIds.get(0), null, now)).isZero();
+        }
+        assertThat(mapper.selectPendingReports("POST", postId)).containsExactlyElementsOf(before);
     }
 
     // D-23 FP-301 테스트 대상 글의 신고 한 건을 지정한 미처리 상태로 저장한다.

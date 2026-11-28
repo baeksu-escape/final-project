@@ -3,6 +3,13 @@
 <!-- FP-191 N-33 신고 접수·N-34 관리자 신고 처리 (CONTENT_REPORT, DDL v0.3.2) -->
 <mapper namespace="com.baeksuescape.community.mapper.ReportMapper">
 
+    <resultMap id="pendingReport" type="com.baeksuescape.community.mapper.ReportMapper$PendingReport">
+        <constructor>
+            <idArg column="REPORT_ID" javaType="_long"/>
+            <arg column="REPORTER_USER_ID" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
     <!-- 한 대상(글 또는 댓글)을 고르는 조건 -->
     <sql id="targetWhere">
         <choose>
@@ -89,11 +96,15 @@
          ORDER BY R.REPORTED_AT DESC, R.REPORT_ID DESC
     </select>
 
-    <!-- N-34-3 처리 결과 저장. 상태·결과 조합은 DDL CK_CRP_RESULT_STATUS가 다시 검사한다. -->
-    <update id="closeOpenReports">
-        UPDATE CONTENT_REPORT R
+    <!-- N-34-3 처리 결과와 담당자를 함께 저장한다. 상태·결과 조합은 DDL CK_CRP_RESULT_STATUS가 다시 검사한다. -->
+    <sql id="reportResolution">
            SET R.STATUS_CODE = #{statusCode}, R.RESULT_CODE = #{resultCode}, R.HANDLER_USER_ID = #{handlerUserId},
                R.HANDLER_MEMO = #{memo,jdbcType=VARCHAR}, R.HANDLED_AT = #{now}
+    </sql>
+
+    <update id="closeOpenReports">
+        UPDATE CONTENT_REPORT R
+        <include refid="reportResolution"/>
          WHERE <include refid="targetWhere"/>
            AND R.STATUS_CODE IN ('RECEIVED', 'IN_REVIEW')
     </update>
@@ -104,4 +115,21 @@
          WHERE <include refid="targetWhere"/>
            AND R.STATUS_CODE IN ('RECEIVED', 'IN_REVIEW')
     </select>
+
+    <!-- N-34-3 경쟁하는 두 요청이 같은 순서로 신고 행을 갱신하도록 신고 번호순으로 읽는다. -->
+    <select id="selectPendingReports" resultMap="pendingReport">
+        SELECT R.REPORT_ID, R.REPORTER_USER_ID
+          FROM CONTENT_REPORT R
+         WHERE <include refid="targetWhere"/>
+           AND R.STATUS_CODE IN ('RECEIVED', 'IN_REVIEW')
+         ORDER BY R.REPORT_ID
+    </select>
+
+    <!-- N-34-3 조회한 번호만 닫고, 먼저 처리된 행은 갱신 건수 0으로 감지한다. -->
+    <update id="closeOpenReport">
+        UPDATE CONTENT_REPORT R
+        <include refid="reportResolution"/>
+         WHERE R.REPORT_ID = #{reportId}
+           AND R.STATUS_CODE IN ('RECEIVED', 'IN_REVIEW')
+    </update>
 </mapper>

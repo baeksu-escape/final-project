@@ -49,4 +49,15 @@ public interface ReportMapper {
 
     // D-23 FP-301 처리 대상의 미처리 신고자 회원 ID를 중복 없이 조회한다.
     List<Long> selectOpenReporterUserIds(@Param("targetType") String targetType, @Param("targetId") long targetId);
+
+    // N-34-3 처리할 신고 번호와 알림을 받을 신고자 번호를 함께 조회한다.
+    List<PendingReport> selectPendingReports(@Param("targetType") String targetType, @Param("targetId") long targetId);
+
+    // N-34-3 조회한 신고 한 건이 아직 미처리일 때만 닫는다.
+    int closeOpenReport(@Param("reportId") long reportId, @Param("statusCode") String statusCode,
+            @Param("resultCode") String resultCode, @Param("handlerUserId") long handlerUserId,
+            @Param("memo") String memo, @Param("now") LocalDateTime now);
+
+    // N-34-3 신고 처리와 알림에 같은 조회 결과를 사용한다.
+    record PendingReport(long reportId, Long reporterUserId) {}
 }

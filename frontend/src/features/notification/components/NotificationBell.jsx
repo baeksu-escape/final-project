@@ -32,6 +32,9 @@ export default function NotificationBell({ enabled = true }) {
   const navigate = useNavigate()
   const notifications = useNotifications(enabled)
 
+  const showBadge = !notifications.countPending && notifications.unreadCount > 0
+  const badgeLabel = notifications.lastSnapshot ? '마지막 조회 기준 안 읽은 알림' : '안 읽은 알림'
+
   useEffect(() => {
     if (!open) return undefined
     // D-23 패널 바깥 클릭은 닫고 종 버튼으로 포커스를 돌린다.
@@ -57,31 +60,32 @@ export default function NotificationBell({ enabled = true }) {
 
   const selectItem = async (item) => {
     try {
-      if (!item.read) await notifications.markRead(item.notificationId)
+      if (!item.read && !(await notifications.markRead(item.notificationId))) return
       setOpen(false)
       if (item.linkUrl) navigate(item.linkUrl)
     } catch { setActionError('읽음 처리에 실패했어요.') }
   }
   // D-23 X 버튼 — 이동하지 않고 읽음 처리만 해서 드롭다운에서 뺀다(알림 페이지에는 읽음으로 남음).
   const dismissItem = async (item) => {
-    try { await notifications.markRead(item.notificationId); setActionError('') }
+    try { if (await notifications.markRead(item.notificationId)) setActionError('') }
     catch { setActionError('읽음 처리에 실패했어요.') }
   }
   const readAll = async () => {
-    try { await notifications.markAllRead(); setActionError('') }
+    try { if (await notifications.markAllRead()) setActionError('') }
     catch { setActionError('읽음 처리에 실패했어요.') }
   }
 
   return (
     <div className="nt-root" ref={rootRef}>
-      <button ref={triggerRef} type="button" className="app-header__text-btn" aria-expanded={open} aria-controls={open ? 'notification-panel' : undefined} aria-label={notifications.unreadCount > 0 ? `알림, 안 읽은 알림 ${notifications.unreadCount}개` : '알림'} onClick={() => { setOpen((value) => !value); setActionError('') }}>
-        <span className="nt-bell"><BellIcon />{notifications.unreadCount > 0 && <span className="nt-badge">{notifications.unreadCount > 99 ? '99+' : notifications.unreadCount}</span>}</span>
+      <button ref={triggerRef} type="button" className="app-header__text-btn" aria-expanded={open} aria-controls={open ? 'notification-panel' : undefined} aria-label={showBadge ? `알림, ${badgeLabel} ${notifications.unreadCount}개` : '알림'} onClick={() => { setOpen((value) => !value); setActionError('') }}>
+        <span className="nt-bell"><BellIcon />{showBadge && <span className="nt-badge">{notifications.unreadCount > 99 ? '99+' : notifications.unreadCount}</span>}</span>
       </button>
       {open && <section ref={panelRef} className="nt-panel" id="notification-panel" role="region" aria-labelledby="notification-panel-title" tabIndex={-1}>
-        <header className="nt-panel__head"><strong id="notification-panel-title">안 읽은 알림</strong><span className="nt-panel__actions"><button type="button" className="nt-read-all" disabled={notifications.unreadCount === 0} onClick={readAll}>모두 읽음</button><Link className="text-link nt-all-link" to={PATHS.NOTIFICATIONS} onClick={() => setOpen(false)}>전체 보기</Link></span></header>
+        <header className="nt-panel__head"><strong id="notification-panel-title">안 읽은 알림</strong><span className="nt-panel__actions"><button type="button" className="nt-read-all" disabled={notifications.readingAll || notifications.countPending || notifications.unreadCount === 0} onClick={readAll}>모두 읽음</button><Link className="text-link nt-all-link" to={PATHS.NOTIFICATIONS} onClick={() => setOpen(false)}>전체 보기</Link></span></header>
+        {notifications.lastSnapshot && <p className="hint" role="status">마지막 조회 목록입니다. 현재 읽음 상태는 갱신 후 확인할 수 있어요.</p>}
+        {notifications.error && <p className="hint" role="status">{notifications.error} <button type="button" className="nt-read-all" onClick={notifications.refresh}>다시 조회</button></p>}
         {notifications.loading ? <p className="hint">알림을 불러오는 중이에요.</p>
-          : notifications.error ? <p className="hint" role="status">{notifications.error}</p>
-            : notifications.items.length === 0 ? <p className="hint">새 알림이 없어요.</p>
+          : notifications.items.length === 0 ? (notifications.error ? null : <p className="hint">새 알림이 없어요.</p>)
               : <ul className="nt-list">{notifications.items.slice(0, PANEL_LIMIT).map((item) => <li key={item.notificationId} className="nt-li">
                 <button type="button" className={item.read ? 'nt-item' : 'nt-item nt-item--unread'} onClick={() => selectItem(item)}>
                   <span className="nt-item__heading">

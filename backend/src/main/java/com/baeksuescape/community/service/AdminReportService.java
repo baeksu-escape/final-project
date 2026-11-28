@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ import com.baeksuescape.community.dto.ContentTarget;
 import com.baeksuescape.community.dto.ReportDtos;
 import com.baeksuescape.community.dto.ReportRow;
 import com.baeksuescape.community.mapper.ReportMapper;
+import com.baeksuescape.community.mapper.ReportMapper.PendingReport;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.util.PiiMasking;
 import com.baeksuescape.notification.service.NotificationService;
@@ -96,7 +98,8 @@ public class AdminReportService {
         ContentTarget target = requireTarget(report);
         String type = target.targetType();
         long id = target.targetId();
-        if (reportMapper.countOpenByTarget(type, id) == 0) {
+        List<PendingReport> pendingReports = reportMapper.selectPendingReports(type, id);
+        if (pendingReports.isEmpty()) {
             throw new ApiException(HttpStatus.CONFLICT, "ALREADY_HANDLED", "이미 처리된 신고입니다.");
         }
 
@@ -113,9 +116,16 @@ public class AdminReportService {
             changeOrFail(type, id, before, after, ACTION_RESTORE, adminUserId, reportId, now);
         }
 
-        List<Long> reporterUserIds = reportMapper.selectOpenReporterUserIds(type, id).stream().distinct().toList();
+        // N-34-3 미리 조회한 행만 닫는다. 경합에서 진 요청은 앞선 상태 변경까지 롤백하고 알림을 등록하지 않는다.
         String reportStatus = RESULT_REJECT.equals(result) ? REPORT_REJECTED : REPORT_DONE;
-        int handled = reportMapper.closeOpenReports(type, id, reportStatus, result, adminUserId, blankToNull(request.memo()), now);
+        String memo = blankToNull(request.memo());
+        for (PendingReport pending : pendingReports) {
+            if (reportMapper.closeOpenReport(pending.reportId(), reportStatus, result, adminUserId, memo, now) == 0) {
+                throw new ApiException(HttpStatus.CONFLICT, "ALREADY_HANDLED", "이미 처리된 신고입니다.");
+            }
+        }
+        List<Long> reporterUserIds = pendingReports.stream().map(PendingReport::reporterUserId)
+                .filter(Objects::nonNull).distinct().toList();
         long postId = target.parentPostId() == null ? target.targetId() : target.parentPostId();
         Long ownerUserId = target.ownerUserId();
         boolean ownerGetsStateNotification = !VISIBLE.equals(after) && !after.equals(before) && ownerUserId != null;
@@ -136,7 +146,7 @@ public class AdminReportService {
             String content = DELETED.equals(after) ? "운영 정책에 따라 " + noun + "이 삭제 처리됐어요." : "운영 정책에 따라 " + noun + "이 숨김 처리됐어요.";
             notificationService.notifyQuietly(ownerUserId, "REPORT_RESULT", title, content, link);
         }
-        return new ReportDtos.ReportProcessed(result, after, handled);
+        return new ReportDtos.ReportProcessed(result, after, pendingReports.size());
     }
 
     // 같은 대상의 신고 묶음 하나. rows는 최근순이라 첫 줄이 가장 최근 신고다.

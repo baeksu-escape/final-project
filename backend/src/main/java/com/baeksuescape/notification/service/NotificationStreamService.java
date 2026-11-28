@@ -88,7 +88,11 @@ public class NotificationStreamService {
         });
         // 끝났거나 시간이 지났거나 오류가 난 연결은 목록에서 뺀다.
         emitter.onCompletion(() -> remove(userId, emitter));
-        emitter.onTimeout(() -> remove(userId, emitter));
+        emitter.onTimeout(() -> {
+            remove(userId, emitter);
+            // D-23 정상 연결 제한 시간에는 MVC가 오류를 처리하기 전에 스트림을 완료한다.
+            completeQuietly(emitter);
+        });
         emitter.onError(error -> remove(userId, emitter));
         toClose.forEach(old -> {
             cancelExpiration(old);
@@ -99,8 +103,12 @@ public class NotificationStreamService {
         if (tokenExpiresAt != null && !stopped && emitters.getOrDefault(userId, List.of()).contains(emitter)) {
             ensureHeartbeatExecutor();
             long delayMillis = Math.max(0, Duration.between(Instant.now(), tokenExpiresAt).toMillis());
-            expirationTasks.put(emitter, heartbeatExecutor.schedule(() -> expire(userId, emitter), delayMillis,
-                    TimeUnit.MILLISECONDS));
+            ScheduledFuture<?> task = heartbeatExecutor.schedule(() -> expire(userId, emitter), delayMillis, TimeUnit.MILLISECONDS);
+            expirationTasks.put(emitter, task);
+            // D-23 예약이 등록되기 전에 끝난 연결의 작업도 취소한다.
+            if (!emitters.getOrDefault(userId, List.of()).contains(emitter)) {
+                cancelExpiration(emitter);
+            }
         }
         return emitter;
     }
@@ -178,13 +186,14 @@ public class NotificationStreamService {
         }
     }
 
+    // D-23 먼저 연결을 목록에서 빼야 뒤늦게 등록된 만료 작업도 스스로 취소할 수 있다.
     private void remove(long userId, SseEmitter emitter) {
-        cancelExpiration(emitter);
         emitters.computeIfPresent(userId, (id, list) -> {
             List<SseEmitter> next = new ArrayList<>(list);
             next.remove(emitter);
             return next.isEmpty() ? null : next;
         });
+        cancelExpiration(emitter);
     }
 
     // D-23 FP-284 연결이 먼저 닫히면 예약된 토큰 만료 작업도 취소한다.

@@ -14,10 +14,16 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +39,7 @@ import com.baeksuescape.community.dto.ReportDtos;
 import com.baeksuescape.community.dto.ReportRow;
 import com.baeksuescape.community.mapper.BoardMapper;
 import com.baeksuescape.community.mapper.ReportMapper;
+import com.baeksuescape.community.mapper.ReportMapper.PendingReport;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.notification.service.NotificationService;
 
@@ -58,7 +65,7 @@ class AdminReportServiceTest {
     void setUp() {
         service = new AdminReportService(reportMapper, new ContentStatusService(boardMapper), settings, CLOCK, notificationService);
         given(settings.intValue("REPORT_AUTO_HIDE_COUNT", 5)).willReturn(5);
-        given(reportMapper.selectOpenReporterUserIds(anyString(), anyLong())).willReturn(List.of(9L));
+        given(reportMapper.closeOpenReport(anyLong(), anyString(), anyString(), anyLong(), any(), eq(NOW))).willReturn(1);
     }
 
     private static ReportRow report(long reportId, String type, long targetId, String reason, String status, String targetStatus,
@@ -128,16 +135,17 @@ class AdminReportServiceTest {
     @Test
     void 반려하면_숨김을_풀고_미처리_신고를_모두_반려로_닫는다() {
         given(reportMapper.selectReport(12L)).willReturn(report(12, "POST", 1, "SPAM", "RECEIVED", "HIDDEN_BY_REPORT", NOW));
-        given(reportMapper.selectOpenReporterUserIds("POST", 1L)).willReturn(List.of(9L, 10L));
+        given(reportMapper.selectPendingReports("POST", 1L))
+                .willReturn(List.of(new PendingReport(12L, 9L), new PendingReport(13L, 10L)));
         given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "HIDDEN_BY_REPORT"));
-        given(reportMapper.countOpenByTarget("POST", 1L)).willReturn(5);
         given(boardMapper.updatePostStatus(1L, "HIDDEN_BY_REPORT", "VISIBLE", NOW)).willReturn(1);
-        given(reportMapper.closeOpenReports("POST", 1L, "REJECTED", "REJECT", ADMIN, "문제없음", NOW)).willReturn(5);
 
         ReportDtos.ReportProcessed result = service.process(ADMIN, 12L, new ReportDtos.ReportProcess("REJECT", " 문제없음 "));
 
         assertThat(result.targetStatus()).isEqualTo("VISIBLE");
-        assertThat(result.handledCount()).isEqualTo(5);
+        assertThat(result.handledCount()).isEqualTo(2);
+        verify(reportMapper).closeOpenReport(12L, "REJECTED", "REJECT", ADMIN, "문제없음", NOW);
+        verify(reportMapper).closeOpenReport(13L, "REJECTED", "REJECT", ADMIN, "문제없음", NOW);
         verify(boardMapper).insertPostLog(1L, "RESTORE", "ADMIN", ADMIN, "HIDDEN_BY_REPORT", "VISIBLE", 12L, NOW);
         verify(notificationService).notifyQuietly(9L, "REPORT_RESULT", "신고 처리 결과가 있어요",
                 "신고하신 글은 운영 정책 위반이 아니라고 판단했어요.", "/lounge?post=1");
@@ -150,11 +158,9 @@ class AdminReportServiceTest {
     @Test
     void 반려할_때_작성자가_신고자이면_신고자_결과_알림만_받는다() {
         given(reportMapper.selectReport(12L)).willReturn(report(12, "POST", 1, "SPAM", "RECEIVED", "HIDDEN_BY_REPORT", NOW));
-        given(reportMapper.selectOpenReporterUserIds("POST", 1L)).willReturn(List.of(OTHER));
+        given(reportMapper.selectPendingReports("POST", 1L)).willReturn(List.of(new PendingReport(12L, OTHER)));
         given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "HIDDEN_BY_REPORT"));
-        given(reportMapper.countOpenByTarget("POST", 1L)).willReturn(1);
         given(boardMapper.updatePostStatus(1L, "HIDDEN_BY_REPORT", "VISIBLE", NOW)).willReturn(1);
-        given(reportMapper.closeOpenReports("POST", 1L, "REJECTED", "REJECT", ADMIN, null, NOW)).willReturn(1);
 
         service.process(ADMIN, 12L, new ReportDtos.ReportProcess("REJECT", null));
 
@@ -168,8 +174,8 @@ class AdminReportServiceTest {
     void 삭제하면_글을_지우고_처리_완료로_닫는다() {
         given(reportMapper.selectReport(12L)).willReturn(report(12, "POST", 1, "SPAM", "RECEIVED", "HIDDEN_BY_REPORT", NOW));
         given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "HIDDEN_BY_REPORT"));
-        given(reportMapper.selectOpenReporterUserIds("POST", 1L)).willReturn(List.of(9L, OTHER));
-        given(reportMapper.countOpenByTarget("POST", 1L)).willReturn(5);
+        given(reportMapper.selectPendingReports("POST", 1L))
+                .willReturn(List.of(new PendingReport(12L, 9L), new PendingReport(13L, OTHER)));
         given(boardMapper.updatePostStatus(1L, "HIDDEN_BY_REPORT", "DELETED", NOW)).willReturn(1);
 
         ReportDtos.ReportProcessed result = service.process(ADMIN, 12L, new ReportDtos.ReportProcess("DELETE", null));
@@ -183,9 +189,9 @@ class AdminReportServiceTest {
                 "운영 정책에 따라 글이 삭제 처리됐어요.", "/lounge");
         verify(notificationService, never()).notifyQuietly(eq(OTHER), eq("REPORT_RESULT"), eq("신고 처리 결과가 있어요"),
                 anyString(), anyString());
-        verify(reportMapper).selectOpenReporterUserIds("POST", 1L);
         verify(reportMapper, never()).selectReporterUserId(anyLong());
-        verify(reportMapper).closeOpenReports("POST", 1L, "DONE", "DELETE", ADMIN, null, NOW);
+        verify(reportMapper).closeOpenReport(12L, "DONE", "DELETE", ADMIN, null, NOW);
+        verify(reportMapper).closeOpenReport(13L, "DONE", "DELETE", ADMIN, null, NOW);
     }
 
     // FP-224: 숨김 유지가 빠져서, 아직 보이는 댓글을 관리자가 내리려면 삭제한다. 댓글은 기록 표가 없어 상태만 바뀐다.
@@ -198,23 +204,93 @@ class AdminReportServiceTest {
         comment.setUserId(OTHER);
         comment.setStatusCode("VISIBLE");
         given(boardMapper.selectComment(9L)).willReturn(comment);
-        given(reportMapper.countOpenByTarget("COMMENT", 9L)).willReturn(1);
+        given(reportMapper.selectPendingReports("COMMENT", 9L)).willReturn(List.of(new PendingReport(5L, 9L)));
         given(boardMapper.updateCommentStatus(9L, "VISIBLE", "DELETED", NOW)).willReturn(1);
 
         ReportDtos.ReportProcessed result = service.process(ADMIN, 5L, new ReportDtos.ReportProcess("DELETE", null));
 
         assertThat(result.targetStatus()).isEqualTo("DELETED");
-        verify(reportMapper).closeOpenReports("COMMENT", 9L, "DONE", "DELETE", ADMIN, null, NOW);
+        verify(reportMapper).closeOpenReport(5L, "DONE", "DELETE", ADMIN, null, NOW);
     }
 
     @Test
     void 이미_처리된_신고는_다시_처리할_수_없다() {
         given(reportMapper.selectReport(12L)).willReturn(report(12, "POST", 1, "SPAM", "DONE", "HIDDEN_BY_REPORT", NOW));
         given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "HIDDEN_BY_REPORT"));
-        given(reportMapper.countOpenByTarget("POST", 1L)).willReturn(0);
+        given(reportMapper.selectPendingReports("POST", 1L)).willReturn(List.of());
 
         assertError(() -> service.process(ADMIN, 12L, new ReportDtos.ReportProcess("REJECT", null)), 409, "ALREADY_HANDLED");
         verify(boardMapper, never()).updatePostStatus(anyLong(), anyString(), anyString(), any());
+    }
+
+    // N-34-3 두 관리자가 같은 글의 서로 다른 신고 번호를 열어 동시에 반려해도 한 요청만 처리한다.
+    @Test
+    void 같은_신고_묶음을_동시에_처리해도_결과_알림은_한_번만_보낸다() throws Exception {
+        given(reportMapper.selectReport(12L)).willReturn(report(12, "POST", 1, "SPAM", "RECEIVED", "VISIBLE", NOW));
+        given(reportMapper.selectReport(13L)).willReturn(report(13, "POST", 1, "ABUSE", "RECEIVED", "VISIBLE", NOW));
+        given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "VISIBLE"));
+        CyclicBarrier bothRead = new CyclicBarrier(2);
+        given(reportMapper.selectPendingReports("POST", 1L)).willAnswer(invocation -> {
+            bothRead.await(5, TimeUnit.SECONDS);
+            return List.of(new PendingReport(12L, 9L), new PendingReport(13L, 10L));
+        });
+        AtomicBoolean closed = new AtomicBoolean();
+        given(reportMapper.closeOpenReport(eq(12L), eq("REJECTED"), eq("REJECT"), anyLong(), eq(null), eq(NOW)))
+                .willAnswer(invocation -> closed.compareAndSet(false, true) ? 1 : 0);
+
+        ExecutorService admins = Executors.newFixedThreadPool(2);
+        try {
+            var first = admins.submit(() -> rejectReport(ADMIN, 12L));
+            var second = admins.submit(() -> rejectReport(ADMIN + 1, 13L));
+            assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder("2", "ALREADY_HANDLED");
+        } finally {
+            admins.shutdownNow();
+        }
+        verify(notificationService).notifyQuietly(eq(9L), eq("REPORT_RESULT"), anyString(), anyString(), anyString());
+        verify(notificationService).notifyQuietly(eq(10L), eq("REPORT_RESULT"), anyString(), anyString(), anyString());
+    }
+
+    // N-34-3 수신자를 조회한 뒤 접수된 신고는 현재 처리 건수에 포함하지 않는다.
+    @Test
+    void 처리할_신고를_조회한_뒤_접수된_신고는_닫지_않는다() {
+        given(reportMapper.selectReport(12L)).willReturn(report(12, "POST", 1, "SPAM", "RECEIVED", "VISIBLE", NOW));
+        given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "VISIBLE"));
+        given(reportMapper.selectPendingReports("POST", 1L)).willReturn(List.of(new PendingReport(12L, 9L)));
+
+        ReportDtos.ReportProcessed result = service.process(ADMIN, 12L, new ReportDtos.ReportProcess("REJECT", null));
+
+        assertThat(result.handledCount()).isEqualTo(1);
+        verify(reportMapper).closeOpenReport(12L, "REJECTED", "REJECT", ADMIN, null, NOW);
+        verify(reportMapper, never()).closeOpenReport(eq(13L), anyString(), anyString(), anyLong(), any(), any());
+        verify(notificationService).notifyQuietly(eq(9L), eq("REPORT_RESULT"), anyString(), anyString(), anyString());
+        verify(notificationService, never()).notifyQuietly(eq(10L), anyString(), anyString(), anyString(), anyString());
+    }
+
+    // N-34-3 신고자 번호가 비어 있는 기존 신고도 처리 건수에 포함하고, 수신 가능한 신고자에게만 알린다.
+    @Test
+    void 신고자가_없는_신고도_닫고_수신자에서만_제외한다() {
+        given(reportMapper.selectReport(12L)).willReturn(report(12, "POST", 1, "SPAM", "RECEIVED", "VISIBLE", NOW));
+        given(boardMapper.selectPost(1L)).willReturn(post(1, OTHER, "VISIBLE"));
+        given(reportMapper.selectPendingReports("POST", 1L))
+                .willReturn(List.of(new PendingReport(12L, null), new PendingReport(13L, 9L)));
+
+        ReportDtos.ReportProcessed result = service.process(ADMIN, 12L, new ReportDtos.ReportProcess("REJECT", null));
+
+        assertThat(result.handledCount()).isEqualTo(2);
+        verify(reportMapper).closeOpenReport(12L, "REJECTED", "REJECT", ADMIN, null, NOW);
+        verify(reportMapper).closeOpenReport(13L, "REJECTED", "REJECT", ADMIN, null, NOW);
+        verify(notificationService).notifyQuietly(eq(9L), eq("REPORT_RESULT"), anyString(), anyString(), anyString());
+        verifyNoMoreInteractions(notificationService);
+    }
+
+    // N-34-3 두 관리자 요청의 처리 건수와 기존 충돌 코드를 비교한다.
+    private String rejectReport(long adminId, long reportId) {
+        try {
+            return String.valueOf(service.process(adminId, reportId, new ReportDtos.ReportProcess("REJECT", null)).handledCount());
+        } catch (ApiException conflict) {
+            return conflict.getCode();
+        }
     }
 
     @Test
