@@ -6,7 +6,8 @@ import { passwordTooLongError, validateNewPassword } from '../validation.js'
 import PasswordField from './PasswordField.jsx'
 import PasswordRuleList from './PasswordRuleList.jsx'
 
-// N-04-3 비밀번호 바꾸기 폼 — 현재 비밀번호와 새 비밀번호를 받는다. 새 비밀번호 규칙은 FP-87 가입과 같은 validateNewPassword로 검사한다.
+// N-04-3 비밀번호 변경 폼 — 현재 비밀번호와 새 비밀번호를 받는다. 새 비밀번호 규칙은 FP-87 가입과 같은 validateNewPassword로 검사한다.
+// FP-259 12차 새 비밀번호가 64자를 넘으면 칸 아래 길이 오류를 바로 보여 주고 [비밀번호 저장]을 끈다.
 // 저장에 성공하면 onSaved(안내 문구)를 부르고, [취소]는 onCancel을 부른다.
 export default function PasswordChangeForm({ onSaved, onCancel }) {
   const [form, setForm] = useState({ currentPassword: '', password: '', passwordConfirm: '' })
@@ -87,7 +88,7 @@ export default function PasswordChangeForm({ onSaved, onCancel }) {
           {formError}
         </p>
       )}
-      <button type="submit" className="account-form__submit" disabled={pending}>
+      <button type="submit" className="account-form__submit" disabled={pending || passwordTooLongError(form.password) !== ''}>
         비밀번호 저장
       </button>
       <button type="button" className="account-form__cancel" onClick={onCancel}>

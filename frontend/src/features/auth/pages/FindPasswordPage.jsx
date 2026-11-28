@@ -118,7 +118,8 @@ export default function FindPasswordPage() {
               {formError}
             </p>
           )}
-          <button type="submit" className="auth-form__submit" disabled={pending}>
+          {/* FP-259 12차 새 비밀번호가 64자를 넘으면 칸 오류와 함께 버튼을 끈다(마이페이지 비밀번호 변경과 같다). */}
+          <button type="submit" className="auth-form__submit" disabled={pending || passwordTooLongError(password) !== ''}>
             비밀번호 변경
           </button>
         </form>

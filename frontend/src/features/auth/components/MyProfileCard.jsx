@@ -18,8 +18,8 @@ export default function MyProfileCard({ profile, unmasked, onUnmask }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
-  // FP-222 v2 내정보 탭은 비밀번호 확인(ProfileUnlockCard)을 거쳐 원래 값을 들고 열리므로, 그때는 원래 값부터 보여 준다.
-  const [revealed, setRevealed] = useState(unmasked != null)
+  // FP-259 비밀번호 확인 뒤에도, 탭에 다시 들어와도 가린 값부터 보여 준다. 원래 값은 [표시]를 눌러야 보인다(비밀번호는 다시 묻지 않음).
+  const [revealed, setRevealed] = useState(false)
 
   const shown = unmasked && revealed ? unmasked : profile
   const items = [
@@ -60,8 +60,32 @@ export default function MyProfileCard({ profile, unmasked, onUnmask }) {
     }
   }
 
+  // FP-259 제목 줄 — 버튼·안내를 제목 옆에 둬 값을 펼치거나 가려도 카드 높이가 그대로다. 공통 Card title은 글자만 받아 card__title로 직접 그린다.
+  const head = (
+    <div className="my-profile-card__head">
+      <h2 className="card__title">내 정보</h2>
+      {/* FP-259 9차 안내 자리는 원래 값이 있으면 늘 그려 둔다(가린 상태에서는 빈칸). 좁은 화면에서 안내가 다음 줄로 내려가도 [표시] 전후 높이가 같다. */}
+      {unmasked && (
+        <p className="my-profile-card__unmasked" role="status">
+          {revealed ? '원래 값 표시 중 · 탭·화면을 옮기면 다시 가려집니다' : ' '}
+        </p>
+      )}
+      {unmasked && (
+        <button type="button" className="my-profile-card__unmask" onClick={() => setRevealed((value) => !value)}>
+          {revealed ? '숨기기' : '표시'}
+        </button>
+      )}
+      {!unmasked && !asking && (
+        <button type="button" className="my-profile-card__unmask" onClick={() => setAsking(true)}>
+          가림 해제
+        </button>
+      )}
+    </div>
+  )
+
   return (
-    <Card title="내 정보" className="my-profile-card">
+    <Card className="my-profile-card">
+      {head}
       <dl className="my-profile-card__list">
         {items.map(([label, value]) => (
           <div key={label} className="my-profile-card__item">
@@ -70,16 +94,6 @@ export default function MyProfileCard({ profile, unmasked, onUnmask }) {
           </div>
         ))}
       </dl>
-      {unmasked && revealed && (
-        <p className="my-profile-card__unmasked" role="status">
-          가림을 해제했습니다. 이 화면을 벗어나면 다시 가려집니다.
-        </p>
-      )}
-      {unmasked && (
-        <button type="button" className="my-profile-card__unmask" onClick={() => setRevealed((value) => !value)}>
-          {revealed ? '숨기기' : '표시'}
-        </button>
-      )}
       {!unmasked && asking && (
         <form className="my-profile-card__unmask-form" onSubmit={handleUnmask} noValidate>
           <TextInput
@@ -98,11 +112,6 @@ export default function MyProfileCard({ profile, unmasked, onUnmask }) {
             취소
           </button>
         </form>
-      )}
-      {!unmasked && !asking && (
-        <button type="button" className="my-profile-card__unmask" onClick={() => setAsking(true)}>
-          가림 해제
-        </button>
       )}
     </Card>
   )

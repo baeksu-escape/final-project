@@ -95,6 +95,9 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
   const [openTerms, setOpenTerms] = useState(null)
   const [bulkStatus, setBulkStatus] = useState(null)
   const [bulkRunning, setBulkRunning] = useState(false)
+  // FP-260 일괄 불러오기의 필수 동의 창 — 불러올 종류 전체(sources)와 그중 동의가 없는 종류(needConsent), 창에서 체크한 종류 key
+  const [bulkConsent, setBulkConsent] = useState(null)
+  const [bulkConsentChecked, setBulkConsentChecked] = useState([])
   const busy = pendingKey !== null || bulkRunning
   const sectionRef = useRef(null)
   const progressRef = useRef(null)
@@ -152,6 +155,7 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
 
   // 전체 불러오기 — 고른 종류를 차례로 처리한다. 동의가 없는 종류는 동의를 저장한 뒤 불러오고, 종류마다 진행 상태를 바꾼다.
   // 한 종류가 실패해도 나머지는 계속하고, 끝나면 실패한 종류만 [다시 시도]할 수 있다.
+  // FP-260 동의 저장은 필수 동의 창에서 모두 체크한 뒤에만 이 함수로 온다(startBulk가 먼저 확인한다).
   const importMany = async (sources) => {
     setBulkRunning(true)
     setBulkStatus((prev) => ({ ...(prev ?? {}), ...Object.fromEntries(sources.map((source) => [source.key, 'wait'])) }))
@@ -177,15 +181,43 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
     setBulkRunning(false)
   }
 
-  // 동의 목록 — 줄마다 체크(그 기관 정보 제공 동의)하거나 [전체 동의]로 모두 체크한 뒤 [동의하고 불러오기]. 하나 이상 체크해야 버튼이 켜진다.
+  // 불러올 종류 목록 — 줄마다 고르거나 [전체 선택]으로 모두 고른 뒤 [동의하고 불러오기]. 하나 이상 골라야 버튼이 켜진다.
   const pickedSources = ALT_DATA_SOURCES.filter((source) => bulkPicked.includes(source.key))
   const allPicked = bulkPicked.length === ALT_DATA_SOURCES.length
   const togglePick = (key) => setBulkPicked((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]))
   const toggleAll = () => setBulkPicked(allPicked ? [] : ALT_DATA_SOURCES.map((source) => source.key))
+
+  // FP-260 N-05-9 일괄 불러오기 시작 — 고른 종류 중 유효한 동의가 없는 종류가 있으면 필수 동의 창을 먼저 띄운다.
+  // 모두 이미 동의했으면 창 없이 바로 불러온다. [실패한 항목만 다시 시도]도 같은 확인을 거친다.
+  const startBulk = (sources) => {
+    const needConsent = sources.filter((source) => !findActiveConsent(consents, source))
+    if (needConsent.length === 0) {
+      importMany(sources)
+      return
+    }
+    setBulkConsent({ sources, needConsent })
+    setBulkConsentChecked([])
+  }
   const handleBulkStart = (event) => {
     event.preventDefault()
     if (pickedSources.length === 0) return
-    importMany(pickedSources)
+    startBulk(pickedSources)
+  }
+
+  // 일괄 동의 창 — 종류마다 [필수] 체크, [전체 동의]로 한꺼번에. 모두 체크해야 [동의하고 불러오기]가 켜진다.
+  const bulkConsentKeys = bulkConsent ? bulkConsent.needConsent.map((source) => source.key) : []
+  const bulkConsentAll = bulkConsentKeys.length > 0 && bulkConsentKeys.every((key) => bulkConsentChecked.includes(key))
+  const toggleBulkConsent = (key, checked) =>
+    setBulkConsentChecked((prev) => (checked ? [...prev.filter((item) => item !== key), key] : prev.filter((item) => item !== key)))
+  // [취소]·Esc·배경 클릭 — 아무것도 저장하지 않고 닫는다.
+  const closeBulkConsent = () => setBulkConsent(null)
+  // [동의하고 불러오기] — 창을 닫고 동의 저장 → 불러오기를 종류마다 차례로 한다(importMany).
+  const handleBulkAgree = (event) => {
+    event.preventDefault()
+    if (!bulkConsent || !bulkConsentAll) return
+    const { sources } = bulkConsent
+    setBulkConsent(null)
+    importMany(sources)
   }
   const failedSources = ALT_DATA_SOURCES.filter((source) => bulkStatus?.[source.key] === 'fail')
   const bulkKeys = bulkStatus ? Object.keys(bulkStatus) : []
@@ -255,13 +287,13 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
         실제 외부 기관에 연결하지 않고, 기준월을 포함한 최근 {ALT_DATA_MONTHS}개월의 더미 데이터를 불러옵니다.
       </p>
       <FieldError message={consentLoadError} />
-      {/* N-05-6·N-05-9 정보 제공 동의 목록(토스 약관 방식) — [전체 동의] 또는 줄마다 체크, [보기]로 제공 기관·항목·목적·보관 기간을 펼친다.
-          체크한 종류만 동의를 저장하고 차례로 불러온다. 종류별 [불러오기]·[연결 해제]는 아래 카드에 그대로 둔다. */}
+      {/* N-05-6·N-05-9 불러올 종류 고르기 — [전체 선택] 또는 줄마다 고르고, [보기]로 제공 기관·항목·목적·보관 기간을 펼친다.
+          FP-260 동의가 없는 종류가 있으면 필수 동의 창에서 모두 체크한 뒤에만 동의를 저장하고 차례로 불러온다. 종류별 [불러오기]·[연결 해제]는 아래 카드에 그대로 둔다. */}
       <form className="alt-data__bulk alt-consent" onSubmit={handleBulkStart} noValidate>
         <button type="button" className="alt-consent__all" role="checkbox" aria-checked={allPicked} onClick={toggleAll} disabled={busy}>
           <CheckMark on={allPicked} />
-          <b>전체 동의</b>
-          <span>아래 기관의 정보 제공에 모두 동의할게요.</span>
+          <b>전체 선택</b>
+          <span>아래 종류를 모두 불러올게요.</span>
         </button>
         <ul className="alt-consent__list">
           {ALT_DATA_SOURCES.map((source) => {
@@ -272,8 +304,8 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
                 <div className="alt-consent__row">
                   <button type="button" className="alt-consent__pick" role="checkbox" aria-checked={on} onClick={() => togglePick(source.key)} disabled={busy}>
                     <CheckMark on={on} />
-                    <em>{agreed ? '동의함' : '선택'}</em>
-                    <span>{source.label} 정보 제공 동의 ({source.consent.providerName})</span>
+                    <em>{agreed ? '동의함' : '동의 전'}</em>
+                    <span>{source.label} 불러오기 ({source.consent.providerName})</span>
                   </button>
                   <button
                     type="button"
@@ -311,7 +343,7 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
               ))}
             </ul>
             {failedSources.length > 0 && !bulkRunning && (
-              <Button size="sm" onClick={() => importMany(failedSources)}>실패한 항목만 다시 시도</Button>
+              <Button size="sm" onClick={() => startBulk(failedSources)}>실패한 항목만 다시 시도</Button>
             )}
           </div>
         )}
@@ -443,6 +475,45 @@ export default function AltDataImport({ baseMonth, imported, onImported, onDisco
               동의하고 불러오기
             </Button>
             <Button onClick={closeConsent}>취소</Button>
+          </form>
+        )}
+      </Modal>
+
+      {/* FP-260 N-05-9 일괄 불러오기 동의 창 — 동의가 없는 종류만 모아 종류별 창과 같은 항목·문구로 보여 주고, 종류마다 [필수] 체크를 받는다. */}
+      <Modal open={bulkConsent !== null} title={`정보 제공 동의 (${bulkConsentKeys.length}개)`} onClose={closeBulkConsent}>
+        {bulkConsent && (
+          <form className="alt-data-consent" onSubmit={handleBulkAgree} noValidate>
+            <Checkbox
+              label="[필수] 아래 기관의 정보 제공에 모두 동의합니다."
+              checked={bulkConsentAll}
+              onChange={(checked) => setBulkConsentChecked(checked ? bulkConsentKeys : [])}
+            />
+            {bulkConsent.needConsent.map((source) => (
+              <div key={source.key}>
+                <dl className="alt-data-consent__terms">
+                  <dt>제공 기관</dt>
+                  <dd>{source.consent.providerName}</dd>
+                  <dt>불러오는 항목</dt>
+                  <dd>
+                    기준월을 포함한 최근 {ALT_DATA_MONTHS}개월의 {source.consent.itemsText}
+                  </dd>
+                  <dt>이용 목적</dt>
+                  <dd>{ALT_DATA_CONSENT_TERMS.purpose}</dd>
+                  <dt>보관 기간</dt>
+                  <dd>{ALT_DATA_CONSENT_TERMS.retention}</dd>
+                </dl>
+                <Checkbox
+                  label={`[필수] 위 내용으로 ${source.label} 정보 제공에 동의합니다.`}
+                  checked={bulkConsentChecked.includes(source.key)}
+                  onChange={(checked) => toggleBulkConsent(source.key, checked)}
+                />
+              </div>
+            ))}
+            {!bulkConsentAll && <p className="hint">필수 동의에 모두 체크하면 불러올 수 있습니다.</p>}
+            <Button type="submit" variant="primary" disabled={busy || !bulkConsentAll}>
+              동의하고 불러오기
+            </Button>
+            <Button onClick={closeBulkConsent}>취소</Button>
           </form>
         )}
       </Modal>

@@ -298,6 +298,26 @@
   cursor: not-allowed;
 }
 
+/* FP-260 잠긴 금액 칸의 빠른 입력 칩 — 자리(높이)만 남기고 보이지 않게 한다. 체크 전후로 폼 높이가 같아 화면이 출렁이지 않는다. */
+.money-quick--locked .money-quick__chips {
+  visibility: hidden;
+}
+
+/* FP-260 9차 좁은 화면(600px 이하)에서는 대안 데이터를 불러온 뒤에도 한 열로 둔다.
+   공통 finForm.css의 '불러온 뒤 2열(1fr 280px)' 규칙이 화면 폭과 관계없이 걸려 390 폭에서 왼쪽 열이 66px로 줄었다.
+   공통 파일은 고치지 않고 여기서 더 구체적인 선택자(section)로 덮는다. 768·1280 모양은 그대로다. */
+@media (max-width: 600px) {
+  section.fin-form.data-input-page:has(.alt-data-source.is-imported) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 불러온 표는 카드 폭 안에서 가로로 스크롤한다(좁은 폭에서 페이지 폭을 넘지 않게). */
+.alt-data-source__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .input-section__summary {
   font-family: var(--f-d);
   font-variant-numeric: tabular-nums;
@@ -427,6 +447,92 @@
   margin: 0 0 4px 48px;
   color: var(--mut);
   font-size: 12px;
+}
+
+/* FP-260 9차 [점수 산출하기]를 막고 있는 단계 — 주의(노랑) 테두리 번호와 주의 색 안내. 색은 tokens.css의 --warn 계열(밝은·어두운 테마 모두 있음). */
+.input-status__item--warn .input-status__marker {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+
+.input-status__item--warn .input-status__hint {
+  color: var(--warn-fg);
+  font-weight: 600;
+}
+
+/* FP-260 9차 7단계 — 점수를 내려면 남은 항목 목록(이름·이유 + [이 단계로]) */
+.score-missing {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--warn-line);
+  border-radius: 12px;
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+
+.score-missing__title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.score-missing__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.score-missing__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.score-missing__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.score-missing__item > .button {
+  flex: none;
+}
+
+/* FP-260 10차 7단계 — 저장하지 않은 변경 안내 + [저장하기]. 남은 항목(노랑)과 구분해 카드 안 낮은 상자(파랑 왼쪽 선)로 둔다. */
+.score-unsaved {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--acc);
+  border-radius: 12px;
+  background: var(--panel2);
+  color: var(--fg2);
+}
+
+.score-unsaved__text {
+  margin: 0;
+  font-size: 13px;
+}
+
+.score-unsaved > .button {
+  flex: none;
+}
+
+/* FP-260 10차 [저장하고 7단계로]는 [다음]보다 글자가 길어 [점수 산출하기]와 같은 폭으로 둔다(390 폭에서도 [이전]과 한 줄). */
+.data-input-page .fin-actions .data-input-page__save-return {
+  flex-basis: 180px;
 }
 
 /* 완료 애니메이션 — 단계가 완료되면 초록 동그라미가 톡 튀어나오고, 체크가 그려지고, 아래 세로선이 위에서부터 초록으로 찬다.

@@ -506,18 +506,40 @@
   min-width: 0;
 }
 
-.my-page > .my-profile-card {
-  grid-column: span 2;
+/* FP-259 4차 탭 줄([진단내역 | 내정보])은 두 열을 합친 전체 폭으로 늘린다(공통 .segmented는 inline-flex라 글자 폭만 차지한다). */
+.my-page > .segmented {
+  display: flex;
 }
 
-.my-page > .account-manage-card {
-  grid-column: span 1;
+/* [내정보] 탭 내용 — 탭 줄 아래에 내 정보(넓게 2칸) + 계정 관리(1칸)를 나란히 두고 윗선을 맞춘다. 좁은 화면은 위아래로 쌓는다.
+   FP-259 5차 내 정보는 늘 자기 내용 높이만 갖고, 계정 관리만 줄 높이만큼 늘어난다.
+   평소에는 두 카드 높이가 같고, [회원 탈퇴] 폼을 펼치면 오른쪽만 길어진다. */
+.my-profile-tab {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.my-profile-tab > .my-profile-card {
+  align-self: start;
+}
+
+.my-profile-tab .card__body {
+  flex: 1;
 }
 
 @media (max-width: 960px) {
-  .my-page > .my-profile-card,
-  .my-page > .account-manage-card {
-    grid-column: 1 / -1;
+  .my-profile-tab {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* FP-259 15차 넓은 화면은 계정 관리 열을 넓혀(3:2) 새 이메일 칸이 주소를 더 보이게 한다.
+   1200부터 넣으면 가린 이메일이 줄바꿈되어 내 정보 높이가 출렁이므로 1280부터 적용한다. */
+@media (min-width: 1280px) {
+  .my-profile-tab {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   }
 }
 
@@ -538,12 +560,19 @@
   text-align: center;
 }
 
-/* 내 정보 — 항목을 칸으로 나열(데모 dl.g2) */
+/* 내 정보 — 항목을 칸으로 나열(데모 dl.g2).
+   FP-259 넓은 화면은 3열로 고정한다(자동 칸이면 4열이 되어 휴대폰 번호 같은 긴 값이 좁아졌다). 좁은 화면은 2열. */
 .my-profile-card__list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
+}
+
+@media (max-width: 560px) {
+  .my-profile-card__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .my-profile-card__item {
@@ -569,6 +598,61 @@
   font-size: 12.5px;
 }
 
+/* FP-259 6차 내 정보 제목 줄 — 제목 왼쪽, [표시]·[숨기기]·[가림 해제] 오른쪽 끝, 원래 값 안내는 그 버튼 왼쪽에 한 줄로.
+   줄 높이를 버튼 높이(36px)로 고정해 원래 값을 펼치거나 가려도 카드 높이가 변하지 않는다.
+   제목 아래 간격은 카드 기본 제목 간격(--sp-4)과 같게 맞춘다(카드 본문 간격은 --sp-3). */
+.my-profile-card__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  margin-bottom: calc(var(--sp-4) - var(--sp-3));
+}
+
+.my-profile-card__head .card__title {
+  flex: none;
+}
+
+.my-profile-card__head .my-profile-card__unmasked {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-profile-card__head .my-profile-card__unmask {
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+}
+
+/* 좁은 화면에서는 안내 문구만 제목 아래 줄로 내린다(버튼은 제목 줄 오른쪽에 그대로). */
+@media (max-width: 560px) {
+  .my-profile-card__head {
+    flex-wrap: wrap;
+  }
+
+  .my-profile-card__head .my-profile-card__unmasked {
+    order: 3;
+    flex-basis: 100%;
+    text-align: left;
+    white-space: normal;
+  }
+
+  /* FP-259 14차 가린 상태(빈칸)에서도 안내 한 줄 자리를 남겨 [표시] 전후 카드 높이를 같게 한다. */
+  .my-profile-card__head .my-profile-card__unmasked {
+    min-height: 1.5em;
+    line-height: 1.5;
+  }
+
+  /* FP-259 14차 이메일(5번째 항목)은 한 줄 전체를 써서 가린 값·원래 값 모두 단어 중간에서 끊기지 않게 한다. */
+  .my-profile-card__item:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+}
+
 .my-profile-card__unmask-form {
   display: flex;
   flex-direction: column;
@@ -587,8 +671,10 @@
 .account-manage-card__email,
 .account-manage-card__password,
 .account-manage-card__data-input,
+.account-manage-card__job-type,
 .account-form__submit,
 .account-form__cancel,
+.account-form__check,
 .withdrawal-card__open {
   display: inline-flex;
   align-items: center;
@@ -612,7 +698,9 @@
 .account-manage-card__email:hover,
 .account-manage-card__password:hover,
 .account-manage-card__data-input:hover,
-.account-form__cancel:hover {
+.account-manage-card__job-type:hover,
+.account-form__cancel:hover,
+.account-form__check:hover:not(:disabled) {
   border-color: var(--acc);
   color: var(--fg);
 }
@@ -637,14 +725,16 @@
 
 .account-form__submit:disabled,
 .my-profile-card__unmask-submit:disabled,
-.account-form__cancel:disabled {
+.account-form__cancel:disabled,
+.account-form__check:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
+/* FP-259 계정 관리 버튼 4개는 화면 폭과 상관없이 2×2로 둔다. */
 .account-manage-card__actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -674,9 +764,8 @@
 }
 
 /* 회원 탈퇴 — 데모 .warnbox, 탈퇴 버튼은 위험 색.
-   FP-222 카드가 화면 전체 폭이라 열린 확인 상자도 전체 폭으로 늘어났다. 가입·찾기 화면과 같은 600px까지만 넓어지게 한다. */
+   FP-259 3차 계정 관리 카드 안으로 옮겨, 상자를 카드 폭에 맞춘다(예전 600px 제한은 위 버튼 격자와 폭이 어긋나 뺐다). */
 .withdrawal-form {
-  max-width: 600px;
   border-color: var(--warn-line);
   background: var(--warn-bg);
 }
@@ -699,6 +788,135 @@
   border-color: var(--bad);
   background: var(--inp);
   color: var(--bad);
+}
+
+/* FP-298 맨 아래 줄 [직군 변경하기]·[회원 탈퇴]도 위 2×2와 같은 격자(.account-manage-card__actions)라 칸 너비를 그대로 채운다. */
+.account-manage-card__actions .withdrawal-card__open {
+  align-self: stretch;
+}
+
+/* 두 격자가 바로 붙어 있으면(사이에 폼·안내가 없으면) 카드 안 간격(12px)에서 4px 줄여 위 격자의 줄 간격(8px)과 같게 둔다. */
+.account-manage-card__actions + .account-manage-card__actions {
+  margin-top: -4px;
+}
+
+/* FP-298 N-04-8 직군 변경 폼 — 지금 직군, 새 직군 라디오(지금 직군은 고를 수 없음), 안내문 */
+.job-type-form__current {
+  font-size: 13px;
+}
+
+.job-type-form__options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.job-type-form__legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: var(--fg2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.job-type-form__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.job-type-form__option.is-current {
+  color: var(--mut);
+  cursor: not-allowed;
+}
+
+.job-type-form__notice {
+  color: var(--fg2);
+  font-size: 12.5px;
+}
+
+/* FP-259 12차 계정 관리 폼의 칸 + 버튼 한 줄(닉네임 [중복 확인]·이메일 [인증코드 받기]) — 회원가입 .signup-form__row와 같은 모양.
+   좁은 화면(390)에서 한 줄에 들어가지 않으면 같은 상자 안에서 버튼만 아래 줄로 내려간다(가로로 넘치지 않는다). */
+.account-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.account-form__row > :not(button) {
+  flex: 1 1 130px;
+  min-width: 0;
+}
+
+/* 칸 옆 버튼은 입력 칸(forms.css 48px)과 같은 높이 */
+.account-form__row > button {
+  min-height: 48px;
+}
+
+/* FP-259 14차 칸 오류를 TextInput error로 넘기는 줄(닉네임·인증코드) — 칸 묶음을 풀어(display: contents) 격자에 놓는다.
+   이름 1행, 입력 칸·버튼 2행(같은 높이), 안내·오류는 그 아래 한 줄씩. 오류가 생겨도 버튼은 입력 칸 옆에 있다. */
+.account-form__row--grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.account-form__row--grid > :not(button),
+.account-form__row--grid .form-field {
+  display: contents;
+}
+
+.account-form__row--grid .form-field__label,
+.account-form__row--grid .form-field__hint,
+.account-form__row--grid .field-error {
+  grid-column: 1 / -1;
+}
+
+.account-form__row--grid .text-input__control {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.account-form__row--grid > button {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+/* 이메일 인증 묶음(줄바꿈 flex) 안에서는 칸 + 버튼 줄이 한 줄 전체를 쓴다 */
+.email-verification > .account-form__row {
+  flex-basis: 100%;
+}
+
+/* FP-259 15차 이메일 칸은 220px보다 좁아지지 않게 한다 — 그보다 좁으면 [인증코드 받기]만 같은 상자 안 아래 줄로 내려간다. */
+.email-verification > .account-form__row > :not(button) {
+  flex-basis: 220px;
+}
+
+/* 좁은 화면에서는 이메일 주소가 잘리지 않게 이메일 칸이 한 줄을 다 쓰고 [인증코드 받기]만 같은 상자 안 아래 줄로 내려간다. */
+@media (max-width: 480px) {
+  .email-verification > .account-form__row > :not(button) {
+    flex-basis: 100%;
+  }
+}
+
+/* [탈퇴하기]·[취소]도 위 버튼과 같은 2칸 격자·8px 간격. 상자 안쪽 여백만큼 칸이 조금 좁다. FP-298 [변경하기]·[취소], FP-259 12차 [닉네임 저장]·[취소]도 같다. */
+.nickname-change-form__actions,
+.job-type-form__actions,
+.withdrawal-form__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.withdrawal-form__actions .account-form__submit {
+  align-self: stretch;
 }
 
 /* 진단 내역 표 — 데모 .tbl */

@@ -10,6 +10,7 @@
 > - 🆕 최근 변경 (11/26, FP-258): AUTH-01 단계적 로그인 제한(429 `LOGIN_TEMPORARILY_BLOCKED`, 10회 잠금), AUTH-09 휴대폰·이메일 인증 필수와 `loginId` 응답, AUTH-08·10 `name` 추가, 인증 목적 `FIND_ID`(DDL C17). 2차: 이메일 규칙 통일·소문자 저장(AUTH-06·07·08·09·10, MEM-03), AUTH-08(재설정)·09·10 이름 형식 400 `name` 칸, AUTH-01 아이디 소문자 조회
 > - 최근 변경 (11/23, FP-222): MEM-08 닉네임 변경 추가(`SAME_NICKNAME` 추가), MEM-04가 400 `SAME_PASSWORD`를 실제로 돌려줌
 > - 최근 변경 (11/19, FP-227): 자산 4종 저장(DDL C13). INP-02 요청 본문 모양은 바뀌지 않고, INP-01이 저장된 4종을 그대로 돌려준다
+> - 🆕 최근 변경 (11/28, FP-298): MEM-05 저장한 회원도 직군 변경(기존 입력·평가 유지), 같은 직군 400 `SAME_JOB_TYPE`, `JOB_TYPE_LOCKED`는 쓰지 않음
 > - 최근 변경 (11/19, FP-227): MEM-05 저장 전 직군 변경 허용(`JOB_TYPE_LOCKED` 추가)
 > - 🆕 최근 변경 (11/19, FP-90): 7장 대출 상품 LOAN-01~05 추가(경환), 5장 오류 code에 `PRODUCT_NOT_FOUND`
 > - 이전 변경 (11/18, FP-219): AUTH-06 가입 요청에 휴대폰 인증 토큰 추가·이름·닉네임 규칙, 닉네임 중복 확인·휴대폰 인증번호 발송·확인 API(AUTH-13~15) 추가
@@ -94,7 +95,7 @@
 | MEM-02 | `POST /api/members/me/profile/unmask` | `{ password }` | `{ profile: { name, phone, email } }` | ✅ |
 | MEM-03 | `PUT /api/members/me/email` | `{ email, emailVerificationToken }` | `{}` | ✅ 🆕 11/26 FP-258 2차 이메일은 앞뒤 공백을 빼고 소문자로 바꿔 판정·저장(규칙은 AUTH-06과 같음) |
 | MEM-04 | `PUT /api/members/me/password` | `{ currentPassword, newPassword }` | `{}` | ✅ (ROLE_USER 전용) |
-| MEM-05 | `PATCH /api/members/me/job-type` | `{ jobType }` | `{ user }` | ✅ 🆕 11/19 FP-227 입력 저장 전에는 다시 고를 수 있다. 비어 있으면 저장 · 같은 직군이면 바꾸지 않고 200 · 다른 직군이면 저장한 데이터 입력(`USER_ASSET_SNAPSHOT`, 기준월 무관)도 평가(`ASSESSMENT`)도 없을 때만 바꾼다. 하나라도 있으면 409 `JOB_TYPE_LOCKED`. 동시에 바뀌어 반영하지 못하면 409 `JOB_TYPE_ALREADY_SELECTED` |
+| MEM-05 | `PATCH /api/members/me/job-type` | `{ jobType }` | `{ user }` | ✅ N-05-1 직군 선택·N-04-8 직군 변경. 비어 있으면 저장 · 다른 직군이면 저장한 데이터 입력·평가가 있어도 바꾸고 입력·평가 행은 그대로 둔다 · 같은 직군이면 400 `SAME_JOB_TYPE`, 틀린 값이면 400 `INVALID_INPUT`(둘 다 `fieldErrors` `jobType`) · 동시에 바뀌어 반영하지 못하면 409 `JOB_TYPE_ALREADY_SELECTED` · 바꾸면 `SYSTEM_LOG` INFO(가린 아이디·직군 코드만) (11/28 변경 FP-298, 이전: 저장한 회원은 409 `JOB_TYPE_LOCKED`, 같은 직군 200) 🆕 11/28 |
 | MEM-06 | `GET /api/members/me/diagnoses` | — | [B팀 명세서](api_spec_b.md) 3-4 | ↗ B팀(범영) 구현 완료(FP-142), A팀 화면 연결됨 🆕 11/18 |
 | MEM-07 | `DELETE /api/members/me` | `{ password }` | `{}` | ✅ |
 | MEM-08 | `PATCH /api/members/me/nickname` | `{ nickname }` | `{}` | ✅ 🆕 11/23 FP-222 규칙은 AUTH-06과 같다(한글·영문·숫자 2~7자, '탈퇴'로 시작 불가, 틀리면 400 `INVALID_INPUT` `nickname` 칸). 지금 닉네임과 같으면 400 `SAME_NICKNAME`(`nickname` 칸), 다른 회원이 쓰면 409 `DUPLICATE_NICKNAME`(저장 직전 겹침도 같음). 화면은 AUTH-13으로 먼저 확인한다 |
@@ -174,6 +175,7 @@
 | 400 | `INVALID_PASSWORD` | 비밀번호 확인 실패(MEM-02·MEM-07 등) |
 | 400 | `INVALID_VERIFICATION_CODE`, `VERIFICATION_CODE_EXPIRED`, `VERIFICATION_ATTEMPTS_EXCEEDED` | 인증번호 틀림·만료·5회 초과 (🆕 11/18 휴대폰 인증 포함 — 휴대폰·이메일은 세 경우 모두 `INVALID_VERIFICATION_CODE`) |
 | 400 | `EMAIL_VERIFICATION_REQUIRED`, `SAME_EMAIL`, `SAME_PASSWORD`, `SAME_NICKNAME` 🆕 11/23 | 이메일 인증 누락, 같은 값으로 변경(`SAME_NICKNAME`은 MEM-08) |
+| 400 | `SAME_JOB_TYPE` 🆕 11/28 | 지금 직군과 같은 직군으로 변경(MEM-05) — "지금 직군과 같습니다. 다른 직군을 골라 주세요." |
 | 400 | `ADMIN_CHALLENGE_INVALID`, `PASSWORD_SETUP_INVALID` | 관리자 1회용 토큰 만료·재사용 |
 | 400 | `ACCESS_REASON_REQUIRED` | ADM-08 사유 없음 |
 | 400 | `INVALID_SOCIAL_CODE`, `SOCIAL_LINK_EXPIRED` | 간편 로그인 코드·연결 키 문제 |
@@ -188,7 +190,7 @@
 | 404 | `PRODUCT_NOT_FOUND` | 없는 대출 상품 코드 (LOAN-02·04·05) 🆕 11/19 |
 | 409 | `DUPLICATE_LOGIN_ID`, `DUPLICATE_EMAIL`, `DUPLICATE_NICKNAME`, `NICKNAME_UNAVAILABLE` | 중복 |
 | 409 | `JOB_TYPE_REQUIRED`, `JOB_TYPE_ALREADY_SELECTED` | 직군 선택 전 저장 / 직군을 바꾸는 사이 다른 요청이 먼저 바꿈(MEM-05) |
-| 409 | `JOB_TYPE_LOCKED` 🆕 11/19 | 입력을 저장했거나 평가가 있는 회원이 다른 직군으로 바꾸려 함(MEM-05) — "입력을 저장한 뒤에는 직군을 바꿀 수 없습니다." |
+| 409 | ~~`JOB_TYPE_LOCKED`~~ | 11/28부터 쓰지 않는다 — 저장했거나 평가가 있는 회원도 직군을 바꿀 수 있다(MEM-05, FP-298). (이전: "입력을 저장한 뒤에는 직군을 바꿀 수 없습니다.") 🆕 11/28 |
 | 409 | `CONSENT_REQUIRED` | 동의 없이 불러오기 |
 | 409 | `CREDIT_PROFILE_IMPORTED` | 같은 기준일에 불러온 신용 정보가 있어 직접 입력 저장 불가 |
 | 409 | `SOCIAL_ALREADY_LINKED` | 이미 연결된 간편 로그인 |

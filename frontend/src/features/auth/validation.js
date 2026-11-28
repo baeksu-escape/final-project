@@ -2,15 +2,16 @@
 // 입력하는 동안 PasswordRuleList가 이 목록으로 충족 여부를 보여 준다.
 // FP-258 N-02-4 새 비밀번호 최대 길이 — 서버 AccountRules.PASSWORD_MAX와 같다(BCrypt 72바이트 안).
 export const PASSWORD_MAX = 64
-// FP-258 64자를 넘은 새 비밀번호의 칸 오류 — 서버 AccountRules.PASSWORD_TOO_LONG_MESSAGE와 같다(잘라 내지 않고 알린다).
-export const PASSWORD_TOO_LONG_MESSAGE = `비밀번호는 ${PASSWORD_MAX}자 이하로 입력해 주세요.`
+// FP-258 64자를 넘은 새 비밀번호의 칸 오류 — 서버 AccountRules.PASSWORD_TOO_LONG_MESSAGE와 같다(잘라 내지 않고 알린다). FP-259 12차 문구 변경.
+export const PASSWORD_TOO_LONG_MESSAGE = `비밀번호가 너무 깁니다. ${PASSWORD_MAX}자 이하로 입력해 주세요.`
 
 export const PASSWORD_RULES = Object.freeze([
   { key: 'length', label: '8자 이상', test: (value) => value.length >= 8 },
   { key: 'letter', label: '영문 포함', test: (value) => /[A-Za-z]/.test(value) },
   { key: 'number', label: '숫자 포함', test: (value) => /\d/.test(value) },
   // FP-258 길이 상한도 목록에 보여 준다(넘으면 이 줄만 안 지킨 것으로 보인다).
-  { key: 'max', label: `${PASSWORD_MAX}자 이하`, test: (value) => value.length <= PASSWORD_MAX },
+  // FP-259 12차 길이 상한은 검사에만 쓰고 조건 목록(PasswordRuleList)에는 보이지 않는다(listed: false). 넘으면 칸 오류로 알린다.
+  { key: 'max', label: `${PASSWORD_MAX}자 이하`, test: (value) => value.length <= PASSWORD_MAX, listed: false },
 ])
 
 // 비밀번호가 모든 규칙을 지키는지 돌려준다. FP-258 64자 이하·ASCII 출력 문자만(서버 isValidPassword와 같음).

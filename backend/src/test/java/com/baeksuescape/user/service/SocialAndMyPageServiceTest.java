@@ -35,12 +35,12 @@ import com.baeksuescape.global.log.SystemLogMapper;
 import com.baeksuescape.global.log.SystemLogService;
 import com.baeksuescape.global.config.AvenueProperties;
 import com.baeksuescape.global.exception.ApiException;
+import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
 import com.baeksuescape.global.security.JwtTokenProvider;
 import com.baeksuescape.user.dto.AuthRequests;
 import com.baeksuescape.user.dto.AuthResponses;
 import com.baeksuescape.user.dto.MyPageDtos;
 import com.baeksuescape.user.dto.UserAccount;
-import com.baeksuescape.user.mapper.FinancialInputMapper;
 import com.baeksuescape.user.mapper.UserAccountMapper;
 import com.baeksuescape.user.mapper.UserConsentMapper;
 import com.baeksuescape.user.mapper.UserSocialAccountMapper;
@@ -61,7 +61,7 @@ class SocialAndMyPageServiceTest {
     @Mock
     private EmailVerificationService emailVerification;
     @Mock
-    private FinancialInputMapper financialInputMapper;
+    private SystemLogMapper systemLogMapper;
 
     private final AvenueProperties properties = TestKeys.properties();
     private final JwtTokenProvider tokenProvider = new JwtTokenProvider(properties);
@@ -78,7 +78,8 @@ class SocialAndMyPageServiceTest {
                 new SystemLogService(mock(SystemLogMapper.class), TransactionOperations.withoutTransaction(), CLOCK),
                 new LoginAttemptService(userMapper, ENCODER, CLOCK));
         social = new SocialLoginService(properties, store, socialMapper, userMapper, auth);
-        myPage = new MyPageService(userMapper, financialInputMapper, emailVerification, views, ENCODER, CRYPTO, HMAC, CLOCK);
+        myPage = new MyPageService(userMapper, new SystemLogService(systemLogMapper, TransactionOperations.withoutTransaction(), CLOCK),
+                emailVerification, views, ENCODER, CRYPTO, HMAC, CLOCK);
     }
 
     private static String codeOf(Runnable action) {
@@ -269,20 +270,30 @@ class SocialAndMyPageServiceTest {
     }
 
     @Test
-    void 같은_직군을_다시_고르면_바꾸지_않고_200() {
+    void 같은_직군을_다시_고르면_400_SAME_JOB_TYPE이고_바꾸지_않는다() {
         givenJobType("EMPLOYEE");
-        given(financialInputMapper.selectSavedBaseMonths(7L)).willReturn(List.of("2026-10"));
 
-        assertThat(myPage.selectJobType(7L, new MyPageDtos.JobType("EMPLOYEE")).user().jobType()).isEqualTo("EMPLOYEE");
+        ApiException error = catchApiException(() -> myPage.selectJobType(7L, new MyPageDtos.JobType("EMPLOYEE")));
+        assertThat(error.getStatus().value() + " " + error.getCode()).isEqualTo("400 SAME_JOB_TYPE");
+        assertThat(error.getFieldErrors()).extracting(FieldErrorItem::field).containsExactly("jobType");
         verify(userMapper, never()).updateWorkerTypeIfEmpty(any(Long.class), anyString(), any());
+        verify(userMapper, never()).updateWorkerTypeFrom(any(Long.class), anyString(), anyString(), any());
+        verify(systemLogMapper, never()).insertLog(anyString(), anyString(), anyString(), any(), any());
+    }
+
+    @Test
+    void 틀린_직군_값은_400_INVALID_INPUT이고_바꾸지_않는다() {
+        givenJobType("EMPLOYEE");
+
+        assertThat(codeOf(() -> myPage.selectJobType(7L, new MyPageDtos.JobType("STUDENT")))).isEqualTo("400 INVALID_INPUT");
+        assertThat(codeOf(() -> myPage.selectJobType(7L, new MyPageDtos.JobType(null)))).isEqualTo("400 INVALID_INPUT");
+        verify(userMapper, never()).lockUser(any(Long.class));
         verify(userMapper, never()).updateWorkerTypeFrom(any(Long.class), anyString(), anyString(), any());
     }
 
     @Test
-    void 저장한_입력도_평가도_없으면_다른_직군으로_바꾼다() {
+    void 다른_직군으로_바꾼다_동시에_바뀌었으면_409() {
         UserAccount account = givenJobType("EMPLOYEE");
-        given(financialInputMapper.selectSavedBaseMonths(7L)).willReturn(List.of());
-        given(userMapper.countAssessments(7L)).willReturn(0);
         given(userMapper.updateWorkerTypeFrom(eq(7L), eq("EMPLOYEE"), eq("FREELANCER"), any())).willAnswer(invocation -> {
             account.setWorkerTypeCode("FREELANCER");
             return 1;
@@ -297,17 +308,30 @@ class SocialAndMyPageServiceTest {
         assertThat(codeOf(() -> myPage.selectJobType(7L, new MyPageDtos.JobType("SELF_EMPLOYED")))).isEqualTo("409 JOB_TYPE_ALREADY_SELECTED");
     }
 
+    // FP-298 N-04-8 저장한 입력·평가가 있어도 직군만 바꾼다(11/28 조장 확인). 입력·평가 행은 읽지도 지우지도 않고, 시스템 로그에는 가린 아이디와 직군 코드만 남긴다.
     @Test
-    void 저장한_입력이나_평가가_있으면_다른_직군으로_못_바꾸고_409_JOB_TYPE_LOCKED() {
-        givenJobType("EMPLOYEE");
-        given(financialInputMapper.selectSavedBaseMonths(7L)).willReturn(List.of("2026-10"));
-        given(userMapper.countAssessments(7L)).willReturn(0);
-        assertThat(codeOf(() -> myPage.selectJobType(7L, new MyPageDtos.JobType("FREELANCER")))).isEqualTo("409 JOB_TYPE_LOCKED");
+    void 저장한_입력이나_평가가_있어도_직군을_바꾸고_개인정보_없이_로그를_남긴다() {
+        UserAccount account = givenJobType("EMPLOYEE");
+        given(userMapper.updateWorkerTypeFrom(eq(7L), eq("EMPLOYEE"), eq("FREELANCER"), any())).willAnswer(invocation -> {
+            account.setWorkerTypeCode("FREELANCER");
+            return 1;
+        });
 
-        given(financialInputMapper.selectSavedBaseMonths(7L)).willReturn(List.of());
-        given(userMapper.countAssessments(7L)).willReturn(1);
-        assertThat(codeOf(() -> myPage.selectJobType(7L, new MyPageDtos.JobType("FREELANCER")))).isEqualTo("409 JOB_TYPE_LOCKED");
+        assertThat(myPage.selectJobType(7L, new MyPageDtos.JobType("FREELANCER")).user().jobType()).isEqualTo("FREELANCER");
 
-        verify(userMapper, never()).updateWorkerTypeFrom(any(Long.class), anyString(), anyString(), any());
+        verify(userMapper, never()).countAssessments(any(Long.class));
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(systemLogMapper).insertLog(eq("INFO"), eq("member-service"), message.capture(), eq(7L), any());
+        assertThat(message.getValue()).isEqualTo("직군 변경 EMPLOYEE → FREELANCER (ne***)");
+        assertThat(message.getValue()).doesNotContain(account.getLoginId());
+    }
+
+    private static ApiException catchApiException(Runnable action) {
+        try {
+            action.run();
+        } catch (ApiException e) {
+            return e;
+        }
+        throw new AssertionError("ApiException이 나지 않았습니다.");
     }
 }

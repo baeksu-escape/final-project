@@ -1,5 +1,7 @@
+import { JOB_TYPES } from '../../../common/config/jobTypes.js'
 import { ALT_DATA_SOURCES, ALT_DATA_TITLE } from './altDataSources.js'
 import { getSectionsForJob } from './inputSections.js'
+import { VALIDATION_LIMITS } from './validationLimits.js'
 
 // 대안 데이터 항목의 key — 입력 섹션 5개만 끝났는지 볼 때 이 항목을 뺀다.
 const ALT_DATA_ITEM_KEY = 'altData'
@@ -44,6 +46,32 @@ export function getCompletionItems(status, jobType) {
 // N-05-8 6개 항목이 모두 완료인지 본다 — 모두 차야 [점수 산출하기]를 연다.
 export function isInputComplete(status, jobType) {
   return getCompletionItems(status, jobType).every((item) => item.done)
+}
+
+// FP-260 9차 [점수 산출하기]를 막는 항목의 이유 한 줄과 고치러 갈 단계(INPUT_STEPS 번호, 0부터).
+// 기준은 서버 status(ScoreCalculationService.isComplete와 같은 6개)다. 대안 데이터 이유는 '5종 중 N종 불러옴'(hint)을 쓴다.
+const MISSING_GUIDES = Object.freeze({
+  income: { step: 0, reason: '소득을 입력하고 저장해 주세요.' },
+  period: { step: 0, reason: '기간을 입력하고 저장해 주세요.' },
+  loans: { step: 1, reason: '대출을 추가하거나 "보유한 대출이 없습니다."에 체크하고 저장해 주세요.' },
+  assets: { step: 3, reason: '자산을 하나 이상 입력하고 저장해 주세요.' },
+  expenses: { step: 4, reason: '월 고정 지출을 입력하고 저장해 주세요.' },
+  [ALT_DATA_ITEM_KEY]: { step: 5 },
+})
+
+// FP-260 10차 자영업자·프리랜서의 소득 이유 — 서버는 서로 다른 달 12개월이 있어야 완료로 본다(직군을 바꾼 뒤에도 이 문구로 안내).
+const MONTHLY_INCOME_REASON = `최근 ${VALIDATION_LIMITS.INCOME_MONTHS_MAX}개월 소득을 모두 입력하고 저장해 주세요.`
+
+// FP-260 9차 점수를 내려면 남은 항목 [{ key, label, reason, step }] — 모두 완료면 빈 목록이다(이때만 [점수 산출하기]가 켜진다).
+export function getMissingItems(status, jobType) {
+  return getCompletionItems(status, jobType)
+    .filter((item) => !item.done)
+    .map((item) => ({
+      key: item.key,
+      label: item.label,
+      reason: item.key === 'income' && jobType !== JOB_TYPES.EMPLOYEE ? MONTHLY_INCOME_REASON : (MISSING_GUIDES[item.key].reason ?? item.hint),
+      step: MISSING_GUIDES[item.key].step,
+    }))
 }
 
 // FP-227 대안 데이터 항목({ done, hint })만 돌려준다 — 입력 완료 현황 6단계 줄의 완료 여부와 '5종 중 N종 불러옴' 안내에 쓴다.
