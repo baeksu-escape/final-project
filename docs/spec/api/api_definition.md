@@ -77,6 +77,7 @@
 | 400 | `INVALID_PASSWORD` | 비밀번호 확인 실패(MEM-02·MEM-07 등) |
 | 400 | `INVALID_VERIFICATION_CODE`, `VERIFICATION_CODE_EXPIRED`, `VERIFICATION_ATTEMPTS_EXCEEDED` | 인증번호 틀림·만료·5회 초과 |
 | 400 | `EMAIL_VERIFICATION_REQUIRED`, `SAME_EMAIL`, `SAME_PASSWORD`, `SAME_NICKNAME` | 이메일 인증 누락, 같은 값으로 변경(SAME_NICKNAME은 MEM-08, FP-222) 🆕 11/23 |
+| 400 | `SAME_JOB_TYPE` | 지금 직군과 같은 직군으로 변경(MEM-05, FP-298) 🆕 11/28 |
 | 400 | `ADMIN_CHALLENGE_INVALID`, `PASSWORD_SETUP_INVALID` | 관리자 1회용 토큰 만료·재사용 |
 | 400 | `ACCESS_REASON_REQUIRED` | ADM-08 사유 없음 |
 | 400 | `INVALID_SOCIAL_CODE`, `SOCIAL_LINK_EXPIRED` | 간편 로그인 코드·연결 키 문제 |
@@ -90,7 +91,7 @@
 | 404 | `NOT_FOUND`, `ACCOUNT_NOT_FOUND` | 대상 없음 |
 | 404 | `PRODUCT_NOT_FOUND` | 없는 대출 상품 코드(LOAN-02·04·05, 경환 FP-90) 🆕 11/20 |
 | 409 | `DUPLICATE_LOGIN_ID`, `DUPLICATE_EMAIL`, `DUPLICATE_NICKNAME`, `NICKNAME_UNAVAILABLE` | 중복 |
-| 409 | `JOB_TYPE_REQUIRED`, `JOB_TYPE_ALREADY_SELECTED`, `JOB_TYPE_LOCKED` | 직군 선택 전 저장 / 직군 재선택 / 입력 저장 뒤 직군 변경(MEM-05) 🆕 11/23 |
+| 409 | `JOB_TYPE_REQUIRED`, `JOB_TYPE_ALREADY_SELECTED` | 직군 선택 전 저장 / 직군을 바꾸는 사이 다른 요청이 먼저 바꿈(MEM-05). `JOB_TYPE_LOCKED`는 11/28부터 쓰지 않는다(저장한 회원도 변경 가능, FP-298) 🆕 11/28 |
 | 409 | `CONSENT_REQUIRED` | 동의 없이 불러오기 |
 | 409 | `CREDIT_PROFILE_IMPORTED` | 같은 기준일에 불러온 신용 정보가 있어 직접 입력 저장 불가 |
 | 409 | `SOCIAL_ALREADY_LINKED` | 이미 연결된 간편 로그인 |
