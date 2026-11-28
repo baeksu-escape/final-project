@@ -9,7 +9,9 @@ from pathlib import Path
 
 import joblib
 
-from pipeline.feature_catalog import REAL_FEATURE_SET_VERSION, REAL_MODEL_VERSION, grade_band, is_real_model_version
+from pipeline.feature_catalog import (
+    REAL_FEATURE_SET_VERSION, REAL_MODEL_VERSION, cutoff_for, grade_band, is_real_model_version,
+)
 from training.explain import AlternativeExplainer, score_one
 
 log = logging.getLogger("avenue.prediction")
@@ -34,16 +36,17 @@ class ModelScorer:
         """피처 dict(build_features 결과) → Mock과 같은 모양의 기존·대안 점수와 SHAP. baseScore + Σ shapScore = 대안 점수."""
         legacy = score_one(self.legacy_model, features, "legacy")
         alternative = self.explainer.explain(features)
+        cutoff_version = cutoff_for(self.version)
         return {
-            "traditional": _model_score(legacy),
-            "alternative": _model_score(alternative),
+            "traditional": _model_score(legacy, cutoff_version),
+            "alternative": _model_score(alternative, cutoff_version),
             "shap": {"baseScore": alternative["baseScore"], "factors": alternative["factors"]},
         }
 
 
-def _model_score(result: dict) -> dict:
-    """explain/score_one 결과 → 응답의 모델 한쪽 모양. 등급은 서비스 등급 구간(CUT-0.3)으로 매긴다."""
-    return {"scorableYn": "Y", "score": result["score"], "gradeBandCode": grade_band(result["score"]),
+def _model_score(result: dict, cutoff_version: str) -> dict:
+    """explain/score_one 결과 → 응답의 모델 한쪽 모양. 등급은 이 모델 버전의 등급 구간(cutoff_for)으로 매긴다."""
+    return {"scorableYn": "Y", "score": result["score"], "gradeBandCode": grade_band(result["score"], cutoff_version),
             "defaultProb": result["defaultProb"]}
 
 

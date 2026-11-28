@@ -20,16 +20,12 @@ export const SCORE_ERROR_CODES = Object.freeze({
   REQUEST_ID_CONFLICT: 'REQUEST_ID_CONFLICT',
 })
 
-// FP-260 서버 경로와 화면 칸 이름이 다른 경우 — 서버는 기간을 periodMonths 하나로 검사하므로 그 오류를 년 칸 아래에 보여 준다.
-const SERVER_FIELD_ALIASES = Object.freeze({ 'workPeriod.periodMonths': 'workPeriod.periodYears' })
-
 const ROW_FIELD_PATH = /^(\w+)\.items\[(\d+)\]\.(\w+)$/
 const LIST_PATH = /^(\w+)\.items$/
 const SECTION_FIELD_PATH = /^(\w+)\.(\w+)$/
 
 // 서버 필드 경로 하나를 화면 오류 key로 바꾼다. 지금 화면에 없는 섹션·줄·칸이면 null.
-function toErrorKey(serverPath, values) {
-  const path = SERVER_FIELD_ALIASES[serverPath] ?? serverPath
+function toErrorKey(path, values) {
   const row = ROW_FIELD_PATH.exec(path)
   if (row) {
     const [, sectionKey, index, fieldKey] = row

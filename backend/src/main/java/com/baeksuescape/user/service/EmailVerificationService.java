@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.baeksuescape.global.config.AvenueProperties;
 import com.baeksuescape.global.exception.ApiException;
 import com.baeksuescape.global.exception.ErrorResponse.FieldErrorItem;
+import com.baeksuescape.global.util.PiiCrypto;
 import com.baeksuescape.global.util.PiiHmac;
 import com.baeksuescape.user.dto.AuthRequests;
 import com.baeksuescape.user.dto.AuthResponses;
@@ -42,12 +43,18 @@ public class EmailVerificationService {
     private final EmailCodeSender sender;
     private final PasswordEncoder passwordEncoder;
     private final PiiHmac hmac;
+    // FP-258 재설정 목적 확인에서 가입 이름을 복호화해 입력한 이름과 비교한다.
+    private final PiiCrypto crypto;
     private final AvenueProperties properties;
     private final Clock clock;
+    private final CodeSendGuard sendGuard;
     private final SecureRandom random = new SecureRandom();
 
     public EmailVerificationService(VerificationCodeMapper codeMapper, UserAccountMapper userMapper, VerificationTokenService tokenService,
-            EmailCodeSender sender, PasswordEncoder passwordEncoder, PiiHmac hmac, AvenueProperties properties, Clock clock) {
+            EmailCodeSender sender, PasswordEncoder passwordEncoder, PiiHmac hmac, PiiCrypto crypto, AvenueProperties properties, Clock clock,
+            CodeSendGuard sendGuard) {
+        this.sendGuard = sendGuard;
+        this.crypto = crypto;
         this.codeMapper = codeMapper;
         this.userMapper = userMapper;
         this.tokenService = tokenService;
@@ -59,34 +66,44 @@ public class EmailVerificationService {
     }
 
     // AUTH-07 인증코드 발송. 가입·이메일 변경 목적이면 이미 가입된 이메일을 막는다. 재설정 목적은 계정이 있는지 알려 주지 않고 항상 보낸다.
-    @Transactional
+    // FP-258 같은 이메일의 발송은 sendGuard 잠금 안에서 한 트랜잭션으로 한다(동시 요청이 하루 상한을 넘지 않게, 잠금은 커밋 뒤에 푼다).
     public AuthResponses.EmailSent send(AuthRequests.EmailSend request) {
         EmailPurpose purpose = purposeOf(request.purpose());
-        String email = request.email().strip();
-        if (!AccountRules.isValidEmail(email)) throw invalidEmail();
+        String email = AccountRules.normalizeEmail(request.email());
+        boolean validFormat = purpose.usesNewEmailRule() ? AccountRules.isValidEmail(email) : AccountRules.isBasicEmail(email);
+        if (!validFormat) throw invalidEmail();
         String target = hmac.email(email);
-        if (purpose.blocksUsedEmail() && userMapper.countByEmailHmac(target) > 0) throw AuthErrors.duplicateEmail();
+        return sendGuard.run(CHANNEL_EMAIL, target, () -> {
+            if (purpose.blocksUsedEmail() && userMapper.countByEmailHmac(target) > 0) throw AuthErrors.duplicateEmail();
 
-        LocalDateTime now = LocalDateTime.now(clock);
-        String code = newCode();
-        VerificationCode row = new VerificationCode();
-        row.setPurposeCode(purpose.dbCode());
-        row.setChannelCode(CHANNEL_EMAIL);
-        row.setTargetHmac(target);
-        row.setCodeHash(passwordEncoder.encode(code));
-        row.setExpiresAt(now.plusSeconds(CODE_TTL_SECONDS));
-        row.setCreatedAt(now);
-        codeMapper.insertCode(row);
-        sender.send(email, code, purpose.name());
-        return new AuthResponses.EmailSent(CODE_TTL_SECONDS);
+            LocalDateTime now = LocalDateTime.now(clock);
+            // FP-258 같은 이메일로 오늘(0시부터) 보낸 횟수가 상한이면 429. 가입 여부와 상관없이 보내는 목적(FIND_ID·RESET_PASSWORD)도 같이 센다.
+            if (codeMapper.countSentSince(CHANNEL_EMAIL, target, now.toLocalDate().atStartOfDay()) >= AuthErrors.DAILY_CODE_SEND_LIMIT) {
+                throw AuthErrors.codeSendDailyLimit("이메일");
+            }
+            String code = newCode();
+            VerificationCode row = new VerificationCode();
+            row.setPurposeCode(purpose.dbCode());
+            row.setChannelCode(CHANNEL_EMAIL);
+            row.setTargetHmac(target);
+            row.setCodeHash(passwordEncoder.encode(code));
+            row.setExpiresAt(now.plusSeconds(CODE_TTL_SECONDS));
+            row.setCreatedAt(now);
+            codeMapper.insertCode(row);
+            sender.send(email, code, purpose.name());
+            return new AuthResponses.EmailSent(CODE_TTL_SECONDS);
+        });
     }
 
     // AUTH-08 인증코드 확인. 같은 목적·대상의 최근 코드만 본다. 틀리면 시도 횟수를 올리고 5회가 되면 그 코드는 쓸 수 없다.
-    // 재설정 목적이면 코드가 맞은 뒤 아이디·이메일이 같은 일반 회원이 있는지 보고, 없으면 404(프론트 mock과 같은 순서).
+    // 재설정 목적이면 코드가 맞은 뒤 아이디·이메일·이름(FP-258)이 같은 일반 회원이 있는지 보고, 없으면 404(프론트 mock과 같은 순서).
+    // 아이디 찾기(FIND_ID) 목적은 계정을 보지 않는다 — 찾기 요청(AUTH-09)이 토큰을 쓸 때 이름과 함께 확인한다.
     @Transactional(noRollbackFor = ApiException.class)
     public AuthResponses.EmailVerified verify(AuthRequests.EmailVerify request) {
         EmailPurpose purpose = purposeOf(request.purpose());
-        String email = request.email().strip();
+        // FP-258 재설정 목적은 이름 형식을 코드보다 먼저 본다(틀리면 400 name 칸, 시도 횟수는 그대로).
+        if (purpose == EmailPurpose.RESET_PASSWORD) AuthErrors.requireValidName(request.name());
+        String email = AccountRules.normalizeEmail(request.email());
         String target = hmac.email(email);
         LocalDateTime now = LocalDateTime.now(clock);
 
@@ -100,8 +117,9 @@ public class EmailVerificationService {
 
         Long userId = null;
         if (purpose == EmailPurpose.RESET_PASSWORD) {
-            UserAccount account = request.loginId() == null ? null : userMapper.selectUserByLoginIdAndEmailHmac(request.loginId().strip(), target);
-            if (account == null) throw AuthErrors.accountNotFound();
+            UserAccount account = request.loginId() == null ? null
+                    : userMapper.selectUserByLoginIdAndEmailHmac(AccountRules.normalizeLoginId(request.loginId()), target);
+            if (account == null || !AccountRules.nameMatches(request.name(), crypto.decrypt(account.getNameEnc()))) throw AuthErrors.accountNotFound();
             userId = account.getUserId();
         }
         codeMapper.markVerified(row.getVerificationId(), userId, now, now.plus(VerificationTokenService.LIFETIME));
@@ -112,7 +130,7 @@ public class EmailVerificationService {
     // 호출하는 쪽의 트랜잭션 안에서 부른다(가입이 실패하면 사용 처리도 되돌아간다).
     public void consume(String token, EmailPurpose purpose, String email, Long expectedUserId) {
         VerificationTokenService.Claim claim = tokenService.parse(token).orElseThrow(EmailVerificationService::verificationRequired);
-        String target = hmac.email(email == null ? "" : email.strip());
+        String target = hmac.email(AccountRules.normalizeEmail(email));
         if (!claim.purposeCode().equals(purpose.dbCode()) || !claim.targetHmac().equals(target)) throw verificationRequired();
         VerificationCode row = codeMapper.selectById(claim.verificationId());
         if (row == null || !purpose.dbCode().equals(row.getPurposeCode()) || !target.equals(row.getTargetHmac())) throw verificationRequired();

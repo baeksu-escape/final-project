@@ -4,16 +4,17 @@ import { ALT_DATA_TITLE } from './altDataSources.js'
 export const SCORE_STEP_TITLE = '점수 산출하기'
 
 // N-05 데이터 입력 화면의 단계 설정(7단계) — 카드(섹션)를 1~2개씩 한 화면에 보여 준다. 묶음을 바꿀 때는 이 목록만 고친다.
+// question: 화면 맨 위 질문형 한 줄 제목.
 // sectionKeys는 config/inputSections.js의 섹션 key다. 입력 카드가 있는 단계의 이름은 그 카드 제목을 이어 붙여 만든다(getStepTitle).
 // 입력 카드가 없는 단계(sectionKeys가 빈 배열)는 title을 직접 갖는다 — 대안 데이터 불러오기, 점수 산출.
 export const INPUT_STEPS = Object.freeze([
-  { key: 'income', sectionKeys: ['income', 'workPeriod'] },
-  { key: 'loans', sectionKeys: ['loans'] },
-  { key: 'creditProfile', sectionKeys: ['creditProfile'] },
-  { key: 'assets', sectionKeys: ['assets'] },
-  { key: 'expenses', sectionKeys: ['fixedExpense', 'otherExpenses'] },
-  { key: 'altData', title: ALT_DATA_TITLE, sectionKeys: [] },
-  { key: 'score', title: SCORE_STEP_TITLE, sectionKeys: [] },
+  { key: 'income', question: '최근 소득과 일해 온 기간을 알려 주세요', sectionKeys: ['income', 'workPeriod'] },
+  { key: 'loans', question: '지금 갚고 있는 대출이 있나요?', sectionKeys: ['loans'] },
+  { key: 'creditProfile', question: '카드와 신용 이용 기록을 알려 주세요', sectionKeys: ['creditProfile'] },
+  { key: 'assets', question: '가지고 있는 자산을 알려 주세요', sectionKeys: ['assets'] },
+  { key: 'expenses', question: '매달 나가는 지출을 알려 주세요', sectionKeys: ['fixedExpense', 'otherExpenses'] },
+  { key: 'altData', title: ALT_DATA_TITLE, question: '납부 기록을 불러올 기관에 동의해 주세요', sectionKeys: [] },
+  { key: 'score', title: SCORE_STEP_TITLE, question: '입력이 끝났어요, 점수를 확인해 볼까요?', sectionKeys: [] },
 ])
 
 // 단계 key로 단계 번호(0부터)를 찾는다.
@@ -23,7 +24,7 @@ const stepIndexOf = (key) => INPUT_STEPS.findIndex((step) => step.key === key)
 export const LAST_INPUT_STEP = stepIndexOf('expenses')
 // 대안 데이터 불러오기 단계 — 저장한 뒤에만 갈 수 있다.
 export const ALT_DATA_STEP = stepIndexOf('altData')
-// 점수 산출 단계([점수 산출하기]·[처음으로 돌아가기]) — 저장한 뒤에만 갈 수 있다.
+// 점수 산출 단계([점수 산출하기]·[처음으로 되돌아가기]) — 저장한 뒤에만 갈 수 있다.
 export const SCORE_STEP = stepIndexOf('score')
 
 // FP-227 입력 완료 현황(단계 리모컨)에서 누를 수 없는 줄에 보여 줄 이유.

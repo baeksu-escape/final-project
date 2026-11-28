@@ -10,22 +10,22 @@ export const GROUP_CODES = Object.freeze({
   AGE_BAND: ['20S', '30S', '40S', '50_PLUS'],
 })
 const GRADE_CODES = ['CAUTION', 'STANDARD', 'GOOD']
-// 예시 회원의 기존 등급은 기존 점수로 정한다(평가 때 저장되는 CUT-0.3 경계 654·727, 예시의 대안 등급도 같은 경계). 기존 점수가 없으면 null
-const gradeOfScore = (score) => (score === null ? null : score >= 727 ? 'GOOD' : score >= 654 ? 'STANDARD' : 'CAUTION')
+// 예시 회원의 기존 등급은 기존 점수로 정한다(평가 때 저장되는 CUT-0.4 경계 645·712, 예시의 대안 등급도 같은 경계). 기존 점수가 없으면 null
+const gradeOfScore = (score) => (score === null ? null : score >= 712 ? 'GOOD' : score >= 645 ? 'STANDARD' : 'CAUTION')
 
 // [직군, 연령대, 기존 점수(null = 기존 모델로 산출 못 함), 대안 점수, 대안 등급] — 회원별 최근 평가 예시
 export const SAMPLE_MEMBERS = Object.freeze([
-  ['EMPLOYEE', '30S', 640, 700, 'STANDARD'], ['EMPLOYEE', '30S', 700, 760, 'STANDARD'], ['EMPLOYEE', '40S', 750, 800, 'GOOD'],
-  ['EMPLOYEE', '20S', 600, 650, 'CAUTION'], ['EMPLOYEE', '40S', 680, 720, 'STANDARD'], ['EMPLOYEE', '30S', 610, 690, 'STANDARD'],
-  ['SELF_EMPLOYED', '40S', 590, 640, 'CAUTION'], ['SELF_EMPLOYED', '50_PLUS', 620, 690, 'STANDARD'], ['SELF_EMPLOYED', '40S', 660, 730, 'STANDARD'],
-  ['SELF_EMPLOYED', '30S', 570, 655, 'CAUTION'], ['SELF_EMPLOYED', '50_PLUS', 700, 790, 'GOOD'],
+  ['EMPLOYEE', '30S', 640, 700, 'STANDARD'], ['EMPLOYEE', '30S', 700, 760, 'GOOD'], ['EMPLOYEE', '40S', 750, 800, 'GOOD'],
+  ['EMPLOYEE', '20S', 600, 650, 'STANDARD'], ['EMPLOYEE', '40S', 680, 720, 'GOOD'], ['EMPLOYEE', '30S', 610, 690, 'STANDARD'],
+  ['SELF_EMPLOYED', '40S', 590, 640, 'CAUTION'], ['SELF_EMPLOYED', '50_PLUS', 620, 690, 'STANDARD'], ['SELF_EMPLOYED', '40S', 660, 730, 'GOOD'],
+  ['SELF_EMPLOYED', '30S', 570, 655, 'STANDARD'], ['SELF_EMPLOYED', '50_PLUS', 700, 790, 'GOOD'],
   ['FREELANCER', '20S', 560, 640, 'CAUTION'], ['FREELANCER', '20S', null, 700, 'STANDARD'], ['FREELANCER', '30S', 600, 710, 'STANDARD'],
 ].map(([workerTypeCode, ageBandCode, tradScore, altScore, altGradeBandCode]) =>
   Object.freeze({ workerTypeCode, ageBandCode, tradScore, altScore, altGradeBandCode, tradGradeBandCode: gradeOfScore(tradScore) })))
 const SAMPLE_REGISTERED_MEMBER_COUNT = 40
 const SAMPLE_TODAY_SCORED_COUNT = 3
 // 통계 기준 모델(실제 API는 MODEL_REGISTRY의 ACTIVE 모델로 낸 평가만 센다, 11/23 리뷰 반영)
-export const SAMPLE_MODEL_VERSION = 'LGBM-BASE-0.2'
+export const SAMPLE_MODEL_VERSION = 'LGBM-BASE-0.3'
 
 // 서버 BigDecimal HALF_UP(소수 첫째 자리)과 같은 반올림 — 값이 모두 0 이상이라 Math.round로 같다
 const round1 = (value) => Math.round(value * 10) / 10

@@ -1,15 +1,18 @@
-# FP-144 N-12 최종 성능 지표 — TEST 평가를 한 번만 실행하고, 사전 기준(정의서 10장 C26)과 비교해 결과를 있는 그대로 기록한다.
-# 평가 대상: 서버 모델 파일(legacy.joblib·alternative.joblib, 모델 0.2)과 같은 설정의 비교용 실험 모델(단조 제약, 시드 5개).
-# 규칙(C26): TEST는 한 번만 본다. 범위를 벗어나도 모델은 고치지 않고 그대로 보고한다. 결과를 본 뒤에 모델·지표·기준·등급 경계를 바꾸지 않는다.
+# FP-144 N-12 최종 성능 지표 — TEST 평가를 한 번만 실행하고, 사전 기준(정의서 10장, 모델 0.2는 C26·0.3은 C38)과 비교해 결과를 있는 그대로 기록한다.
+# 평가 대상: 서버 모델 파일(legacy.joblib·alternative.joblib)과 같은 설정의 비교용 실험 모델(단조 제약, 시드 5개). 모델 버전은 --version으로 고른다.
+# 규칙(C26·C38): 버전마다 TEST는 한 번만 본다. 범위를 벗어나도 모델은 고치지 않고 그대로 보고한다. 결과를 본 뒤에 모델·지표·기준·등급 경계를 바꾸지 않는다.
 # 학습·내보내기 스크립트(train.py 등)는 TEST를 읽자마자 버린다. TEST 행은 이 파일의 load_eval_split만 읽으며, --confirm-test-once를 줄 때만 읽는다.
 # 실행(fastapi_server 폴더에서):
 #   리허설(VALID, 기본): python -m training.final_test_eval        # 알려진 VALID 값과 맞는지 먼저 본다. 파일은 만들지 않는다(--out-dir를 주면 저장)
 #   최종(TEST, 한 번):    python -m training.final_test_eval --split TEST --confirm-test-once
+#   모델 0.3은 두 명령에 --version 0.3을 더한다(데이터 data/training(v3.7.0), 모델 data/model_v03가 기본값). 0.2의 기록·결과 파일은 건드리지 않는다.
+#   0.2를 다시 볼 때는 --data-dir data/training_v3.6.1을 준다(11/27 데이터 폴더 교체, FP-285)
 import argparse
 import json
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,7 +38,12 @@ RUN_RECORD_PATH = REPO_ROOT / "docs" / "spec" / "final_test_eval_run.json"
 # 공용 DB에 등록한 모델 0.2의 파일 해시(MODEL_ARTIFACT.FILE_SHA256, METRICS_JSON.meta_sha256)가 적힌 SQL. 로컬 모델 파일이 공용 0.2 묶음과 같은지 비교하는 기준이다.
 REGISTER_SQL_PATH = REPO_ROOT / "docs" / "spec" / "sql" / "register_model_lgbm_base_0_2.sql"
 # 작업 트리 검사에서 뺄 파일: TEST 실행이 만드는 기록·결과 파일(첫 실행 뒤 재실행을 막지 않게)
-RUN_OUTPUT_PATHS = ["docs/spec/final_test_eval_run.json", "docs/spec/final_test_eval_result.json", "docs/spec/final_test_eval_result.md"]
+RUN_OUTPUT_PATHS = ["docs/spec/final_test_eval_run.json", "docs/spec/final_test_eval_result.json", "docs/spec/final_test_eval_result.md",
+                    "docs/spec/final_test_eval_run_v03.json", "docs/spec/final_test_eval_result_v03.json", "docs/spec/final_test_eval_result_v03.md"]
+# 모델 0.3은 아직 DB에 등록하지 않아, 모델 파일 해시를 TEST 전에 적어 둔 정의서의 VALID 결과 행(C37)과 비교한다.
+DEFINITION_PATH = REPO_ROOT / "docs" / "spec" / "feature_definition.md"
+RECORDED_HASH = re.compile(r"`(?P<file>(?:legacy|alternative)\.(?:joblib|meta\.json))` `(?P<sha>[0-9a-f]{64})`")
+RECORDED_TABLE = re.compile(r"표 SHA `(?P<sha>[0-9a-f]{8})`")
 REGISTER_ARTIFACT = re.compile(r"add_artifact\('[^']*',\s*'[^']*/ (?P<file>\w+)\.joblib',\s*'(?P<file_sha>[0-9a-f]{64})'.*?\"meta_sha256\":\"(?P<meta_sha>[0-9a-f]{64})\"", re.S)
 EXPECTED_MODEL_VERSION = "LGBM-BASE-0.2"
 TEST_SPLIT = "TEST"
@@ -56,16 +64,58 @@ PAIR_NAMES = {("legacy", "delinq"): "기존 모델·연체 라벨", ("alt", "non
               ("alt", "delinq"): "대안 모델·연체 라벨", ("legacy", "nonfin"): "기존 모델·비금융 효과 라벨"}
 SYNTHETIC_NOTICE = "합성 데이터와 합성 라벨 기준이며, 실제 신용평가·대출 심사 결과나 실제 개선을 뜻하지 않는다."
 
+# 정의서 10장 C38 사전 기준(모델 0.3 제약 19개, TEST를 보기 전에 기록). 범위는 VALID 5개 시드 평균 ±0.02이며 TEST 결과를 본 뒤에 바꾸지 않는다.
+C38_CRITERIA = {
+    ("legacy", "delinq"): (0.6749, 0.6549, 0.6949),
+    ("alt", "nonfin"): (0.7383, 0.7183, 0.7583),
+    ("alt", "delinq"): (0.6750, 0.6550, 0.6950),
+    ("legacy", "nonfin"): (0.7193, 0.6993, 0.7393),
+}
+# 모델 0.3의 등급 경계 후보 CUT-0.4(C37, VALID 대안 점수 25·75%). TEST를 실행한 11/27에는 서비스 구간이 CUT-0.3이었다(반영은 FP-285).
+CUT_0_4_BANDS = [
+    {"gradeBandCode": "CAUTION", "minScore": 0, "maxScore": 644},
+    {"gradeBandCode": "STANDARD", "minScore": 645, "maxScore": 711},
+    {"gradeBandCode": "GOOD", "minScore": 712, "maxScore": 1000},
+]
+
+
+@dataclass(frozen=True)
+class Plan:
+    """모델 버전 하나의 평가 설정. 값은 정의서의 사전 기준과 같아야 하며 TEST를 본 뒤에 바꾸지 않는다."""
+    version: str
+    criteria_source: str
+    criteria: dict
+    diff_limit: float
+    monotone: dict
+    cutoff_label: str
+    grade_bands: list
+    stem: str
+    record_name: str | None      # None이면 RUN_RECORD_PATH(0.2)를 쓰고 공용 등록 SQL로 해시를 확인한다
+    data_dir: Path
+    model_dir: Path
+    hash_row: str | None = None  # 모델 파일·표 해시를 적어 둔 정의서 행(0.2는 공용 등록 SQL을 써서 None)
+    notes: tuple = ()
+
+
+PLAN_02 = Plan(EXPECTED_MODEL_VERSION, "C26", C26_CRITERIA, DELINQ_DIFF_LIMIT, config.MONOTONE_CONSTRAINTS, "CUT-0.3", GRADE_BANDS,
+               RESULT_STEM, None, config.DEFAULT_DATA_DIR, config.DEFAULT_OUT_DIR)
+PLAN_03 = Plan("LGBM-BASE-0.3", "C38", C38_CRITERIA, 0.02, config.MONOTONE_CONSTRAINTS_V03, "CUT-0.4 후보", CUT_0_4_BANDS,
+               f"{RESULT_STEM}_v03", "final_test_eval_run_v03.json", config.DEFAULT_DATA_DIR,
+               config.FASTAPI_ROOT / "data" / "model_v03", "C37",
+               ("씬파일 TEST는 이전 데이터 버전과 같은 분할이라 이전에 본 고객이다(판정하지 않는 참고 값).",
+                "0.2의 TEST를 본 뒤 데이터와 라벨을 바꿔 만든 모델이다. 0.2 수치와 직접 비교하지 않는다."))
+PLANS = {"0.2": PLAN_02, "0.3": PLAN_03}
+
 
 def pair_key(pair: tuple) -> str:
     return f"{pair[0]}_{pair[1]}"
 
 
-def judge_range(pair: tuple, auc: float | None) -> str:
-    """C26 정상 범위와 0.5 초과 여부로 AUC 하나를 판정한다. 범위 밖이어도 모델은 고치지 않고 그대로 보고한다."""
+def judge_range(pair: tuple, auc: float | None, plan: Plan = PLAN_02) -> str:
+    """사전 기준의 정상 범위와 0.5 초과 여부로 AUC 하나를 판정한다. 범위 밖이어도 모델은 고치지 않고 그대로 보고한다."""
     if auc is None:
         return "계산 못 함(한 클래스뿐)"
-    _, low, high = C26_CRITERIA[pair]
+    _, low, high = plan.criteria[pair]
     if auc <= 0.5:
         return "0.5 이하(우연 수준 이하)"
     if auc < low:
@@ -75,12 +125,13 @@ def judge_range(pair: tuple, auc: float | None) -> str:
     return "범위 안"
 
 
-def judge_diff(label_key: str, diff: float) -> str:
-    """같은 라벨에서 대안−기존 AUC 차이를 C26 기준으로 판정한다. 연체 라벨은 ±0.04면 차이 없음, 비금융 효과 라벨은 +면 설계 효과 재현."""
+def judge_diff(label_key: str, diff: float, plan: Plan = PLAN_02) -> str:
+    """같은 라벨에서 대안−기존 AUC 차이를 사전 기준으로 판정한다. 연체 라벨은 허용 폭 안이면 차이 없음, 비금융 효과 라벨은 +면 설계 효과 재현."""
     if label_key == "delinq":
-        if abs(diff) <= DELINQ_DIFF_LIMIT:
-            return "차이 없음(±0.04 안)"
-        return "대안 높음(+0.04 초과)" if diff > 0 else "대안 낮음(-0.04 미만)"
+        limit = plan.diff_limit
+        if abs(diff) <= limit:
+            return f"차이 없음(±{limit} 안)"
+        return f"대안 높음(+{limit} 초과)" if diff > 0 else f"대안 낮음(-{limit} 미만)"
     return "설계한 효과 재현(+방향)" if diff > 0 else "설계한 효과 미재현(0 이하)"
 
 
@@ -96,12 +147,15 @@ def auc_by_group(frame: pd.DataFrame, scores: pd.Series, label: str, column: str
     return {str(name): auc_info(part[label], scores.loc[part.index]) for name, part in frame.groupby(column)}
 
 
-def grade_ratio(scores) -> dict:
-    """CUT-0.3 경계로 등급을 나눈 건수와 비율. 경계는 VALID로 정한 값이며 TEST에서는 비율만 확인한다."""
-    codes = [grade_band(int(score)) for score in scores]
+def grade_ratio(scores, bands: list = GRADE_BANDS) -> dict:
+    """등급 경계(기본 CUT-0.3)로 등급을 나눈 건수와 비율. 경계는 VALID로 정한 값이며 TEST에서는 비율만 확인한다."""
+    if bands is GRADE_BANDS:
+        codes = [grade_band(int(score)) for score in scores]
+    else:
+        codes = [next(b["gradeBandCode"] for b in bands if b["minScore"] <= int(score) <= b["maxScore"]) for score in scores]
     total = len(codes)
     return {band["gradeBandCode"]: {"count": codes.count(band["gradeBandCode"]),
-                                    "ratio": round(codes.count(band["gradeBandCode"]) / total, 4)} for band in GRADE_BANDS}
+                                    "ratio": round(codes.count(band["gradeBandCode"]) / total, 4)} for band in bands}
 
 
 def read_sums(path: Path) -> dict:
@@ -149,6 +203,31 @@ def verify_shipped(model_dir: Path, registry_path: Path = REGISTER_SQL_PATH) -> 
         version = json.loads((model_dir / name).read_text(encoding="utf-8")).get("model_version")
         if version != EXPECTED_MODEL_VERSION:
             sys.exit(f"{name}의 model_version이 {version}이다({EXPECTED_MODEL_VERSION}이어야 한다). 평가하지 않는다")
+    return hashes
+
+
+def verify_recorded(model_dir: Path, table_path: Path, plan: Plan = PLAN_03, definition_path: Path = DEFINITION_PATH) -> dict:
+    """모델 0.3 파일 4개의 해시가 정의서의 해시 행(plan.hash_row)에 적은 값과 같고, meta.json의 버전·학습 표 해시가 평가할 표와 맞는지 확인한다. 다르면 TEST를 열기 전에 멈춘다."""
+    row = next((line for line in definition_path.read_text(encoding="utf-8").splitlines() if line.startswith(f"| {plan.hash_row} |")), "")
+    recorded = {match["file"]: match["sha"] for match in RECORDED_HASH.finditer(row)}
+    table = RECORDED_TABLE.search(row)
+    if set(recorded) != set(SHIPPED_FILES) or not table:
+        sys.exit(f"정의서 {plan.hash_row}에서 모델 파일 해시 4개와 표 해시를 읽지 못했다(읽은 파일: {sorted(recorded)}): {definition_path}")
+    hashes = {}
+    for name in SHIPPED_FILES:
+        path = model_dir / name
+        if not path.exists():
+            sys.exit(f"모델 파일이 없다: {path}")
+        hashes[name] = sha256_of(path)
+        if hashes[name] != recorded[name]:
+            sys.exit(f"{name}의 해시가 정의서 {plan.hash_row}에 적은 값과 다르다. 그 행의 모델 파일인지 확인하기 전에는 평가하지 않는다")
+    table_sha = sha256_of(table_path)
+    if not table_sha.startswith(table["sha"]):
+        sys.exit(f"학습 표 해시({table_sha[:8]})가 정의서 {plan.hash_row}의 값({table['sha']})과 다르다. 데이터 버전을 확인하기 전에는 평가하지 않는다")
+    for name in ("legacy.meta.json", "alternative.meta.json"):
+        meta = json.loads((model_dir / name).read_text(encoding="utf-8"))
+        if meta.get("model_version") != plan.version or meta.get("data", {}).get("table_sha256") != table_sha:
+            sys.exit(f"{name}의 model_version 또는 학습 표 해시가 평가 설정과 다르다. 평가하지 않는다")
     return hashes
 
 
@@ -219,9 +298,9 @@ def load_eval_split(table_path: Path, split: str, group: str = "legacy", confirm
     return prepared
 
 
-def train_models(train: pd.DataFrame) -> dict:
-    """(모델, 라벨, 시드) → 모델. 4쌍을 TRAIN으로 시드 5개씩 단조 제약(모델 0.2와 같은 설정)으로 학습한다."""
-    return {(model, label, seed): fit_model(train, MODEL_FEATURES[model], LABEL_COLUMNS[label], seed, config.MONOTONE_CONSTRAINTS)
+def train_models(train: pd.DataFrame, plan: Plan = PLAN_02) -> dict:
+    """(모델, 라벨, 시드) → 모델. 4쌍을 TRAIN으로 시드 5개씩, 평가할 모델과 같은 단조 제약으로 학습한다."""
+    return {(model, label, seed): fit_model(train, MODEL_FEATURES[model], LABEL_COLUMNS[label], seed, plan.monotone)
             for model, label in PAIRS for seed in config.SEEDS}
 
 
@@ -230,9 +309,9 @@ def proba(model, frame: pd.DataFrame, model_name: str) -> pd.Series:
     return pd.Series(model.predict_proba(frame[MODEL_FEATURES[model_name]])[:, 1], index=frame.index)
 
 
-def evaluate_group(frame: pd.DataFrame, models: dict, shipped: dict, judged: bool = True) -> dict:
+def evaluate_group(frame: pd.DataFrame, models: dict, shipped: dict, judged: bool = True, plan: Plan = PLAN_02) -> dict:
     """한 집단의 평가: 서버 모델 AUC, 4쌍 5시드 AUC, 같은 라벨 차이, 판정. shipped는 {(모델, 라벨): 서버 모델 파일에서 읽은 모델}.
-    judged=False(씬파일)는 C26 정상 범위가 기존 집단 기준이라 판정하지 않고 값만 참고로 남긴다."""
+    judged=False(씬파일)는 사전 기준의 정상 범위가 기존 집단 기준이라 판정하지 않고 값만 참고로 남긴다."""
     five, per_seed = {}, {}
     for pair in PAIRS:
         model_name, label_key = pair
@@ -246,14 +325,14 @@ def evaluate_group(frame: pd.DataFrame, models: dict, shipped: dict, judged: boo
     for label_key in LABEL_COLUMNS:
         diff = five[("alt", label_key)] - five[("legacy", label_key)]
         diffs[label_key] = {"mean": round(float(diff.mean()), 4), "min": round(float(diff.min()), 4), "max": round(float(diff.max()), 4),
-                            "verdict": judge_diff(label_key, float(diff.mean())) if judged else "참고(C26 판정 기준은 기존 집단에만 적용)"}
+                            "verdict": judge_diff(label_key, float(diff.mean()), plan) if judged else f"참고({plan.criteria_source} 판정 기준은 기존 집단에만 적용)"}
     judgement = {}
     for pair in PAIRS if judged else []:
-        entry = {"range": [C26_CRITERIA[pair][1], C26_CRITERIA[pair][2]], "valid_mean_reference": C26_CRITERIA[pair][0],
-                 "five_seed_mean": five_info[pair_key(pair)]["mean"], "five_seed_verdict": judge_range(pair, five_info[pair_key(pair)]["mean"])}
+        entry = {"range": [plan.criteria[pair][1], plan.criteria[pair][2]], "valid_mean_reference": plan.criteria[pair][0],
+                 "five_seed_mean": five_info[pair_key(pair)]["mean"], "five_seed_verdict": judge_range(pair, five_info[pair_key(pair)]["mean"], plan)}
         if pair in SHIPPED:
             value = shipped_info[pair_key(pair)]["auc"]
-            entry.update({"shipped_auc": value, "shipped_verdict": judge_range(pair, value)})
+            entry.update({"shipped_auc": value, "shipped_verdict": judge_range(pair, value, plan)})
         judgement[pair_key(pair)] = entry
     return {"rows": int(len(frame)), "shipped_auc": shipped_info, "five_seed_auc": five_info, "same_label_diff": diffs, "judgement": judgement}
 
@@ -269,32 +348,33 @@ def reproduction_check(models: dict, shipped: dict, valid_frame: pd.DataFrame) -
     return result
 
 
-def legacy_group_report(frame: pd.DataFrame, models: dict, shipped: dict) -> dict:
+def legacy_group_report(frame: pd.DataFrame, models: dict, shipped: dict, plan: Plan = PLAN_02) -> dict:
     """기존 집단 평가에 직군별 AUC와 등급 비율을 더한다. 직군별·등급 비율은 서버 모델 파일 2개로 본다."""
-    report = evaluate_group(frame, models, shipped)
+    report = evaluate_group(frame, models, shipped, plan=plan)
     report["by_segment"] = {pair_key(pair): auc_by_group(frame, proba(model, frame, pair[0]), LABEL_COLUMNS[pair[1]], "segment_name")
                             for pair, model in shipped.items()}
-    report["grade_ratio"] = {pair[0]: grade_ratio(scores_from(model, frame, MODEL_FEATURES[pair[0]])) for pair, model in shipped.items()}
+    report["grade_ratio"] = {pair[0]: grade_ratio(scores_from(model, frame, MODEL_FEATURES[pair[0]]), plan.grade_bands) for pair, model in shipped.items()}
     return report
 
 
-def thinfile_report(frame: pd.DataFrame, models: dict, shipped: dict) -> dict:
+def thinfile_report(frame: pd.DataFrame, models: dict, shipped: dict, plan: Plan = PLAN_02) -> dict:
     """씬파일 집단 평가: 전체와 cohort별(양성 건수 포함). 평가 표본에 이력이 긴 비교군(young_established)이 섞여 있다."""
-    report = evaluate_group(frame, models, shipped, judged=False)
+    report = evaluate_group(frame, models, shipped, judged=False, plan=plan)
     report["by_cohort"] = {pair_key(pair): auc_by_group(frame, proba(model, frame, pair[0]), LABEL_COLUMNS[pair[1]], "cohort")
                            for pair, model in shipped.items()}
     report["cohort_rows"] = {str(name): int(count) for name, count in frame["cohort"].value_counts().sort_index().items()}
-    report["grade_ratio"] = {pair[0]: grade_ratio(scores_from(model, frame, MODEL_FEATURES[pair[0]])) for pair, model in shipped.items()}
+    report["grade_ratio"] = {pair[0]: grade_ratio(scores_from(model, frame, MODEL_FEATURES[pair[0]]), plan.grade_bands) for pair, model in shipped.items()}
     return report
 
 
-def render_markdown(result: dict) -> str:
-    """결과 요약 md. C26 보고 문구(합성 데이터 한계, 양성 건수 흔들림, 씬파일 비교군 혼합)를 항상 넣는다."""
+def render_markdown(result: dict, plan: Plan = PLAN_02) -> str:
+    """결과 요약 md. 사전 기준의 보고 문구(합성 데이터 한계, 양성 건수 흔들림, 씬파일 비교군 혼합)를 항상 넣는다."""
     split = result["split"]
     lines = [f"# {split} 평가 결과 (모델 {result['model_version']})", "",
              f"> {SYNTHETIC_NOTICE}", "",
              f"- 실행: {result['generated_at']} / 코드 커밋 {result['provenance']['commit']} (작업 트리 깨끗함: {result['provenance']['working_tree_clean']})",
-             f"- 사전 기준: 정의서 10장 C26. 기준은 결과를 본 뒤에 바꾸지 않았다. 범위를 벗어난 값도 그대로 보고한다.",
+             f"- 사전 기준: 정의서 10장 {plan.criteria_source}. 기준은 결과를 본 뒤에 바꾸지 않았다. 범위를 벗어난 값도 그대로 보고한다.",
+             *[f"- {note}" for note in plan.notes],
              f"- 평가 행 수: 기존 집단 {result['legacy_group']['rows']}행, 씬파일(노출 1) {result['thinfile']['rows']}행", ""]
     for title, key in (("기존 집단", "legacy_group"), ("씬파일 집단(노출 1)", "thinfile")):
         group = result[key]
@@ -302,7 +382,7 @@ def render_markdown(result: dict) -> str:
         if judged:
             lines += [f"## {title} AUC", "", "| 모델·라벨 | 서버 모델 파일(시드 11) | 5개 시드 평균 ± 표준편차 | 정상 범위 | 판정(5개 시드 평균) |", "|---|---|---|---|---|"]
         else:
-            lines += [f"## {title} AUC (참고 값, C26 정상 범위는 기존 집단 기준이라 판정하지 않음)", "", "| 모델·라벨 | 서버 모델 파일(시드 11) | 5개 시드 평균 ± 표준편차 |", "|---|---|---|"]
+            lines += [f"## {title} AUC (참고 값, {plan.criteria_source} 정상 범위는 기존 집단 기준이라 판정하지 않음)", "", "| 모델·라벨 | 서버 모델 파일(시드 11) | 5개 시드 평균 ± 표준편차 |", "|---|---|---|"]
         for pair in PAIRS:
             name = pair_key(pair)
             shipped = group["shipped_auc"].get(name)
@@ -328,7 +408,8 @@ def render_markdown(result: dict) -> str:
     for name, groups in result["thinfile"]["by_cohort"].items():
         for cohort, info in groups.items():
             lines.append(f"| {name} | {cohort} | {info['rows']} | {info['positives']} | {info['auc']} |")
-    lines += ["", "## CUT-0.3 등급 비율 (경계 0~653 / 654~726 / 727~1000, 비율만 확인)", "", "| 집단 | 모델 | CAUTION | STANDARD | GOOD |", "|---|---|---|---|---|"]
+    bounds = " / ".join(f"{band['minScore']}~{band['maxScore']}" for band in plan.grade_bands)
+    lines += ["", f"## {plan.cutoff_label} 등급 비율 (경계 {bounds}, 비율만 확인)", "", "| 집단 | 모델 | CAUTION | STANDARD | GOOD |", "|---|---|---|---|---|"]
     for title, key in (("기존 집단", "legacy_group"), ("씬파일", "thinfile")):
         for model_name, ratios in result[key]["grade_ratio"].items():
             lines.append(f"| {title} | {model_name} | " + " | ".join(f"{ratios[code]['ratio'] * 100:.1f}% ({ratios[code]['count']})" for code in ("CAUTION", "STANDARD", "GOOD")) + " |")
@@ -339,39 +420,45 @@ def render_markdown(result: dict) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="FP-144 TEST 평가(정의서 C26 사전 기준). 기본은 VALID 리허설이고, TEST는 --confirm-test-once를 줄 때 한 번만 읽는다")
+    parser = argparse.ArgumentParser(description="FP-144 TEST 평가(정의서 C26·C38 사전 기준). 기본은 VALID 리허설이고, TEST는 --confirm-test-once를 줄 때 한 번만 읽는다")
     parser.add_argument("--split", choices=["VALID", TEST_SPLIT], default="VALID", help="평가할 분할(기본 VALID = 리허설)")
     parser.add_argument("--confirm-test-once", action="store_true", help="TEST를 한 번만 읽겠다는 확인(TEST에만 필요)")
     parser.add_argument("--rerun-reason", default=None, help="TEST 결과가 이미 있을 때, 평가 코드 오류를 고쳐 같은 모델·코드로 다시 돌리는 이유")
-    parser.add_argument("--data-dir", type=Path, default=config.DEFAULT_DATA_DIR, help="학습 데이터 폴더(1_model/ 이 들어 있는 폴더)")
-    parser.add_argument("--model-dir", type=Path, default=config.DEFAULT_OUT_DIR, help="서버 모델 파일 폴더")
+    parser.add_argument("--version", choices=sorted(PLANS), default="0.2", help="평가할 모델 버전(기본 0.2)")
+    parser.add_argument("--data-dir", type=Path, default=None, help="학습 데이터 폴더(1_model/ 이 들어 있는 폴더, 기본은 버전별 설정)")
+    parser.add_argument("--model-dir", type=Path, default=None, help="평가할 모델 파일 폴더(기본은 버전별 설정)")
     parser.add_argument("--out-dir", type=Path, default=None, help="결과 json·md 저장 폴더(TEST 기본 docs/spec, VALID 리허설은 주지 않으면 저장하지 않음)")
     args = parser.parse_args()
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")        # Windows 콘솔(cp949)에서 ±·→ 같은 기호 출력이 실패하지 않게 한다
 
+    plan = PLANS[args.version]
+    args.data_dir, args.model_dir = args.data_dir or plan.data_dir, args.model_dir or plan.model_dir
+    record_path = RUN_RECORD_PATH if plan.record_name is None else RUN_RECORD_PATH.with_name(plan.record_name)
     is_test = args.split == TEST_SPLIT
     if is_test and not args.confirm_test_once:
-        print("TEST는 한 번만 평가한다(정의서 C26). 읽지 않고 끝낸다. 리허설은 --split VALID, 최종은 --split TEST --confirm-test-once")
+        print(f"TEST는 한 번만 평가한다(정의서 {plan.criteria_source}). 읽지 않고 끝낸다. 리허설은 --split VALID, 최종은 --split TEST --confirm-test-once")
         return
     out_dir = args.out_dir if args.out_dir else (DEFAULT_RESULT_DIR if is_test else None)
-    stem = RESULT_STEM if is_test else f"{RESULT_STEM}_valid_rehearsal"
+    stem = plan.stem if is_test else f"{plan.stem}_valid_rehearsal"
     # 실행 기록(고정 경로)과 기본 결과 파일은 --out-dir과 상관없이 검사한다. --out-dir을 바꿔도 이전 실행을 피해 갈 수 없다
-    previous_hash = check_not_done(RUN_RECORD_PATH, DEFAULT_RESULT_DIR / f"{RESULT_STEM}.json", args.rerun_reason) if is_test else None
+    previous_hash = check_not_done(record_path, DEFAULT_RESULT_DIR / f"{plan.stem}.json", args.rerun_reason) if is_test else None
     provenance = git_state()
     if is_test and provenance["working_tree_clean"] is not True:
         sys.exit("작업 트리가 깨끗하지 않거나 git 상태를 읽지 못했다. TEST는 평가 코드를 먼저 커밋한 뒤에 본다")
 
-    model_hashes = verify_shipped(args.model_dir)
-    shipped = {pair: joblib.load(args.model_dir / file_name) for pair, file_name in SHIPPED.items()}
     legacy_path, thinfile_path = (args.data_dir / config.TABLE_RELATIVE_PATH), (args.data_dir / config.THINFILE_TABLE_RELATIVE_PATH)
+    model_hashes = verify_shipped(args.model_dir) if plan.record_name is None else None
     for path in (legacy_path, thinfile_path):
         if not path.exists():
             sys.exit(f"학습 표가 없다: {path}")
+    if model_hashes is None:
+        model_hashes = verify_recorded(args.model_dir, legacy_path, plan)
+    shipped = {pair: joblib.load(args.model_dir / file_name) for pair, file_name in SHIPPED.items()}
 
     train, valid, _, _ = load_training_sets(args.data_dir)           # TRAIN·VALID만 읽는다(TEST는 이 로더가 버린다)
     print(f"TRAIN {len(train)}행으로 4쌍 × 시드 {len(config.SEEDS)}개 학습(단조 제약)")
-    models = train_models(train)
+    models = train_models(train, plan)
     reproduction = reproduction_check(models, shipped, valid)        # 재현 확인은 VALID로 한다(TEST를 열기 전에 확인)
     print(f"서버 모델 파일 재현 확인(VALID): {reproduction}")
     if "다름" in reproduction.values() and is_test:
@@ -379,12 +466,12 @@ def main() -> None:
 
     if is_test:
         # TEST 행을 읽기 전에 실행 기록을 먼저 남긴다. 읽는 도중 오류·중단이 나도 기록이 남아 재실행에는 사유가 필요하다
-        start_run_record(RUN_RECORD_PATH, {
+        start_run_record(record_path, {
             "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "provenance": provenance, "model_files_sha256": model_hashes,
             "tables_sha256_8": {"legacy": sha256_of(legacy_path)[:8], "thinfile": sha256_of(thinfile_path)[:8]},
             "out_dir": str(out_dir), "rerun_reason": args.rerun_reason})
     try:
-        result, markdown = evaluate_and_render(args, models, shipped, reproduction, model_hashes, provenance, legacy_path, thinfile_path, previous_hash)
+        result, markdown = evaluate_and_render(args, models, shipped, reproduction, model_hashes, provenance, legacy_path, thinfile_path, previous_hash, plan)
         if out_dir:
             out_dir.mkdir(parents=True, exist_ok=True)
             (out_dir / f"{stem}.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n")
@@ -392,36 +479,51 @@ def main() -> None:
             print(f"저장: {out_dir / (stem + '.json')}, {out_dir / (stem + '.md')}")
     except BaseException as error:
         if is_test:
-            finish_run_record(RUN_RECORD_PATH, "failed", error=repr(error)[:500])
+            finish_run_record(record_path, "failed", error=repr(error)[:500])
         raise
     if is_test:
-        finish_run_record(RUN_RECORD_PATH, "finished", result_json_sha256=sha256_of(out_dir / f"{stem}.json") if out_dir else None)
+        finish_run_record(record_path, "finished", result_json_sha256=sha256_of(out_dir / f"{stem}.json") if out_dir else None)
+
+
+def reference_check(group: dict, plan: Plan) -> dict:
+    """VALID 평가의 5개 시드 평균이 사전 기준에 적은 기준값(소수 넷째 자리)과 같은지 쌍마다 '같음'·'다름(값)'으로 돌려준다."""
+    result = {}
+    for pair, values in plan.criteria.items():
+        measured = group["five_seed_auc"][pair_key(pair)]["mean"]
+        result[pair_key(pair)] = "같음" if abs(measured - values[0]) < 5e-5 else f"다름({measured})"
+    return result
 
 
 def evaluate_and_render(args, models: dict, shipped: dict, reproduction: dict, model_hashes: dict, provenance: dict,
-                        legacy_path: Path, thinfile_path: Path, previous_hash: str | None) -> tuple:
+                        legacy_path: Path, thinfile_path: Path, previous_hash: str | None, plan: Plan = PLAN_02) -> tuple:
     """평가할 분할(VALID 리허설 또는 TEST)을 읽어 결과 dict와 요약 md를 만든다. TEST 행은 여기서 처음 읽는다(실행 기록을 먼저 남긴 뒤)."""
     is_test = args.split == TEST_SPLIT
     print(f"{args.split} 행을 읽어 평가한다")
     legacy_frame = load_eval_split(legacy_path, args.split, "legacy", args.confirm_test_once)
     thin_frame = load_eval_split(thinfile_path, args.split, "thinfile", args.confirm_test_once)
     result = {
-        "split": args.split, "model_version": EXPECTED_MODEL_VERSION, "synthetic_notice": SYNTHETIC_NOTICE,
-        "criteria": {"source": "정의서 10장 C26", "ranges": {pair_key(pair): list(values[1:]) for pair, values in C26_CRITERIA.items()},
-                     "delinq_diff_limit": DELINQ_DIFF_LIMIT},
-        "legacy_group": legacy_group_report(legacy_frame, models, shipped),
-        "thinfile": thinfile_report(thin_frame, models, shipped),
+        "split": args.split, "model_version": plan.version, "synthetic_notice": SYNTHETIC_NOTICE,
+        "criteria": {"source": f"정의서 10장 {plan.criteria_source}", "ranges": {pair_key(pair): list(values[1:]) for pair, values in plan.criteria.items()},
+                     "delinq_diff_limit": plan.diff_limit},
+        "legacy_group": legacy_group_report(legacy_frame, models, shipped, plan),
+        "thinfile": thinfile_report(thin_frame, models, shipped, plan),
         "reproduction_on_valid": reproduction, "model_files_sha256": model_hashes,
         "tables_sha256_8": {"legacy": sha256_of(legacy_path)[:8], "thinfile": sha256_of(thinfile_path)[:8]},
-        "provenance": provenance, "settings": {"seeds": config.SEEDS, "monotone_constraints": config.MONOTONE_CONSTRAINTS, "shipped_seed": SHIPPED_SEED},
+        "provenance": provenance, "settings": {"seeds": config.SEEDS, "monotone_constraints": plan.monotone, "shipped_seed": SHIPPED_SEED},
         "library_versions": {"lightgbm": lgb.__version__, "scikit-learn": sklearn.__version__, "pandas": pd.__version__, "numpy": np.__version__},
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     if args.rerun_reason and is_test:
         result["rerun"] = {"reason": args.rerun_reason, "previous_result_sha256": previous_hash}
 
-    markdown = render_markdown(result)
+    if not is_test:
+        # 리허설: 사전 기준에 적은 VALID 5개 시드 평균(기준값)이 그대로 다시 나오는지 본다.
+        result["valid_reference_check"] = reference_check(result["legacy_group"], plan)
+
+    markdown = render_markdown(result, plan)
     print(markdown)
+    if not is_test:
+        print(f"VALID 기준값({plan.criteria_source}) 재현: {result['valid_reference_check']}")
     return result, markdown
 
 

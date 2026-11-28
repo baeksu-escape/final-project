@@ -33,7 +33,7 @@ export const PATHS = Object.freeze({
 })
 
 // N-08-1 사용자 기능 9개(이 순서). 직군과 상관없이 모두 같다. 마이 페이지는 헤더 버튼이다.
-// 화면 위쪽 메뉴는 아래 NAV_GROUPS로 큰 분류 5개에 묶어 보인다(UI 리뉴얼 FP-252).
+// 화면 위쪽 메뉴는 아래 NAV_GROUPS로 큰 분류 6개에 묶어 보인다(UI 리뉴얼 FP-252, 11/27 상권 분석 분리 FP-307).
 export const USER_TABS = Object.freeze([
   { key: 'report', label: '신용 리포트', path: PATHS.REPORT, nId: 'N-12' },
   { key: 'asset-debt', label: '자산·부채 건전성', path: PATHS.ASSET_DEBT, nId: 'N-16' },
@@ -55,7 +55,7 @@ export const ADMIN_TABS = Object.freeze([
   { key: 'audit', label: '접근·감사 로그', path: PATHS.ADMIN_AUDIT, nId: 'N-28·N-35' },
 ])
 
-// UI 리뉴얼 — 사용자 메뉴를 큰 분류 5개로 묶는다. 분류 안 항목은 USER_TABS의 key를 가리키고, 설명은 허브·홈 화면 목록에 쓴다.
+// UI 리뉴얼 — 사용자 메뉴를 큰 분류 6개로 묶는다. 분류 안 항목은 USER_TABS의 key를 가리키고, 설명은 허브·홈 화면 목록에 쓴다.
 const TAB_BY_KEY = Object.fromEntries(USER_TABS.map((tab) => [tab.key, tab]))
 const item = (key, description) => Object.freeze({ ...TAB_BY_KEY[key], description })
 
@@ -73,15 +73,16 @@ export const NAV_GROUPS = Object.freeze([
   },
   {
     key: 'finance', label: '재무 진단', path: PATHS.FINANCE,
-    description: '빚·현금흐름·위기 상황·상권까지 내 살림 점검',
+    description: '빚·현금흐름·위기 상황까지 내 살림 점검',
     items: [
       item('asset-debt', '자산 대비 빚, 상환 부담률 점검'),
       item('cash-flow', '월별 수입·지출과 소득 흔들림'),
       item('scenario', '금리·소득이 바뀌면 어떻게 될까'),
-      item('market', '서울 동네별 업종 개폐업 흐름'),
     ],
   },
   { key: 'loans', label: '대출', path: PATHS.LOANS, description: '내 점수로 알아볼 수 있는 대출 상품', items: [item('loans', '조건·금리·한도 비교')] },
+  // FP-307 상권 분석을 재무 진단에서 빼 위쪽 메뉴의 별도 분류로 뒀다(11/27 동주 결정, 큰 분류 6개). 대출처럼 누르면 바로 간다.
+  { key: 'market', label: '상권 분석', path: PATHS.MARKET, description: '창업 전 동네 상권 살펴보기', items: [item('market', '서울 동네별 업종 개폐업 흐름')] },
   { key: 'lounge', label: '라운지', path: PATHS.LOUNGE, description: '같은 고민을 가진 사람들과 이야기', items: [item('lounge', '익명 게시판')] },
 ].map((group) => Object.freeze(group)))
 

@@ -84,7 +84,8 @@ public class MyPageService {
     @Transactional
     public void changeEmail(long userId, MyPageDtos.EmailChange request) {
         UserAccount account = require(userId);
-        String email = request.email().strip();
+        // FP-258 암호문(EMAIL_ENC)도 소문자로 바꾼 값으로 저장한다.
+        String email = AccountRules.normalizeEmail(request.email());
         if (!AccountRules.isValidEmail(email)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "이메일 형식이 올바르지 않습니다.",
                     List.of(new FieldErrorItem("email", "이메일 형식이 올바르지 않습니다.")));
@@ -124,10 +125,9 @@ public class MyPageService {
         if (!passwordMatches(account, request.currentPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PASSWORD", "현재 비밀번호가 올바르지 않습니다.");
         }
-        if (!AccountRules.isValidPassword(request.newPassword())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "비밀번호 규칙을 지켜 주세요.",
-                    List.of(new FieldErrorItem("newPassword", "비밀번호 규칙을 지켜 주세요.")));
-        }
+        // FP-258 64자를 넘으면 길이 안내 문구(가입·재설정과 같음).
+        String passwordError = AccountRules.newPasswordError(request.newPassword(), "비밀번호 규칙을 지켜 주세요.");
+        if (passwordError != null) throw AuthErrors.invalidField("newPassword", passwordError);
         if (passwordMatches(account, request.newPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "SAME_PASSWORD", SAME_PASSWORD_MESSAGE,
                     List.of(new FieldErrorItem("newPassword", SAME_PASSWORD_MESSAGE)));

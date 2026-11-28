@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
-import { TextInput } from '../../../common/components/index.js'
 import { requestWithdrawal } from '../api/myPageApi.js'
 import { AUTH_PATHS } from '../authPaths.js'
+import usePasswordReveal from '../usePasswordReveal.js'
+import PasswordField from './PasswordField.jsx'
 
 // N-04-7 탈퇴 확인 폼의 안내문(FP-259 3차) — 두 줄로 나눠 보여 준다.
 const WITHDRAWAL_NOTICE_LINES = Object.freeze([
@@ -24,6 +25,8 @@ export default function WithdrawalCard({ onCancel }) {
   const [passwordError, setPasswordError] = useState('')
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
+  // FP-258 2차 비밀번호 [보기] 상태. 탈퇴 요청 직전에 가린다.
+  const { reveal, hideAll } = usePasswordReveal()
 
   // 비밀번호를 보내 탈퇴를 요청한다. 비밀번호가 틀리면(400 fieldErrors password) 칸 옆에, 그 밖의 오류는 폼 아래에 보여 준다.
   const handleSubmit = async (event) => {
@@ -44,6 +47,8 @@ export default function WithdrawalCard({ onCancel }) {
       setPending(false)
       return
     }
+    // FP-258 2차 탈퇴에 성공해 로그아웃·이동하기 직전에만 가린다. 실패하면 보기 상태를 그대로 둔다.
+    hideAll()
     // 알림은 로그아웃 상태와 함께 AuthProvider에 맡긴다. 라우트 가드가 먼저 로그인 화면으로 보내도 알림이 남는다.
     await logout({ notice: WITHDRAWAL_DONE_MESSAGE })
     navigate(AUTH_PATHS.LOGIN, { replace: true })
@@ -56,9 +61,8 @@ export default function WithdrawalCard({ onCancel }) {
         <br />
         {WITHDRAWAL_NOTICE_LINES[1]}
       </p>
-      <TextInput
+      <PasswordField
         label="비밀번호 확인"
-        type="password"
         value={password}
         onChange={(value) => {
           setPassword(value)
@@ -66,6 +70,7 @@ export default function WithdrawalCard({ onCancel }) {
         }}
         error={passwordError}
         autoComplete="current-password"
+        {...reveal('password')}
       />
       {formError && (
         <p className="account-form__error" role="alert">

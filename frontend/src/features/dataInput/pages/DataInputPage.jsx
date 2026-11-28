@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../common/auth/useAuth.js'
 import { JOB_TYPE_LABELS } from '../../../common/config/jobTypes.js'
 import { PATHS } from '../../../common/config/navigation.js'
-import { Button, Card, Notice } from '../../../common/components/index.js'
+import { Button, JourneySteps, Notice } from '../../../common/components/index.js'
 import { GRADE_STATUS, getNotScorableMessage } from '../../../common/config/scoreStatus.js'
 import { fetchFinancialInput, requestScoreCalculation, saveFinancialInput } from '../api/dataInputApi.js'
 import AltDataImport from '../components/AltDataImport.jsx'
@@ -72,6 +72,8 @@ export default function DataInputPage() {
   const [draftRestored, setDraftRestored] = useState(false)
   const [altData, setAltData] = useState({})
   const [step, setStep] = useState(0)
+  // 단계 전환 방향 — 앞으로(next)면 오른쪽에서, 뒤로(prev)면 왼쪽에서 들어온다
+  const [stepDir, setStepDir] = useState('next')
   // 빈 필수 칸 오류를 보여 줄 단계 번호들 — [다음]을 시도한 단계만 넣는다.
   const [attemptedSteps, setAttemptedSteps] = useState([])
   // FP-227 [다음] 검사를 통과한 단계 번호들(1~4단계) — 입력 완료 현황의 초록 동그라미에 쓰고, 임시저장본에 함께 남긴다.
@@ -161,6 +163,10 @@ export default function DataInputPage() {
   }
   // 지금 단계의 카드(기준월은 0단계)에 있는 오류만 센다.
   const errorCount = Object.keys(errors).filter((key) => getStepIndexOfErrorKey(key) === step).length
+  const stepIncomplete = Object.keys({ ...fullErrors, ...serverErrors }).some((key) => {
+    const index = getStepIndexOfErrorKey(key)
+    return step < LAST_INPUT_STEP ? index === step : index <= LAST_INPUT_STEP
+  })
   const stepSectionKeys = INPUT_STEPS[step].sectionKeys
   // N-05-7 오류가 아닌 안내(월별 소득의 남은 달 수). 지금 입력 중인 값으로 세고, 저장은 막지 않는다.
   const notices = getInputNotices(values, sections)
@@ -226,6 +232,7 @@ export default function DataInputPage() {
   // 단계를 바꾸고 화면 맨 위로 올린다. 포커스는 위 effect가 새 단계 제목으로 옮긴다.
   const goToStep = (nextStep) => {
     focusStepRef.current = true
+    setStepDir(nextStep >= step ? 'next' : 'prev')
     setStep(nextStep)
     window.scrollTo(0, 0)
   }
@@ -364,8 +371,31 @@ export default function DataInputPage() {
 
   if (loading) return <p className="data-input-page__loading">저장된 입력을 불러오는 중입니다.</p>
 
+  // 단계 머리 — 오른쪽 n / 7, 아래 질문형 한 줄 제목. [이전]은 아래 버튼 줄 왼쪽에 둔다.
+  const canGoBack = step > 0 || !saved
+  // 카드 위 테두리 진행 막대(1/7 → 약 14%)
+  const progressStyle = { '--progress': `${((step + 1) / INPUT_STEPS.length) * 100}%` }
+  const backButton = canGoBack && (
+    <button type="button" className="fin-back" onClick={() => (step > 0 ? handlePrev() : handleBackToJobSelect())}>
+      이전
+    </button>
+  )
+  const stepHead = (
+    <header className="step-head">
+      <div className="step-head__nav">
+        <span />
+        <span className="step-head__count" aria-label={`${INPUT_STEPS.length}단계 중 ${step + 1}단계`}>
+          {step + 1} / {INPUT_STEPS.length}
+        </span>
+      </div>
+      <h2 className="step-head__title">{INPUT_STEPS[step].question}</h2>
+    </header>
+  )
+
   return (
-    <section className="data-input-page">
+    <section className="data-input-page fin-form">
+      {/* 처음 저장하기 전에는 가입 여정의 마지막 단계로 보여 준다 */}
+      {savedAt === null && <JourneySteps current={2} />}
       <h1 className="data-input-page__title">데이터 입력</h1>
       <p className="data-input-page__job">직군: {JOB_TYPE_LABELS[user.jobType]}</p>
       {loadError && (
@@ -376,7 +406,9 @@ export default function DataInputPage() {
 
       {/* 왼쪽 열 — 단계마다 내용만 바뀐다. 1~5단계는 입력 폼, 6·7단계는 같은 왼쪽 열 클래스(data-input-form)를 쓴 묶음이다. */}
       {step <= LAST_INPUT_STEP && (
-        <form className="data-input-form" onSubmit={handleNext} noValidate>
+        <form className="data-input-form" style={progressStyle} onSubmit={handleNext} noValidate>
+          <div key={step} className={`step-slide step-slide--${stepDir}`}>
+            {stepHead}
           {/* FP-227 임시저장본으로 채운 경우 안내와 [처음 값으로] */}
           {draftRestored && (
             <Notice>
@@ -386,7 +418,7 @@ export default function DataInputPage() {
           {/* FP-227 처음 쓰는 사람 안내 — 저장된 입력도 임시저장본도 없을 때 첫 단계에서만 */}
           {!serverInput && !draftRestored && step === 0 && (
             <Notice>
-              {INPUT_STEPS.length}단계로 나눠 입력합니다. 입력값은 이 탭에 임시로 보관되고, {LAST_INPUT_STEP + 1}단계에서 [저장하기]를 누르면
+              {INPUT_STEPS.length}단계로 나눠 입력합니다. 입력값은 이 탭에 임시로 보관되고, {LAST_INPUT_STEP + 1}단계에서 [다음]을 누르면
               저장됩니다.
             </Notice>
           )}
@@ -440,24 +472,22 @@ export default function DataInputPage() {
               기준월 {values.baseMonth}에 저장한 입력이 있습니다. 지금 저장하면 기존 입력을 덮어씁니다.
             </p>
           )}
-          {/* FP-227 버튼 줄 — 왼쪽 입력 열 안에서 [이전]은 왼쪽 끝, 주 버튼([다음]·[저장하기])은 오른쪽 끝. [이전]이 없어도 주 버튼은 오른쪽이다. */}
-          <div className="data-input-form__actions">
-            <div className="data-input-form__actions-start">
-              {step > 0 && <Button onClick={handlePrev}>이전</Button>}
-              {step === 0 && !saved && <Button onClick={handleBackToJobSelect}>이전</Button>}
-            </div>
-            <div className="data-input-form__actions-end">
-              <Button variant="primary" type="submit" disabled={pending || errorCount > 0}>
-                {step === LAST_INPUT_STEP ? (pending ? '저장 중…' : '저장하기') : '다음'}
-              </Button>
-            </div>
+          </div>
+          {/* 버튼 줄 — 왼쪽 [이전], 오른쪽 주 버튼. 지금 단계를 다 채우기 전에는 주 버튼이 꺼져 있다 */}
+          <div className="fin-actions">
+            {backButton}
+            <button type="submit" className="fin-submit" disabled={pending || stepIncomplete}>
+              {step === LAST_INPUT_STEP && pending ? '저장 중…' : '다음'}
+            </button>
           </div>
         </form>
       )}
 
       {/* 6단계 — 대안 데이터 불러오기. 저장 직후면 위쪽에 "저장되었습니다."를 보여 준다. */}
       {step === ALT_DATA_STEP && (
-        <div className="data-input-form">
+        <div className="data-input-form" style={progressStyle}>
+          <div key={step} className={`step-slide step-slide--${stepDir}`}>
+            {stepHead}
           {justSaved && (
             <p className="data-input-form__saved" role="status">
               저장되었습니다.
@@ -469,52 +499,41 @@ export default function DataInputPage() {
             onImported={handleAltImported}
             onDisconnected={handleAltDisconnected}
           />
-          <div className="data-input-form__actions">
-            <div className="data-input-form__actions-start">
-              <Button onClick={handlePrev}>이전</Button>
-            </div>
-            <div className="data-input-form__actions-end">
-              <Button variant="primary" onClick={handleAltDataNext}>
-                다음
-              </Button>
-            </div>
+          </div>
+          <div className="fin-actions">
+            {backButton}
+            <button type="button" className="fin-submit" onClick={handleAltDataNext}>
+              다음
+            </button>
           </div>
         </div>
       )}
 
       {/* 7단계 — 점수 산출. [점수 산출하기]는 입력 완료 현황 6개가 모두 완료일 때만 켜진다. */}
       {step === SCORE_STEP && (
-        <div className="data-input-form">
-          <Card title={SCORE_STEP_TITLE}>
-            <p className="hint">
-              오른쪽 입력 완료 현황이 모두 완료되면 점수를 산출할 수 있습니다. 점수는 마지막으로 저장한 입력으로 계산합니다.
-            </p>
-          </Card>
-          {calculateError && (
-            <p className="data-input-page__calculate-error" role="alert">
-              {calculateError}
-            </p>
-          )}
-          {/* 7단계 버튼 줄 — [이전] 왼쪽 끝, [처음으로 돌아가기]·[점수 산출하기](주 버튼)는 오른쪽 끝. */}
-          {/* FP-260 멘토링 13 [처음으로 돌아가기]는 1단계로 보낸다(직군 선택 화면으로는 보내지 않는다). */}
-          <div className="data-input-form__actions">
-            <div className="data-input-form__actions-start">
-              <Button onClick={handlePrev}>이전</Button>
-            </div>
-            <div className="data-input-form__actions-end">
-              <Button variant="weak" onClick={() => goToStep(0)}>
-                처음으로 돌아가기
-              </Button>
-              <button
-                type="button"
-                className="data-input-page__calculate"
-                onClick={handleCalculateScore}
-                disabled={calculating || !isInputComplete(status, user.jobType)}
-              >
-                {calculating ? '산출 중…' : SCORE_STEP_TITLE}
-              </button>
-            </div>
+        <div className="data-input-form" style={progressStyle}>
+          <div key={step} className={`step-slide step-slide--${stepDir}`}>
+            {stepHead}
+          <p className="hint data-input-page__score-hint">오른쪽 단계가 모두 완료되면 마지막으로 저장한 입력으로 점수를 계산합니다.</p>
+          {/* 오류 문구 자리는 늘 남겨 둔다 — 산출을 다시 누를 때 문구가 사라졌다 생기며 페이지 높이가 바뀌어 화면이 튀지 않게 */}
+          <p className="data-input-page__calculate-error" aria-live="assertive">
+            {calculateError || ' '}
+          </p>
+          {/* 7단계 — 주 버튼 [점수 산출하기] 하나, 아래에 [처음으로 되돌아가기] 글자 링크(입력한 값은 그대로 남는다) */}
           </div>
+          <div className="fin-actions fin-actions--center">
+            <button
+              type="button"
+              className="fin-submit data-input-page__calculate"
+              onClick={handleCalculateScore}
+              disabled={calculating || !isInputComplete(status, user.jobType)}
+            >
+              {calculating ? '산출 중…' : SCORE_STEP_TITLE}
+            </button>
+          </div>
+          <button type="button" className="step-head__back fin-sublink" onClick={() => goToStep(0)}>
+            처음으로 되돌아가기
+          </button>
         </div>
       )}
 

@@ -1,5 +1,5 @@
-# 등급 구간 CUT-0.2(DRAFT)·CUT-0.3(ACTIVE) 일치 검사 — DDL 기준 데이터, 기존 DB용 변경·전환 SQL, 더미 DB 묶음(시드), FastAPI의 CUT-0.3 상수가 같은 값을 쓰는지 본다(DB 접속 불필요).
-# 25/50/25 임시 결정(D-01)의 경계: CUT-0.2(11/19, 모델 0.1 분포)는 CAUTION 0~659 / STANDARD 660~730 / GOOD 731~1000, CUT-0.3(11/20, 모델 0.2 분포)은 0~653 / 654~726 / 727~1000이다. 서비스는 11/23(FP-248)부터 CUT-0.3(ACTIVE)을 쓴다.
+# 등급 구간 CUT-0.2·CUT-0.3 일치 검사 — DDL 기준 데이터, 기존 DB용 변경·전환 SQL, FastAPI의 CUT-0.3 상수가 같은 값을 쓰는지 본다(DB 접속 불필요). 지금 ACTIVE·시드는 test_cutoff_cut_0_4.py가 본다.
+# 25/50/25 임시 결정(D-01)의 경계: CUT-0.2(11/19, 모델 0.1 분포)는 CAUTION 0~659 / STANDARD 660~730 / GOOD 731~1000, CUT-0.3(11/20, 모델 0.2 분포)은 0~653 / 654~726 / 727~1000이다. CUT-0.3은 11/23(FP-248)부터 11/27 CUT-0.4 전환(FP-285)까지 서비스 구간이었고, 모델 0.2와 Mock은 계속 이 구간으로 답한다.
 # 실행: fastapi_server 폴더에서 `python -m unittest discover tests -v`
 import hashlib
 import json
@@ -22,7 +22,7 @@ CUT_0_3 = [("CAUTION", 0, 653), ("STANDARD", 654, 726), ("GOOD", 727, 1000)]
 CUT_0_2 = [("CAUTION", 0, 659), ("STANDARD", 660, 730), ("GOOD", 731, 1000)]
 CUT_0_1 = [("CAUTION", 0, 664), ("STANDARD", 665, 779), ("GOOD", 780, 1000)]
 DRAFT_VERSIONS = {"CUT-0.2": CUT_0_2}
-BAND_VALUES = {"CUT-0.2": CUT_0_2, "CUT-0.3": CUT_0_3}   # 25/50/25 경계 후보. CUT-0.3은 11/23부터 ACTIVE(서비스)
+BAND_VALUES = {"CUT-0.2": CUT_0_2, "CUT-0.3": CUT_0_3}   # 25/50/25 경계. CUT-0.3은 11/23~11/27 서비스 구간(지금 RETIRED)
 
 
 def bands_of(version: str) -> list:
@@ -32,13 +32,12 @@ def bands_of(version: str) -> list:
 
 
 class DdlBaseDataTests(unittest.TestCase):
-    def test_cut_0_3_is_the_only_active_and_cut_0_1_is_retired(self):
+    def test_older_versions_are_not_active(self):
         versions = {name: (status, activated) for name, status, activated in VERSION_ROW.findall(DDL)}
         for version in DRAFT_VERSIONS:
             self.assertEqual(versions[version], ("DRAFT", "NULL"), version)         # DRAFT는 활성화 시각이 없다(CK_SCV_ACTIVATED)
-        self.assertEqual(versions["CUT-0.3"], ("ACTIVE", "SYSTIMESTAMP"))            # ACTIVE는 활성화 시각이 있어야 한다(FP-248 전환)
+        self.assertEqual(versions["CUT-0.3"], ("RETIRED", "SYSTIMESTAMP"))           # 한 번 서비스했던 버전은 활성화 시각을 남긴다
         self.assertEqual(versions["CUT-0.1"][0], "RETIRED")
-        self.assertEqual([name for name, (status, _) in versions.items() if status == "ACTIVE"], ["CUT-0.3"])   # UX_SCV_ACTIVE
 
     def test_candidate_versions_follow_the_25_50_25_decision(self):
         for version, expected in BAND_VALUES.items():
@@ -127,7 +126,7 @@ class DummyDbBundleTests(unittest.TestCase):
 
 class ServiceUsesCut03Tests(unittest.TestCase):
     def test_fastapi_constants_match_cut_0_3(self):
-        # 서비스 구간을 다시 바꿀 때는 이 상수도 함께 바꾼다(전환 PR). DB의 ACTIVE 버전과 같아야 FK 오류가 없다.
+        # CUT-0.3은 Mock과 모델 0.2가 쓰는 기본 구간이다. 0.3 모델의 구간은 cutoff_for가 고른다(FP-285).
         self.assertEqual(feature_catalog.CUTOFF_VERSION, "CUT-0.3")
         self.assertEqual([(b["gradeBandCode"], b["minScore"], b["maxScore"]) for b in feature_catalog.GRADE_BANDS], CUT_0_3)
 
@@ -186,17 +185,6 @@ class ActivateSqlTests(unittest.TestCase):
         self.assertIn("SET STATUS_CODE = 'DRAFT', ACTIVATED_AT = NULL WHERE CUTOFF_VERSION = 'CUT-0.3'", text)
         self.assertIn("SET STATUS_CODE = 'ACTIVE', ACTIVATED_AT = NVL(ACTIVATED_AT, SYSTIMESTAMP) WHERE CUTOFF_VERSION = 'CUT-0.1'", text)
         self.assertIn("WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK", ROLLBACK_SQL)
-
-    def test_seed_offers_and_products_use_the_new_boundaries(self):
-        offers = (DB_DIR / "21_seed_score_band_offer.sql").read_text(encoding="utf-8")
-        found = re.findall(r"VALUES \((\d), (\d+), (\d+), ", offers)
-        self.assertEqual([(int(a), int(b), int(c)) for a, b, c in found], [(1, 0, 653), (2, 654, 726), (3, 727, 1000)])
-        products = (DB_DIR / "22_seed_loan_product.sql").read_text(encoding="utf-8")
-        scores = re.findall(r"', (\d+|NULL), '[^']*대상\(시연용\)'", products)
-        self.assertEqual(len(scores), 17)
-        self.assertEqual(sorted(set(scores)), ["0", "654", "727"])
-        builder = (DB_DIR / "tools/build_db.py").read_text(encoding="utf-8")
-        self.assertIn("PRODUCT_MIN_SCORES = {'0': 727, '5': 654, '1': 0, '2': 0, '3': 0}", builder)
 
 
 if __name__ == "__main__":

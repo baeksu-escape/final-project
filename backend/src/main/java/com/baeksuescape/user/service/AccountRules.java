@@ -1,5 +1,6 @@
 package com.baeksuescape.user.service;
 
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 // FP-87 N-02 회원 입력 규칙 — 프론트 features/auth/validation.js와 같은 규칙·문구. 가입·찾기·마이페이지가 함께 쓴다.
@@ -24,10 +25,15 @@ public final class AccountRules {
     private static final Pattern NICKNAME = Pattern.compile("^[A-Za-z0-9가-힣]{" + NICKNAME_MIN + "," + NICKNAME_MAX + "}$");
     public static final String NICKNAME_RULE_MESSAGE = "닉네임은 한글·영문·숫자 2~7자로 입력해 주세요.";
     public static final String NAME_RULE_MESSAGE = "이름은 한글 2~20자로 입력해 주세요. (숫자·영문·기호 불가)";
-    private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
+    // FP-258 이메일 규칙(프론트 validation.js와 같음) — 앞부분 a-z0-9._-(처음·끝 a-z0-9, 점 연속 불가, 64자), 도메인 덩어리는 a-z0-9로 시작·끝, 마지막은 영문 2자 이상.
+    private static final Pattern EMAIL_LOCAL = Pattern.compile("^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$");
+    private static final Pattern DOMAIN_LABEL = Pattern.compile("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$");
+    private static final Pattern TOP_LEVEL_DOMAIN = Pattern.compile("^[a-z]{2,}$");
     private static final Pattern PHONE = Pattern.compile("^01[016-9]\\d{7,8}$");
     private static final Pattern LETTER = Pattern.compile("[A-Za-z]");
     private static final Pattern DIGIT = Pattern.compile("\\d");
+    // FP-258 N-02-4 새 비밀번호에 쓸 수 있는 글자 — ASCII 출력 문자(영문·숫자·키보드 기호)와 공백(프론트 filterPassword와 같음). 64자라 BCrypt 72바이트 안이다.
+    private static final Pattern PRINTABLE_ASCII = Pattern.compile("^[\\x20-\\x7E]*$");
 
     private AccountRules() {
     }
@@ -37,19 +43,66 @@ public final class AccountRules {
         return value != null && LOGIN_ID.matcher(value).matches();
     }
 
+    // FP-258 N-03-1·N-03-2 기존 이메일 기본 형식(새 규칙 전 develop 규칙, 100자 이하). 아이디·비밀번호 찾기와 관리자 업무 이메일이 쓴다.
+    private static final Pattern BASIC_EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
+
+    // + 같은 글자가 든 기존 이메일도 통과한다. 프론트 validation.js isBasicEmail과 같다.
+    public static boolean isBasicEmail(String value) {
+        return value != null && value.length() <= EMAIL_MAX && BASIC_EMAIL.matcher(value).matches();
+    }
+
+    // 이메일 형식 — 소문자로 바꾼 값을 '앞부분@도메인'으로 나눠 위 규칙으로 본다(100자 이하). 대소문자 때문에 거절하지는 않는다.
+    // FP-258 새 규칙은 가입(AUTH-06·SIGNUP 인증)과 이메일 변경(MEM-03·CHANGE_EMAIL 인증)에만 쓴다.
     public static boolean isValidEmail(String value) {
-        return value != null && value.length() <= EMAIL_MAX && EMAIL.matcher(value).matches();
+        if (value == null) return false;
+        String text = value.toLowerCase(Locale.ROOT);
+        if (text.length() > EMAIL_MAX) return false;
+        String[] parts = text.split("@", -1);
+        if (parts.length != 2) return false;
+        String local = parts[0];
+        if (!EMAIL_LOCAL.matcher(local).matches() || local.contains("..")) return false;
+        String[] labels = parts[1].split("\\.", -1);
+        if (labels.length < 2) return false;
+        for (String label : labels) {
+            if (!DOMAIN_LABEL.matcher(label).matches()) return false;
+        }
+        return TOP_LEVEL_DOMAIN.matcher(labels[labels.length - 1]).matches();
+    }
+
+    // FP-258 이메일 정리 — 앞뒤 공백을 빼고 소문자로 바꾼다. 가입·이메일 변경·인증코드·아이디 찾기·재설정이 이 값으로 판정·저장한다.
+    public static String normalizeEmail(String value) {
+        return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
+    }
+
+    // FP-258 로그인 아이디 정리 — 앞뒤 공백을 빼고 소문자로 바꾼다(로그인·비밀번호 찾기 조회).
+    public static String normalizeLoginId(String value) {
+        return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
     }
 
     // 비밀번호: 영문과 숫자를 섞어 8자 이상(decisions.md 1-2). 기호는 요구하지 않는다.
+    // FP-258 새 비밀번호(가입·재설정·변경·관리자 비밀번호 설정)에만 쓴다 — 64자 이하, ASCII 출력 문자만. 로그인·현재 비밀번호 확인·탈퇴는 이 검사를 하지 않는다.
     public static boolean isValidPassword(String value) {
-        return value != null && value.length() >= 8 && value.length() <= PASSWORD_MAX
+        return value != null && value.length() >= 8 && value.length() <= PASSWORD_MAX && PRINTABLE_ASCII.matcher(value).matches()
                 && LETTER.matcher(value).find() && DIGIT.matcher(value).find();
+    }
+
+    // FP-258 새 비밀번호가 64자를 넘을 때의 칸 오류(프론트 validation.js PASSWORD_TOO_LONG_MESSAGE와 같다).
+    public static final String PASSWORD_TOO_LONG_MESSAGE = "비밀번호는 " + PASSWORD_MAX + "자 이하로 입력해 주세요.";
+
+    // 새 비밀번호 칸 오류 문구 — 64자를 넘으면 길이 안내, 그 밖의 규칙 위반이면 ruleMessage(화면마다 지금 쓰는 문구), 맞으면 null.
+    public static String newPasswordError(String value, String ruleMessage) {
+        if (value != null && value.length() > PASSWORD_MAX) return PASSWORD_TOO_LONG_MESSAGE;
+        return isValidPassword(value) ? null : ruleMessage;
     }
 
     // 휴대폰에서 숫자만 남긴다. 하이픈을 넣거나 빼도 같은 값이 된다. null이면 빈 문자열.
     public static String normalizePhone(String value) {
         return value == null ? "" : value.replaceAll("\\D", "");
+    }
+
+    // FP-258 아이디·비밀번호 찾기 본인 확인 — 입력한 이름(앞뒤 공백 제거)이 복호화한 가입 이름과 같은지 본다.
+    public static boolean nameMatches(String input, String storedName) {
+        return input != null && !input.isBlank() && input.strip().equals(storedName);
     }
 
     // 숫자만 남긴 휴대폰 형식(010·011·016~019로 시작하는 10~11자리).
@@ -72,7 +125,8 @@ public final class AccountRules {
         return null;
     }
 
-    // 가입 이름 오류 문구. 숫자·영문·기호·공백·자음만 입력은 거절한다. 문제없으면 null. 아이디 찾기·관리자 계정 만들기는 이 규칙을 쓰지 않는다.
+    // 가입 이름 오류 문구. 숫자·영문·기호·공백·자음만 입력은 거절한다. 문제없으면 null.
+    // FP-258 아이디·비밀번호 찾기도 이 규칙을 쓴다(AuthErrors.requireValidName). 관리자 계정 만들기는 쓰지 않는다.
     public static String nameError(String name) {
         if (name == null || name.isBlank()) return "이름을 입력해 주세요.";
         if (!NAME.matcher(name).matches()) return NAME_RULE_MESSAGE;

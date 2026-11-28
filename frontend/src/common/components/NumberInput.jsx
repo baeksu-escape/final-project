@@ -3,7 +3,9 @@ import FieldError from './FieldError.jsx'
 
 // 숫자 입력(텍스트 칸, 스핀 버튼 없음) — 숫자만 받고, '-'는 min이 음수일 때만, '.'은 step이 소수이거나 지금 값이 소수일 때만 받는다. max를 넘는 입력은 받지 않고 칸 테두리를 잠깐 빨갛게 표시한다(이유는 화면 낭독기로 읽음). 휴대폰에서는 숫자 키패드(음수 칸 제외)를 띄우고, 칸을 벗어나면 앞자리 0을 정리한다. onChange에는 완성된 숫자를, 비우면 null을 넘긴다.
 // 사용 예: <NumberInput label="재직 기간" unit="개월" value={months} onChange={setMonths} min={0} max={600} />
-export default function NumberInput({ label, value, onChange, min, max, step, unit, error, name, disabled = false }) {
+// ref: 입력 칸에 단다(React 19는 ref를 props로 받는다). 예) 재직기간 년 칸을 다 채우면 개월 칸으로 포커스를 옮길 때
+// placeholder: 비었을 때 흐리게 보일 글자(예: '0')
+export default function NumberInput({ label, value, onChange, min, max, step, unit, error, name, placeholder, disabled = false, ref }) {
   const id = useId()
   const errorId = `${id}-error`
   const blockedId = `${id}-blocked`
@@ -65,16 +67,18 @@ export default function NumberInput({ label, value, onChange, min, max, step, un
     else if (!incomplete && text !== '' && Number.isFinite(Number(text))) setText(String(Number(text)))
   }
   return (
-    <div className="form-field number-input">
+    <div className="form-field number-input" data-unit-len={unit ? unit.length : undefined}>
       <label htmlFor={id} className="form-field__label">
         {label}
       </label>
       <input
         id={id}
+        ref={ref}
         name={name}
         type="text"
         inputMode={negative ? undefined : decimal ? 'decimal' : 'numeric'}
         autoComplete="off"
+        placeholder={placeholder}
         className="number-input__control"
         value={text}
         onChange={handleChange}

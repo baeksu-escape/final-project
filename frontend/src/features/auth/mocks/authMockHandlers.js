@@ -2,14 +2,30 @@ import { ApiError } from '../../../common/api/ApiError.js'
 import { registerMockHandlers } from '../../../common/mocks/mockHandlers.js'
 import { MOCK_USERS, toMockToken } from '../../../common/mocks/mockUsers.js'
 import { ROLES } from '../../../common/config/roles.js'
-import { ACCOUNT_LOCKED_MESSAGE, AUTH_ERROR_CODES, EMAIL_PURPOSES, LOGIN_FAILED_MESSAGE, PHONE_PURPOSES } from '../authConstants.js'
+import {
+  ACCOUNT_LOCKED_MESSAGE,
+  ADMIN_ACCOUNT_LOCKED_MESSAGE,
+  AUTH_ERROR_CODES,
+  EMAIL_PURPOSES,
+  FIND_ID_METHODS,
+  LOGIN_FAILED_MESSAGE,
+  LOGIN_MAX_FAILURES,
+  LOGIN_TEMP_BLOCK_FAILURES,
+  LOGIN_TEMP_BLOCK_MINUTES,
+  PHONE_PURPOSES,
+  loginTemporarilyBlockedMessage,
+} from '../authConstants.js'
 import {
   SIGNUP_PENDING_MESSAGES,
+  isBasicEmail,
   isValidEmail,
   isValidPassword,
   isValidPhone,
+  normalizeEmail,
+  normalizeLoginId,
   normalizePhone,
   validateBirthYear,
+  validateLoginId,
   validateName,
   validateNickname,
 } from '../validation.js'
@@ -21,6 +37,7 @@ import {
   MOCK_PHONE_CODE,
   MOCK_PHONE_CODE_TTL_SECONDS,
 } from './authMockData.js'
+import { countMockDailySend, countMockFailures, hitMockRate } from './authMockRateLimits.js'
 import { mockLinkKeys } from './socialLoginMockData.js'
 import { startAdminLoginChallenge } from '../../admin/mocks/adminLoginChallenges.js'
 
@@ -38,6 +55,21 @@ let sequence = 0
 // 칸 하나의 400 오류(서버와 같은 모양: data.fieldErrors [{ field, message }]).
 function fieldError(field, message) {
   return new ApiError(400, message, { fieldErrors: [{ field, message }] })
+}
+
+// FP-258 이름 형식(가입과 같은 validateName)이 틀리면 400 name 칸(서버 AuthErrors.requireValidName과 같음).
+function assertName(name) {
+  const nameError = validateName(name)
+  if (nameError) throw fieldError('name', nameError)
+}
+
+// 이메일 인증 토큰이 없거나 맞지 않을 때(400, 서버 EmailVerificationService.verificationRequired와 같은 code).
+function emailVerificationRequired() {
+  return new ApiError(400, '이메일 인증을 다시 진행해 주세요.', { code: AUTH_ERROR_CODES.EMAIL_VERIFICATION_REQUIRED })
+}
+
+function duplicateEmailError() {
+  return new ApiError(409, '이미 가입된 이메일입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_EMAIL })
 }
 
 // 휴대폰 인증 토큰이 목적·번호와 맞는지 확인한다. 틀리면 휴대폰 칸 오류. 맞으면 부르는 쪽이 가입을 마친 뒤 지운다(한 번만 사용).
@@ -148,25 +180,76 @@ function maskLoginId(loginId) {
   return loginId.slice(0, visible) + '*'.repeat(loginId.length - visible)
 }
 
+// FP-258 5분 제한의 남은 분(올림). 실패가 정확히 5회이고 5회째 실패에서 5분이 안 지났을 때만 0보다 크다(서버 remainingBlockMinutes와 같음).
+function remainingBlockMinutes(account) {
+  if (account.loginFailCount !== LOGIN_TEMP_BLOCK_FAILURES || !account.lastLoginFailureAt) return 0
+  const leftMs = account.lastLoginFailureAt + LOGIN_TEMP_BLOCK_MINUTES * 60 * 1000 - Date.now()
+  return leftMs > 0 ? Math.ceil(leftMs / 60000) : 0
+}
+
+// FP-258 5분 제한 오류(429 LOGIN_TEMPORARILY_BLOCKED).
+function loginBlockedError(minutes) {
+  return new ApiError(429, loginTemporarilyBlockedMessage(minutes), { code: AUTH_ERROR_CODES.LOGIN_TEMPORARILY_BLOCKED })
+}
+
+// FP-258 잠긴 계정 오류(423) — 관리자는 다른 관리자에게 풀어 달라는 안내(ADMIN_ACCOUNT_LOCKED), 회원은 비밀번호 찾기 안내(ACCOUNT_LOCKED).
+export function lockedAccountError(account) {
+  if (account.user.role === ROLES.ADMIN) {
+    return new ApiError(423, ADMIN_ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ADMIN_ACCOUNT_LOCKED })
+  }
+  return new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ACCOUNT_LOCKED })
+}
+
+// N-01 아이디·비밀번호 확인 — 로그인과 소셜 계정 연결(AUTH-05)이 같은 규칙을 쓴다(서버 AuthService.authenticate와 같은 순서). 맞으면 계정을 돌려준다.
+//   잠긴 계정은 비밀번호가 맞을 때만 423(관리자는 ADMIN_ACCOUNT_LOCKED), 5회째 실패부터 5분 동안 429(횟수는 그대로), 누적 10회째면 잠그고 423.
+export function authenticateMockAccount(loginId, password) {
+  const account = findMockAccount(normalizeLoginId(loginId))
+  if (!account) throw new ApiError(401, LOGIN_FAILED_MESSAGE)
+  const passwordMatches = account.password === null || account.password === password
+  if (account.locked) {
+    if (!passwordMatches) throw new ApiError(401, LOGIN_FAILED_MESSAGE)
+    throw lockedAccountError(account)
+  }
+  const blockedMinutes = remainingBlockMinutes(account)
+  if (blockedMinutes > 0) throw loginBlockedError(blockedMinutes)
+  if (!passwordMatches) {
+    account.loginFailCount = (account.loginFailCount ?? 0) + 1
+    account.lastLoginFailureAt = Date.now()
+    if (account.loginFailCount >= LOGIN_MAX_FAILURES) {
+      account.locked = true
+      // FP-258 10회째에 잠기는 관리자도 관리자 안내(서버와 같음).
+      throw lockedAccountError(account)
+    }
+    if (account.loginFailCount === LOGIN_TEMP_BLOCK_FAILURES) throw loginBlockedError(LOGIN_TEMP_BLOCK_MINUTES)
+    throw new ApiError(401, LOGIN_FAILED_MESSAGE)
+  }
+  return account
+}
+
+// FP-258 아이디·비밀번호 찾기 본인 확인 — 입력한 이름(앞뒤 공백 제거)이 가입 이름과 같은지 본다(서버 AccountRules.nameMatches와 같음).
+function nameMatches(account, name) {
+  return typeof name === 'string' && name.trim() !== '' && account.user.name === name.trim()
+}
+
 // 이메일 인증 토큰이 목적·이메일(재설정이면 아이디까지)과 맞는지 확인하고 맞으면 꺼내서 지운다(한 번만 사용).
 // N-04-3 이메일 변경 mock도 이 함수로 인증 토큰을 확인한다.
 export function consumeVerification(token, { purpose, email, loginId }) {
   const saved = verifications.get(token)
   const matches = saved && saved.purpose === purpose && saved.email === email && (loginId === undefined || saved.loginId === loginId)
-  if (!matches) throw new ApiError(400, '이메일 인증을 다시 진행해 주세요.')
+  // FP-258 재설정 화면이 이 code로 인증 단계로 돌아간다.
+  if (!matches) throw emailVerificationRequired()
   verifications.delete(token)
 }
 
 registerMockHandlers({
-  // N-01 로그인 — 아이디·비밀번호가 틀리면 같은 문구로 401, 잠긴 계정이면 423. 탈퇴한 계정은 없는 계정과 같게 401이다.
+  // N-01 로그인 — 확인은 authenticateMockAccount(틀리면 같은 문구로 401, 탈퇴한 계정은 없는 계정과 같게 401). 성공하면 실패 횟수를 비운다.
   // FP-80 관리자는 토큰 대신 2단계 인증 시작 응답 { twoFactorRequired, challengeToken, maskedEmail }을 받는다(1분 안에 다시 부르면 429).
   'POST /api/auth/login': ({ body }) => {
     if (!body?.loginId || !body?.password) throw new ApiError(400, '아이디와 비밀번호를 입력해 주세요.')
-    const account = findMockAccount(body.loginId)
-    if (!account || (account.password !== null && account.password !== body.password)) {
-      throw new ApiError(401, LOGIN_FAILED_MESSAGE)
-    }
-    if (account.locked) throw new ApiError(423, ACCOUNT_LOCKED_MESSAGE, { code: AUTH_ERROR_CODES.ACCOUNT_LOCKED })
+    // FP-258 같은 접속지(mock은 이 탭)의 로그인 실패가 많으면 계정과 상관없이 429(서버 ClientRateLimiter LOGIN_FAILURE).
+    const account = countMockFailures(() => authenticateMockAccount(body.loginId, body.password))
+    account.loginFailCount = 0
+    account.lastLoginFailureAt = null
     if (account.user.role === ROLES.ADMIN) return startAdminLoginChallenge(account)
     return { accessToken: toMockToken(account.user.userId), user: structuredClone(account.user) }
   },
@@ -175,47 +258,67 @@ registerMockHandlers({
   'GET /api/auth/me': ({ token }) => ({ user: structuredClone(requireAccountByToken(token).user) }),
 
   // N-02·N-03 인증코드 발송 — 가입·이메일 변경(N-04-3) 목적이면 이미 가입된 이메일을 막는다. 재설정 목적은 계정이 있는지 알려 주지 않는다.
+  // FP-258 이메일은 서버처럼 앞뒤 공백을 빼고 소문자로 바꾼 뒤 판정·저장한다(발송·확인·가입·찾기·재설정 모두 같다).
   'POST /api/auth/email/send': ({ body }) => {
-    if (!isValidEmail(body?.email)) throw new ApiError(400, '이메일 형식이 올바르지 않습니다.')
-    const blocksUsedEmail = body.purpose === EMAIL_PURPOSES.SIGNUP || body.purpose === EMAIL_PURPOSES.CHANGE_EMAIL
-    if (blocksUsedEmail && accounts.some((item) => item.email === body.email)) {
-      throw new ApiError(409, '이미 가입된 이메일입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_EMAIL })
-    }
-    sentCodes.set(`${body.purpose}:${body.email}`, Date.now() + MOCK_EMAIL_CODE_TTL_SECONDS * 1000)
+    // FP-258 접속지별 1시간 요청 제한(CODE_SEND), 같은 이메일 하루 10회 상한(형식·중복 검사 뒤, 보내기 전)
+    hitMockRate('CODE_SEND')
+    const email = normalizeEmail(body?.email)
+    // FP-258 새 이메일 규칙은 가입·이메일 변경만. 아이디·비밀번호 찾기는 기존 이메일(+ 등)도 찾도록 기본 형식만 본다(서버 EmailPurpose.usesNewEmailRule).
+    const blocksUsedEmail = body?.purpose === EMAIL_PURPOSES.SIGNUP || body?.purpose === EMAIL_PURPOSES.CHANGE_EMAIL
+    if (!(blocksUsedEmail ? isValidEmail(email) : isBasicEmail(email))) throw new ApiError(400, '이메일 형식이 올바르지 않습니다.')
+    if (blocksUsedEmail && accounts.some((item) => item.email === email)) throw duplicateEmailError()
+    countMockDailySend('EMAIL', email, '이메일')
+    sentCodes.set(`${body.purpose}:${email}`, Date.now() + MOCK_EMAIL_CODE_TTL_SECONDS * 1000)
     return { expiresInSeconds: MOCK_EMAIL_CODE_TTL_SECONDS }
   },
 
-  // N-02·N-03 인증코드 확인 — 맞으면 이후 요청에 붙일 인증 토큰을 준다. 재설정 목적이면 아이디·이메일이 같은 계정인지도 본다.
+  // N-02·N-03 인증코드 확인 — 맞으면 이후 요청에 붙일 인증 토큰을 준다. 재설정 목적이면 아이디·이메일·이름(FP-258)이 같은 계정인지도 본다.
+  // FP-258 FIND_ID 목적은 계정을 보지 않고(찾기 요청이 확인), 재설정 목적은 이름 형식을 먼저 본다(틀리면 400 name 칸).
   'POST /api/auth/email/verify': ({ body }) => {
-    const key = `${body?.purpose}:${body?.email}`
+    if (body?.purpose === EMAIL_PURPOSES.RESET_PASSWORD) assertName(body.name)
+    const email = normalizeEmail(body?.email)
+    const loginId = body?.loginId === undefined ? undefined : normalizeLoginId(body.loginId)
+    const key = `${body?.purpose}:${email}`
     const expiresAt = sentCodes.get(key)
     if (!expiresAt || expiresAt < Date.now() || body.code !== MOCK_EMAIL_CODE) {
       throw new ApiError(400, '인증코드가 올바르지 않거나 만료되었습니다.')
     }
     if (body.purpose === EMAIL_PURPOSES.RESET_PASSWORD) {
-      const found = accounts.some((item) => item.loginId === body.loginId && item.email === body.email)
+      const found = accounts.some((item) => item.loginId === loginId && item.email === email && nameMatches(item, body.name))
       if (!found) throw new ApiError(404, NO_MATCH_MESSAGE)
     }
     sentCodes.delete(key)
     sequence += 1
     const verificationToken = `mock-email-verified-${sequence}`
-    verifications.set(verificationToken, { purpose: body.purpose, email: body.email, loginId: body.loginId })
+    verifications.set(verificationToken, { purpose: body.purpose, email, loginId })
     return { verificationToken }
   },
 
   // N-02-1 닉네임 중복 확인 — 형식이 틀리면 400(칸별 오류), 아니면 계정 목록(탈퇴 표시값 포함)의 닉네임과 비교한다.
   'POST /api/auth/nickname/check': ({ body }) => {
+    // FP-258 접속지별 1분 확인 제한(AVAILABILITY_CHECK, 아이디 확인과 함께 센다)
+    hitMockRate('AVAILABILITY_CHECK')
     const nicknameError = validateNickname(body?.nickname)
     if (nicknameError) throw fieldError('nickname', nicknameError)
     const nickname = body.nickname.trim()
     return { available: !accounts.some((item) => item.nickname === nickname) }
   },
 
+  // AUTH-16 N-02-1 아이디 중복 확인(FP-258) — 형식이 틀리면 400(loginId 칸), 아니면 가입 mock과 같은 기준(계정 목록의 아이디 그대로)으로 비교한다.
+  'POST /api/auth/login-id/check': ({ body }) => {
+    hitMockRate('AVAILABILITY_CHECK')
+    const loginIdError = validateLoginId(body?.loginId)
+    if (loginIdError) throw fieldError('loginId', loginIdError)
+    return { available: !accounts.some((item) => item.loginId === body.loginId) }
+  },
+
   // N-02 휴대폰 인증번호 발송 — 이메일 발송 mock과 같은 구조. 실제 문자는 보내지 않고 고정 코드(MOCK_PHONE_CODE)를 쓴다.
   'POST /api/auth/phone/send': ({ body }) => {
+    hitMockRate('CODE_SEND')
     const phone = normalizePhone(body?.phone)
     if (!isValidPhone(phone)) throw fieldError('phone', '휴대폰 번호 형식이 올바르지 않습니다. 예) 010-1234-5678')
-    if (body.purpose !== PHONE_PURPOSES.SIGNUP) throw fieldError('purpose', '인증 목적이 올바르지 않습니다.')
+    if (!Object.values(PHONE_PURPOSES).includes(body.purpose)) throw fieldError('purpose', '인증 목적이 올바르지 않습니다.')
+    countMockDailySend('PHONE', phone, '번호')
     sentPhoneCodes.set(`${body.purpose}:${phone}`, Date.now() + MOCK_PHONE_CODE_TTL_SECONDS * 1000)
     return { expiresInSeconds: MOCK_PHONE_CODE_TTL_SECONDS }
   },
@@ -237,28 +340,27 @@ registerMockHandlers({
 
   // N-02 회원가입 — 직군은 받지 않으므로 jobType은 null로 만든다(로그인 후 직군 선택 화면으로 간다).
   'POST /api/auth/signup': ({ body }) => {
-    if (body?.agreeCreditInfo !== true) throw new ApiError(400, '필수 동의 항목에 동의해 주세요.')
+    // FP-258 N-02-2 필수 동의 2개(agreeTerms·agreePrivacy)는 각각 true여야 한다. 예전 agreeCreditInfo는 보지 않는다(서버와 같음).
+    if (body?.agreeTerms !== true || body?.agreePrivacy !== true) throw new ApiError(400, '필수 동의 항목에 동의해 주세요.')
     if (!isValidPassword(body.password)) throw new ApiError(400, '비밀번호 규칙을 지켜 주세요.')
     // 이름은 완성형 한글 2~20자 — 화면과 같은 규칙(validateName)이다.
-    const nameError = validateName(body.name)
-    if (nameError) throw fieldError('name', nameError)
+    assertName(body.name)
     // 휴대폰은 필수이고, 형식이 맞아야 한다(인증 토큰은 중복 검사 뒤에 쓴다).
     const phone = normalizePhone(body.phone)
     if (!isValidPhone(phone)) throw fieldError('phone', '휴대폰 번호 형식이 올바르지 않습니다. 예) 010-1234-5678')
     if (!body.phoneVerificationToken) throw fieldError('phone', SIGNUP_PENDING_MESSAGES.phone)
     // N-02-1 출생연도 — 화면과 같은 규칙(validateBirthYear)으로 다시 검사하고, 어기면 칸별 오류로 돌려준다.
     const birthYearError = validateBirthYear(body.birthYear)
-    if (birthYearError) throw new ApiError(400, birthYearError, { fieldErrors: [{ field: 'birthYear', message: birthYearError }] })
+    if (birthYearError) throw fieldError('birthYear', birthYearError)
     // N-02-1 닉네임 — 화면과 같은 규칙(validateNickname)으로 다시 검사하고, 어기면 칸별 오류로 돌려준다.
     const nicknameError = validateNickname(body.nickname)
-    if (nicknameError) throw new ApiError(400, nicknameError, { fieldErrors: [{ field: 'nickname', message: nicknameError }] })
+    if (nicknameError) throw fieldError('nickname', nicknameError)
     const nickname = body.nickname.trim()
+    const email = normalizeEmail(body.email)
     if (accounts.some((item) => item.loginId === body.loginId)) {
       throw new ApiError(409, '이미 사용 중인 아이디입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_LOGIN_ID })
     }
-    if (accounts.some((item) => item.email === body.email)) {
-      throw new ApiError(409, '이미 가입된 이메일입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_EMAIL })
-    }
+    if (accounts.some((item) => item.email === email)) throw duplicateEmailError()
     // N-02-1 닉네임 중복 불가(DDL UK_APU_NICKNAME) — 탈퇴 회원의 표시값('탈퇴'+userId)도 계정 행에 남아 있으므로 함께 비교한다.
     if (accounts.some((item) => item.nickname === nickname)) {
       throw new ApiError(409, '이미 사용 중인 닉네임입니다.', { code: AUTH_ERROR_CODES.DUPLICATE_NICKNAME })
@@ -269,7 +371,7 @@ registerMockHandlers({
     }
     // 휴대폰 토큰을 먼저 본다. 여기서 막히면 이메일 인증 토큰은 쓰지 않은 채로 남아 다시 가입할 수 있다.
     assertPhoneVerification(body.phoneVerificationToken, { purpose: PHONE_PURPOSES.SIGNUP, phone })
-    consumeVerification(body.emailVerificationToken, { purpose: EMAIL_PURPOSES.SIGNUP, email: body.email })
+    consumeVerification(body.emailVerificationToken, { purpose: EMAIL_PURPOSES.SIGNUP, email })
     phoneVerifications.delete(body.phoneVerificationToken)
     mockLinkKeys.delete(body.socialLinkKey)
     const userId = createMockUserId(body.loginId)
@@ -278,7 +380,7 @@ registerMockHandlers({
       password: body.password,
       locked: false,
       createdAt: new Date().toISOString(), // N-04-1 마이페이지 가입일로 쓴다.
-      email: body.email,
+      email,
       phone,
       ageGroup: body.ageGroup,
       birthYear: Number(body.birthYear),
@@ -288,25 +390,51 @@ registerMockHandlers({
     return { userId }
   },
 
-  // N-03 아이디 찾기 — 이름·휴대폰이 맞는 계정의 아이디를 가려서 돌려준다.
+  // N-03-1 아이디 찾기(FP-258) — { method: PHONE | EMAIL, name, phone 또는 email, verificationToken(FIND_ID) }. 서버와 같은 순서로 본다:
+  //   이름 형식(400 name) → 방법(400 method) → 토큰(휴대폰 400 phone 칸, 이메일 400) → 이름이 같은 일반 회원(없으면 404, 토큰은 남음) → 토큰 사용.
   'POST /api/auth/find-id': ({ body }) => {
-    const phone = normalizePhone(body?.phone)
-    const account = accounts.find((item) => item.user.name === body?.name && item.phone === phone)
+    assertName(body?.name)
+    if (body?.method !== FIND_ID_METHODS.PHONE && body?.method !== FIND_ID_METHODS.EMAIL) {
+      throw fieldError('method', '아이디를 찾을 방법을 골라 주세요.')
+    }
+    const token = body.verificationToken
+    // 이름이 같은 일반 회원(탈퇴 제외) 중 휴대폰 또는 이메일이 맞는 계정
+    const findUser = (matches) => accounts.find((item) => !isWithdrawn(item) && item.user.role === ROLES.USER && matches(item) && nameMatches(item, body.name))
+    let account
+    if (body.method === FIND_ID_METHODS.PHONE) {
+      const phone = normalizePhone(body.phone)
+      assertPhoneVerification(token, { purpose: PHONE_PURPOSES.FIND_ID, phone })
+      account = findUser((item) => item.phone === phone)
+    } else {
+      const email = normalizeEmail(body.email)
+      const saved = verifications.get(token)
+      if (!saved || saved.purpose !== EMAIL_PURPOSES.FIND_ID || saved.email !== email) throw emailVerificationRequired()
+      account = findUser((item) => item.email === email)
+    }
     if (!account) throw new ApiError(404, NO_MATCH_MESSAGE)
-    return { maskedLoginId: maskLoginId(account.loginId) }
+    phoneVerifications.delete(token)
+    verifications.delete(token)
+    return { maskedLoginId: maskLoginId(account.loginId), loginId: account.loginId }
   },
 
-  // N-03 비밀번호 재설정 — 이메일 인증 토큰을 확인한 뒤 새 비밀번호로 바꾼다.
+  // N-03 비밀번호 재설정 — 이름 형식(400 name 칸) → 아이디·이메일·이름(FP-258)이 같은 계정(없으면 404, 토큰은 남음) → 이메일 인증 토큰 사용 순서로 보고
+  //   새 비밀번호로 바꾼다. 서버처럼 잠금과 실패 횟수도 푼다.
   'POST /api/auth/password/reset': ({ body }) => {
+    assertName(body?.name)
     if (!isValidPassword(body?.newPassword)) throw new ApiError(400, '비밀번호 규칙을 지켜 주세요.')
+    const loginId = normalizeLoginId(body.loginId)
+    const email = normalizeEmail(body.email)
+    const account = accounts.find((item) => item.loginId === loginId && item.email === email && nameMatches(item, body.name))
+    if (!account) throw new ApiError(404, NO_MATCH_MESSAGE)
     consumeVerification(body.emailVerificationToken, {
       purpose: EMAIL_PURPOSES.RESET_PASSWORD,
-      email: body.email,
-      loginId: body.loginId,
+      email,
+      loginId,
     })
-    const account = accounts.find((item) => item.loginId === body.loginId && item.email === body.email)
-    if (!account) throw new ApiError(404, NO_MATCH_MESSAGE)
     account.password = body.newPassword
+    account.locked = false
+    account.loginFailCount = 0
+    account.lastLoginFailureAt = null
     return {}
   },
 })

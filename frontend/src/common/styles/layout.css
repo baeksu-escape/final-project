@@ -8,6 +8,8 @@
 
 html {
   background: var(--bg);
+  /* 세로 스크롤바 자리를 늘 비워 둔다 — 내용이 길어져 스크롤바가 생겨도 가로 폭이 바뀌지 않아 헤더가 옆으로 밀리지 않는다 */
+  scrollbar-gutter: stable;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -176,6 +178,13 @@ p {
 
 .mega__link[aria-current='page'] {
   font-weight: 800;
+  box-shadow: inset 0 -2px 0 var(--acc);
+  border-radius: 0;
+}
+
+/* 지금 있는 분류가 있으면 나머지 분류는 흐리게 — 어디에 있는지 바로 보이게 */
+.mega__bar:has([aria-current='page']) .mega__link:not([aria-current='page']):not(:hover):not(:focus-visible):not([aria-expanded='true']) {
+  opacity: 0.4;
 }
 
 .mega__panel {
@@ -244,6 +253,8 @@ p {
   flex: none;
   align-items: center;
   gap: 4px;
+  /* 메뉴가 숨겨진 화면(직군·점수 전)에서도 오른쪽 끝에 붙는다 */
+  margin-left: auto;
 }
 
 .app-header__text-btn,
@@ -326,6 +337,17 @@ p {
   border-bottom-color: var(--fg);
   color: var(--fg);
   font-weight: 800;
+}
+
+/* FP-307 큰 분류가 6개가 되어 961~1060px에서 로고·메뉴·알림이 겹치지 않게 메뉴 간격을 줄인다(11/27 범영 확인) */
+@media (min-width: 961px) and (max-width: 1060px) {
+  .mega__bar {
+    gap: 4px;
+  }
+
+  .mega__link {
+    padding-inline: 12px;
+  }
 }
 
 @media (max-width: 960px) {

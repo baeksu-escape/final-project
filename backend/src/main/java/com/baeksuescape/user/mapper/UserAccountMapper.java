@@ -22,6 +22,9 @@ public interface UserAccountMapper {
     // N-03 아이디 찾기 후보 — 휴대폰 HMAC이 같은 일반 회원(탈퇴 제외). 휴대폰은 UNIQUE가 아니라 여러 명일 수 있다.
     List<UserAccount> selectUsersByPhoneHmac(@Param("phoneHmac") String phoneHmac);
 
+    // FP-258 N-03-1 이메일로 아이디 찾기 대상 — 이메일 HMAC이 같은 일반 회원(탈퇴 제외). 없으면 null.
+    UserAccount selectUserByEmailHmac(@Param("emailHmac") String emailHmac);
+
     // N-03 비밀번호 재설정 대상 — 아이디·이메일 HMAC이 모두 맞는 일반 회원(탈퇴 제외). 없으면 null.
     UserAccount selectUserByLoginIdAndEmailHmac(@Param("loginId") String loginId, @Param("emailHmac") String emailHmac);
 
@@ -37,14 +40,14 @@ public interface UserAccountMapper {
     // N-02-4 가입. 저장한 USER_ID를 account.userId에 채운다.
     int insertUser(UserAccount account);
 
-    // 로그인 성공: 실패 횟수 0, 마지막 로그인 시각 기록.
+    // 로그인 성공: 실패 횟수 0, 마지막 로그인 시각 기록. FP-258 마지막 실패 시각도 비운다.
     int updateLoginSuccess(@Param("userId") long userId, @Param("now") LocalDateTime now);
 
-    // 로그인 실패: 실패 횟수 저장. lock이면 LOCKED·LOCKED_AT·LOCK_REASON도 기록한다.
+    // 로그인 실패: 실패 횟수 저장. lock이면 LOCKED·LOCKED_AT·LOCK_REASON도 기록한다. FP-258 마지막 실패 시각을 now로 남긴다.
     int updateLoginFailure(@Param("userId") long userId, @Param("failCount") int failCount, @Param("lock") boolean lock,
             @Param("now") LocalDateTime now);
 
-    // N-03-3 비밀번호 재설정: 새 해시, 실패 횟수 0, 잠김이면 ACTIVE로 푼다.
+    // N-03-3 비밀번호 재설정: 새 해시, 실패 횟수 0(FP-258 마지막 실패 시각도 비움), 잠김이면 ACTIVE로 푼다.
     int updatePasswordAndUnlock(@Param("userId") long userId, @Param("passwordHash") String passwordHash, @Param("now") LocalDateTime now);
 
     // N-04-3 비밀번호 변경(로그인한 상태).

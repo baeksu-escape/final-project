@@ -17,6 +17,7 @@ import { AUTH_PATHS } from '../../features/auth/authPaths.js'
 import GuestOnlyRoute from '../../features/auth/components/GuestOnlyRoute.jsx'
 import FindIdPage from '../../features/auth/pages/FindIdPage.jsx'
 import FindPasswordPage from '../../features/auth/pages/FindPasswordPage.jsx'
+import AuthSplitLayout from '../../features/auth/components/AuthSplitLayout.jsx'
 import LoginPage from '../../features/auth/pages/LoginPage.jsx'
 import MyPage from '../../features/auth/pages/MyPage.jsx'
 import SignupPage from '../../features/auth/pages/SignupPage.jsx'
@@ -50,10 +51,13 @@ export default function AppRoutes() {
         <Route path={PATHS.HOME} element={<LandingPage />} />
         {/* 로그인 전 (FP-87 N-01~N-03) — 이미 로그인했으면 첫 화면으로 보낸다 */}
         <Route element={<GuestOnlyRoute />}>
-          <Route path={AUTH_PATHS.LOGIN} element={<LoginPage />} />
-          <Route path={AUTH_PATHS.SIGNUP} element={<SignupPage />} />
-          <Route path={AUTH_PATHS.FIND_ID} element={<FindIdPage />} />
-          <Route path={AUTH_PATHS.FIND_PASSWORD} element={<FindPasswordPage />} />
+          {/* 로그인·회원가입·계정 찾기 — 왼쪽 브랜드 패널 · 오른쪽 폼 좌우 분할 틀 */}
+          <Route element={<AuthSplitLayout />}>
+            <Route path={AUTH_PATHS.LOGIN} element={<LoginPage />} />
+            <Route path={AUTH_PATHS.SIGNUP} element={<SignupPage />} />
+            <Route path={AUTH_PATHS.FIND_ID} element={<FindIdPage />} />
+            <Route path={AUTH_PATHS.FIND_PASSWORD} element={<FindPasswordPage />} />
+          </Route>
           {/* 소셜 로그인 (FP-145 N-01-6) */}
           <Route path={SOCIAL_PATHS.CALLBACK} element={<SocialCallbackPage />} />
           <Route path={SOCIAL_PATHS.LINK} element={<SocialLinkPage />} />
@@ -67,12 +71,11 @@ export default function AppRoutes() {
           {/* 직군 선택 (FP-85 N-05-1) — 직군이 없는 사용자만 머문다 */}
           <Route path={PATHS.SELECT_JOB} element={<JobSelectPage />} />
 
-          {/* 일반 사용자 전용 + 직군 선택 완료 — N-08-1 기능 9개(위쪽 메뉴는 큰 분류 5개로 묶음) */}
+          {/* 일반 사용자 전용 + 직군 선택 완료 — N-08-1 기능 9개(위쪽 메뉴는 큰 분류 6개로 묶음) */}
           <Route element={<RouteGuard requiredRole={ROLES.USER} requireJobType />}>
             {/* 점수가 있어야 보는 화면 — 점수가 없으면 데이터 입력으로 보낸다(11/06 확정 UI) */}
             <Route element={<RouteGuard requireScore />}>
-              {/* UI 리뉴얼: 홈과 큰 분류 화면 */}
-              <Route path={PATHS.DASHBOARD} element={<HomePage />} />
+              {/* UI 리뉴얼: 큰 분류 화면(홈은 아래 일반 사용자 묶음 — 가입 직후에도 연다) */}
               <Route path={PATHS.MY_CREDIT} element={<GroupHubPage groupKey="credit" />} />
               <Route path={PATHS.FINANCE} element={<GroupHubPage groupKey="finance" />} />
               <Route path={PATHS.REPORT} element={<CreditReportPage />} />
@@ -92,6 +95,8 @@ export default function AppRoutes() {
 
           {/* 일반 사용자 전용, 직군 선택 전에도 연다 — N-08-1 직군 선택·데이터 입력 중에도 헤더의 [마이 페이지]로 들어온다(PR #45 검토) */}
           <Route element={<RouteGuard requiredRole={ROLES.USER} />}>
+            {/* 한눈에(홈) — 회원가입 직후 바로 온다. 직군·점수가 없으면 시작 안내를 보여 준다 */}
+            <Route path={PATHS.DASHBOARD} element={<HomePage />} />
             <Route path={PATHS.MY_PAGE} element={<MyPage />} />
           </Route>
 

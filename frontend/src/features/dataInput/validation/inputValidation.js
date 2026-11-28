@@ -1,5 +1,5 @@
 import { BASE_MONTH_FIELD } from '../config/inputSections.js'
-import { currentMonth, isEmptyValue } from '../utils/inputValues.js'
+import { currentMonth, isBlankRow, isEmptyValue } from '../utils/inputValues.js'
 import { findDuplicateRowIds } from './inputRules.js'
 
 // 필수 칸이 비었을 때의 기본 문구.
@@ -43,10 +43,8 @@ export function errorKeyOf(sectionKey, fieldKey, rowId) {
 
 // 칸 하나를 검사해 오류가 있으면 errors에 넣는다 — 필수 검사를 먼저 하고, 값이 있을 때만 칸의 validate를 부른다.
 // checkRequired가 false면 필수 검사는 건너뛴다(첫 저장 전에는 빈 칸 오류를 보여 주지 않기 위해서).
-// FP-260 칸 설정에 requiredWhen(칸 섹션 값)이 있으면 required 대신 그 결과로 필수 여부를 정한다(기간: 개월 칸이 비었을 때만 년 칸 필수).
 function checkField(field, value, context, errors, key, checkRequired) {
-  const required = field.requiredWhen ? field.requiredWhen(context.row) : field.required
-  if (required && isEmptyValue(value)) {
+  if (field.required && isEmptyValue(value)) {
     if (checkRequired) errors[key] = field.requiredMessage ?? REQUIRED_MESSAGE
     return
   }
@@ -72,7 +70,12 @@ export function validateFinancialInput(values, sections, { checkRequired = true,
       if (checkRequired && section.minItems && value.length < section.minItems) {
         errors[errorKeyOf(section.key)] = section.minItemsMessage ?? REQUIRED_MESSAGE
       }
-      for (const row of value) {
+      // 비어 있는 카드(처음 값 그대로)는 건너뛴다. "없음" 체크가 있는 섹션(대출)이 빈 카드뿐이면 칸마다 '필수'를 띄우지 않고 무엇을 할지 한 줄로 알린다.
+      const filledRows = value.filter((row) => !isBlankRow(section, row))
+      if (checkRequired && section.noItemsLabel && filledRows.length === 0) {
+        errors[errorKeyOf(section.key)] = `${section.itemLabel ?? '항목'} 정보를 입력하거나 '${section.noItemsLabel}'에 체크해 주세요.`
+      }
+      for (const row of filledRows) {
         for (const field of section.itemFields) {
           const key = errorKeyOf(section.key, field.key, row.id)
           checkField(field, row[field.key], { row, values, nowMonth }, errors, key, checkRequired)
