@@ -8,10 +8,13 @@ import { patchMockAccountUser } from '../../auth/mocks/authMockHandlers.js'
 import { ALT_DATA_CONSENT_TYPE, ALT_DATA_SOURCES } from '../config/altDataSources.js'
 import { isInputComplete } from '../config/completionItems.js'
 import { BASE_MONTH_FIELD, getSectionsForJob } from '../config/inputSections.js'
+import { VALIDATION_LIMITS } from '../config/validationLimits.js'
 import { getSectionStatus, isEmptyValue, toValues } from '../utils/inputValues.js'
+import { addMonths } from '../validation/inputRules.js'
 import { validateFinancialInput } from '../validation/inputValidation.js'
 import { INPUT_ERROR_CODE, SCORE_ERROR_CODES, toServerFieldErrors } from '../validation/serverErrors.js'
 import { createAltDataRows } from './altDataMock.js'
+import { recordMockAssessment } from './assessmentMockStore.js'
 import { mockScoreSettings } from './scoreMockData.js'
 import {
   createConsent,
@@ -25,8 +28,9 @@ import {
 } from './altDataMockStore.js'
 
 // 사용자별 저장값 — 메모리에만 있어 새로고침하면 사라진다. 동의·불러온 대안 데이터는 altDataMockStore.js에 있다.
-const savedInputs = new Map() // userId → 가장 최근에 저장한 요청 본문(+savedAt)
 const savedByMonth = new Map() // userId → { 기준월: 요청 본문(+savedAt) } (D-16 기준월별 저장)
+// FP-298 소득은 서버 USER_INCOME_MONTH처럼 기준월 본문과 따로 달마다 둔다 — userId → { 'YYYY-MM': 금액 }.
+const savedIncomes = new Map()
 
 // N-05-9 유효한 동의 없이 불러오려 할 때 쓰는 오류 코드(DDL v0.3.2 W3: 불러온 행은 동의 ID가 꼭 있어야 한다).
 const CONSENT_REQUIRED_CODE = 'CONSENT_REQUIRED'
@@ -78,24 +82,57 @@ function hasAllAltDataConsents(user) {
   return ALT_DATA_SOURCES.every((source) => findActiveConsent(user.userId, source.consent))
 }
 
-// FP-298 저장본을 지금 직군의 모양으로 돌려준다(서버 FinancialInputService.toInput과 같음). 소득은 직군과 상관없이 달별 행으로 보고,
-// 급여소득자면 기준월 달의 소득을 월급 칸으로, 그 밖은 달별 소득 줄로 보여 준다(급여소득자 월급 → 기준월 한 줄).
-function inputForJob(input, jobType) {
+// 기준월로 끝나는 최근 12개월(오래된 달부터) — 서버 FinancialInputService.incomeWindow와 같다.
+function incomeWindow(baseMonth) {
+  const count = VALIDATION_LIMITS.INCOME_MONTHS_MAX
+  return Array.from({ length: count }, (_, index) => addMonths(baseMonth, index - (count - 1)))
+}
+
+// FP-298 소득 저장(서버 saveIncome과 같음) — 급여소득자는 기준월 한 달만 바꾸고 다른 달은 그대로 둔다.
+// 자영업자·프리랜서는 기준월의 12개월 구간을 이번 입력으로 바꾸고(빈 달은 지움), 구간 밖의 달은 그대로 둔다.
+function saveIncomes(userId, jobType, body) {
+  const incomes = { ...savedIncomes.get(userId) }
+  const { baseMonth, income } = body
+  if (jobType === JOB_TYPES.EMPLOYEE) {
+    if (!isEmptyValue(income?.monthlySalary)) incomes[baseMonth] = income.monthlySalary
+  } else {
+    const amounts = new Map((income?.items ?? []).map((item) => [item.month, item.amount]))
+    for (const month of incomeWindow(baseMonth)) {
+      if (isEmptyValue(amounts.get(month))) delete incomes[month]
+      else incomes[month] = amounts.get(month)
+    }
+  }
+  savedIncomes.set(userId, incomes)
+}
+
+// FP-298 저장본을 지금 직군의 모양으로 돌려준다(서버 FinancialInputService.loadSaved·toInput과 같음). 소득은 달별 보관(savedIncomes)에서 읽어,
+// 급여소득자면 기준월 달의 소득을 월급 칸으로, 그 밖은 기준월의 12개월 구간에 있는 달을 달별 소득 줄로 보여 준다.
+function inputForJob(input, jobType, incomes = {}) {
   if (!input) return null
-  const { baseMonth, income } = input
-  const salaryRows =
-    income?.incomeType === 'MONTHLY_SALARY' && !isEmptyValue(income.monthlySalary) ? [{ month: baseMonth, amount: income.monthlySalary }] : []
-  const rows = income?.incomeType === 'MONTHLY_SALARY' ? salaryRows : (income?.items ?? [])
+  const { baseMonth } = input
   const nextIncome =
     jobType === JOB_TYPES.EMPLOYEE
-      ? { baseMonth, incomeType: 'MONTHLY_SALARY', monthlySalary: rows.find((row) => row.month === baseMonth)?.amount ?? null }
-      : { baseMonth, incomeType: 'MONTHLY_INCOME', items: rows }
+      ? { baseMonth, incomeType: 'MONTHLY_SALARY', monthlySalary: incomes[baseMonth] ?? null }
+      : {
+          baseMonth,
+          incomeType: 'MONTHLY_INCOME',
+          items: incomeWindow(baseMonth)
+            .filter((month) => incomes[month] !== undefined)
+            .map((month) => ({ month, amount: incomes[month] })),
+        }
   return { ...input, jobType, income: nextIncome }
 }
 
+// FP-260 한 기준월의 저장본을 지금 직군 모양으로 돌려준다. 기준월을 주지 않으면 서버처럼 저장한 기준월 중 가장 최근 달(저장한 순서가 아니라 기준월 순)을 쓴다.
+function savedInputOf(user, baseMonth = savedBaseMonthsOf(user).at(-1)) {
+  const stored = baseMonth ? savedByMonth.get(user.userId)?.[baseMonth] : null
+  return inputForJob(stored ?? null, user.jobType, savedIncomes.get(user.userId))
+}
+
 // 사용자의 입력 완료 현황 — { sections: { 섹션 key: 입력 여부 }, altData: { 대안 데이터 key: 불러옴 여부 } }
-function statusOf(user) {
-  const input = inputForJob(savedInputs.get(user.userId) ?? null, user.jobType)
+// 서버처럼 조회·점수 산출은 가장 최근 기준월, 저장 응답은 방금 저장한 기준월(baseMonth)로 본다.
+function statusOf(user, baseMonth) {
+  const input = savedInputOf(user, baseMonth)
   const altData = getImportedAltData(user.userId)
   return {
     sections: getSectionStatus(input, getSectionsForJob(user.jobType)),
@@ -188,7 +225,7 @@ registerMockHandlers({
   'GET /api/members/me/financial-input': ({ token }) => {
     const user = requireUserWithJob(token)
     return {
-      input: structuredClone(inputForJob(savedInputs.get(user.userId) ?? null, user.jobType)),
+      input: structuredClone(savedInputOf(user)),
       status: statusOf(user),
       altData: structuredClone(getImportedAltData(user.userId)),
       savedBaseMonths: savedBaseMonthsOf(user),
@@ -228,9 +265,9 @@ registerMockHandlers({
     if (Object.keys(errors).length > 0) throw invalidInputError(toServerFieldErrors(errors, values))
     const savedAt = new Date().toISOString()
     const saved = { ...structuredClone(body), savedAt }
-    savedInputs.set(user.userId, saved)
     savedByMonth.set(user.userId, { ...savedByMonth.get(user.userId), [body.baseMonth]: saved })
-    return { savedAt, status: statusOf(user), savedBaseMonths: savedBaseMonthsOf(user) }
+    saveIncomes(user.userId, user.jobType, body)
+    return { savedAt, status: statusOf(user, body.baseMonth), savedBaseMonths: savedBaseMonthsOf(user) }
   },
 
   // N-05-8 점수 산출(B팀 명세서 v0.2 3-1 RPT-01) — 실제 계산 없이 mock 점수를 돌려준다. SCORED면 '점수 있음'으로 바꾼다(N-01-2).
@@ -257,6 +294,17 @@ registerMockHandlers({
     }
     const response = buildScoreResponse(user, requestId)
     scoreResults.set(requestId, { userId: user.userId, response })
+    // FP-298 진단 내역 mock이 쓰도록 산출 당시 직군과 함께 남긴다(서버 ASSESSMENT.WORKER_TYPE_CODE, 직군을 바꿔도 그대로).
+    recordMockAssessment(user.userId, {
+      diagnosisId: requestId,
+      calculatedAt: response.calculatedAt,
+      existingScore: response.traditional.score,
+      alternativeScore: response.alternative.score,
+      modelVersion: 'DEV-DUMMY',
+      gradeStatusCode: response.gradeStatusCode,
+      notScorableReasonCode: response.notScorableReasonCode,
+      jobType: user.jobType,
+    })
     if (response.gradeStatusCode === GRADE_STATUS.SCORED) patchMockAccountUser(token, { hasScore: true })
     return structuredClone(response)
   },
