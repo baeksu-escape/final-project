@@ -91,15 +91,39 @@ function logMessage(data, error) {
   return null
 }
 
+// 열람 감사 로그 카드의 Chip·안내 문장.
+const ACCESS_LOG_CHIP = '기록은 고치거나 지울 수 없습니다'
+const ACCESS_LOG_FOOTNOTE = '계정·권한 관리에서 회원 상세를 열면 사유와 함께 자동으로 남습니다.'
+
+// FP-273 5차 로그 카드 틀 — 두 탭이 같은 뼈대(제목 · Chip 줄 · 표 · 쪽 넘기기 자리 · 안내 줄)를 쓰게 해, 탭을 바꿔도 카드 높이와 [이전]/[다음] 위치가 같다.
+// 시스템 로그 카드(ghost)는 열람 감사 카드의 Chip·안내를 보이지 않게(visibility hidden, 화면 낭독기 제외) 두어 같은 높이만 차지한다.
+// 쪽 넘기기 자리는 불러오는 동안에도 높이를 남겨 둔다.
+function AdminLogCard({ title, ghost = false, error, data, page, onPageChange, children }) {
+  const ghostClass = ghost ? ' admin-log-card__ghost' : ''
+  return (
+    <Card title={title} className="admin-log-card">
+      <div className={`admin-log-card__meta${ghostClass}`} aria-hidden={ghost || undefined}>
+        <Chip>{ACCESS_LOG_CHIP}</Chip>
+      </div>
+      {error && data && <p role="alert">{error}</p>}
+      {children}
+      <div className="admin-log-card__pager">
+        {data && <AdminPagination page={page} size={data.size} totalCount={data.totalCount} onChange={onPageChange} />}
+      </div>
+      <p className={`hint${ghostClass}`} aria-hidden={ghost || undefined}>
+        {ACCESS_LOG_FOOTNOTE}
+      </p>
+    </Card>
+  )
+}
+
 // N-35-2 열람 감사 로그(ADM-09) — 관리자가 회원 상세를 연 기록을 최신순으로 보여 준다. 고치거나 지우는 기능은 없다.
 function AccessLogSection() {
   const [page, setPage] = useState(ADMIN_FIRST_PAGE)
   const { data, error, busy } = useAdminLogs(fetchAccessLogs, page, '')
 
   return (
-    <Card title="열람 감사 로그" className="admin-log-card">
-      <Chip>기록은 고치거나 지울 수 없습니다</Chip>
-      {error && data && <p role="alert">{error}</p>}
+    <AdminLogCard title="열람 감사 로그" error={error} data={data} page={page} onPageChange={setPage}>
       <AdminLogTable
         caption="열람 감사 로그"
         columns={ACCESS_LOG_COLUMNS}
@@ -119,28 +143,16 @@ function AccessLogSection() {
           )
         }}
       />
-      {data && <AdminPagination page={page} size={data.size} totalCount={data.totalCount} onChange={setPage} />}
-      <p className="hint">계정·권한 관리에서 회원 상세를 열면 사유와 함께 자동으로 남습니다.</p>
-    </Card>
+    </AdminLogCard>
   )
 }
 
-// N-28-2 시스템 로그(ADM-10) — AUTH·INFO·WARN으로 걸러 최신순으로 보여 준다.
-function SystemLogSection() {
-  const [type, setType] = useState('')
-  const [page, setPage] = useState(ADMIN_FIRST_PAGE)
+// N-28-2 시스템 로그(ADM-10) — AUTH·INFO·WARN으로 걸러 최신순으로 보여 준다. 구분(type)·쪽(page)은 페이지가 들고 있다(구분 탭이 위 탭 줄에 있다).
+function SystemLogSection({ type, page, onPageChange }) {
   const { data, error, busy } = useAdminLogs(fetchSystemLogs, page, type)
 
-  // 구분을 바꾸면 첫 쪽부터 본다.
-  const changeType = (nextType) => {
-    setType(nextType)
-    setPage(ADMIN_FIRST_PAGE)
-  }
-
   return (
-    <Card title="시스템 로그" className="admin-log-card">
-      <SegmentedControl label="로그 구분" options={SYSTEM_LOG_TYPE_OPTIONS} value={type} onChange={changeType} />
-      {error && data && <p role="alert">{error}</p>}
+    <AdminLogCard title="시스템 로그" ghost error={error} data={data} page={page} onPageChange={onPageChange}>
       <AdminLogTable
         caption="시스템 로그"
         columns={SYSTEM_LOG_COLUMNS}
@@ -158,15 +170,24 @@ function SystemLogSection() {
           </tr>
         )}
       />
-      {data && <AdminPagination page={page} size={data.size} totalCount={data.totalCount} onChange={setPage} />}
-    </Card>
+    </AdminLogCard>
   )
 }
 
 // N-28·N-35-2 접근·감사 로그(/admin/audit-logs) — 탭 2개: 열람 감사 로그, 시스템 로그.
 export default function AdminAuditLogsPage() {
   const [tab, setTab] = useState(LOG_TABS.ACCESS)
+  const [systemType, setSystemType] = useState('')
+  const [systemPage, setSystemPage] = useState(ADMIN_FIRST_PAGE)
+
+  // 시스템 로그 구분을 바꾸면 첫 쪽부터 본다.
+  const changeSystemType = (nextType) => {
+    setSystemType(nextType)
+    setSystemPage(ADMIN_FIRST_PAGE)
+  }
+
   // FP-273 4차 UI v2 공통 틀 — 머리는 .page-head, 탭은 통계 화면의 구분 줄처럼 section.card.l-g2에 둔다.
+  // FP-273 5차 순서는 머리 → Notice → 탭 줄 → 로그 카드. 시스템 로그 구분은 탭 줄 오른쪽 칸에 두고, 열람 감사 탭에서는 그 칸을 같은 높이로 비워 둔다.
   return (
     <>
       <div className="page-head">
@@ -177,11 +198,20 @@ export default function AdminAuditLogsPage() {
           </p>
         </div>
       </div>
-      <section className="card l-g2 admin-log-tabs" aria-label="로그 종류">
-        <SegmentedControl label="로그 종류" options={LOG_TAB_OPTIONS} value={tab} onChange={setTab} />
-      </section>
       <Notice type="info">최신 기록이 위에 옵니다.</Notice>
-      {tab === LOG_TABS.ACCESS ? <AccessLogSection /> : <SystemLogSection />}
+      <section className="card l-g2 admin-log-tabs" aria-label="로그 종류와 구분">
+        <SegmentedControl label="로그 종류" options={LOG_TAB_OPTIONS} value={tab} onChange={setTab} />
+        <div className="admin-log-tabs__filter">
+          {tab === LOG_TABS.SYSTEM && (
+            <SegmentedControl label="로그 구분" options={SYSTEM_LOG_TYPE_OPTIONS} value={systemType} onChange={changeSystemType} />
+          )}
+        </div>
+      </section>
+      {tab === LOG_TABS.ACCESS ? (
+        <AccessLogSection />
+      ) : (
+        <SystemLogSection type={systemType} page={systemPage} onPageChange={setSystemPage} />
+      )}
     </>
   )
 }
