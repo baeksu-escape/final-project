@@ -8,7 +8,7 @@ import { patchMockAccountUser } from '../../auth/mocks/authMockHandlers.js'
 import { ALT_DATA_CONSENT_TYPE, ALT_DATA_SOURCES } from '../config/altDataSources.js'
 import { isInputComplete } from '../config/completionItems.js'
 import { BASE_MONTH_FIELD, getSectionsForJob } from '../config/inputSections.js'
-import { getSectionStatus, toValues } from '../utils/inputValues.js'
+import { getSectionStatus, isEmptyValue, toValues } from '../utils/inputValues.js'
 import { validateFinancialInput } from '../validation/inputValidation.js'
 import { INPUT_ERROR_CODE, SCORE_ERROR_CODES, toServerFieldErrors } from '../validation/serverErrors.js'
 import { createAltDataRows } from './altDataMock.js'
@@ -78,9 +78,24 @@ function hasAllAltDataConsents(user) {
   return ALT_DATA_SOURCES.every((source) => findActiveConsent(user.userId, source.consent))
 }
 
+// FP-298 저장본을 지금 직군의 모양으로 돌려준다(서버 FinancialInputService.toInput과 같음). 소득은 직군과 상관없이 달별 행으로 보고,
+// 급여소득자면 기준월 달의 소득을 월급 칸으로, 그 밖은 달별 소득 줄로 보여 준다(급여소득자 월급 → 기준월 한 줄).
+function inputForJob(input, jobType) {
+  if (!input) return null
+  const { baseMonth, income } = input
+  const salaryRows =
+    income?.incomeType === 'MONTHLY_SALARY' && !isEmptyValue(income.monthlySalary) ? [{ month: baseMonth, amount: income.monthlySalary }] : []
+  const rows = income?.incomeType === 'MONTHLY_SALARY' ? salaryRows : (income?.items ?? [])
+  const nextIncome =
+    jobType === JOB_TYPES.EMPLOYEE
+      ? { baseMonth, incomeType: 'MONTHLY_SALARY', monthlySalary: rows.find((row) => row.month === baseMonth)?.amount ?? null }
+      : { baseMonth, incomeType: 'MONTHLY_INCOME', items: rows }
+  return { ...input, jobType, income: nextIncome }
+}
+
 // 사용자의 입력 완료 현황 — { sections: { 섹션 key: 입력 여부 }, altData: { 대안 데이터 key: 불러옴 여부 } }
 function statusOf(user) {
-  const input = savedInputs.get(user.userId) ?? null
+  const input = inputForJob(savedInputs.get(user.userId) ?? null, user.jobType)
   const altData = getImportedAltData(user.userId)
   return {
     sections: getSectionStatus(input, getSectionsForJob(user.jobType)),
@@ -152,7 +167,8 @@ function registerConsentDeleteHandler(consentId) {
 
 registerMockHandlers({
   // N-05-1 직군 선택·N-04-8 직군 변경(MEM-05, FP-298 서버 규칙과 같음) — 비어 있으면 저장, 다른 직군이면 저장한 입력·평가가 있어도 바꾼다.
-  // 같은 직군·틀린 값은 400이다. 저장한 입력·점수 결과는 그대로 둔다(소득·기간은 새 직군 기준으로 다시 입력).
+  // 같은 직군·틀린 값은 400이다. 저장한 입력·점수 결과는 그대로 둔다. 기간은 직군과 상관없이 하나라 그대로 쓰고,
+  // 급여소득자 → 다른 직군일 때만 남은 달 소득을 더 입력해야 한다(급여소득자는 기준월 한 달, 그 밖은 12개월).
   'PATCH /api/members/me/job-type': ({ body, token }) => {
     const user = patchMockAccountUser(token)
     if (user.role !== ROLES.USER) throw new ApiError(403, '일반 사용자만 직군을 선택할 수 있습니다.')
@@ -172,7 +188,7 @@ registerMockHandlers({
   'GET /api/members/me/financial-input': ({ token }) => {
     const user = requireUserWithJob(token)
     return {
-      input: structuredClone(savedInputs.get(user.userId) ?? null),
+      input: structuredClone(inputForJob(savedInputs.get(user.userId) ?? null, user.jobType)),
       status: statusOf(user),
       altData: structuredClone(getImportedAltData(user.userId)),
       savedBaseMonths: savedBaseMonthsOf(user),
