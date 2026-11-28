@@ -61,8 +61,14 @@
 
 ### 다음 사람이 알아야 할 것
 - decisions.md 1-2의 「직군 선택·변경」 행은 11차에 새 결정으로 고쳐 쓰고 10차에 더한 「직군 변경」 행과 합쳤다(옛 결정은 같은 행에 "이전:"으로 남김).
-- features.md N-04-8 제목의 우선순위 "미정"과 D-27 목록의 N-04-8도 그대로다.
+- decisions.md D-27에서는 N-04-8을 우선순위 미정 목록에서 뺐다. features.md N-04-8 제목의 "미정"은 우선순위 값이라 그대로 두고 구현 현황 줄을 더했다(13차).
 - `UserAccountMapper.countAssessments`는 더 부르는 곳이 없지만 지우지 않았다.
+
+### 검수 반영(11/28)
+- `fastapi_server/artifacts/README.txt`(B팀 모형 설명서)를 저장소에서만 뺐다. 로컬 파일은 남기고 `.git/info/exclude`로 무시한다.
+- decisions.md D-27·features.md N-04-8을 위와 같이 정리했다.
+- 진단 내역 mock(`diagnosisHistoryMockHandlers.js`)이 서버처럼 진단 당시 직군을 보내게 고쳤다. 직군을 바꿔도 지난 진단의 직군은 그대로다.
+- `JobTypeChangeApiTest`에서 쓰이지 않는 `countAssessments` 스텁을 지웠다.
 
 ## 검수
 > 검수 담당: 문서 담당자 · 형상 관리자 · 조장 (`README.md` 참고)
