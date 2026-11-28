@@ -298,6 +298,11 @@
   cursor: not-allowed;
 }
 
+/* FP-260 잠긴 금액 칸의 빠른 입력 칩 — 자리(높이)만 남기고 보이지 않게 한다. 체크 전후로 폼 높이가 같아 화면이 출렁이지 않는다. */
+.money-quick--locked .money-quick__chips {
+  visibility: hidden;
+}
+
 .input-section__summary {
   font-family: var(--f-d);
   font-variant-numeric: tabular-nums;

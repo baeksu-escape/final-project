@@ -41,8 +41,25 @@ export default function FieldControl({ field, value, onChange, error, disabled =
   const label = field.required ? `${field.label} (필수)` : field.label
   if (disabled && field.input !== 'checkbox') {
     switch (field.input) {
-      case 'money':
-        return <MoneyInput label={label} value={null} onChange={onChange} placeholder={LOCKED_PLACEHOLDER} disabled />
+      case 'money': {
+        const locked = <MoneyInput label={label} value={null} onChange={onChange} placeholder={LOCKED_PLACEHOLDER} disabled />
+        if (!field.quickAdd) return locked
+        // FP-260 빠른 입력 칩이 있는 칸은 잠겨도 한글 금액 줄·칩 줄 자리를 그대로 남긴다("없음" 체크 전후로 폼 높이가 같게).
+        // 칩은 자리만 차지하고 보이지 않는다(money-quick--locked, dataInput.css).
+        return (
+          <div className={`${field.wide ? 'money-quick is-wide' : 'money-quick'} money-quick--locked`}>
+            {locked}
+            <span className="money-quick__korean" aria-hidden="true" />
+            <div className="money-quick__chips" aria-hidden="true">
+              {field.quickAdd.map((amount) => (
+                <button key={amount} type="button" className="money-quick__chip" tabIndex={-1} disabled>
+                  +{toKoreanWon(amount).replace(' 원', '')}
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      }
       case 'select':
         return <Select label={label} value={null} onChange={onChange} options={field.options} placeholder={LOCKED_PLACEHOLDER} disabled />
       default:
@@ -50,7 +67,8 @@ export default function FieldControl({ field, value, onChange, error, disabled =
     }
   }
   switch (field.input) {
-    // 금액 칸은 흐린 글자로 0을 보여 주되 값은 비워 둔다 — 0원과 '값 없음'은 모델에서 다른 값이라 입력하지 않으면 지금처럼 '값 없음'으로 저장한다
+    // 금액 칸은 흐린 글자로 0을 보여 준다. 처음 값은 inputValues.js initialValueOf가 정한다 —
+    // 필수가 아닌 금액 칸(자산 4종·월 고정 지출 등)은 처음부터 0원, 필수 금액 칸(월급·대출 잔액 등)은 빈 칸(값 없음)이다.
     case 'money':
       // 설정에 quickAdd가 있으면 칸 아래에 [+100만] 같은 빠른 입력 칩과 한글 금액(예: 1,200만 원)을 함께 보여 준다
       if (field.quickAdd) {
