@@ -655,6 +655,7 @@
 .account-manage-card__job-type,
 .account-form__submit,
 .account-form__cancel,
+.account-form__check,
 .withdrawal-card__open {
   display: inline-flex;
   align-items: center;
@@ -679,7 +680,8 @@
 .account-manage-card__password:hover,
 .account-manage-card__data-input:hover,
 .account-manage-card__job-type:hover,
-.account-form__cancel:hover {
+.account-form__cancel:hover,
+.account-form__check:hover:not(:disabled) {
   border-color: var(--acc);
   color: var(--fg);
 }
@@ -704,7 +706,8 @@
 
 .account-form__submit:disabled,
 .my-profile-card__unmask-submit:disabled,
-.account-form__cancel:disabled {
+.account-form__cancel:disabled,
+.account-form__check:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -818,7 +821,39 @@
   font-size: 12.5px;
 }
 
-/* [탈퇴하기]·[취소]도 위 버튼과 같은 2칸 격자·8px 간격. 상자 안쪽 여백만큼 칸이 조금 좁다. FP-298 [변경하기]·[취소]도 같다. */
+/* FP-259 12차 계정 관리 폼의 칸 + 버튼 한 줄(닉네임 [중복 확인]·이메일 [인증코드 받기]) — 회원가입 .signup-form__row와 같은 모양.
+   좁은 화면(390)에서 한 줄에 들어가지 않으면 같은 상자 안에서 버튼만 아래 줄로 내려간다(가로로 넘치지 않는다). */
+.account-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.account-form__row > :not(button) {
+  flex: 1 1 130px;
+  min-width: 0;
+}
+
+/* 칸 옆 버튼은 입력 칸(forms.css 48px)과 같은 높이 */
+.account-form__row > button {
+  min-height: 48px;
+}
+
+/* 이메일 인증 묶음(줄바꿈 flex) 안에서는 칸 + 버튼 줄이 한 줄 전체를 쓴다 */
+.email-verification > .account-form__row {
+  flex-basis: 100%;
+}
+
+/* 좁은 화면에서는 이메일 주소가 잘리지 않게 이메일 칸이 한 줄을 다 쓰고 [인증코드 받기]만 같은 상자 안 아래 줄로 내려간다. */
+@media (max-width: 480px) {
+  .email-verification > .account-form__row > :not(button) {
+    flex-basis: 100%;
+  }
+}
+
+/* [탈퇴하기]·[취소]도 위 버튼과 같은 2칸 격자·8px 간격. 상자 안쪽 여백만큼 칸이 조금 좁다. FP-298 [변경하기]·[취소], FP-259 12차 [닉네임 저장]·[취소]도 같다. */
+.nickname-change-form__actions,
 .job-type-form__actions,
 .withdrawal-form__actions {
   display: grid;

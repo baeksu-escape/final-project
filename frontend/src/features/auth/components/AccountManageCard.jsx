@@ -42,7 +42,7 @@ export default function AccountManageCard({ currentNickname, onSaved }) {
           aria-expanded={openForm === FORMS.NICKNAME}
           onClick={() => toggleForm(FORMS.NICKNAME)}
         >
-          닉네임 바꾸기
+          닉네임 변경
         </button>
         <button
           type="button"
@@ -50,7 +50,7 @@ export default function AccountManageCard({ currentNickname, onSaved }) {
           aria-expanded={openForm === FORMS.EMAIL}
           onClick={() => toggleForm(FORMS.EMAIL)}
         >
-          이메일 바꾸기
+          이메일 변경
         </button>
         <button
           type="button"
@@ -58,7 +58,7 @@ export default function AccountManageCard({ currentNickname, onSaved }) {
           aria-expanded={openForm === FORMS.PASSWORD}
           onClick={() => toggleForm(FORMS.PASSWORD)}
         >
-          비밀번호 바꾸기
+          비밀번호 변경
         </button>
         <button type="button" className="account-manage-card__data-input" onClick={() => navigate(DATA_INPUT_PATHS.DATA_INPUT)}>
           데이터 다시 입력

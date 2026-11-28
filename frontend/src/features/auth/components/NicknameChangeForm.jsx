@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { Button, TextInput } from '../../../common/components/index.js'
+import { FieldError, TextInput } from '../../../common/components/index.js'
 import { checkNicknameAvailability } from '../api/authFeatureApi.js'
 import { requestNicknameChange } from '../api/myPageApi.js'
 import { AUTH_ERROR_CODES, SAME_NICKNAME_MESSAGE } from '../authConstants.js'
 import useImeSafeFilter from '../useImeSafeFilter.js'
 import { NICKNAME_MAX, filterNickname, validateNickname } from '../validation.js'
 
-// FP-222 N-04-3 닉네임 바꾸기 폼 — 규칙은 가입과 같고(validateNickname), [중복 확인](AUTH-13)에서 쓸 수 있다고 나온 닉네임만 저장한다(MEM-08).
+// FP-222 N-04-3 닉네임 변경 폼 — 규칙은 가입과 같고(validateNickname), [중복 확인](AUTH-13)에서 쓸 수 있다고 나온 닉네임만 저장한다(MEM-08).
+// FP-259 12차 [중복 확인]은 가입 화면처럼 칸 오른쪽 같은 줄에 두고(좁으면 버튼만 아래 줄), 안내·오류는 줄 아래에, [닉네임 저장]·[취소]는 2칸 격자로 둔다.
 // 저장에 성공하면 onSaved(안내 문구)를 부르고, [취소]는 onCancel을 부른다. 서버가 같은 값·중복으로 막으면 칸 아래에 보여 준다.
 export default function NicknameChangeForm({ currentNickname, onSaved, onCancel }) {
   const [nickname, setNickname] = useState('')
@@ -64,24 +65,31 @@ export default function NicknameChangeForm({ currentNickname, onSaved, onCancel 
 
   return (
     <form className="account-form nickname-change-form" onSubmit={handleSubmit} noValidate>
-      <div {...nicknameInput.compositionProps}>
-        <TextInput
-          label="새 닉네임"
-          value={nickname}
-          onChange={nicknameInput.onChange}
-          error={formatError || (sameAsCurrent ? SAME_NICKNAME_MESSAGE : '') || error}
-          hint={checked ? '사용할 수 있는 닉네임입니다.' : `한글·영문·숫자 2~${NICKNAME_MAX}자, 신용 라운지에 작성자로 보입니다`}
-          maxLength={NICKNAME_MAX}
-          autoComplete="nickname"
-        />
+      <div className="account-form__row">
+        <div {...nicknameInput.compositionProps}>
+          <TextInput label="새 닉네임" value={nickname} onChange={nicknameInput.onChange} maxLength={NICKNAME_MAX} autoComplete="nickname" />
+        </div>
+        <button
+          type="button"
+          className="account-form__check"
+          onClick={handleCheck}
+          disabled={pending || !text || formatError !== '' || sameAsCurrent || checked}
+        >
+          중복 확인
+        </button>
       </div>
-      <Button onClick={handleCheck} disabled={pending || !text || formatError !== '' || sameAsCurrent || checked}>
-        중복 확인
-      </Button>
-      <Button variant="primary" type="submit" disabled={pending || !checked}>
-        닉네임 저장
-      </Button>
-      <Button onClick={onCancel}>취소</Button>
+      <p className="form-field__hint">
+        {checked ? '사용할 수 있는 닉네임입니다.' : `한글·영문·숫자 2~${NICKNAME_MAX}자, 신용 라운지에 작성자로 보입니다`}
+      </p>
+      <FieldError message={formatError || (sameAsCurrent ? SAME_NICKNAME_MESSAGE : '') || error} />
+      <div className="nickname-change-form__actions">
+        <button type="submit" className="account-form__submit" disabled={pending || !checked}>
+          닉네임 저장
+        </button>
+        <button type="button" className="account-form__cancel" onClick={onCancel}>
+          취소
+        </button>
+      </div>
     </form>
   )
 }

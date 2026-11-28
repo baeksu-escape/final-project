@@ -6,7 +6,8 @@ import useImeSafeFilter from '../useImeSafeFilter.js'
 import { filterEmail } from '../validation.js'
 import EmailVerification from './EmailVerification.jsx'
 
-// N-04-3 이메일 바꾸기 폼 — 새 이메일을 FP-87 이메일 인증(N-02-3)으로 확인한 경우에만 저장을 요청한다.
+// N-04-3 이메일 변경 폼 — 새 이메일을 FP-87 이메일 인증(N-02-3)으로 확인한 경우에만 저장을 요청한다.
+// FP-259 12차 "새 이메일" 칸은 EmailVerification의 field로 넘겨 [인증코드 받기]와 한 줄에 둔다(좁으면 버튼만 아래 줄).
 // 저장에 성공하면 onSaved(안내 문구)를 부르고, [취소]는 onCancel을 부른다.
 export default function EmailChangeForm({ onSaved, onCancel }) {
   const [email, setEmail] = useState('')
@@ -40,10 +41,12 @@ export default function EmailChangeForm({ onSaved, onCancel }) {
 
   return (
     <form className="account-form email-change-form" onSubmit={handleSubmit} noValidate>
-      <div {...emailInput.compositionProps}>
-        <TextInput label="새 이메일" type="email" value={email} onChange={emailInput.onChange} autoComplete="email" />
-      </div>
       <EmailVerification
+        field={
+          <div {...emailInput.compositionProps}>
+            <TextInput label="새 이메일" type="email" value={email} onChange={emailInput.onChange} autoComplete="email" />
+          </div>
+        }
         email={email}
         purpose={EMAIL_PURPOSES.CHANGE_EMAIL}
         verified={verified}

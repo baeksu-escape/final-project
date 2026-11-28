@@ -414,7 +414,7 @@ class AuthServiceTest {
             assertThat(fieldOf(() -> service.signup(request))).as(password).isEqualTo("password");
         }
         // FP-258 64자를 넘으면 길이 안내 문구(화면 validation.js와 같음), 그 밖의 위반은 지금 문구.
-        assertThat(AccountRules.newPasswordError("a1" + "b".repeat(63), "규칙")).isEqualTo("비밀번호는 64자 이하로 입력해 주세요.");
+        assertThat(AccountRules.newPasswordError("a1" + "b".repeat(63), "규칙")).isEqualTo("비밀번호가 너무 깁니다. 64자 이하로 입력해 주세요.");
         assertThat(AccountRules.newPasswordError("abcd1234한", "규칙")).isEqualTo("규칙");
         assertThat(AccountRules.newPasswordError("a1" + "b".repeat(62), "규칙")).isNull();
         assertThat(AccountRules.isValidPassword("ab cd!@#1234")).isTrue();

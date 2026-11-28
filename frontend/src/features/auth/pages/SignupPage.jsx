@@ -24,6 +24,7 @@ import {
   joinEmail,
   joinPhone,
   normalizePhone,
+  passwordTooLongError,
   validateLoginId,
   validateNickname,
   validateSignup,
@@ -446,12 +447,13 @@ export default function SignupPage() {
         return (
           <>
             <div {...fieldProps('password')}>
+              {/* FP-259 12차 64자를 넘으면 칸을 벗어나기 전에도 길이 오류를 바로 보여 준다([다음]은 검사로 이미 꺼짐). */}
               <PasswordField
                 label="비밀번호"
                 rule="new"
                 value={form.password}
                 onChange={update('password')}
-                error={errorOf('password')}
+                error={passwordTooLongError(form.password) || errorOf('password')}
                 placeholder="비밀번호"
                 autoComplete="new-password"
                 {...reveal('password')}
