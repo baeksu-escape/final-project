@@ -27,7 +27,7 @@ const ALT_DATA_FIELDS = [
   { key: 'healthInsurance', label: '건강보험' },
 ]
 
-// 이름·값 목록(dl)을 그린다. FP-275 이름·값 2열(admin.css admin-dl).
+// 이름·값 목록(dl)을 그린다.
 function DefinitionList({ rows }) {
   return (
     <dl className="admin-dl">
@@ -52,15 +52,14 @@ function DetailGroup({ title, children }) {
 }
 
 // N-35-1 회원 상세 패널 — 사유를 남기고 연 회원의 가린 기본 정보, 최근 평가, 카드·신용 값, 대안 데이터 개월 수를 보여 준다.
-// FP-275 네 묶음을 넓은 화면에서는 2×2, 좁은 화면(900px 미만)에서는 한 줄에 하나로 놓고, 패널을 열면(다른 회원을 열어도) 패널로 스크롤한다.
+// FP-275 네 묶음을 2×2(900px 미만은 한 줄에 하나)로 놓고, 열 때마다 패널로 스크롤한다.
 // 사용 예: <MemberDetailPanel detail={{ reason, data }} onClose={() => setDetail(null)} />   // data: ADM-08 응답
 export default function MemberDetailPanel({ detail, onClose }) {
   const { reason, data } = detail
   const { profile, latestAssessment, creditProfile, altDataSummary } = data
   const panelRef = useRef(null)
 
-  // 패널 제목이 위쪽 고정 메뉴 줄(.app-header, 폭마다 높이가 다름)에 가리지 않게 그 높이만큼 띄워 스크롤한다.
-  // 움직임 줄이기 설정이면 부드러운 스크롤 없이 바로 옮긴다.
+  // 제목이 위쪽 고정 메뉴 줄(.app-header, 폭마다 높이가 다름)에 가리지 않게 그 높이만큼 띄워 스크롤한다.
   useEffect(() => {
     const panel = panelRef.current
     if (!panel) return

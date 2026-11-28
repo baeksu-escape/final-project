@@ -27,7 +27,7 @@ public final class AdminRows {
         private Integer reportedPostCount;
         private LocalDateTime createdAt;
         private LocalDateTime lastLoginAt;
-        // FP-273 ACCT-03 닉네임(가리지 않는 공개 값). 탈퇴 회원은 DB의 표시값('탈퇴'+회원 번호) 그대로.
+        // FP-273 ACCT-03 닉네임(가리지 않는 공개 값).
         private String nickname;
     }
 

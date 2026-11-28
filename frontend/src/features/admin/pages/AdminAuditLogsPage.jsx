@@ -26,7 +26,7 @@ const SYSTEM_LOG_COLUMNS = Object.freeze([
   { key: 'source', label: '출처', className: 'admin-log__col--source' },
 ])
 
-// 로그 목록을 부르는 훅 — fetchLogs({ type, page, size })를 쪽(page)·구분(type)이 바뀔 때마다 다시 부른다. { data, error }를 돌려준다.
+// 로그 목록을 부르는 훅 — fetchLogs({ type, page, size })를 쪽(page)·구분(type)이 바뀔 때마다 다시 부른다. { data, error, busy }를 돌려준다(busy는 쪽을 넘기는 동안 true).
 function useAdminLogs(fetchLogs, page, type) {
   const handleAdminError = useAdminErrorHandler()
   const [state, setState] = useState({ data: null, error: '', loadedKey: '' })
@@ -51,10 +51,8 @@ function useAdminLogs(fetchLogs, page, type) {
   return { data: state.data, error: state.error, busy: state.data !== null && state.loadedKey !== key && !state.error }
 }
 
-// FP-275 로그 표 — 높이를 한 쪽(ADMIN_PAGE_SIZE) 줄 수로 고정하고(admin.css), 열 너비를 고정해 긴 칸은 한 줄로 말줄임한다(전체 글은 title).
-// 불러오는 중·오류·기록 없음 안내도 같은 상자 안에 보여 줘, 마지막 쪽·건수가 적은 구분에서도 표 높이와 [이전]/[다음] 위치가 그대로다.
-// 쪽을 넘기는 동안에는 지난 쪽을 그대로 두고(aria-busy) 새 쪽이 오면 바꾼다. 빈 자리는 데이터 줄처럼 그리지 않는다.
-// columns: [{ key, label, className }]   rows: 그릴 줄 목록   renderRow(row, index): <tr>   busy: 새 쪽을 불러오는 중인지
+// FP-275 로그 표 — 높이(한 쪽 줄 수)와 열 너비를 고정하고 긴 칸은 말줄임한다(전체 글은 title).
+// 안내 문구도 상자 안에 두어 줄 수가 적어도 [이전]/[다음] 위치가 같고, 쪽을 넘기는 동안 지난 쪽을 흐리게 둔다.
 function AdminLogTable({ caption, columns, rows, renderRow, message, busy }) {
   return (
     <div className="data-table-wrap admin-log" style={{ '--admin-log-rows': ADMIN_PAGE_SIZE }} aria-busy={busy || undefined}>

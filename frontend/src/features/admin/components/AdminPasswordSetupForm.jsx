@@ -78,7 +78,7 @@ export default function AdminPasswordSetupForm({ passwordSetupToken, onDone, onR
           {formError}
         </p>
       )}
-      {/* FP-275 새 비밀번호가 64자를 넘으면 칸 아래 길이 오류를 바로 보여 주고 버튼을 끈다(회원 화면과 같음). */}
+      {/* FP-275 64자를 넘으면 버튼을 끈다(회원 화면과 같음). */}
       <button type="submit" className="auth-form__submit" disabled={pending || passwordTooLongError(form.password) !== ''}>
         비밀번호 정하고 들어가기
       </button>
