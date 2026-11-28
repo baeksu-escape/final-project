@@ -44,6 +44,12 @@ function toComparable(values) {
   return JSON.stringify(values, (key, value) => (key === 'id' ? undefined : value))
 }
 
+// 기준월 'YYYY-MM'을 '2026년 11월'처럼 보여 준다.
+function formatBaseMonth(baseMonth) {
+  const [year, month] = String(baseMonth).split('-')
+  return `${year}년 ${Number(month)}월`
+}
+
 // N-05 데이터 입력 화면 —내 직군의 소득 섹션과 공통 섹션(부채·자산·월 고정 지출·할부·정기결제)을 설정대로 그리고,
 // 기준월과 함께 저장한 뒤 입력 완료 현황을 보여 준다. 대안 데이터는 모의 연동으로 따로 불러온다.
 // FP-227 카드를 7단계(config/inputSteps.js)로 나눠 [이전]/[다음]으로 넘기고, 입력값은 브라우저에 임시저장한다(utils/inputDraft.js).
@@ -227,6 +233,12 @@ export default function DataInputPage() {
       : ''
   // FP-260 10차 서버에 저장한 뒤 화면에서 값을 고쳤는지 — 고친 값은 저장해야 완료 현황·점수 산출에 반영된다.
   const hasUnsavedChanges = savedComparable !== null && toComparable(values) !== savedComparable
+  // FP-260 16차 점수 산출 기준월 — 서버(RPT-01)는 저장한 기준월 중 가장 최근 달로 계산한다. 화면의 기준월이 그 달과 다르면 따로 알린다.
+  const scoreBaseMonth = savedBaseMonths.at(-1) ?? null
+  const otherMonthNotice =
+    scoreBaseMonth && values.baseMonth && values.baseMonth !== scoreBaseMonth
+      ? `${justSaved ? '방금 저장한' : '지금 화면의'} ${formatBaseMonth(values.baseMonth)}이 아니라 ${formatBaseMonth(scoreBaseMonth)} 기준으로 계산됩니다.`
+      : ''
 
   // 고친 칸의 서버 오류만 지운다 — key가 errorKey와 같거나 'errorKey.'로 시작하는 오류(줄 섹션이면 그 섹션 전체)를 뺀다.
   const clearServerErrors = (errorKey) =>
@@ -400,7 +412,7 @@ export default function DataInputPage() {
     setStatus((prev) => (prev ? { ...prev, altData: { ...prev.altData, [sourceKey]: false } } : prev))
   }
 
-  // N-05-8 [점수 산출하기] — 마지막으로 저장한 입력으로 산출을 요청한다(RPT-01). 점수·등급은 화면에서 계산하지 않는다.
+  // N-05-8 [점수 산출하기] — 저장한 기준월 중 가장 최근 달의 입력으로 서버가 산출한다(RPT-01). 점수·등급은 화면에서 계산하지 않는다.
   // - requestId: 처음 누를 때 소문자 UUID를 만들고, 네트워크 오류·시간 초과로 다시 누르면 같은 값을 보낸다. 처리 결과를 받으면 비운다.
   // - SCORED면 신용 리포트로, NOT_SCORABLE이면 입력 화면에 머물며 사유별 안내를 보여 준다.
   // - 409 JOB_TYPE_REQUIRED는 직군 선택으로 보내고, REQUEST_ID_CONFLICT는 새 requestId를 만든다. 그 밖의 409(입력 미완료)는 서버 문구를 보여 준다.
@@ -623,7 +635,11 @@ export default function DataInputPage() {
           )}
           {/* FP-260 9차 산출이 막혀 있으면 안내 한 줄 대신 남은 항목(이름·이유·[이 단계로])을 보여 준다. 모두 완료면 안내 한 줄만. */}
           {missingItems.length === 0 ? (
-            <p className="hint data-input-page__score-hint">마지막으로 저장한 입력으로 점수를 계산합니다.</p>
+            <p className="hint data-input-page__score-hint">
+              {scoreBaseMonth
+                ? `${formatBaseMonth(scoreBaseMonth)} 기준 입력으로 점수를 계산합니다(가장 최근에 저장한 기준월).`
+                : '저장한 입력으로 점수를 계산합니다.'}
+            </p>
           ) : (
             <div className="score-missing" role="status">
               <p className="score-missing__title">점수를 내려면 남은 항목 {missingItems.length}개</p>
@@ -642,6 +658,12 @@ export default function DataInputPage() {
                 ))}
               </ul>
             </div>
+          )}
+          {/* FP-260 16차 화면의 기준월이 산출 기준월과 다르면 어느 달로 계산되는지 한 줄 더 알린다. */}
+          {otherMonthNotice && (
+            <p className="hint data-input-page__score-hint" role="status">
+              {otherMonthNotice}
+            </p>
           )}
           {/* 오류 문구 자리는 늘 남겨 둔다 — 산출을 다시 누를 때 문구가 사라졌다 생기며 페이지 높이가 바뀌어 화면이 튀지 않게 */}
           <p className="data-input-page__calculate-error" aria-live="assertive">
